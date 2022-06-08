@@ -17,6 +17,11 @@ namespace YAM
 		, _scriptHash(rand())
 	{}
 
+	void CommandNode::setInputAspects(FileAspectSet const& newInputAspects) {
+		_inputAspects = newInputAspects;
+		// TODO: must state be set to Dirty? Or only if aspects change?
+	}
+
 	void CommandNode::setOutputs(std::vector<OutputFileNode*> const & newOutputs) {
 		if (_outputs != newOutputs) {
 			// TODO: ownership? What if outputs are still referenced?
@@ -38,10 +43,10 @@ namespace YAM
 		}
 	}
 
-	void CommandNode::setInputProducers(std::vector<Node*> const& newIputProducers) {
-		if (_inputProducers != newIputProducers) {
+	void CommandNode::setInputProducers(std::vector<Node*> const& newInputProducers) {
+		if (_inputProducers != newInputProducers) {
 			for (auto i : _inputProducers) i->removeParent(this);
-			_inputProducers = newIputProducers;
+			_inputProducers = newInputProducers;
 			for (auto i : _inputProducers) i->addParent(this);
 			setState(State::Dirty);
 		}
@@ -73,7 +78,15 @@ namespace YAM
 	}
 
 	XXH64_hash_t CommandNode::computeExecutionHash() const {
-		return Node::computeExecutionHashExt({ _scriptHash });
+		static std::string entireFile("entireFile");
+		std::vector<XXH64_hash_t> hashes;
+		hashes.push_back(_scriptHash);
+		for (auto node : _outputs) hashes.push_back(node->hashOf(entireFile));
+		for (auto node : _inputs) {
+			std::string const& aspectName = _inputAspects.findApplicableAspectName(node->name());
+			hashes.push_back(node->hashOf(aspectName));
+		}
+		return XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
 	}
 
 	void CommandNode::startSelf() {
@@ -111,10 +124,7 @@ namespace YAM
 
 		std::vector<std::string> data;
 		std::string line;
-		while (
-			c.running()
-			&& std::getline(stdoutOfScript, line)
-		) {
+		while (c.running() && std::getline(stdoutOfScript, line)) {
 			data.push_back(line);
 			std::cout << line << std::endl;
 		}
@@ -128,7 +138,7 @@ namespace YAM
 		State newState = executeScript();
 
 		rehashOutputs();
-		_executionHash = computeExecutionHashExt({_scriptHash});
+		_executionHash = computeExecutionHash();
 
 		postCompletion(newState);
 	}

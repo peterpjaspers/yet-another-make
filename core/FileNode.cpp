@@ -2,11 +2,28 @@
 #include "ExecutionContext.h"
 #include <cstdio>
 
+namespace
+{
+    using namespace YAM;
+
+    XXH64_hash_t HashFile(std::filesystem::path const& fileName) {
+        return XXH64_file(fileName.string().c_str());
+    }
+
+    FileNode::AspectHasher entireFileHasher {
+        std::string("entireFile"), 
+        Delegate<XXH64_hash_t, std::filesystem::path const&>::CreateStatic(HashFile) 
+    };
+}
+
 namespace YAM
 {
     FileNode::FileNode(ExecutionContext* context, std::filesystem::path name)
         : Node(context, name)
-    {}
+    {
+        // by default hash entire file content
+        setAspectHashers({ entireFileHasher });
+    }
 
     bool FileNode::supportsPrerequisites() const {
         return false;
@@ -29,9 +46,43 @@ namespace YAM
     void FileNode::appendInputs(std::vector<Node*>& inputs) const {
     }
 
-    // Note that pendingStartSelf is (intended to be) only called during node execution.
-    // A node execution only starts when the node was dirty, i.e. when the last computed 
-    // file hash may have changed. Therefore always return true.
+    // Hashers are set when the node is created, when the hasher configuration has
+    // changed or after restore of the node from buildstate. Note that hashers cannot
+    // be saved to build state because functions cannot be serialized.  
+    // On restore after buildstate the node _hashes may still be up-to-date.
+    // Therefore make sure to only invalidate hashes when different aspects
+    // are requested. 
+    void FileNode::setAspectHashers(std::vector<AspectHasher> const& newHashers) {
+        _hashers = newHashers;
+        bool changedAspects = _hashers.size() != _hashes.size();
+        if (!changedAspects) {
+            for (auto& hasher : _hashers) {
+                if (!_hashes.contains(hasher.name)) {
+                    changedAspects = true;
+                    break;
+                }
+            }
+        }
+        if (changedAspects) {
+            // changing last write time causes re-computation of hashes.
+            _lastWriteTime = std::chrono::time_point<std::chrono::utc_clock>::min();
+            for (auto& entry : _hashers) {
+                _hashes[entry.name] = rand();
+            }
+        }
+        // Set state dirty to re-execute node. Note that re-execution will only rehash
+        // when file last write time has changed.
+        setState(State::Dirty);
+    }
+
+    XXH64_hash_t FileNode::hashOf(std::string const& aspectName) {
+        return _hashes[aspectName];
+    }
+
+    // Note that pendingStartSelf is only called during node execution, i.e. when
+    // state() == State::Executing. A node execution only starts when the node was
+    // Dirty, i.e. when it is not sure that previously computed hashes are still
+    // up-to-date. Therefore always return true.
     bool FileNode::pendingStartSelf() const {
         return true;
     }
@@ -41,14 +92,6 @@ namespace YAM
         _context->threadPoolQueue().push(std::move(d));
     }
 
-    std::chrono::time_point<std::chrono::utc_clock> FileNode::lastWriteTime() const {
-        return _lastWriteTime;
-    }
-
-    XXH64_hash_t FileNode::computeExecutionHash() const {
-        return XXH64_file(name().string().c_str());
-    }
-
     void FileNode::rehash() {
         std::error_code error;
         auto lwtime = std::filesystem::last_write_time(name(), error);
@@ -56,11 +99,14 @@ namespace YAM
             auto lwutc = decltype(lwtime)::clock::to_utc(lwtime);
             if (lwutc != _lastWriteTime) {
                 _lastWriteTime = lwutc;
-                _executionHash = computeExecutionHash();
+                for (auto& entry : _hashers) {
+                    _hashes[entry.name] = entry.hashFunction.Execute(name());
+                }
             }
         } else {
-            _lastWriteTime = std::chrono::time_point<std::chrono::utc_clock>::min();
-            _executionHash = rand();
+            for (auto& entry : _hashers) {
+                _hashes[entry.name] = rand();
+            }
         }
     }
 

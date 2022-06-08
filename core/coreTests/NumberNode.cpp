@@ -50,6 +50,10 @@ namespace YAMTest
 		_executionHash = computeExecutionHash();
 	}
 
+	XXH64_hash_t NumberNode::executionHash() const {
+		return _executionHash;
+	}
+
 	XXH64_hash_t NumberNode::computeExecutionHash() const {
 		return _number;
 	}

@@ -1,0 +1,76 @@
+A command node computes output files from a set of input files. 
+The command stores the versions of the used input files by means of their hashes.
+When input files are modified their hashes are recomputed. The changed hashes are
+detected by the command node and results in re-execution of the command.
+
+In some cases only part of the content of an input file is relevant to the computation.
+E.g. a compile command has .h and .cpp input files. The comments in these files are irrelevant for
+the compilation. The command node can use a hash of the input file that only hashes the code
+sections (i.e. excludes the comment sections from hashing). Changing comments in the file will not
+change that hash and hence will not result in recompilation.
+E.g. a dll or exe link command have .dllimportlib input files.
+Only the exported symbols (i.e. the interface of the dll) in the .dllimportlib are relevant for 
+dll/exe that is using the dll. Using a hash that only hashes these exports allows implementation 
+of the dll to be changed without affecting the hash of the exported symbols and hence will not result
+in reling of the dlls/exes that use that dll.
+
+The user of YAM can configure a set of FileAspectHashers. A hasher has the following properties:
+    - aspectName - the name of the aspect being hashed, e.g. codeHasher, dllExportsHasher
+    - one or more filename patterns (regexes) - the aspect hash is applicable for files whose name match one of the patterns.
+    - hasher function - a function that hashes the relevant aspect of the file
+
+Based on the hashers configuration each filenode is configured with its applicable aspects.
+A filenode execution computes all applicable aspect hashes.
+
+Adding a FileAspectHasher or adding a pattern to a hasher requires the aspect to be added to all FileNodes applicableFor the modified aspect.
+Removing a pattern requires the aspect to be removed from all FileNodes that are no longer applicableFor the modified aspect.
+Removing a hasher requires the aspect to be removed from all FileNodes.
+
+Both scenarios require all FileNodes in the graph to be suspended for execution, updated for their fileaspect and then resumed.
+Updating a file node aspects:
+	- remove an aspect can be done immediately, no re-execution needed
+        - adding an aspect requires re-execution of the filenode to compute the hash for the added aspect 
+
+When are hashers added/modified/removed?
+Hasher definitions are taken from a configuration file. Whenever this file changes all FileNodes need to be inspected.
+
+Each CommandNode must use for each input file the aspect hash relevant for that command.
+E.g. a C++ compile command will use the codeHash for .cpp and .h files.
+E.g. a packing command will use the allContentHash for any file type.
+E.g. a link command will use the dllImportLibExportsHash for dll import libraries. This only hashes the exports section of the import lib.
+       Note:These files have default file extension .lib. Static libs however use the same extension. This can either be solved by the hasher 
+      detecting what lib type it has at hand (and computing allContentHash for static libs) or be using file name conventions that allow the
+      hasher filename patters to distinguish between dll import libs and static libs.
+E.g. a C# assembly creation command will use the dotNetAssemblyInterfaceHash for its assembly dependencies. 
+
+How to define the mapping CommandNode -> input file -> aspectHash?
+Option 1: define the mapping as part of the command
+Option 2: define the mapping by means of output file pattern
+Command nodes are typically derived from the same template and produce output files with the same extension.
+E.g. a compile command has .obj output files and .h and .cpp input files.
+E.g. a dll link command has .dll output file and .obj and/or .importlib and/or .staticlib input files.
+Also command node names are derived from the (first) output file name. This suggests that option 2 is a convenient way to define the mapping. 
+E.g. the mapping can be defined by a vector of InputFileAspects:
+    // class that defines which input file aspects are relevant for the computation of 
+    // a specific outputfile type.
+    class InputFileAspects {
+        bool applicableFor(std::filesystem::path outputFile);
+        std::string & const aspectNameFor(std::filesystem::path inputFile);
+    }
+
+Note that this may require adoption of naming conventions to allow for proper differentiation in output file patterns.
+A command node with output file X uses the mapping with the output file pattern that matches X.
+
+Inputfile aspect definitions are read from a configuration file. Changes in this file do not require immediate re-execution of commands.
+Note that re-execution is likely to occur when command node gets Dirty because the executionHash during last build was computed with 
+the old inputfile aspect hashes while the newly computed executionHash will be computed with the new inputfile aspect hashes, likely 
+causing the node to be pendingSelfExecution. This will also happen even when the command input files did not change.
+
+Note: the union of InputFileAspects defines the set of actually used aspects and hence the used FileAspectHashers.
+This info should be used to only compute the hashes for the actually used aspects.
+
+Note: FileAspectHashers and InputFileAspects are best defined in a single configuration file to simplify detection of duplicate aspect names,
+references to non-existing aspects (from InputFileAspects) and duplicate outputfile patterns.
+
+Note that parsing of the fileaspects configuration file must be done before parsing of buildfiles.
+

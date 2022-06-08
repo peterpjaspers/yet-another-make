@@ -1,6 +1,7 @@
 #pragma once
 
-#include "..\Node.h"
+#include "../Node.h"
+#include "../../xxHash/xxhash.h"
 
 namespace YAMTest
 {
@@ -27,8 +28,9 @@ namespace YAMTest
 		virtual void appendInputs(std::vector<Node*>& inputs) const override;
 
 		void rehash();
-
-		virtual XXH64_hash_t computeExecutionHash() const override;
+		
+		XXH64_hash_t executionHash() const;
+		XXH64_hash_t computeExecutionHash() const;
 
 	protected:
 		virtual bool pendingStartSelf() const override;
@@ -39,5 +41,6 @@ namespace YAMTest
 		void execute();
 
 		int _number;
+		XXH64_hash_t _executionHash;
 	};
 }

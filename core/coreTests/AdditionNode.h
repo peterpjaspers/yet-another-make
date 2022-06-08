@@ -1,7 +1,8 @@
 #pragma once
 
-#include "..\Node.h"
 #include "NumberNode.h"
+#include "../Node.h"
+#include "../../xxHash/xxhash.h"
 
 namespace YAMTest
 {
@@ -30,10 +31,14 @@ namespace YAMTest
 
 		virtual void startSelf() override;
 
+		XXH64_hash_t executionHash() const;
+		XXH64_hash_t computeExecutionHash() const;
+
 	private:
 		void execute();
 
 		std::vector<NumberNode*> _operands;
 		NumberNode _sum;
+		XXH64_hash_t _executionHash;
 	};
 }

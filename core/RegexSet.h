@@ -1,0 +1,30 @@
+#pragma once
+
+#include <string>
+#include <vector>
+#include <filesystem>
+#include <regex>
+
+namespace YAM
+{
+	class RegexSet
+	{
+	public:
+		// Construct an object that can match a string against a
+		// set of regular expressions
+		RegexSet() = default;
+
+		std::vector<std::string> const& regexStrings() const;
+
+		void add(std::string const& regexString);
+		void remove(std::string const& regexString);
+		void clear();
+
+		// Return whehter s matches one of the regular expressions.
+		bool matches(std::string const & s) const;
+
+	private:
+		std::vector<std::string> _regexStrings;
+		std::vector<std::regex> _regexes; // derived from _regexes
+	};
+}

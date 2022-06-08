@@ -7,7 +7,6 @@ namespace YAM
 {
 	Node::Node(ExecutionContext* context, std::filesystem::path const& name)
         : _context(context)
-		, _executionHash(rand())
 		, _name(name)
 		, _state(Node::State::Dirty)
         , _executionState(ExecutionState::Idle)
@@ -274,18 +273,5 @@ namespace YAM
                 throw std::runtime_error("invalid _executionState");
             }
         }
-    }
-
-    XXH64_hash_t Node::computeExecutionHashExt(std::initializer_list<XXH64_hash_t> additionalHashes) const {
-        std::vector<Node*> nodes;
-        if (supportsInputs()) appendInputs(nodes);
-        if (supportsOutputs()) appendOutputs(nodes);
-
-        std::vector<XXH64_hash_t> hashes;
-        hashes.reserve(nodes.size() + additionalHashes.size());
-        for (auto node : nodes) hashes.push_back(node->executionHash());
-        hashes.insert(hashes.end(), additionalHashes.begin(), additionalHashes.end());
-
-        return XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
     }
 }

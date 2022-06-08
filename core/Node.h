@@ -2,8 +2,6 @@
 
 #include "Delegates.h"
 
-#include "..\xxhash\xxhash.h"
-
 #include <filesystem>
 #include <functional>
 #include <vector>
@@ -26,12 +24,10 @@ namespace YAM
 	//		 include files.
 	//     - Output file node (or derived file node)
 	//       Associated with an output file of a command node. 
-	//		 Provides access to the hash of the file content.
-	//		 Execution (re-)computes the hash. 
+	//		 Execution (re-)computes hashes of the file content. 
 	//     - Source file node
 	//       Associated with a source file.
-	//		 Provides access to the hash of the file content.
-	//		 Execution (re-)computes the hash.
+	//		 Execution (re-)computes hashes of the file content.
 	//
 	// A node's name takes the form of a file path. For file nodes this path
 	// indeed references a file. In general however this need not be the case.
@@ -81,20 +77,12 @@ namespace YAM
 		// The prerequisites vector contains one or more of:
 		//		- (command) nodes that produce output nodes. 
 		//	      Output nodes are only allowed to be used as inputs by this
-		//		  node when the command nodes that produce these outputs are 
-		//		  in prerequisites.
+		//		  node when the nodes that produce these outputs are in
+		//		  prerequisites.
 		//		- source nodes used as inputs by last execution of this node.
 		//		- output nodes of this node.
 		// 
-		// Source/output node execution computes the hash of the node content,
-		// e.g. the hash of a C++ object file.
-		// Hashes of input nodes that are output nodes of prerequisite command
-		// nodes are computed as part of the execution of those command nodes. 
-		// Input/output node hashes are used to figure out whether input/output 
-		// nodes changed since last execution of this node. See hash() and
-		// computeHash().
 		// Source/output nodes are typically, but not necessarily, file nodes.
-		// The hash of file nodes is the hash of the file content.
 		virtual bool supportsPrerequisites() const = 0;
 
 		// Pre: supportsPrerequisites()
@@ -160,12 +148,6 @@ namespace YAM
 		// Notify execution completion as specified by start() function. 
 		void cancel();
 
-		// Return the execution hash as it was computed and stored immediately 
-		// after last execution. 
-	    XXH64_hash_t executionHash() const { return _executionHash; }
-
-		virtual XXH64_hash_t computeExecutionHash() const { return computeExecutionHashExt({}); }
-
 		// Pre: !busy()
 		// Suspend execution.
 		// While suspended: execution waits for node to be resumed() before
@@ -202,19 +184,13 @@ namespace YAM
 
 	protected:
 		ExecutionContext* _context;
-		XXH64_hash_t _executionHash;
 
-		// Return the hash of additionalHashes and of the execution hashes of the input and output nodes.
-		XXH64_hash_t computeExecutionHashExt(std::initializer_list<XXH64_hash_t> additionalHashes) const;
-
-		// Pre: all prerequisites in state NodeState::Ok.
+		// Pre: state() == State::Executing && all prerequisites are in State::Ok.
 		// Return true when self-execution is needed. 
 		// 
-		// A command node implements this as: return executionHash() != computeExecutionHash()
-		// A file node implements this as: return state() == State::Dirty
-		// This requires the file node to be marked dirty when the file may have been
-		// modified since last build. I.e. at start of alpha-build or, in case of 
-		// beta-build, when it has been write-accessed since last build.
+		// Self-execution is needed when the node was never executed or when 
+		// there is reason to believe that previously computed outputs are no
+		// longer valid, typically because inputs (may) have changed.
 		// A node that has no self-execution implements this as: return false. This is
 		// the default implementation. 
 		// 
@@ -240,17 +216,18 @@ namespace YAM
 		// 
 		// Self-execution (ascending up-to the link node):
 		// The file node (re-)computes the hash of the C++ file.
-		// On file node completion the compile node detects that its execution 
-		// hash has changed, hence it is pendingStartSelf(), hence it 
-		// (re-)compiles the C++ file. 
+		// On file node completion the compile node detects that the C++ hash 
+		// has changed. This invalidates the output object file, hence it is 
+		// pendingStartSelf(). 
 		// 
 		// Assume that the C++ changes were only in comments. Comments do not
-		// affect object file content and therefore the execution hash of the link
-		// node will not change, hence the link node is not pendingStartSelf().
+		// affect object file content and therefore the hash of the object 
+		// file will not change, hence the link node is not pendingStartSelf().
 		// This completes the build.
 		// 
-		// Note: YAM is also capable of preventing re-compilation by using a hash
-		// algorithm that excludes the comments from being hashed.
+		// Note: YAM is also capable of preventing re-compilation by using 
+		// aspect hashes. For C++ files an aspect hash exists that excludes 
+		// the comments from being hashed.
 		virtual bool pendingStartSelf() const { return false; }
 
 		// Pre:pendingStartSelf(), current thread is main thread.

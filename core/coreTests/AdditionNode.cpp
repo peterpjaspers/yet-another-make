@@ -55,6 +55,19 @@ namespace YAMTest
 		_context->threadPoolQueue().push(std::move(d));
 	}
 
+	XXH64_hash_t AdditionNode::executionHash() const {
+		return _executionHash;
+	}
+
+	XXH64_hash_t AdditionNode::computeExecutionHash() const {
+		std::vector< XXH64_hash_t> hashes;
+		for (auto node : _operands) {
+			hashes.push_back(node->executionHash());
+		}
+		hashes.push_back(_sum.executionHash());
+		return XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
+	}
+
 	void AdditionNode::execute() {
 		int sum = 0;
 		for (auto op : _operands) {

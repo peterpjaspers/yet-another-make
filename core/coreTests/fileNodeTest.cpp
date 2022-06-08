@@ -27,6 +27,8 @@ namespace
     XXH64_hash_t hashString(std::string const& content) {
         return XXH64(content.c_str(), content.length(), 0);
     }
+
+    std::string entireFile("entireFile");
 }
 
 namespace
@@ -41,15 +43,14 @@ namespace
 
         ExecutionContext context;
         FileNode fnode(&context, testPath);
-        EXPECT_NE(expectedHash, fnode.executionHash());
+        EXPECT_NE(expectedHash, fnode.hashOf(entireFile));
         EXPECT_EQ(Node::State::Dirty, fnode.state());
 
         bool completed = YAMTest::executeNode(&fnode);
 
         EXPECT_TRUE(completed);
         EXPECT_EQ(Node::State::Ok, fnode.state());
-        EXPECT_EQ(expectedHash, fnode.executionHash());
-        EXPECT_EQ(expectedHash, fnode.computeExecutionHash());
+        EXPECT_EQ(expectedHash, fnode.hashOf(entireFile));
 
         std::filesystem::remove(testPath);
     }
@@ -61,15 +62,13 @@ namespace
 
         ExecutionContext context;
         FileNode fnode(&context, testPath);
-        EXPECT_NE(expectedHash, fnode.executionHash());
+        EXPECT_NE(expectedHash, fnode.hashOf(entireFile));
         EXPECT_EQ(Node::State::Dirty, fnode.state());
 
         bool completed = YAMTest::executeNode(&fnode);
 
         EXPECT_TRUE(completed);
         EXPECT_EQ(Node::State::Ok, fnode.state());
-        EXPECT_NE(expectedHash, fnode.executionHash());
-        EXPECT_NE(expectedHash, fnode.computeExecutionHash());
-
+        EXPECT_NE(expectedHash, fnode.hashOf(entireFile));
     }
 }
