@@ -184,11 +184,10 @@ namespace YAM
                 // TODO: can prerequisites indeed contain duplicates? Should
                 // that be disallowed?
                 //
-                // A node may have duplicate prerequisites, e.g. because a source
-                // file node is both registered as an input file and as a compute
-                // dependency. In that case this callback can be called more
-                // than once from the same node. Therefore ignore such duplicate
-                // callbacks. 
+                // Example: a source file node can be both registered as an input 
+                // file and as a prerequisite. In that case this callback can be 
+                // called more than once from the same node. However, registering
+                // a source file as prerequisite make little sense.
                 handlePrerequisitesCompletion();
             }
         }

@@ -1,4 +1,5 @@
 #include "FileNode.h"
+#include "FileAspect.h"
 #include "ExecutionContext.h"
 #include <cstdio>
 
@@ -9,21 +10,13 @@ namespace
     XXH64_hash_t HashFile(std::filesystem::path const& fileName) {
         return XXH64_file(fileName.string().c_str());
     }
-
-    FileNode::AspectHasher entireFileHasher {
-        std::string("entireFile"), 
-        Delegate<XXH64_hash_t, std::filesystem::path const&>::CreateStatic(HashFile) 
-    };
 }
 
 namespace YAM
 {
     FileNode::FileNode(ExecutionContext* context, std::filesystem::path name)
         : Node(context, name)
-    {
-        // by default hash entire file content
-        setAspectHashers({ entireFileHasher });
-    }
+    {}
 
     bool FileNode::supportsPrerequisites() const {
         return false;
@@ -46,36 +39,24 @@ namespace YAM
     void FileNode::appendInputs(std::vector<Node*>& inputs) const {
     }
 
-    // Hashers are set when the node is created, when the hasher configuration has
-    // changed or after restore of the node from buildstate. Note that hashers cannot
-    // be saved to build state because functions cannot be serialized.  
-    // On restore after buildstate the node _hashes may still be up-to-date.
-    // Therefore make sure to only invalidate hashes when different aspects
-    // are requested. 
-    void FileNode::setAspectHashers(std::vector<AspectHasher> const& newHashers) {
-        _hashers = newHashers;
-        bool changedAspects = _hashers.size() != _hashes.size();
-        if (!changedAspects) {
-            for (auto& hasher : _hashers) {
-                if (!_hashes.contains(hasher.name)) {
-                    changedAspects = true;
-                    break;
-                }
+    bool FileNode::addAspect(std::string const& aspectName)
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        bool mustAdd = !_hashes.contains(aspectName);
+        if (mustAdd) {
+            _hashes.insert({ aspectName, rand() });
+            {
+                auto& allHashers = _context->aspectHashers();
+                std::lock_guard<std::mutex> allHashersLock(allHashers.mutex());
+                auto& hasher = allHashers.find(aspectName);
+                _hashers.insert({ aspectName, hasher });
             }
         }
-        if (changedAspects) {
-            // changing last write time causes re-computation of hashes.
-            _lastWriteTime = std::chrono::time_point<std::chrono::utc_clock>::min();
-            for (auto& entry : _hashers) {
-                _hashes[entry.name] = rand();
-            }
-        }
-        // Set state dirty to re-execute node. Note that re-execution will only rehash
-        // when file last write time has changed.
-        setState(State::Dirty);
+        return mustAdd;
     }
 
     XXH64_hash_t FileNode::hashOf(std::string const& aspectName) {
+        std::lock_guard<std::mutex> lock(_mutex);
         return _hashes[aspectName];
     }
 
@@ -92,26 +73,54 @@ namespace YAM
         _context->threadPoolQueue().push(std::move(d));
     }
 
-    void FileNode::rehash() {
-        std::error_code error;
-        auto lwtime = std::filesystem::last_write_time(name(), error);
-        if (!error) {
-            auto lwutc = decltype(lwtime)::clock::to_utc(lwtime);
-            if (lwutc != _lastWriteTime) {
-                _lastWriteTime = lwutc;
-                for (auto& entry : _hashers) {
-                    _hashes[entry.name] = entry.hashFunction.Execute(name());
-                }
-            }
-        } else {
-            for (auto& entry : _hashers) {
-                _hashes[entry.name] = rand();
-            }
+    XXH64_hash_t FileNode::rehash(std::string const& aspectName) {
+        std::lock_guard<std::mutex> lock(_mutex);
+        auto it = _hashers.find(aspectName);
+        if (it == _hashers.end()) throw std::runtime_error("unknown aspect");
+        auto const & hasher = it->second;
+        auto hash = hasher.hash(name());
+        _hashes[aspectName] = hash;
+        return hash;
+    }
+
+    // Sync _lastWriteTime with current file state. 
+    // Return whether it was changed since previous update.
+    bool FileNode::updateLastWriteTime() {
+        std::error_code ec;
+        auto lwt = std::filesystem::last_write_time(name(), ec);
+        auto lwutc = decltype(lwt)::clock::to_utc(lwt);
+        if (lwutc != _lastWriteTime) {
+            _lastWriteTime = lwutc;
+            return true;
+        }
+        return false;
+    }
+
+    void FileNode::rehashAll(bool doUpdateLastWriteTime) {
+        if (doUpdateLastWriteTime) updateLastWriteTime();
+        for (auto& entry : _hashers) {
+            auto& aspectName = entry.first;
+            auto& hasher = entry.second;
+            _hashes[aspectName] = hasher.hash(name());
         }
     }
 
+    void FileNode::rehashAll() {
+        // Note: no lock needed because this function is intended to only
+        // be called on output files by command node that re-computed
+        // these outputs. This happens during command node execution.
+        // The command that produced/updated the outputfile is a prerequiste
+        // of a commands that uses that output file as input file. Hence this
+        // command will not access the output file until all its prerequisite
+        // has completed execution.
+        //
+        rehashAll(true);
+    }
+
     void FileNode::execute() {
-        rehash();
+        if (updateLastWriteTime()) {
+            rehashAll(false);
+        }
         postCompletion(Node::State::Ok);
     }
 }

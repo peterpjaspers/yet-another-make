@@ -6,39 +6,33 @@ namespace YAM
 		return _aspects;
 	}
 
-	FileAspect const* FileAspectSet::find(std::string const& aspectName) const {
+	std::pair<bool, FileAspect const&> FileAspectSet::find(std::string const& aspectName) const {
 		for (auto& _a : _aspects) {
-			if (_a.applicableFor(aspectName)) return &_a;
+			if (_a.name() == aspectName) return { true, _a };
 		}
-		return nullptr;
+		return { false, FileAspect() };
 	}
 
-	FileAspect const * FileAspectSet::findApplicableAspect(std::filesystem::path const & fileName) const {
-		FileAspect const * found = nullptr;
+	FileAspect const & FileAspectSet::findApplicableAspect(std::filesystem::path const & fileName) const {
+		FileAspect const * foundAspect = nullptr;
 		for (auto& _a : _aspects) {
-			if (_a.applicableFor(fileName)) {
-				if (found != nullptr) throw std::runtime_error("filename must be applicable for one aspect only");
-				found = &_a;
+			if (_a.matches(fileName)) {
+				if (foundAspect != nullptr) throw std::runtime_error("fileName must be applicable for one aspect only");
+				foundAspect = &_a;
 			}
 		}
-		return found;
-	}
-
-	std::string const& FileAspectSet::findApplicableAspectName(std::filesystem::path const & fileName) const {
-		static std::string entireFile("entireFile");
-		FileAspect const* found = findApplicableAspect(fileName);
-		if (found != nullptr) return found->aspectName();
-		return entireFile;
+		return foundAspect != nullptr ? *foundAspect : FileAspect::entireFileAspect();
 	}
 
 	void FileAspectSet::add(FileAspect const& aspect) {
-		if (nullptr != find(aspect.aspectName())) throw std::runtime_error("aspect must be unique");
+		const bool alreadyExists = find(aspect.name()).first;
+		if (alreadyExists) throw std::runtime_error("aspect must be unique");
 		_aspects.push_back(aspect);
 	}
 
 	void FileAspectSet::remove(FileAspect const& aspect) {
 		for (std::size_t index = 0; index < _aspects.size(); ++index) {
-			if (_aspects[index].aspectName() == aspect.aspectName()) {
+			if (_aspects[index].name() == aspect.name()) {
 				_aspects.erase(_aspects.begin() + index);
 			    break;
 			}

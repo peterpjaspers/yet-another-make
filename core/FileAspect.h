@@ -12,23 +12,35 @@ namespace YAM
 	class __declspec(dllexport) FileAspect
 	{
 	public:
+
+		FileAspect() = default;
+		FileAspect(const FileAspect& other) = default;
+
 		// Construct an object that identifies a file aspect by given 
 		// aspect name. The aspect is applicable for files whose names
-		// match the given filename patterns.
+		// match one of the patterns in the given RegexSet.
 		// An example of a file aspect is the code aspect of a C++ file,
-		// i.e. all parts of the file excluding comment sections.
-		// C++ filename patterns include .cpp, .h, .hpp, .inline.
+		// i.e. all parts of the file excluding comment sections, empty 
+		// lines, trailing and leading whitespace.
+		// C++ filename regexes are: \.cpp$, \.h$, \.hpp$, \.inline$
+		//
 		FileAspect(
-			std::string const& aspectName,
+			std::string const& name,
 			RegexSet const & fileNamePatterns);
 
-		std::string const& aspectName() const;
-		RegexSet const& fileNamePatterns() const;
+		std::string const& name() const;
+		RegexSet & fileNamePatterns();
 
-		bool applicableFor(std::filesystem::path fileName) const;
+		// Return whether given fileName matches one of the fileNamePatterns().
+		bool matches(std::filesystem::path fileName) const;
+
+		// Return the entire file aspect, i.e. the aspect that
+		// includes all of a file's content and that matches all
+		// file names.
+		static FileAspect const & entireFileAspect();
 
 	private:
-		std::string _aspectName;
+		std::string _name;
 		RegexSet _fileNamePatterns;
 	};
 }

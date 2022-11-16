@@ -9,7 +9,11 @@ namespace YAM
         Node* producer)
         : FileNode(context, name)
         , _producer(producer) 
-    { }
+    { 
+        addAspect(FileAspect::entireFileAspect().name());
+    }
 
-    Node* OutputFileNode::producer() const { return _producer; }
+    Node* OutputFileNode::producer() const { 
+        return _producer; 
+    }
 }

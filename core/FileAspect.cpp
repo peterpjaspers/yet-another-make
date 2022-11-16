@@ -3,25 +3,27 @@
 namespace YAM
 {
 	FileAspect::FileAspect(
-		std::string const& aspectName,
+		std::string const& name,
 		RegexSet const& fileNamePatterns)
-		: _aspectName(aspectName)
+		: _name(name)
 		, _fileNamePatterns(fileNamePatterns)
 	{ }
 
-	std::string const& FileAspect::aspectName() const {
-		return _aspectName;
+	std::string const& FileAspect::name() const {
+		return _name;
 	}
 
-	RegexSet const& FileAspect::fileNamePatterns() const {
+	RegexSet & FileAspect::fileNamePatterns() {
 		return _fileNamePatterns;
 	}
 
-	// Return whether this aspect is applicable for the given file name.
-	// The aspect is applicable when the file name matches one of the
-	// file name patterns.
-	bool FileAspect::applicableFor(std::filesystem::path fileName) const {
+	bool FileAspect::matches(std::filesystem::path fileName) const {
 		std::string name = fileName.string();
 		return _fileNamePatterns.matches(name);
+	}
+
+	FileAspect const & FileAspect::entireFileAspect() {
+		static FileAspect entireFileAspect("entireFile", RegexSet({ "" }));
+		return entireFileAspect;
 	}
 }

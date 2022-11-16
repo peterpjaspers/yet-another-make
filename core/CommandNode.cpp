@@ -74,19 +74,20 @@ namespace YAM
 	}
 
 	bool CommandNode::pendingStartSelf() const {
-		return _executionHash != computeExecutionHash(); 
+		bool pending = _executionHash != computeExecutionHash();
+		return pending;
 	}
 
 	XXH64_hash_t CommandNode::computeExecutionHash() const {
-		static std::string entireFile("entireFile");
 		std::vector<XXH64_hash_t> hashes;
 		hashes.push_back(_scriptHash);
-		for (auto node : _outputs) hashes.push_back(node->hashOf(entireFile));
+		for (auto node : _outputs) hashes.push_back(node->hashOf(FileAspect::entireFileAspect().name()));
 		for (auto node : _inputs) {
-			std::string const& aspectName = _inputAspects.findApplicableAspectName(node->name());
-			hashes.push_back(node->hashOf(aspectName));
+			auto & applibleInputAspect = _inputAspects.findApplicableAspect(node->name());
+			hashes.push_back(node->hashOf(applibleInputAspect.name()));
 		}
-		return XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
+		XXH64_hash_t hash = XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
+		return hash;	
 	}
 
 	void CommandNode::startSelf() {
@@ -110,12 +111,14 @@ namespace YAM
 			// output files are part of this node's prerequisites and were
 			// hence executed, and moved to state Ok, before the start of 
 			// this node's self-execution. 
-			if (ofile->state() != State::Ok) throw std::runtime_error("state error");
-			ofile->rehash();
+			if (ofile->state() != State::Ok) {
+				throw std::runtime_error("state error");
+			}
+			ofile->rehashAll();
 		}
 	}
 
-	// TODO: detected in/output files, handle cancelation, log script output
+	// TODO: detect in/output files, handle cancelation, log script output
 	//
 	Node::State CommandNode::executeScript() {
 		ipstream stdoutOfScript;
@@ -130,12 +133,15 @@ namespace YAM
 		}
 		g.wait();
 		c.wait();
-		return (c.exit_code() == 0) ? State::Ok : State::Failed;
+		Node::State newState = (c.exit_code() == 0) ? State::Ok : State::Failed;
+		return newState;
 	}
 
 	void CommandNode::execute() {
 
 		State newState = executeScript();
+		// todo: process detected input files as described in FileNode.h
+		// scenarios 1 and 3.
 
 		rehashOutputs();
 		_executionHash = computeExecutionHash();

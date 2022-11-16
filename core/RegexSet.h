@@ -14,6 +14,8 @@ namespace YAM
 		// set of regular expressions
 		RegexSet() = default;
 
+		RegexSet(std::initializer_list<std::string> regexString);
+
 		std::vector<std::string> const& regexStrings() const;
 
 		void add(std::string const& regexString);

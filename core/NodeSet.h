@@ -40,7 +40,7 @@ namespace YAM
 		std::size_t size() const;
 
 	private:
-		// TODO: used unordered_set. However set cannot use path as keys.
+		// TODO: used unordered_set. However set cannot use std::filesystem::path as keys.
 		std::map<std::filesystem::path, Node*> _nodes;
 	};
 }

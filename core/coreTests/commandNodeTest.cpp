@@ -69,7 +69,11 @@ namespace
 
 			// convenient for debugging: limit threadpool to 1 thread
 			//
-			//cmds.pietCmd.threadPool().size(1);
+			//context.threadPool().size(1);
+		}
+
+		~Commands() {
+			clean();
 		}
 
 		void clean() {
@@ -156,8 +160,54 @@ namespace
 
 		EXPECT_TRUE(cmds.execute());
 
+		std::ofstream myfile;
+		myfile.open("jan.txt");
+		myfile << "Modified this file.\n";
+		myfile.close();
+		cmds.jan.setState(Node::State::Dirty);
+
+		EXPECT_EQ(Node::State::Ok, cmds.pietCmd.state());
+		EXPECT_EQ(Node::State::Dirty, cmds.janCmd.state());
+		EXPECT_EQ(Node::State::Dirty, cmds.pietjanCmd.state());
+		EXPECT_EQ(Node::State::Ok, cmds.piet.state());
+		EXPECT_EQ(Node::State::Dirty, cmds.jan.state());
+		EXPECT_EQ(Node::State::Ok, cmds.pietjan.state());
+
+		cmds.stats.reset();
+		EXPECT_TRUE(cmds.execute());
+
+		EXPECT_EQ(3, cmds.stats.started.size());
+		EXPECT_TRUE(cmds.stats.started.contains(&(cmds.jan)));
+		EXPECT_TRUE(cmds.stats.started.contains(&(cmds.janCmd)));
+		EXPECT_TRUE(cmds.stats.started.contains(&(cmds.pietjanCmd)));
+		
+		// 1: self-execution of jan => from hash("jan") to hash("Modified this file.\n") 
+		// 2: pendingStartSelf of janCmd sees changed hash of jan => execute janCmd
+		// 3: execution of janCmd restores jan.txt to "jan", rehashes jan, recomputes
+		//    execution hash of janCmd. Note that previous and new execution hashes are
+		//    both computed from jan 'seeing' content "jan" in jan.txt, hence execution 
+		//    hash of janCmd does not change.
+		// 4: pendingStartSelf of pietjanCmd sees no changes in the hashes of its prerequisites,
+		//    hence no self-execution of pietjanCmd
+		EXPECT_EQ(2, cmds.stats.selfExecuted.size());
+		EXPECT_TRUE(cmds.stats.selfExecuted.contains(&(cmds.jan)));
+		EXPECT_TRUE(cmds.stats.selfExecuted.contains(&(cmds.janCmd)));
+
+		EXPECT_EQ(Node::State::Ok, cmds.pietCmd.state());
+		EXPECT_EQ(Node::State::Ok, cmds.janCmd.state());
+		EXPECT_EQ(Node::State::Ok, cmds.pietjanCmd.state());
+		EXPECT_EQ(Node::State::Ok, cmds.piet.state());
+		EXPECT_EQ(Node::State::Ok, cmds.jan.state());
+		EXPECT_EQ(Node::State::Ok, cmds.pietjan.state());
+	}
+
+	TEST(CommandNode, incrementalBuildAfterFileDeletion) {
+		Commands cmds;
+
+		EXPECT_TRUE(cmds.execute());
 		std::filesystem::remove("jan.txt");
 		cmds.jan.setState(Node::State::Dirty);
+
 		EXPECT_EQ(Node::State::Ok, cmds.pietCmd.state());
 		EXPECT_EQ(Node::State::Dirty, cmds.janCmd.state());
 		EXPECT_EQ(Node::State::Dirty, cmds.pietjanCmd.state());
@@ -173,6 +223,17 @@ namespace
 		EXPECT_TRUE(cmds.stats.started.contains(&(cmds.janCmd)));
 		EXPECT_TRUE(cmds.stats.started.contains(&(cmds.pietjanCmd)));
 
+		// Note: execution of janCmd restores jan => execution hash of janCmd 
+		// does not change => pietjanCmd not pendingSelfStart
+
+		// 1: self-execution of jan => from hash("jan") to hash of deleted file) 
+		// 2: pendingStartSelf of janCmd sees changed hash of jan => execute janCmd
+		// 3: execution of janCmd restores jan.txt to "jan", rehashes jan, recomputes
+		//    execution hash of janCmd. Note that previous and new execution hashes are
+		//    both computed from jan 'seeing' content "jan" in jan.txt, hence execution 
+		//    hash of janCmd does not change.
+		// 4: pendingStartSelf of pietjanCmd sees no changes in the hashes of its prerequisites,
+		//    hence no self-execution of pietjanCmd
 		EXPECT_EQ(2, cmds.stats.selfExecuted.size());
 		EXPECT_TRUE(cmds.stats.selfExecuted.contains(&(cmds.jan)));
 		EXPECT_TRUE(cmds.stats.selfExecuted.contains(&(cmds.janCmd)));

@@ -3,6 +3,7 @@
 #include "FileAspect.h"
 
 #include <vector>
+#include <tuple>
 #include <filesystem>
 
 namespace YAM
@@ -13,24 +14,21 @@ namespace YAM
 	public:
 		FileAspectSet() = default;
 
+		void add(FileAspect const& aspect);
+		void remove(FileAspect const& aspect);
+		void clear();
+
 		std::vector<FileAspect> const & aspects() const;
 
-		// Find aspect with given name. Return nullptr when not found.
-		FileAspect const* find(std::string const & aspectName) const;
+		// Find aspect with given aspect name.
+		// If found: return {true, found aspect}, else return {false, dont_use} 
+		std::pair<bool, FileAspect const&> find(std::string const & aspectName) const;
 
 		// Find the aspect applicable for given file.
-		// Return nullptr when not found.
+		// Find aspect with given aspect name and return it.
+		// Return entireFile aspect when given name is not found.
 		// Throw an exception when multiple aspects are applicable.
-		FileAspect const * findApplicableAspect(std::filesystem::path const & fileName) const;
-
-		// Find the name of the aspect applicable for given file.
-		// When not found return "entireFile".
-		// Throw an exception when multiple aspects are applicable.
-		std::string const& findApplicableAspectName(std::filesystem::path const& inputFileName) const;
-
-		void add(FileAspect const & aspect);
-		void remove(FileAspect const & aspect);
-		void clear();
+		FileAspect const& findApplicableAspect(std::filesystem::path const & fileName) const;
 
 	private:
 		std::vector<FileAspect> _aspects;

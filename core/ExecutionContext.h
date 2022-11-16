@@ -4,6 +4,8 @@
 #include "Dispatcher.h"
 #include "Thread.h"
 #include "ThreadPool.h"
+#include "FileAspectHasher.h"
+#include "InputFileAspects.h"
 #include "ExecutionStatistics.h"
 
 namespace YAM
@@ -20,6 +22,9 @@ namespace YAM
 
 		ExecutionStatistics& statistics();
 
+		FileAspectHasherSet& aspectHashers();
+		InputFileAspectsSet & inputAspects();
+
 		NodeSet& nodes();
 
 	private:
@@ -28,6 +33,9 @@ namespace YAM
 		Thread _mainThread;
 		ThreadPool _threadPool;
 		ExecutionStatistics _statistics;
+		FileAspectHasherSet _aspectHashers;
+		InputFileAspectsSet _inputAspects;
+
 		NodeSet _nodes;
 		
 		// TODO: 

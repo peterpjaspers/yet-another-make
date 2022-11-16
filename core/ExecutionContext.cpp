@@ -33,6 +33,14 @@ namespace YAM
         return _statistics;
     }
 
+    FileAspectHasherSet& ExecutionContext::aspectHashers() {
+        return _aspectHashers;
+    }
+
+    InputFileAspectsSet& ExecutionContext::inputAspects() {
+        return _inputAspects;
+    }
+
     NodeSet& ExecutionContext::nodes() {
         return _nodes;
     }

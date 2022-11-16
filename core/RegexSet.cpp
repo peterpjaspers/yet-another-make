@@ -2,6 +2,10 @@
 
 namespace YAM
 {
+	RegexSet::RegexSet(std::initializer_list<std::string> regexStrings) {
+		for (auto & re : regexStrings) add(re);
+	}
+
 	bool RegexSet::matches(std::string const & s) const {
 		for (auto& re : _regexes) {
 			if (std::regex_search(s, re)) return true;

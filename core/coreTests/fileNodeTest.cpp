@@ -28,7 +28,7 @@ namespace
         return XXH64(content.c_str(), content.length(), 0);
     }
 
-    std::string entireFile("entireFile");
+    std::string entireFile = FileAspect::entireFileAspect().name();
 }
 
 namespace
@@ -37,12 +37,13 @@ namespace
 
     TEST(FileNode, executeFileExists) {
         std::string content("Hello world");
-        auto testPath(std::filesystem::temp_directory_path() / "fileNode_tmp.txt");
+        auto testPath(std::filesystem::temp_directory_path() / "fileNode_ex.txt");
         XXH64_hash_t expectedHash = hashString(content);
         EXPECT_TRUE(createTestFile(testPath, content));
 
         ExecutionContext context;
         FileNode fnode(&context, testPath);
+        fnode.addAspect(entireFile);
         EXPECT_NE(expectedHash, fnode.hashOf(entireFile));
         EXPECT_EQ(Node::State::Dirty, fnode.state());
 
@@ -57,7 +58,7 @@ namespace
 
     TEST(FileNode, executeFileDeleted) {
         std::string content("Hello world");
-        auto testPath(std::filesystem::temp_directory_path() / "fileNode_tmp.txt");
+        auto testPath(std::filesystem::temp_directory_path() / "fileNode_del.txt");
         XXH64_hash_t expectedHash = hashString(content);
 
         ExecutionContext context;

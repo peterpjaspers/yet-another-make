@@ -17,11 +17,15 @@ namespace YAM
 
     void ExecutionStatistics::registerStarted(Node* node) {
         nStarted++;
-        if (registerNodes) started.insert(node);
+        if (registerNodes) {
+            started.insert(node);
+        }
     }
 
     void ExecutionStatistics::registerSelfExecuted(Node* node) {
         nSelfExecuted++;
-        if (registerNodes) selfExecuted.insert(node);
+        if (registerNodes) {
+            selfExecuted.insert(node);
+        }
     }
 }

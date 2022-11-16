@@ -66,7 +66,8 @@ namespace YAM
 		Node::State executeScript();
 		void execute();
 
-		// The aspects of input files that contribute to output file content.
+		// The aspects relevant for this comment, i.e. the aspects of input files
+		// that contribute to output file content.
 		FileAspectSet _inputAspects;
 
 		std::vector<Node*> _inputProducers;
