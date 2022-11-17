@@ -44,6 +44,10 @@
     <ClCompile Include="nodeExecutionTest.cpp" />
     <ClCompile Include="nodeSetTest.cpp" />
     <ClCompile Include="NumberNode.cpp" />
+    <ClCompile Include="regexSetTest.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="threadPoolTest.cpp" />
     <ClCompile Include="threadTest.cpp" />
     <ClCompile Include="main_gtest.cpp" />

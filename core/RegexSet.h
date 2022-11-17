@@ -7,7 +7,7 @@
 
 namespace YAM
 {
-	class RegexSet
+	class __declspec(dllexport) RegexSet
 	{
 	public:
 		// Construct an object that can match a string against a
@@ -27,6 +27,6 @@ namespace YAM
 
 	private:
 		std::vector<std::string> _regexStrings;
-		std::vector<std::regex> _regexes; // derived from _regexes
+		std::vector<std::regex> _regexes; // derived from _regexeStrings
 	};
 }

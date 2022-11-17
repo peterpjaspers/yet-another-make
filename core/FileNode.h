@@ -10,11 +10,12 @@
 namespace YAM
 {
     // A file node computes aspect hashes of its associated file. The computed
-    // aspect hashes and the file's last-write-time are cached in the node.
+    // aspect hashes and the file's last-write-time are cached in member fields
+    // of the node.
     // 
     // Aspects must be made known to the node with the addAspect(..) function.
     // Adding an aspect is a no-op when the aspect was already known, else the
-    // aspect is added and its cached hash value is set to a random value.
+    // aspect is added and its cached hash value is initialized to a random value.
     // 
     // Hashes of aspects known to the file node are (re-)computed and cached
     // during file node execution. As an optimization hashes are only (re-)
@@ -41,7 +42,8 @@ namespace YAM
     // C will act as follows:
     //     if file node F does not exist:
     //         - create file node F
-    //         - execute F (to retrieve last_write_time and move to Ok state)
+    //         - execute F (to retrieve last_write_time and compute aspect hashes
+    //           and move file node to Ok state)
     //     if F.addAspect(aspectRelevantToC), i.e. aspect was not known:
     //         - call rehash(aspectRelevantToC) 
     //     add F to C's input files and prerequisites
@@ -77,9 +79,9 @@ namespace YAM
     // context, either as part of the file node's execution or as part of the
     // command node's execution.
     //
-    // Note: a file node maintains one last-write-time for all hashes and
-    // that its last-write-time is only updated by the node execution. In the
-    // same build rehash calls to the node can be made after its execution. 
+    // Note: a file node maintains one last-write-time for all aspect hashes.
+    // The last-write-time is only updated by the node execution and rehashAll.
+    // In the same build rehash calls to the node can be made after its execution. 
     // In the interval between node execution and rehash call the user may 
     // have modified the (source) file, resulting in the hashes to have been
     // computed from different file versions. This is not a problem because the
@@ -145,7 +147,8 @@ namespace YAM
         XXH64_hash_t rehash(std::string const& aspectName);
 
         // Pre: state() == State::Ok
-        // Re-compute hashes of all added aspects and cache them.
+        // Retrieve and cache file's last-write-time, then re-compute and cache 
+        // hashes of all added aspects.
         void rehashAll();
 
     protected:
@@ -158,7 +161,7 @@ namespace YAM
         void rehashAll(bool doUpdateLastWriteTime);
         void execute();
 
-        // file modification time as retrieved during last node execution
+        // file modification time as retrieved during last rehashAll()
         std::chrono::time_point<std::chrono::utc_clock> _lastWriteTime;
         std::mutex _mutex; // to serialize access to _hashes and _hashers
         std::map<std::string, FileAspectHasher> _hashers;
