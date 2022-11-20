@@ -1,7 +1,6 @@
 #include "../RegexSet.h"
 
 #include "gtest/gtest.h"
-#include "gtest/gtest.h"
 
 namespace
 {
@@ -13,10 +12,11 @@ namespace
 		EXPECT_FALSE(set.matches(""));
 	}
 
-	TEST(RegexSet, constructMatchAllSet) {
+	TEST(RegexSet, constructNonEmptySet) {
 		RegexSet set({ (".*") });
 		EXPECT_EQ(1, set.regexStrings().size());
 		EXPECT_TRUE(set.matches(""));
+		EXPECT_TRUE(set.matches("dit is peter"));
 	}
 
 	TEST(RegexSet, add) {
@@ -51,7 +51,10 @@ namespace
 	TEST(RegexSet, matchFileSuffix) {
 		RegexSet set;
 		set.add("_special.cpp$");
+		set.add("\\.c$");
 		EXPECT_TRUE(set.matches("aap\\.cpp\\mies\\source_special.cpp"));
-		EXPECT_FALSE(set.matches("aap\\.cpp\\mies\\source_special.c"));
+		EXPECT_FALSE(set.matches("aap\\.cpp\\mies\\source.cpp"));
+		EXPECT_FALSE(set.matches("aap\\.cpp\\mies\\source.cppc"));
+		EXPECT_TRUE(set.matches("aap\\.cpp\\mies\\source.c"));
 	}
 }

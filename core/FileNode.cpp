@@ -3,15 +3,6 @@
 #include "ExecutionContext.h"
 #include <cstdio>
 
-namespace
-{
-    using namespace YAM;
-
-    XXH64_hash_t HashFile(std::filesystem::path const& fileName) {
-        return XXH64_file(fileName.string().c_str());
-    }
-}
-
 namespace YAM
 {
     FileNode::FileNode(ExecutionContext* context, std::filesystem::path name)

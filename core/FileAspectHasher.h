@@ -30,7 +30,7 @@ namespace YAM
 
 		FileAspect const& aspect() const;
 
-		// Pre: this.aspect().applicableFor(fileName)
+		// Pre: this.aspect().matches(fileName)
 		XXH64_hash_t hash(std::filesystem::path const & fileName) const;
 
 	private:

@@ -40,7 +40,11 @@
     <ClCompile Include="delegatesTest.cpp" />
     <ClCompile Include="dispatcherTest.cpp" />
     <ClCompile Include="executeNode.cpp" />
+    <ClCompile Include="fileAspectHasherTest.cpp" />
+    <ClCompile Include="fileAspectSetTest.cpp" />
+    <ClCompile Include="fileAspectTest.cpp" />
     <ClCompile Include="fileNodeTest.cpp" />
+    <ClCompile Include="inputFileAspectsTest.cpp" />
     <ClCompile Include="nodeExecutionTest.cpp" />
     <ClCompile Include="nodeSetTest.cpp" />
     <ClCompile Include="NumberNode.cpp" />

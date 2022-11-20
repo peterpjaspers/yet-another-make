@@ -23,7 +23,7 @@ namespace YAM
 	}
 
 	FileAspect const & FileAspect::entireFileAspect() {
-		static FileAspect entireFileAspect("entireFile", RegexSet({ "" }));
+		static FileAspect entireFileAspect("entireFile", RegexSet({ ".*" }));
 		return entireFileAspect;
 	}
 }
