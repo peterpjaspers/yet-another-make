@@ -3,12 +3,12 @@
 
 namespace YAM
 {
-    class __declspec(dllexport) OutputFileNode : public FileNode
+    class __declspec(dllexport) GeneratedFileNode : public FileNode
     {
     public:
         // Construct an output file node. Execution of the producer node
         // generates the output file.
-        OutputFileNode(ExecutionContext* context, std::filesystem::path const& name, Node* producer);
+        GeneratedFileNode(ExecutionContext* context, std::filesystem::path const& name, Node* producer);
 
         Node* producer() const;
 

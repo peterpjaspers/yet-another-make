@@ -96,21 +96,25 @@ namespace YAM
     // resulting in wrong content of the command's output files.
     // This problem can be fixed in several ways:
     //    - Do not allow modification of source files during the build.
-    //    - Capture last-write-times of all source files before using them.
+    //    - Capture last-write-times and hash code of all source files before
+    //      using them.
     //      Because input files are detected after the build this can only
-    //      be implemented by scanning the entire directory tree.
+    //      be implemented by scanning the entire directory tree before
+    //      doing the build. This requires that source files can be distinguished
+    //      from generated files (e.g. store source and generated files in seperate
+    //      directories).
     //    - Detect which source files are modified during the build.
     //      At next build force the commands that used these files as input
     //      to re-execute.      
     //  
-    // Note: a user may tamper with an output file in the time interval 
-    // between completion of the command script that produced the file and the
-    // subsequent computation of the output file's entireFile hash. In this
-    // case the next build will not detect that the file has changed (because
-    // last-write-time has not changed) and the command will not re-execute,
-    // resulting in wrong content of the output file. This problem can be
-    // fixed by detecting during the build which output files are modified
-    // by other actors than commands. At next build force the commands that
+    // Note: a user may tamper with an output file in the time interval between
+    // the time that the command that produced the file updated it and the 
+    // computation of the output file's entireFile hash (which happens after 
+    // command completion). In this case the next build will not detect that the
+    // file has changed (because last-write-time has not changed) and the command
+    // will not re-execute, resulting in wrong content of the output file. This 
+    // problem can be fixed by detecting during the build which output files are 
+    // modified by other actors than commands. At next build force the commands that
     // produced these files to re-execute.
     // 
     class __declspec(dllexport) FileNode : public Node

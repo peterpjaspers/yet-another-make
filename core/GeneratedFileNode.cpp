@@ -1,9 +1,9 @@
-#include "OutputFileNode.h"
+#include "GeneratedFileNode.h"
 #include "ExecutionContext.h"
 
 namespace YAM
 {
-    OutputFileNode::OutputFileNode(
+    GeneratedFileNode::GeneratedFileNode(
         ExecutionContext* context,
         std::filesystem::path const& name,
         Node* producer)
@@ -13,7 +13,7 @@ namespace YAM
         addAspect(FileAspect::entireFileAspect().name());
     }
 
-    Node* OutputFileNode::producer() const { 
+    Node* GeneratedFileNode::producer() const { 
         return _producer; 
     }
 }

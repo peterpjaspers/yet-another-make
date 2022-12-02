@@ -1,6 +1,6 @@
 #include "CommandNode.h"
 #include "SourceFileNode.h"
-#include "OutputFileNode.h"
+#include "GeneratedFileNode.h"
 #include "ExecutionContext.h"
 
 #include <iostream>
@@ -22,7 +22,7 @@ namespace YAM
 		// TODO: must state be set to Dirty? Or only if aspects change?
 	}
 
-	void CommandNode::setOutputs(std::vector<OutputFileNode*> const & newOutputs) {
+	void CommandNode::setOutputs(std::vector<GeneratedFileNode*> const & newOutputs) {
 		if (_outputs != newOutputs) {
 			// TODO: ownership? What if outputs are still referenced?
 			for (auto i : _outputs) i->removeParent(this);

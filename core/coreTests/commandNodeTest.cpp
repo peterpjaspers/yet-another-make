@@ -1,7 +1,7 @@
 #include "executeNode.h"
 #include "../CommandNode.h"
 #include "../SourceFileNode.h"
-#include "../OutputFileNode.h"
+#include "../GeneratedFileNode.h"
 #include "../ThreadPool.h"
 #include "../ExecutionContext.h"
 #include "../../xxhash/xxhash.h"
@@ -31,9 +31,9 @@ namespace
 		CommandNode pietCmd;
 		CommandNode janCmd;
 		CommandNode pietjanCmd;
-		OutputFileNode piet;
-		OutputFileNode jan;
-		OutputFileNode pietjan;
+		GeneratedFileNode piet;
+		GeneratedFileNode jan;
+		GeneratedFileNode pietjan;
 		ExecutionStatistics& stats;
 
 		Commands()

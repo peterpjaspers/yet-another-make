@@ -166,7 +166,7 @@
     <ClInclude Include="InputFileAspects.h" />
     <ClInclude Include="RegexSet.h" />
     <ClInclude Include="FileAspectSet.h" />
-    <ClInclude Include="OutputFileNode.h" />
+    <ClInclude Include="GeneratedFileNode.h" />
     <ClInclude Include="Dispatcher.h" />
     <ClInclude Include="FileNode.h" />
     <ClInclude Include="NodeSet.h" />
@@ -186,7 +186,7 @@
     <ClCompile Include="InputFileAspects.cpp" />
     <ClCompile Include="RegexSet.cpp" />
     <ClCompile Include="FileAspectSet.cpp" />
-    <ClCompile Include="OutputFileNode.cpp" />
+    <ClCompile Include="GeneratedFileNode.cpp" />
     <ClCompile Include="Dispatcher.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="FileNode.cpp" />

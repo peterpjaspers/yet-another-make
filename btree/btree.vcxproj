@@ -171,9 +171,15 @@
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="PagePool.cpp" />
     <ClCompile Include="PersistentPagePool.cpp" />
-    <ClCompile Include="testBTree.cpp" />
-    <ClCompile Include="testPage.cpp" />
-    <ClCompile Include="testStreamingBTree.cpp" />
+    <ClCompile Include="testBTree.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="testPage.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="testStreamingBTree.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="Types.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

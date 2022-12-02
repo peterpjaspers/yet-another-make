@@ -1,4 +1,5 @@
 #include "ThreadPool.h"
+#include <sstream>
 
 namespace YAM
 {
