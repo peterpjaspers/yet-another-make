@@ -5,16 +5,65 @@ Todo
 	- command line options
 	- logBook
 	- cancel multicastdelegate
-	- filehashers (std::map<aspectName => hasher>
-          hasher = {XXH64_hash_t hash(std::filesystem::path fileName), std::vector<regex> fileNamePatters>
-   files whose name matches one of fileNamePatterns must compute aspect hash.
-- sourcefile
-- file dependency detection asa responsibility of the script
-    - script communicates file dependencies via stdout to YAM or 
-      via files (as MS filetracker)
-    - YAM provides file dependency detection support a la MS filetracker
-      Consider reuse of tup dependency detector
-- file modification notifier for beta-build
+- Command node:
+    - file dependency detection as responsibility of the script
+        - define dependency detection interface that supports implementation by
+          hooking dll-injection techniques as well as by filesystem filter driver.
+          In the latter case one needs to keep track of both file access and process
+          creation/destruction. The latter to build a process tree needed to trace-back
+          fileaccess by some pid to the pid of the top-level build command.
+        - script communicates file dependencies via stdout to YAM or 
+          via files (as MS filetracker)
+        - YAM provides file dependency detection support a la MS filetracker
+          Consider reuse of tup dependency detector
+    - integrate file dependency detector (from tup dllinject or MSBuild tracker.exe)
+    - handle the race-conditions described in the last 2 notes in the description of
+      FileNode.h
+    - distinguish between modifications caused by user editing source files and tampering
+      (e.g. deleting) with generated files.
+      Note: not doing 
+- build state storage
+    - implement streaming btree (provides streaming of value types into btree via ValueStreamer i/f)
+    - implement ObjectStreamer (streams C++ objects to/from ValueStreamer)
+    - implement BuildStateStreamer (streams YAM buildstate)
+- winkin (build cache)
+    - a generated file can be winkedin when its inputs are identical to their in the worktree
+      running the build that wants to generate the file. Identical means that the input file
+      aspect hashes in cache and worktree are identical.
+      A problem is that some tools, e.g. the MS compilers and linkers, are not deterministic. 
+      I.e. running these tools twice on identical inputs produces outputs that are functional 
+      but not binary identical. This non-determinism does not matter when the non-deterministic
+      parts can be excluded from the file aspect hashes. Builds (and winkin) will be sub-optimal
+      when that is not possible.
+      Example: assume the hash of object files does not exclude the non-deterministic part.
+      Assume cache contains: P.exe linked from A.dll-import.lib, linked from O1.obj and O2.obj, 
+      compiled from sources C1.cpp and C2.cpp respectively with versions V1 and V2 respectively
+      compiled at time T1 and T2 respectively.
+      Worktree contains the same source file versions. C1.cpp is not yet compiled, C2.cpp was 
+      compiled at time T0 (!=T2), before C2.obj entered the cache. The cached and worktree C2.obj 
+      files are NOT identical and neither are their aspect hashes. This causes A.dll-import.lib
+      to be re-linked unnecessarily.
+      A work-around is to only consider the hashes of the input source files (recursively). 
+      In this example A.dll-import.lib can then be winkedin.
+      Note: in practice linking the import lib is a side-effect of linking the dll. However, when
+      linking the import lib seperately one would ideally use an input aspect for object files
+      that only includes interface aspects of the object file. This requires in-depth knowledge
+      of object file formats and how object file content affects the import lib file.
+
+
+- build file format (follow tup, follow mrmake, something completely different?)
+    - decide
+    - implement parsers and DAG updater
+
+Done
+- ExecutionContext
+  To avoid singletons a context object is passed to Node constructor.
+  It provides access to:
+	- node repository (renamed from Graph)
+	- main thread and thread pool and their dispatchers
+	- file aspect hasher configuration
+- filenode, sourcefile, generatedfile (output file of command node)
+- Process class => boost process
 - file aspect hashes
     - FileNode::_hashes (std::map<aspectName => XXH64_hash_t)
       _hashes is populated when node is created and updated when context.filehashers changes
@@ -24,17 +73,6 @@ Todo
       Unfortunately this is not possible because it cannot be known in advance which commands
       will use a file as input.
     - CommandNode::_inputAspects (std::vector<{fileNamePattern, aspectName}>)
-- winkin (outputfile cache)
-
-Done
-- ExecutionContext
-  To avoid singletons a context object is passed to Node constructor.
-  It provides access to:
-	- node repository (renamed from Graph)
-	- main thread and thread pool and their dispatchers
-- filenode, outputfilenode
-- Process class => boost process
-
 
 
   In our latest discussion we stated that all inputs and outputs must be modeled as nodes.

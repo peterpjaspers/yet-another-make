@@ -23,6 +23,12 @@
   Option 2) does not have the complication of option 1). It will however add file nodes that will never be
   used as inputs of command nodes and thus increase graph size unnecessarily. It is also no solution for modification
   of output files during the build.
-  Note that tampering with outputfiles is outside the intended use and will be rare. It may be acceptable for YAM to
-  ignore outputfile modification notifications during a build. Edits of source files during a build however will
-  happen frequently and YAM must be robust for this use-case.
+
+  Note that YAM's promise is that, in absence of file modifications since last build, all outputfiles are up-to-date and 
+  all obsolete outputfiles have been deleted. Hence ideally tampering with outputfiles would never be needed.
+  In practice however, even with a flawless YAM, engineers often force a "clean" build by deleting outputfiles. 
+  This is not without rationale: even though YAM may be flawless the build scripts themselves may be not.
+
+  Edits of source files during a build are happen frequently and are part of normal workflow.
+
+  Conclusion: YAM must be robust for both cases.
