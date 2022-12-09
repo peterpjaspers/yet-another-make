@@ -60,16 +60,16 @@ namespace
 		additions.push_back(&addition1);
 		bool completed = executeNodes(additions);
 
-		EXPECT_TRUE(completed);
-		EXPECT_EQ(Node::State::Ok, addition0.state());
-		EXPECT_EQ(Node::State::Ok, addition1.state());
-		EXPECT_EQ(sum0, addition0.sum()->number());
-		EXPECT_EQ(sum1, addition1.sum()->number());
-		EXPECT_EQ(addition0.executionHash(), addition0.computeExecutionHash());
-		EXPECT_EQ(addition1.executionHash(), addition1.computeExecutionHash());
+		ASSERT_TRUE(completed);
+		ASSERT_EQ(Node::State::Ok, addition0.state());
+		ASSERT_EQ(Node::State::Ok, addition1.state());
+		ASSERT_EQ(sum0, addition0.sum()->number());
+		ASSERT_EQ(sum1, addition1.sum()->number());
+		ASSERT_EQ(addition0.executionHash(), addition0.computeExecutionHash());
+		ASSERT_EQ(addition1.executionHash(), addition1.computeExecutionHash());
 
 		for (std::size_t i = 0; i < n; ++i) {
-			EXPECT_EQ(Node::State::Ok, ops[i]->state());
+			ASSERT_EQ(Node::State::Ok, ops[i]->state());
 			delete ops[i];
 		}
 	}

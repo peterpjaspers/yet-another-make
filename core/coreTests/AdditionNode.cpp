@@ -9,7 +9,8 @@ namespace YAMTest
 		ExecutionContext* context,
 		std::filesystem::path const& name)
 		: Node(context, name)
-		, _sum(context, "sumOf" / name) {
+		, _sum(context, "sumOf" / name)
+		, _executionHash(rand()) {
 		_sum.number(0);
 		_sum.addParent(this);
 	}

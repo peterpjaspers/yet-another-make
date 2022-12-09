@@ -15,6 +15,7 @@ namespace YAM
 		std::filesystem::path const& name)
 		: Node(context, name)
 		, _scriptHash(rand())
+		, _executionHash(rand())
 	{}
 
 	void CommandNode::setInputAspects(FileAspectSet const& newInputAspects) {

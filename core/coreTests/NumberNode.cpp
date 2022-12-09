@@ -9,7 +9,8 @@ namespace YAMTest
 		ExecutionContext* context,
 		std::filesystem::path const& name)
 		: Node(context, name)
-		, _number(0) {
+		, _number(0)
+		, _executionHash(rand()) {
 	}
 
 	int NumberNode::number() const { return _number; }
