@@ -168,6 +168,7 @@
       <XMLDocumentationFileName>$(OutDir)</XMLDocumentationFileName>
       <PrecompiledHeaderOutputFile>$(OutDir)$(TargetName).pch</PrecompiledHeaderOutputFile>
       <BrowseInformationFile>$(OutDir)</BrowseInformationFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
