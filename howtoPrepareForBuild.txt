@@ -4,8 +4,7 @@ It is the ambition to make it buildable (and runnable) on Windows, Linux and Mac
 
 Getting boost:
 Download https://www.boost.org/users/history/version_1_79_0.html and unzip to directory of your choice.
-Update YAM\core\boost_x64_debug.props and YAM\core\coretests\coretests.vcxproj to change references to 
-boost directories to the unzip directories.
+Update YAM\core\boost_x64.props to change references to boost unzip directory.
 
 Getting googletest:
 From https://github.com/google/googletest/blob/main/googletest/README.md :
@@ -19,7 +18,7 @@ From https://github.com/google/googletest/blob/main/googletest/README.md :
 	cmake ..             # Generate native build scripts for GoogleTest
 
 
-If you are on Windows and have Visual Studio installed, a gtest.sln file and several .vcproj files will be 
+If you are on Windows and have Visual Studio installed, a gtest.sln file and several .vcxproj files will be 
 created. You can then build them using Visual Studio.
 
 If you are on a linux system, you should now see a Makefile in the current directory. 

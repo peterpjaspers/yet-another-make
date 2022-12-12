@@ -11,7 +11,7 @@ namespace YAMTest
 		: Node(context, name)
 		, _sum(context, "sumOf" / name)
 		, _executionHash(rand()) {
-		_sum.number(0);
+		_sum.number(rand());
 		_sum.addParent(this);
 	}
 

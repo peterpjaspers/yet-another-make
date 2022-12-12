@@ -72,7 +72,7 @@ namespace YAM
 
     void Node::continueStart() {
         if (_state == Node::State::Deleted) {
-            notifyCompletion(State::Deleted);
+            postCompletion(State::Deleted);
         }
         else if (supportsPrerequisites()) {
             startPrerequisites();
@@ -82,7 +82,7 @@ namespace YAM
             _context->statistics().registerSelfExecuted(this);
             startSelf();
         } else {
-            notifyCompletion(State::Ok);
+            postCompletion(State::Ok);
         }
     }
 
@@ -197,10 +197,10 @@ namespace YAM
         bool allCompleted = _executingPrerequisites.size() == 0;
         if (allCompleted) {
             if (_canceling) {
-                notifyCompletion(State::Canceled);
+                postCompletion(State::Canceled);
             }
             else if (!allPrerequisitesAreOk()) {
-                notifyCompletion(State::Failed);
+                postCompletion(State::Failed);
             }
             else if (pendingStartSelf()) {
                 _executionState = ExecutionState::Self;
@@ -208,7 +208,7 @@ namespace YAM
                 startSelf();
             }
             else {
-                notifyCompletion(State::Ok);
+                postCompletion(State::Ok);
             }
         }
     }
@@ -259,7 +259,7 @@ namespace YAM
             case ExecutionState::Idle:
                 break;
             case ExecutionState::Suspended:
-                notifyCompletion(State::Canceled);
+                postCompletion(State::Canceled);
                 break;
             case ExecutionState::Prerequisites:
                 for (auto preq : _executingPrerequisites) {
