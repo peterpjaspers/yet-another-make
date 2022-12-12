@@ -808,7 +808,9 @@ public:
 	//Execute the delegate with the given parameters
 	RetVal Execute(Args... args) const
 	{
-		DELEGATE_ASSERT(m_Allocator.HasAllocation(), "Delegate is not bound");
+		if (!m_Allocator.HasAllocation()) {
+			DELEGATE_ASSERT(m_Allocator.HasAllocation(), "Delegate is not bound");
+		}
 		return ((IDelegateT*)GetDelegate())->Execute(std::forward<Args>(args)...);
 	}
 

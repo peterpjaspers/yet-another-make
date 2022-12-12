@@ -21,10 +21,11 @@ namespace YAMTest
 		setState(State::Dirty);
 	}
 
-	void AdditionNode::clearOperands() {
+	void AdditionNode::clearOperands(bool deleteOps) {
 		if (!_operands.empty()) {
 			for (auto op : _operands) {
 				op->removeParent(this);
+				if (deleteOps) delete op;
 			}
 			_operands.clear();
 			setState(State::Dirty);

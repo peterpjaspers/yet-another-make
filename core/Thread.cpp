@@ -21,6 +21,10 @@ namespace YAM
 		return _name;
 	}
 
+	Dispatcher* Thread::dispatcher() const {
+		return _dispatcher;
+	}
+
 	bool Thread::joinable() {
 		return _thread.joinable();
 	}

@@ -16,6 +16,7 @@ namespace YAM
 		~Thread();
 
 		std::string const& name() const;
+		Dispatcher* dispatcher() const;
 
 		bool joinable();
 		void join();

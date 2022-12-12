@@ -82,14 +82,14 @@ namespace
 
 		r1 = -1;
 		r2 = -1;
-		d.Remove(h1);
+		d -= h1;
 		d.Broadcast(x, y);
 		EXPECT_EQ(-1, r1);
 		EXPECT_EQ(sum, r2);
 
 		r1 = -1;
 		r2 = -1;
-		d.Remove(h2);
+		d -= h2;
 		d.Broadcast(x, y);
 		EXPECT_EQ(-1, r1);
 		EXPECT_EQ(-1, r2);

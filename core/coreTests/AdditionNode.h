@@ -14,7 +14,7 @@ namespace YAMTest
 		AdditionNode(ExecutionContext* context, std::filesystem::path const& name);
 
 		void addOperand(NumberNode* operand);
-		void clearOperands();
+		void clearOperands(bool deleteOps);
 
 		NumberNode* sum();
 

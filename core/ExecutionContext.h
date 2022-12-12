@@ -17,6 +17,7 @@ namespace YAM
 		~ExecutionContext();
 
 		ThreadPool& threadPool();
+		Thread& mainThread();
 		Dispatcher& threadPoolQueue();
 		Dispatcher& mainThreadQueue();
 

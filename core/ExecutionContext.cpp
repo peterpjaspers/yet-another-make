@@ -22,10 +22,13 @@ namespace YAM
     ThreadPool& ExecutionContext::threadPool() {
         return _threadPool;
     }
+    Thread& ExecutionContext::mainThread() {
+        return _mainThread;
+    }
     Dispatcher& ExecutionContext::threadPoolQueue() {
         return _threadPoolQueue;
     }
-    Dispatcher& ExecutionContext::mainThreadQueue() {
+    Dispatcher& ExecutionContext::mainThreadQueue()  {
         return _mainThreadQueue;
     }
 
