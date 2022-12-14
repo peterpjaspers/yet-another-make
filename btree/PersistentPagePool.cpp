@@ -59,7 +59,7 @@ namespace BTree {
     // Write all page modifications (since the last commit or its creation) to persistent store.
     // The given PageLink defines the (new) root of the updated B-tree.
     void PersistentPagePool::commit( const PageLink link ) {
-        static const std::string signature( "void commit( const PageLink link )" );
+        static const std::string signature( "void PersistentPagePool::commit( const PageLink link )" );
         // Discard all outstanding recover requests.
         for (int i = 0; i < recoverPages.size(); i++) pages[ recoverPages[ i ].index ]->recover = 0;
         recoverPages.clear();
@@ -114,7 +114,7 @@ namespace BTree {
     // This effectively recovers the B-tree to the state of the last commit.
     // Returns PageLink of the recoverd B-tree root page.
     PageLink PersistentPagePool::recover( bool freeModifiedPages ) {
-        static const std::string signature( "PageLink recover( bool freeModifiedPages )" );
+        static const std::string signature( "PageLink PersistentPagePool::recover( bool freeModifiedPages )" );
         // Purge modified list of recover pages.
         vector<PageLink> modifiedRecoverPages;
         for (int i = 0; i < modifiedPages.size(); i++) {

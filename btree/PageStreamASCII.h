@@ -1,9 +1,8 @@
 #ifndef BTREE_PAGE_STREAM_ASCII_H
 #define BTREE_PAGE_STREAM_ASCII_H
 
-#include <algorithm>
-
 #include <stdlib.h>
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <iostream>
@@ -11,7 +10,7 @@
 
 #include "Types.h"
 
-// ToDo: Key specific streaming, pass as program argument to constructor
+// ToDo: Key and value specific streaming
 
 namespace BTree {
 

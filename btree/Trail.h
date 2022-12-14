@@ -3,7 +3,6 @@
 
 #include "Page.h"
 #include "PagePool.h"
-#include <array>
 
 namespace BTree {
 
@@ -64,19 +63,19 @@ namespace BTree {
         };
         
         inline Trail& push( const PageHeader* header, PageIndex index, KeyCompare compare  ) {
-            static const std::string signature( "Trail& push( const PageHeader* header, PageIndex index, KeyCompare compare  )" );
+            static const std::string signature( "Trail& Trail::push( const PageHeader* header, PageIndex index, KeyCompare compare  )" );
             if (height == MaxHeight) throw signature + " - trail overflow.";
             stack[ height++ ] = { header, index, compare };
             return *this;
         }
         inline Trail& push( const PageHeader* header ) {
-            static const std::string signature( "Trail& push( const PageHeader* header )" );
+            static const std::string signature( "Trail& Trail::push( const PageHeader* header )" );
             if (height == MaxHeight) throw signature + " - trail overflow.";
             stack[ height++ ].header = header;
             return *this;
         }
         inline Trail&  pop() {
-            static const std::string signature( "Trail& pop()" );
+            static const std::string signature( "Trail& Trail::pop()" );
             if (height == 0) throw signature + " - trail underflow.";
             height--;
             return *this;
@@ -84,19 +83,19 @@ namespace BTree {
         inline PageDepth depth() const { return height; }
         // Return header of current Page on Trail
         inline const PageHeader* header( PageDepth offset = 0 ) const {
-            static const std::string signature( "const PageHeader* header( PageDepth offset = 0 ) const" );
+            static const std::string signature( "const PageHeader* Trail::header( PageDepth offset = 0 ) const" );
             if (height < (offset + 1)) throw signature + " - Invalid offset.";
             return stack[ height - offset - 1 ].header;
         }
         // Return current Page index on Trail
         inline PageIndex index( PageDepth offset = 0 ) const {
-            static const std::string signature( "PageIndex index( PageDepth offset = 0 ) const" );
+            static const std::string signature( "PageIndex Trail::index( PageDepth offset = 0 ) const" );
             if (height < (offset + 1)) throw signature + " - Invalid offset.";
             return stack[ height - offset - 1 ].index;
         }
         // Return current comparison result on Trail
         inline KeyCompare compare( PageDepth offset = 0 ) const {
-            static const std::string signature( "KeyCompare compare( PageDepth offset = 0 ) const" );
+            static const std::string signature( "KeyCompare Trail::compare( PageDepth offset = 0 ) const" );
             if (height < (offset + 1)) throw signature + " - Invalid offset.";
             return stack[ height - offset - 1 ].compare;
         }
@@ -105,12 +104,12 @@ namespace BTree {
         }
         inline void compare( KeyCompare c ) { stack[ height - 1 ].compare = c; }
         inline void compare( PageDepth offset, KeyCompare c ) {
-            static const std::string signature( "void compare( PageDepth offset, KeyCompare c )" );
+            static const std::string signature( "void Trail::compare( PageDepth offset, KeyCompare c )" );
             if (height < (offset + 1)) throw signature + " - Invalid offset.";
             stack[ height - offset - 1 ].compare = c;
         }
         inline bool split( PageDepth offset = 0 ) const {
-            static const std::string signature( "bool split( PageDepth offset = 0 ) const" );
+            static const std::string signature( "bool Trail::split( PageDepth offset = 0 ) const" );
             if (height < (offset + 1)) throw signature + " - Invalid offset.";
             return( (stack[ height - offset - 1 ].compare < 0) && (stack[ height - offset - 1 ].index == 0) );
         }
@@ -124,7 +123,7 @@ namespace BTree {
         }
         // Pop the trail to the level of a match
         inline void popToMatch() {
-            static const std::string signature( "void popToMatch()" );
+            static const std::string signature( "void Trail::popToMatch()" );
             if (height == 0) throw signature + " - trail underflow.";
             for (PageDepth offset = 0; offset < height; offset++) {
                 if (0 <= stack[ height - offset - 1 ].compare) {
@@ -142,7 +141,7 @@ namespace BTree {
         // Trail is assumed to access a Node page.
         template< class K, bool KA >
         const PageHeader* indexedHeader( PageDepth offset = 0 ) const {
-            static const std::string signature( "const PageHeader* indexedHeader( PageDepth offset = 0 ) const" );
+            static const std::string signature( "const PageHeader* Trail::indexedHeader( PageDepth offset = 0 ) const" );
             if (height < (offset + 1)) throw signature + " - Invalid offset.";
             const PageHeader* header = this->header( offset );
             if (header->depth == 0) throw signature + " - Trail does not reference a Node Page";

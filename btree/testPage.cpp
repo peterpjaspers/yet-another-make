@@ -1,11 +1,8 @@
-// Next 3 includes needed for memory usage logging
-// Commented-out because the windows macro definition for min
-// conflicts with std::min
-//#include <Windows.h>
-//#include "psapi.h"
-//#include "processthreadsapi.h"
+#include <windows.h>
+#include "psapi.h"
+#include "processthreadsapi.h"
 
-#include <string>
+#include <cstring>
 #include <cstdlib>
 #include <chrono>
 #include <iostream>
@@ -45,7 +42,6 @@ char* generateName( int n ) {
 #define MAX_N 1000000
 #define NODE_POOL_CAPACITY 1000
 
-/*
 int currentMemoryUsage() {
     PROCESS_MEMORY_COUNTERS counters;
     GetProcessMemoryInfo( GetCurrentProcess(), &counters, sizeof( counters ) );
@@ -64,7 +60,6 @@ void outputMemoryUsage( int baseUsage, ostream stream ) {
         stream << "Required " << usage << " bytes.\n";        
     }
 }
-*/
 
 int compare( const int& a, const int& b ) { return(a - b); };
 

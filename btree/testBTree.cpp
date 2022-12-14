@@ -4,7 +4,6 @@
 #include <fstream>
 #include <map>
 #include <chrono>
-#include <string>
 
 // B-tree test program.
 //
@@ -17,10 +16,11 @@
 //    array values      array values (otherwise scalar values)
 //    persistent        persistent store (otherwise in memory)
 //    transaction       transaction mode updates (otherwise in-place)
-//    create NNN (name) create B-tree with page size NNN in file name (if persistent)
+//    create NNN name   create B-tree with page size NNN in file name (if persistent)
 //    commit            commit modifications (transaction succeeds)
 //    recover           recover from modifications (transaction fails)
 //    stream            stream content of B-tree to human readable text file (testBTree.txt)
+//    file name         close current stream file and continue streaming to named file
 //    generate NNN      generate NNN key-value pairs without insertion in B-tree
 //    insert NNN        insert NNN entries
 //    retreive NNN      retreive NNN values
@@ -35,7 +35,7 @@
 // The generate command may be used to synchronize entry generation with a persistent B-tree or to minimize
 // key-value generation overhead for performance measurements.
 //
-// Example: testBTree array keys persistent tranascation create 1024 insert 1000 commit delete 300 stream
+// Example: testBTree array keys persistent transaction create 1024 insert 1000 commit delete 300 stream
 // Creates a 1024 byte page, PersistentTransaction B-tree with character array keys.
 // Inserts 1000 entries, commits, deletes 300 entries and finally streams the resulting
 // B-tree to a text file.
@@ -511,6 +511,7 @@ int main(int argc, char* argv[]) {
                 }
                 verify = false;
             } else if (command == "start") {
+                stream << "Start time monitoring\n";
                 start = chrono::steady_clock::now();
             } else if (command == "stop") {
                 auto end = chrono::steady_clock::now();

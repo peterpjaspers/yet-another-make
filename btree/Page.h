@@ -26,7 +26,7 @@ namespace BTree {
         PageHeader header;
         Page() = delete;
         Page( const PageDepth depth ) {
-            static const std::string signature( "Page<K,V,false,false>::Page( const PageDepth depth )" );
+            static const std::string signature( "Page<K,V,KA,VA>::Page( const PageDepth depth )" );
             if (maxKeySize() < sizeof(K)) throw signature + " - Invalid key size";
             if (maxValueSize() < sizeof(V)) throw signature + " - Invalid value size";
             header.depth = depth;
@@ -220,21 +220,21 @@ namespace BTree {
         // Return reference to scalar key at index.
         template <bool AK = KA>
         const typename std::enable_if<(!AK), K>::type &key(PageIndex index) const {
-            static const std::string signature( "const K& key( PageIndex index ) const" );
+            static const std::string signature( "const K& Page<K,V,KA,VA>::key( PageIndex index ) const" );
             if (header.count <= index) throw signature + " - Invalid index";
             return (keys()[index]);
         }
         // Return pointer to array key at index.
         template <bool AK = KA>
         const typename std::enable_if<(AK), K>::type *key(PageIndex index) const {
-            static const std::string signature( "const K* key( PageIndex index ) const" );
+            static const std::string signature( "const K* Page<K,V,KA,VA>::key( PageIndex index ) const" );
             if (header.count <= index) throw signature + " - Invalid index";
             return (&keys()[keyIndex(index)]);
         }
         // Return size of array key at index.
         template <bool AK = KA>
         typename std::enable_if<(AK), PageSize>::type keySize( PageIndex index ) const {
-            static const std::string signature( "PageSize keySize( PageIndex index ) const" );
+            static const std::string signature( "PageSize Page<K,V,KA,VA>::keySize( PageIndex index ) const" );
             if (header.count <= index) throw signature + " - Invalid index";
             if (index == 0) return keyIndeces()[0];
             return (keyIndeces()[index] - keyIndeces()[index - 1]);
@@ -242,21 +242,21 @@ namespace BTree {
         // Return reference to scalar value at index.
         template <bool AV = VA>
         const typename std::enable_if<(!AV), V>::type &value(PageIndex index) const {
-            static const std::string signature( "const V& value( PageIndex index ) const" );
+            static const std::string signature( "const V& Page<K,V,KA,VA>::value( PageIndex index ) const" );
             if (header.count <= index) throw signature + " - Invalid index";
              return (values()[index]);
         }
         // Return pointer to array value at index.
         template <bool AV = VA>
         const typename std::enable_if<(AV), V>::type *value( PageIndex index ) const {
-            static const std::string signature( "const V* value( PageIndex index ) const" );
+            static const std::string signature( "const V* Page<K,V,KA,VA>::value( PageIndex index ) const" );
             if (header.count <= index) throw signature + " - Invalid index";
             return (&values()[valueIndex(index)]);
         }
         // Return size of array value at index.
         template <bool AV = VA>
         typename std::enable_if<(AV), PageSize>::type valueSize( PageIndex index ) const {
-            static const std::string signature( "PageSize valueSize( PageIndex index ) const" );
+            static const std::string signature( "PageSize Page<K,V,KA,VA>::valueSize( PageIndex index ) const" );
             if (header.count <= index) throw signature + " - Invalid index";
             if (index == 0) return (valueIndeces()[0]);
             return (valueIndeces()[index] - valueIndeces()[index - 1]);
@@ -267,21 +267,21 @@ namespace BTree {
         // Return the scalar split value (if any)
         template <bool AV = VA>
         const typename std::enable_if<(!AV), V>::type &split() const {
-            static const std::string signature( "const V& split() const" );
+            static const std::string signature( "const V& Page<K,V,KA,VA>::split() const" );
             if (header.split == 0) throw signature + " - No split defined";
             return splitValue<false>();
         }
         // Return pointer to array split value (if any)
         template <bool AV = VA>
         const typename std::enable_if<(AV), V>::type *split() const {
-            static const std::string signature( "const V* split() const" );
+            static const std::string signature( "const V* Page<K,V,KA,VA>::split() const" );
             if (header.split == 0) throw signature + " - No split defined";
             return splitValue<true>();
         }
         // Return size of array split value (if any)
         template <bool AV = VA>
         typename std::enable_if<(AV), PageSize>::type splitSize() const {
-            static const std::string signature( "PageSize splitSize() const" );
+            static const std::string signature( "PageSize Page<K,V,KA,VA>::splitSize() const" );
             if (header.split == 0) throw signature + " - No split defined";
             return (header.split);
         }
@@ -289,21 +289,21 @@ namespace BTree {
         // Set scalar split value
         template <bool AV = VA>
         typename std::enable_if<(!AV), void>::type split( const V& value, Page<K,V,KA,false>* dst = nullptr ) {
-            static const std::string signature( "void split( const V& value, Page<K,V,KA,false>* dst )" );
+            static const std::string signature( "void Page<K,V,KA,VA>::split( const V& value, Page<K,V,KA,false>* dst )" );
             if (header.capacity < (filling() + sizeof(V) - (header.split * sizeof(V)))) throw signature + " - Overflow";
             PageFunctions::pageSplit( *this, ((dst) ? *dst : *this), value );
         }
          // Set array split value
        template <bool AV = VA>
         typename std::enable_if<(AV), void>::type split( const V* value, PageSize valueSize, Page<K,V,KA,true>* dst = nullptr ) {
-            static const std::string signature( "void split( const V* value, PageSize valueSize, Page<K,V,KA,true>* dst )" );
+            static const std::string signature( "void Page<K,V,KA,VA>::split( const V* value, PageSize valueSize, Page<K,V,KA,true>* dst )" );
             if (header.capacity < (filling() + (valueSize * sizeof(V)) - (header.split * sizeof(V)))) throw signature + " - Overflow";
             PageFunctions::pageSplit( *this, ((dst) ? *dst : *this), value, valueSize );
         }
 
         // Remove split value in scalar key - scalar value page
         void removeSplit( Page<K,V,KA,VA>* dst = nullptr ) {
-            static const std::string signature( "void removeSplit( Page<K,V,KA,VA>* dst )" );
+            static const std::string signature( "void Page<K,V,KA,VA>::removeSplit( Page<K,V,KA,VA>* dst )" );
             if (header.split == 0) throw signature + " - No split defined";
             PageFunctions::pageRemoveSplit( *this, ((dst) ? *dst : *this) );
         }
@@ -328,7 +328,7 @@ namespace BTree {
         // Insert a scalar key - array value entry at an index
         template <bool AK = KA, bool AV = VA>
         typename std::enable_if<(!AK && AV), void>::type insert( PageIndex index, const K& key, const V* value, const PageSize valueSize, Page<K,V,false,true>* copy = nullptr) {
-            static const std::string signature( "Page<K,V,KA,VA>::insert( PageIndex index, const K& key, const V* value, const PageSize valueSize, Page<K,V,false,true>* copy ) - Invalid index" );
+            static const std::string signature( "void Page<K,V,KA,VA>::insert( PageIndex index, const K& key, const V* value, const PageSize valueSize, Page<K,V,false,true>* copy ) - Invalid index" );
             if (header.count < index) throw signature + " - Invalid index";
             if ((valueSize == 0) || (maxValueSize() < (valueSize * sizeof(V)))) throw signature + " - Invalid value size";
             if (header.capacity < (filling() + entryFilling( valueSize ))) throw signature + " - Overflow";
@@ -366,14 +366,14 @@ namespace BTree {
         // Exchange a scalar key scalar value entry
         template <bool AK = KA, bool AV = VA>
         typename std::enable_if<(!AK && !AV), void>::type exchange(PageIndex index, const K& key, const V& value, Page<K,V,false,false>* copy = nullptr) {
-            static const std::string signature( "void exchange( PageIndex index, const K& key, const V* value, const PageSize valueSize, Page<K,V,false,false>* copy )" );
+            static const std::string signature( "void Page<K,V,KA,VA>::exchange( PageIndex index, const K& key, const V* value, const PageSize valueSize, Page<K,V,false,false>* copy )" );
             if (header.count < index) throw signature + " - Invalid index";
             PageFunctions::pageExchange( *this, ((copy) ? *copy : *this), index, key, value );
         }
         // Exchange an array key scalar value entry
         template <bool AK = KA, bool AV = VA>
         typename std::enable_if<(AK && !AV), void>::type exchange( PageIndex index, const K* key, const PageSize keySize, const V& value, Page<K,V,true,false>* copy = nullptr) {
-            static const std::string signature( "void exchange( PageIndex index, const K* key, const PageSize keySize, const V& value, Page<K,V,true,false>* copy )" );
+            static const std::string signature( "void Page<K,V,KA,VA>::exchange( PageIndex index, const K* key, const PageSize keySize, const V& value, Page<K,V,true,false>* copy )" );
             if (header.count < index) throw signature + " - Invalid index";
             if ((keySize == 0) || (maxKeySize() < (keySize * sizeof(K)))) throw signature + " - Invalid key size";
             if (header.capacity < (filling() + entryFilling( keySize ) - entryFilling( this->keySize(index) ))) throw signature + " - Overflow";
@@ -382,7 +382,7 @@ namespace BTree {
         // Exchange a scalar key array value entry
         template <bool AK = KA, bool AV = VA>
         typename std::enable_if<(!AK && AV), void>::type exchange( PageIndex index, const K& key, const V* value, const PageSize valueSize, Page<K,V,false,true>* copy = nullptr) {
-            static const std::string signature( "void exchange( PageIndex index, const K& key, const V* value, const PageSize valueSize, Page<K,V,false,true>* copy )" );
+            static const std::string signature( "void Page<K,V,KA,VA>::exchange( PageIndex index, const K& key, const V* value, const PageSize valueSize, Page<K,V,false,true>* copy )" );
             if (header.count < index) throw signature + " - Invalid index";
             if ((valueSize == 0) || (maxValueSize() < (valueSize * sizeof(V)))) throw signature + " - Invalid value size";
             if (header.capacity < (filling() + entryFilling( valueSize ) - entryFilling( this->valueSize(index) ))) throw signature + " - Overflow";
@@ -391,7 +391,7 @@ namespace BTree {
         // Exchange an array key array value entry
         template <bool AK = KA, bool AV = VA>
         typename std::enable_if<(AK && AV), void>::type exchange( PageIndex index, const K* key, const PageSize keySize, const V* value, const PageSize valueSize, Page<K,V,true,true>* copy = nullptr) {
-            static const std::string signature( "void exchange( PageIndex index, const K* key, const PageSize keySize, const V* value, const PageSize valueSize, Page<K,V,true,true>* copy )" ) ;
+            static const std::string signature( "void Page<K,V,KA,VA>::exchange( PageIndex index, const K* key, const PageSize keySize, const V* value, const PageSize valueSize, Page<K,V,true,true>* copy )" ) ;
             if (header.count < index) throw signature + " - Invalid index";
             if ((keySize == 0) || (maxKeySize() < (keySize * sizeof(K)))) throw signature + " - Invalid key size";
             if ((valueSize == 0) || (maxValueSize() < (valueSize * sizeof(V)))) throw signature + " - Invalid value size";
@@ -401,21 +401,21 @@ namespace BTree {
 
         // Remove the key - value entry at an index
         void remove( PageIndex index, Page<K,V,KA,VA>* copy = nullptr ) {
-            static const std::string signature( "void remove( PageIndex index, Page<K,V,KA,VA>* copy" );
+            static const std::string signature( "void Page<K,V,KA,VA>::remove( PageIndex index, Page<K,V,KA,VA>* copy" );
             if (header.count <= index) throw signature + " - Invalid index";
             PageFunctions::pageRemove( *this, ((copy) ? *copy : *this), index );
         }
 
         // Shift page content from indexed entry up to last entry to lower entries in another page
         void shiftRight( Page &right, PageIndex index, Page* copy = nullptr, Page* copyRight = nullptr ) {
-            static const std::string signature( "void shiftRight( Page &right, PageIndex index, Page* copy, Page* copyRight" );
+            static const std::string signature( "void Page<K,V,KA,VA>::shiftRight( Page &right, PageIndex index, Page* copy, Page* copyRight" );
             if (header.count < index) throw signature + " - Invalid index or empty page";
             if (right.header.capacity < (right.filling() + (filling() - filling( index )))) throw signature + " - Overflow";
             PageFunctions::pageShiftRight( *this, right, ((copy) ? *copy : *this), ((copyRight) ? *copyRight : right), index );
         }
         // Shift page content from first entry up to indexed entry up to higher entries in another page
         void shiftLeft( Page &left, PageIndex index, Page* copy = nullptr, Page* copyLeft = nullptr ) {
-            static const std::string signature( "void shiftLeft( Page &left, PageIndex index, Page* copy, Page* copyLeft" );
+            static const std::string signature( "void Page<K,V,KA,VA>::shiftLeft( Page &left, PageIndex index, Page* copy, Page* copyLeft" );
             if (header.count < index) throw signature + " - Invalid index or empty page";
             if (left.header.capacity < (left.filling() + filling( index ))) throw signature + " - Overflow";
             PageFunctions::pageShiftLeft( *this, left, ((copy) ? *copy : *this), ((copyLeft) ? *copyLeft : left), index );

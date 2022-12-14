@@ -3,7 +3,6 @@
 
 #include <cstdint>
 #include <iostream>
-#include <iostream>
 
 namespace BTree {
 
@@ -74,6 +73,18 @@ namespace BTree {
     }
 
     template <class K, class V, bool KA, bool VA> class Page;
+
+    typedef std::uint16_t StreamBlockSize;
+    typedef std::uint64_t StreamIndex;
+    typedef std::uint16_t StreamSequence;
+    struct StreamKey {
+        uint64_t index : 48;
+        uint64_t sequence : 16;
+        StreamKey() = delete;
+        StreamKey( StreamIndex i, StreamSequence s ) : index( i ), sequence( s ) {};
+        StreamKey( const StreamKey& range ) : index( range.index ), sequence( range.sequence ) {};
+    };
+    std::ostream & operator<<( std::ostream & stream, StreamKey const & range );
 
 } // namespace BTree
 

@@ -514,7 +514,7 @@ namespace BTree {
         // Insert scalar key-link
         template< bool AK = KA > typename std::enable_if<(!AK),void>::type
         nodeInsert( Trail& trail, const K& key, PageLink link ) {
-            static const std::string signature( "void nodeInsert( Trail& trail, const K& key, PageLink link )" );
+            static const std::string signature( "void BTree<K,V,KA,VA>::nodeInsert( Trail& trail, const K& key, PageLink link )" );
             if (trail.depth() == 0) {
                 if (MaxHeight < (root->depth + 1)) throw signature + " - Max B-tree heigth exceeded";
                 PageLink linkRoot = root->page;
@@ -542,7 +542,7 @@ namespace BTree {
         // Insert array key-link
         template< bool AK = KA > typename std::enable_if<(AK),void>::type
         nodeInsert( Trail& trail, const K* key, PageIndex keySize, PageLink link ) {
-            static const std::string signature( "void nodeInsert( Trail& trail, const K* key, PageIndex keySize, PageLink link )" );
+            static const std::string signature( "void BTree<K,V,KA,VA>::nodeInsert( Trail& trail, const K* key, PageIndex keySize, PageLink link )" );
             if (trail.depth() == 0) {
                 if (MaxHeight < (root->depth + 1)) throw signature + " - Max B-tree heigth exceeded";
                 PageLink linkRoot = root->page;
@@ -743,7 +743,7 @@ namespace BTree {
         // Returns null if there is no previous page
         template< class VT = V, bool AV = VA>
         Page<K,VT,KA,AV>* previousPage( Trail& trail ) {
-            static const std::string signature( "Page<K,VT,KA,AV>* previousPage( Trail& trail )" );
+            static const std::string signature( "Page<K,VT,KA,AV>* BTree<K,V,KA,VA>::previousPage( Trail& trail )" );
             if ( trail.previousPage<K,KA>() ) {
                 const PageHeader* header = trail.indexedHeader<K,KA>();
                 if (0 < header->count) {
@@ -760,7 +760,7 @@ namespace BTree {
         // Returns null if there is no next page
         template< class VT = V, bool AV = VA>
         Page<K,VT,KA,AV>* nextPage( Trail& trail ) {
-            static const std::string signature( "Page<K,VT,KA,AV>* nextPage( Trail& trail )" );
+            static const std::string signature( "Page<K,VT,KA,AV>* BTree<K,V,KA,VA>::nextPage( Trail& trail )" );
             if ( trail.nextPage<K,KA>() ) {
                 const PageHeader* header = trail.indexedHeader<K,KA>();
                 if (0 < header->split) {
@@ -897,11 +897,16 @@ namespace BTree {
                 }
             } else o << "Invalid page link " << link << "\n";
         }
+
+    protected:
+
         void stream( std::ostream & o ) const {
             o << "Root\n";
             for (int d = root->depth; 0 <= d; d--) streamPage( o, root->page, d );
         }
 
+    private:
+    
         struct Iterator 
         {
             using iterator_category = std::forward_iterator_tag;

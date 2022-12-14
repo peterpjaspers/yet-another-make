@@ -65,7 +65,7 @@ namespace BTree {
         freedPage->free = 1;
         freePages.push_back( link );
     };
-    // Return the address of the page indexed by the a PageLink.
+    // Return the address of the page indexed by a PageLink.
     PageHeader* PagePool::reference( const PageLink& link ) const {
         static const std::string signature( "PageHeader* PagePool::reference( const PageLink& link ) const" );
         if (link.null()) { return nullptr; }
