@@ -33,27 +33,31 @@ namespace YAM
     // rehash(..) function. rehashAll() will re-compute all known hashes.
     // 
     // The intended use of addAspect, hashOf and rehash functions is described 
-    // for the following scenarios:
-    //   1) Source file F is detected as input of command C
-    //   2) Output file F ia produced by command node C
-    //   3) Output file F produced by command P is detected as input by command C
+    // for the following scenarios (C and P are command nodes):
+    //   1) Source file F is detected as input of C
+    //   2) Output file F is produced by C
+    //   3) Output file F, produced by command P, is detected as input of C
     //  
-    // 1) Source file F is detected as input of command C
+    // 1) Source file F is detected as input of C
     // C will act as follows:
     //     if file node F does not exist:
     //         - create file node F
+    //           Note:creating file node for F must be done in main thread 
+    //           context because graph is not thread-safe.
     //         - execute F (to retrieve last_write_time and compute aspect hashes
     //           and move file node to Ok state)
+    //         - Note: multiple concurrent command executions may discover F as
+    //           input. Take care to create and execute node F only once.
     //     if F.addAspect(aspectRelevantToC), i.e. aspect was not known:
     //         - call rehash(aspectRelevantToC) 
     //     add F to C's input files and prerequisites
     //     compute executionHash from the inputs, outputs and script hashes
-    //     cache executionHash
+    //     cache executionHash in member field of C
     // During next build: once C's prerequisites have been executed C's 
     // pendingStartSelf will compare the cached executionHash with the current
     // executionHash to detect whether re-execution of C is needed.
     // 
-    // 2) Output file F is produced by command node C
+    // 2) Output file F is produced by C
     // Output file node F is created when C is created (note that at that time
     // file F does not yet exist). C adds the entireFile aspect to F and adds
     // F to its prerequisites in order to be able to detect that F has been 
@@ -65,24 +69,24 @@ namespace YAM
     // C's execution has written new content to F). C calls rehashAll() to force 
     // F to re-compute all of its known aspect hashes.  
     // 
-    // 3) Output file F produced by command P is detected as input by command C
+    // 3) Output file F, produced by P is detected, as input of C
     // On first detection of input F by C the relevant aspect needed by C may
     // not yet be known by F.
     // If relevant aspect was unknown by F:
     //      - C adds the relevant aspect to F
-    //      - C calls rehash(aspectRelevantToC) to compute and cache the hash
-    //      - C calls hashOf(aspectRelevantToC) to compute C's new executionHash
-    // If the relevant aspect was known by F:
-    //      - C calls hashOf(aspectRelevantToC) to compute C's new executionHash
+    //      - C calls F.rehash(aspectRelevantToC) to compute and cache the hash
+    //      - C uses F.hashOf(aspectRelevantToC) to compute C's executionHash
+    // Else:
+    //      - C uses F.hashOf(aspectRelevantToC) to compute C's executionHash
     // 
-    // Note: all file aspect hash computation takes place in thread-pool
-    // context, either as part of the file node's execution or as part of the
-    // command node's execution.
+    // Note: care must be taken that all file aspect hash computation is done 
+    // in thread-pool context, either as part of the file node's execution or
+    // or as part of the command node's execution.
     //
-    // Note: a file node maintains one last-write-time for all aspect hashes.
+    // Note: a file node F maintains one last-write-time for all aspect hashes.
     // The last-write-time is only updated by the node execution and rehashAll.
-    // In the same build rehash calls to the node can be made after its execution. 
-    // In the interval between node execution and rehash call the user may 
+    // In the same build rehash calls to F can be made after F's execution. 
+    // In the interval between F's execution and rehash call the user may 
     // have modified the (source) file, resulting in the hashes to have been
     // computed from different file versions. This is not a problem because the
     // file node will re-compute all hashes during the next build because of 
@@ -95,27 +99,36 @@ namespace YAM
     // last-write-time has not changed) and the command will not re-execute,
     // resulting in wrong content of the command's output files.
     // This problem can be fixed in several ways:
-    //    - Do not allow modification of source files during the build.
-    //    - Capture last-write-times and hash code of all source files before
-    //      using them.
-    //      Because input files are detected after the build this can only
-    //      be implemented by scanning the entire directory tree before
-    //      doing the build. This requires that source files can be distinguished
-    //      from generated files (e.g. store source and generated files in seperate
-    //      directories).
-    //    - Detect which source files are modified during the build.
-    //      At next build force the commands that used these files as input
-    //      to re-execute.      
-    //  
+    //    1- Do not allow modification of source files during the build.
+    //    2- Capture last-write-times and hash code of all source files before
+    //       using them.
+    //       Because input files are detected after the build this can only
+    //       be implemented by creating file nodes for all files in the worktree
+    //       before starting cmd node execution. Note that source files can
+    //       easily be distinguished from generated files because yam requires
+    //       all output (==generated) files to be specified in the build file.
+    //    3- Detect which source files are modified during the build.
+    //       At next build force the commands that used these files as input
+    //       to re-execute.      
+    // Option 1 is not user-friendly and not easy to implement.
+    // Option 2 is easy to implement but may result in more file nodes than
+    // actually used as inputs. It also simplifies handling input file
+    // detection during cmd node execution because the file node already
+    // exists at that time.
+    // Option 3 may cause unnecessary re-builds in case the file was modified 
+    // before it was used as input. Also different commands may use the same 
+    // input at different times. This complicates the implementation.
+    // 
     // Note: a user may tamper with an output file in the time interval between
-    // the time that the command that produced the file updated it and the 
-    // computation of the output file's entireFile hash (which happens after 
-    // command completion). In this case the next build will not detect that the
-    // file has changed (because last-write-time has not changed) and the command
-    // will not re-execute, resulting in wrong content of the output file. This 
-    // problem can be fixed by detecting during the build which output files are 
-    // modified by other actors than commands. At next build force the commands that
-    // produced these files to re-execute.
+    // the time of its update by the command script and the time of the 
+    // retrieval/computation of its last-write-time and hash (which happens 
+    // after command completion). In this case the next build will not detect
+    // that the file has changed (because last-write-time has not changed) and
+    // will not re-execute the command, resulting in wrong content of the 
+    // output file. 
+    // This problem can be fixed by detecting, during the build, which output 
+    // files are modified by other actors than commands and, at the next build,
+    // force the commands that produced these files to re-execute.
     // 
     class __declspec(dllexport) FileNode : public Node
     {
@@ -147,6 +160,7 @@ namespace YAM
 
         // Pre: state() == State::Ok
         // (Re-)compute the hash of given aspect, cache it and return it.
+        // Do not update the cached last-write-time.
         // Throw exception when aspect is unknown.
         XXH64_hash_t rehash(std::string const& aspectName);
 

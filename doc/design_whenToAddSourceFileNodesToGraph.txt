@@ -1,34 +1,56 @@
+Output file nodes are specified in the build files and hence are added to the
+graph before command node execution.
 
-- When to add sourcefile nodes to the graph?
+But when to add a source file node to the graph?
 	1) when it is detected as input file of a command node
-	2) upfront, adding all source files in the repository
-  Option 1) has the disadvantage that sourcefile hash is computed after it has been used as input.
-  When the user modifies the sourcefile after it was used as input and before its hash is computed (which
-  happens after script completion) then this invalidates the output file. This would not be a problem
-  if the command node is re-executed at next build. The current implementation however will fail to do so:
-      - the lastWriteTime and hash of the modified file are recorded after script completion.
-      - the file modification will be detected by the 'file modification detector' and the file will be set 
-        Dirty at next build.
-      - At next build hash filenode will not recompute hash because lastWriteTime has not changed (unless 
-        user made more modifications to file). But even if filenode did recompute the file hash then it would 
-        still be the same.
-      - Result: command node 'sees' unchanged input file and does not re-execute itself.
-  In mrmake this was solved by forcing a re-compute of all parents of the files-modified-during-build
-  Note that the same problem (and solution) applies to outputfiles that are tampered with between their time 
-  of creation and time of hash computation. The problem however is more complex because outputfiles are (by intent)
-  modified during the build by the command script. This requires YAM to distinguish between file modification 
-  notifications caused by the command script and caused by other actors. In mrmake that was possible because
-  CBFS modification notification is synchronous and provides the process id that caused file modification.
+	2) adding (and hashing) all source files in the repository before start
+    of command node execution.
+
+  Option 1) has the disadvantage that source file hash is computed after it has 
+  been used as input. When the user modifies the source file after it was used 
+  as input and before its hash is computed (which happens after script 
+  completion) then this invalidates the output file. This would not be a 
+  problem if the command node is re-executed at next build. The current 
+  implementation however will fail to do so:
+      - the lastWriteTime and hash of the modified file are recorded after 
+        script completion.
+      - the file modification will be detected by the 'file modification 
+        detector' and the file node will be set Dirty at next build.
+      - At next build the filen ode will not recompute hash because 
+        lastWriteTime has not changed. But even if filenode did recompute the
+        file hash then it would still be the same.
+      - Result: command node 'sees' unchanged input file and does not 
+        re-execute itself. 
+        
+  In mrmake this was solved by forcing a re-compute of all parents of the 
+  files-modified-during-build.
+
+  The same problem (and solution) applies to output files that are tampered 
+  with between their time of creation and time of hash computation.
+  This problem however is more complex because output files are (by intent)
+  modified during the build by the command script. This requires YAM to 
+  distinguish between file modification notifications caused by the command 
+  script and caused by other actors. In mrmake that was 'easy' because CBFS
+    - file-access notification is synchronous and provides the id of the 
+      process that accessed the file
+    - process-creation/destruction notification is synchronous and allows 
+      reconstruction of the process tree in which the file is modified, 
+      allowing the file-accessed to be traced-back to the command script.
   
-  Option 2) does not have the complication of option 1). It will however add file nodes that will never be
-  used as inputs of command nodes and thus increase graph size unnecessarily. It is also no solution for modification
-  of output files during the build.
+  Option 2) does not have the complication of option 1). It will however add
+  file nodes that will never be used as inputs of command nodes and thus 
+  increase graph size unnecessarily. It is also no solution for modification
+  of output files during the build (because output files are modified by the
+  build itself).
 
-  Note that YAM's promise is that, in absence of file modifications since last build, all outputfiles are up-to-date and 
-  all obsolete outputfiles have been deleted. Hence ideally tampering with outputfiles would never be needed.
-  In practice however, even with a flawless YAM, engineers often force a "clean" build by deleting outputfiles. 
-  This is not without rationale: even though YAM may be flawless the build scripts themselves may be not.
+ YAM's promise is that, in absence of file modifications during and since last
+ build, all output files are up-to-date and all obsolete output files have been
+ deleted. Hence ideally tampering with output files would never be needed. In
+ practice however, even with a bug-free YAM, engineers often force a "clean" 
+ build by deleting output files. This is not without rationale: even when YAM
+ would be bug-free the build scripts themselves may not be bug-free.
 
-  Edits of source files during a build are happen frequently and are part of normal workflow.
+  Edits of source files during a build happen frequently and are part of normal
+  workflow.
 
   Conclusion: YAM must be robust for both cases.
