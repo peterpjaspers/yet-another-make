@@ -54,3 +54,21 @@ But when to add a source file node to the graph?
   workflow.
 
   Conclusion: YAM must be robust for both cases.
+
+  Decision made by Phil and Peter dd 2022-12-29:
+  - implement option 2), add (and hash) source file nodes for all source files
+    in the worktree before starting command node execution.
+  - between builds yam server processes file modification requests as follows:
+        fileNode = nodes[fileName]
+        if (fileNode == null) fileName = addFileNode(fileName)
+        fileNode.state = Dirty; // recursively propagated to fileNode.parents
+  - when a file node is set Dirty yam stores it in a list of dirty filenodes.
+    This to avoid having to access all nodes to find the dirty file nodes.
+  - when a cmd node is set Dirty yam stores it in a list of dirty cmd nodes.
+    This to avoid having to access all nodes to find the dirty cmd nodes.
+  - between builds yam server periodically executes dirty file nodes.
+    This to perform file node hashing as much as possible in background.
+  - at build time: yam executes all remaining Dirty file nodes before starting 
+    cmd node execution.
+  - yam only executes dirty cmd nodes that are in build scope
+ 

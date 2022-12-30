@@ -13,9 +13,8 @@ cache can be winked-in (re-used) from the cache by a build in worktree DST
 when:
     - the build scripts to generate G in DST and SRC are equal
     - AND DST and SRC have the same output file path names
-    - AND all input files of G in SRC exist in DST
-    - AND all input files of G in SRC are identical to the ones in DST,
-      i.e. the input file aspect hashes of G in SRC and DST are identical. 
+    - AND all input files of G in SRC exist and are identical to the ones
+      in DST, i.e. the input file aspect hashes are identical. 
 Note: input files can be both source files and generated files.
 Note: winkin can be implemented in various ways. The most simple one is
 to copy G from winkin cache to DST worktree. Other implementations may 
@@ -41,16 +40,19 @@ DST/S.obj are not binary identical. If the file aspect hashes do not exclude
 the non-deterministic parts of the object files then the hashes of SRC/S.obj 
 and DST/S.obj will be different and the winkin criteria for A.dll are not met.
 Pseudo code:
-    - Node::pendingStartSelf() {
-            // return whether output is out-dated.
-            // selfExecute is only executed when output is out-dated.
-            return _executionHash != computeExecutionHash()
-        }
-    - selfExecute():
-        if (outputFile cannot be winked-in from cache) {
-            execute build script (i.e. (re-)generate outputFile)
-        } else {
-            copy SRC/outputFile to DST/outputFile // winkin
+    - void Node::pendingStartSelf() {
+          // return whether output is out-dated
+          // selfExecute to be executed (async in thread pool) when output
+          // is out-dated.
+          return _executionHash != computeExecutionHash()
+      }
+    - void selfExecute() {
+          if (outputFile cannot be winked-in from cache) {
+              execute build script (i.e. (re-)generate outputFile)
+          } else {
+              copy SRC/outputFile to DST/outputFile // winkin
+          }
+      }
 
 -- Work-around in mrmake for winkin in case of non-deterministic hashes
 The problem is worked-around by mrmake's forcedWinkin option.
@@ -63,22 +65,24 @@ Build logic:
             // I.e. set A.dll and S.obj to Dirty.
             // Note: pendingStartSelf() is only called on Dirty nodes
         }
-    - Node::pendingStartSelf() {
-            return forcedWinkin || _executionHash != computeExecutionHash()
-            // I.e. always selfExecute in case of forcedWinkin
-        }
-    - selfExecute():
-        if (outputFile cannot be winked-in from cache) {
-            execute build script (i.e. (re-)generate outputFile)
-        } else {
-            if (outputFile is not up-to-date) {
-                copy SRC/outputFile to DST/outputFile // winkin
-            } else if (
-                forcedWinkin 
-                && (hashOf(SRC/outputFile) != hashOf(DST/outputFile)
-            ) {
-                copy SRC/outputFile to DST/outputFile // force winkin
-            }
+    - bool Node::pendingStartSelf() {
+          return forcedWinkin || _executionHash != computeExecutionHash()
+          // I.e. always selfExecute in case of forcedWinkin
+      }
+    - void selfExecute() {
+          if (outputFile cannot be winked-in from cache) {
+              execute build script (i.e. (re-)generate outputFile)
+          } else {
+              if (outputFile is not up-to-date) {
+                  copy SRC/outputFile to DST/outputFile // winkin
+              } else if (
+                  forcedWinkin 
+                  && (hashOf(SRC/outputFile) != hashOf(DST/outputFile)
+              ) {
+                  copy SRC/outputFile to DST/outputFile // force winkin
+              }
+          }
+      }
  
 Note that forcedWinkin adds some overhead because already up-to-date nodes 
 are re-visited.
@@ -157,7 +161,6 @@ Store the build output of a cmd node as follows:
         XXH64_hash_t CommandNode::computeWinkinHash() {
             return computeHash(
                 computeHash(_script), 
-                computeHash(getNamesOf(_inputFiles)), 
                 computeHash(getNamesOf(_outputFiles)), 
                 computeHash(getHashesOf(_inputFiles)));
     - store the cmd output files in the winkin cache in a location identified
@@ -175,75 +178,78 @@ When building an out-dated cmd node find winkin-able files:
       }
 
 
--- Why Yam cannot realize O(1) winkin overhead
+-- O(N) winkin in yam
 As we have seen in the Bazel winkin discussion O(1) overhead requires
 a-priori knowlegde of all inputs. Yam however does not have this a-priori 
 knowledge because inputs are discovered during cmd execution. Therefore yam
 can only realize O(N) overhead where N is the number of cached versions
-of the cmd. Cached versions differ in cmd script and/or inputs and/or
+of a cmd. Cached versions differ in cmd script and/or inputs and/or
 outputs names and/or input versions (i.e. input file aspect hashes).
 
 For yam the caching can be implemented as described below.
 
-Store the build output of a cmd node in the winkin cache
-    - store cmd output files:
-        - Compute output hash
-            XXH64_hash_t CommandNode::computeOutputHash() {
-                return computeHash(
-                    computeHash(getHashesOf(_outputFiles)));
-        - store the cmd output files in the output cache in a location 
-          identified by the output hash
-        - the output cache supports O(1) lookup of the output files location by
-          means of lookup table {outputHash => (output files location, ref count}
-          Note: multiple commands with different winkin caches can have identical
-          output files. Therefore also keep track of reference count.
-          Note: optionally output storage can be done on a per-file basis. cmd 
-          metadata then stores output hash per file.
-    - store cmd metadata
-        - compute the winkin hash:
-            XXH64_hash_t CommandNode::computeWinkinHash() {
-                return computeHash(
-                    computeHash(_script), 
-                    computeHash(getNamesOf(_inputFiles)), 
-                    computeHash(getNamesOf(_outputFiles)), 
-                    computeHash(getHashesOf(_inputFiles)));
-        - metadata contains: script, names of input+output files, winkin hash,
-          output hash
-        - compute the metadata hash:
-            XXH64_hash_t CommandNode::computeMetadataHash() {
-                return computeHash(
-                    computeHash(_script),  
-                    computeHash(getNamesOf(_outputFiles)));
-            }
-          Note: multiple cmd versions can have same metadata hash. 
-        - store metadata in a set of metadata in the winkin cache in a O(1)
-          lookup table {metadata hash => set of metadata}
-        
-When building an out-dated cmd node find winkin-able files:
-    - compute the metadata hash of the out-dated node
-    - lookup the set of cached metadata by metadata hash
-      if (metadata set found) {
-          - if (!winkinFrom(setOfMetadata))
-                execute cmd script
-            }
-          - bool winkinFrom(setOfMetadata) {
-              foreach metadata in setOfMetaData {
-                  - compute hashes of metadata.inputFiles in the worktree
-                  - compute the winkin hash of the out-dated cmd node as
-                    computeHash(
-                        computeHash(_script), 
-                        computeHash(getNamesOf(metadata._inputFiles)), 
-                        computeHash(getNamesOf(_outputFiles)), 
-                        computeHash(getHashesOf(metadata._inputFiles)))
-                  - if (winkin hash == metadata.winkinHash)
-                        re-use the output files in cache[metadata.outputHash]
-                        return true;
-                    }
-              }
-              return false;              
-      } else {
-          execute cmd script
+Store the build output of a cmd node in the winkin cache.
+    - metaData contains: metaDataHash, inputFilesHash, executionHash
+        and inputFileNames.
+    - metaData.metaDataHash = cmd.computeMetaDataHash()
+    - XXH64_hash_t CommandNode::computeMetaDataHash() {
+          return computeHash(
+              computeHash(_script),  
+              computeHash(getNamesOf(_outputFiles)));
       }
+    - metaData.inputFilesHash = cmd.computeInputFilesHash()
+    - XXH64_hash_t CommandNode::computeInputsHash() {
+          return computeHash(getHashesOf(_inputFiles));
+      }
+    - metaData.executionHash = cmd._executionHash.
+        See design_computeExecutionHash.txt for details on how the
+        executionHash is computed.
+    - metaData.inputFilenames = cmd.inputFileNames
+    - winkinCache contains a O(1) lookup table for metaData storage.
+      winkinCache.metaData {metaDataHash => setOfMetaData} where
+      setOfMetaData is a O(1) lookup table {executionHash => metaData}
+    - winkinCache contains a O(1) lookup table for outputFiles storage.
+      winkinCache.outputFiles {executionHash => set of output files}
+    - void storeInWinkinCache(cmd) {
+          metaData = createMetaDataFrom(cmd)
+          setOfMetaData = winkinCache.metaData[metaData.metaDataHash]
+          if (setOfMetaData.contains(metaData.executionHash)) {
+              // do not store duplicate cmd versions
+          } else {
+              setOfMetaData[metaData.executionHash] = metaData
+              winkinCache.outputFiles[metaData.executionHash] = copyOf(cmd.outputFiles)
+          }
+      }
+        
+Building an out-dated cmd node with winkin:
+    void CommandNode::executeSelf() override {
+        metaDataHash = computeMetaDataHash()
+        metaDataSet = winkinCache.metaData[metaDataHash].values()
+        if (metaDataSet == null) || !winkinFrom(metaDataSet))  
+            execute cmd script
+        }
 
-
-
+    // Try to winkin from given set of cached cmd versions.
+    // Return whether winkin is performed.
+    bool winkinFrom(metaDataSet) {
+        foreach metaData in metaDataSet {
+            // We already know from metaDataHash that the cached cmd and the
+            // out-dated cmd have same script and same set of outputfiles.
+            inputFilesHash = computeHash(computeFileHashes(metaData._inputFileNames))
+            if (inputsFileHash == metadata.inputsFileHash) {
+                // We now also know that the input files of the cached cmd 
+                // exist in the worktree of the out-dated cmd and have same 
+                // hashes. Hence we can re-use the output files of the cached cmd.
+                outdatedCmd.outputFiles = winkinCache.outputFiles[metadata.executionHash]
+                return true;
+            }
+        }
+        return false;
+    }
+  
+  Some attention points:
+    - computeFileHashes computes the input file aspect hashes
+    - cached cmd may have used different input aspects and/or hash 
+      implementations than out-dated cmd. Probably not a problem
+      because in that cases the inputFilesHash will not match and
+      out-dated cmd script be executed.

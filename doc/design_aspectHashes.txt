@@ -1,117 +1,133 @@
 A command node computes output files from a set of input files. 
-YAM stores the versions of the used input and produced output files by means of their hashes.
-When input files are modified their hashes are recomputed. 
-A command node 'remembers' the hashes of the input files by storing its executionHash:
-	executationHash = hashOf(hashes of input files, output files, script) 
-The command node detects changes in input/output/script by comparing the stored executionHash
-with the current executionHash. A changed executationHash results in re-execution of 
-the command script.
+YAM stores the versions of the used input and produced output files by means
+of their hashes. When input files are modified their hashes are recomputed. 
+A command node 'remembers' the hashes of its input files by making them part 
+of the cmd's executionHash, see file design_computeExecutionHash.txt.
+The command node detects changes in script/input/output by comparing the 
+executionHash of its last execution with the current executionHash. A changed
+executationHash results in re-execution of the command script.
 
 Often only part of the content of an input file is relevant to the computation.
-E.g. a C++ compile command has .h and .cpp input files. The comments in these files are irrelevant for
-the compilation. The command node can use a hash of the input file that only hashes the code
-sections and excludes the comment sections. Changing comments in the file will not change this  
-hash and hence will not result in recompilation.
-E.g. a dll or exe that depends on a dll is linked with the import library .lib file of that dll.
-Only the exported symbols (i.e. the interface of the dll) in the .lib file are relevant when
-linking the dll/exe with the .lib file. Changing the implementation of the dll will not affect
-the exported symbols and hence will not affect the hash of the exported symbols and hence will 
-not result in relinking of the dlls/exes that link the .lib file.
+E.g. a C++ compile command has .h and .cpp input files. The comments in these 
+files are irrelevant for the compilation. The command node can use a hash of 
+the input file that only hashes the code sections and excludes the comment 
+sections. Changing comments in the file will not change this hash and hence 
+will not result in recompilation.
+E.g. a dll or exe that depends on a dll is linked with the import library .lib
+file of that dll. Only the exported symbols (i.e. the interface of the dll) in
+the .lib file are relevant when linking the dll/exe with the .lib file. 
+Changing the implementation of the dll will not affect the exported symbols and
+hence will not affect the hash of the exported symbols and hence will not 
+result in relinking of the dlls/exes that link the .lib file.
 
-How to define the mapping CommandNode -> input file -> relevant aspect?
-Option 1: define the mapping as part of the command rule in the build file
-Option 2: define the mapping by means of input and output file patterns, i.e. by file naming conventions.
-Note that Command node scripts are derived (instantiated) from rule templates. All command nodes derived from
-the same template produce output files with the same file extensions.
-E.g. a compile command has .obj output files and .h and .cpp input files.
-E.g. a dll link command has .dll output file and .obj and/or .importlib and/or .staticlib input files.
-In YAM command node names are derived from the first output file name. This suggests that option 2 is a
-convenient way to define the mapping. 
+Command nodes are derived (instantiated) from build rules.
+E.g. in tup command nodes are derived from 'foreach' rules. A rule
+defines (amongst others) the command script. It is the (type of) command script
+that determines which aspects of input files are relevant. Hence the build
+rule must define its input file aspects: for each possible input file type 
+the relevant aspect of that file. 
+Note that multiple script types can have the same input file aspects. 
+E.g. debug and release compilation scripts have same input file aspects.
 
-The user can configure YAM (following option 2) by configuring FileAspects, FileAspectHashers and 
-InputFileAspects:
+The user can configure YAM for use of input file aspects by configuring 
+FileAspects, FileAspectHashers and InputFileAspects:
 
 A FileAspect object has 2 properties:
-    - aspectName - the name of the aspect being hashed, e.g. "cpp-code", "dllExports"
-    - one or more filename patterns (regexes) - the aspect is applicable for files whose name match
-      one of the patterns. E.g. C++ input files of a compilation match \.cpp$, \.c$, \.h$ patterns.
+    - aspectName - the name of the aspect being hashed, e.g. "cpp-code", 
+      "dllExports"
+    - set of filename patterns (regexes) - the aspect is applicable for
+      files whose name match one of the patterns. E.g. a C++ input file for a 
+      compilation script matches one of \.cpp$, \.c$, \.h$ patterns.
 
 A FileAspectHasher object has 2 properties:
     - aspect (FileAspect) to be hashed
     - hasher function - a function that hashes the aspect of the file
 
 An InputFileAspects object has 2 properties:
-    - set of FileAspects - the relevant file aspects for input files of a specific outputfile type. 
-    - output filename pattern (regex) - the inputfile aspects applies to commands whose first outputfile 
-      matches the output filename pattern.
+    - set of FileAspects
+      A set of input file aspects that are relevant for some type of command
+      script.
+    - name 
+      The name of the set. A build rule for which this set is applicable
+      references the set by this name.
 
-How to deal with overlapping patterns? E.g. \.obj$ (for commands with some default list of compiler options) 
-and _special\.obj$ (for commands with a special list of compiler options). One way to derive pattern precedence
-from pattern length. E.g. InputFileAspects can be ordered by decreasing outputfile pattern length.
-For FileAspect this is a bit more complex because a fileaspect may have multiple patterns. Here we can use a
-dictionary {pattern => fileaspect} ordered by decreasing pattern length.
+To avoid unnecessary re-execution a CommandNode computes its executionHash by
+using for each input file the hash of the file aspect relevant for that 
+command. The command node references the set of relevant input aspects by the
+name of an InputFileAspects object.
+E.g. a C++ compile command will use the cpp-code aspect hasher for .cpp and .h
+     input files
+E.g. a packing command will use the entireContent hasher, irrespective of file
+     type.
+E.g. a C# assembly creation command will use the dotNetAssemblyInterface hasher 
+     for its assembly dependencies. 
+E.g. a C++/C link command will use the dllExports hasher for dll import 
+     libraries.
+     Note: dll import lib has default file extension .lib. Static libs however
+     use the same extension. This can be solved by the hasher detecting the 
+     actual file type (like done in mrmake) or by using file naming conventions
+     that allow one to distinguish between import libs and static libs.
 
+FileAspects, FileAspectHashers and InputfileAspects definitions are read from a
+configuration file. Command nodes query the configuration to find the 
+relevant input file aspects. File nodes query this configuration to find the
+applicable file aspects and to find the associated hasher functions.
 
-To avoid unnecessary re-execution a CommandNode uses, in its executionHash, for each input file the hash of
-the file aspect relevant for that command (as defined in the InputFileAspects object that matches the command's
-first outputfile name).
-E.g. a C++ compile command will use the cpp-code aspect hasher for .cpp and .h input files
-E.g. a packing command will use the entireContent hasher, irrespective of file type.
-E.g. a C# assembly creation command will use the dotNetAssemblyInterface hasher for its assembly dependencies. 
-E.g. a C++/C link command will use the dllExports hasher for dll import libraries.
-     Note: dll import lib has default file extension .lib. Static libs however use the same extension.
-     This can be solved by the hasher detecting the actual file type (like done in mrmake) or by using
-     file naming conventions that allow one to distinguish between import libs and static libs.
-
-FileAspects, FileAspectHashers and InputfileAspects definitions are read from a configuration file. 
-For each command node the matching InputFileAspects object is associated with the command node and for all
-aspects in InputFileAspects the FileAspectHasher is determined.
-Some changes in this configuration required commands to re-execute.
-E.g. assume that for one or more of the command's inputfiles a different input file aspect is configured.
-Further assume that, since the commands last execution, one or more hashes of these different aspects has
-changed while none of the hashes of the previously configured aspects has changed. In the old situation the
-command did not need re-execution while it does not re-execution in the new situation.
+Some changes in this configuration require commands to re-execute.
+E.g. assume that for one or more of the command's inputfiles a different input 
+file aspect is configured. Further assume that, since the commands last 
+execution, one or more hashes of these different aspects has changed while 
+none of the hashes of the previously configured aspects has changed. In the old
+situation the command did not need re-execution while it would need 
+re-execution in the new situation.
 Similar need to re-execute exists when a (bug in a) hash function has changed.
-The command node can detect such changes by including the hashes of InputFileAspects and FileAspectHashers
-in its executionHash.
+The command node can detect such changes by including the hashes of 
+InputFileAspects and FileAspectHashers in its executionHash.
 
-FileAspects, FileAspectHashers and InputFileAspects are best stored in a single configuration file to simplify
-detection of duplicate aspect names, references to non-existing aspects (from InputFileAspects) and duplicate
-outputfile patterns.
+FileAspects, FileAspectHashers and InputFileAspects are best stored in a single
+configuration file to simplify detection of duplicate aspect names, references
+to non-existing aspects (from InputFileAspects) and duplicate outputfile 
+patterns. Hasher functions are linked in Yam executable and their address are
+resolved at runtime via lookup by function name (e.g. in Windows by means of 
+GetProcAddress).
 
-FileAspects, FileAspectHashers and InputFileAspects are stored in the ExecutionContext.
-This is used by CommandNode and FileNode as follows:
+FileAspects, FileAspectHashers and InputFileAspects are stored in the 
+ExecutionContext. This is used by CommandNode and FileNode as follows:
 	- command node:
-                - executes script and detect input files
-		- queries (MT-safe) ExecutionContext for its InputFileAspects
-                - executionHash = hash(
-                      hashes of relevant aspects of input files, 
-                      hashes of (entire content) of output files, 
-                      hash of used InputFileAspects
-                      hash of command script)
-                - pendingStartSelf compares stored executionHash with current one
-	- input file get hash of some aspect:
-		- if hash already computed: return it
-		- else
-			- query (MT-safe) ExecutionContext for FileAspectHasher of requested aspect
-                        - use hasher to compute aspect hash
-			- store hash in in member var (std::map<aspectName => hashValue>)
-                          This must be MT-safe (even though no updates will take place during build).
-                	- executionHash = hash(hashes of FileAspectHashers)
-                - pendingStartSelf compares stored executionHash with current one
-	- once a hash for a certain aspect is requested the input file will always compute that hash during
-	  its self-execution.
-	- the aspect is removed from the input files when the hasher for the aspect is removed from the configuration
-          (and consequently the aspect is removed from all InputFileAspects)	
+        - executes script and detects input files
+		- queries ExecutionContext for its InputFileAspects 
+        - executionHash = hash(
+                hashes of relevant aspects of input files, 
+                hashes of (entire content) of output files, 
+                hash of used InputFileAspects and aspect hash functions
+                hash of command script)
+        - pendingStartSelf compares stored executionHash with current one
+	- input file node:
+		- stores hashes in member var hashes (std::map<aspectName => hashValue>)
+        - computes the applicable aspect hashes:
+		    - query ExecutionContext for all FileAspects that match the file
+            - query ExecutionContext to find associated FileAspectHashers
+            - use hashers to compute aspect hashes
+            - clear member var hashes and store new hashes in it
+        - compute executionHash = hashOf(relevant FileAspects + hashers)
+        - only (re)compute hashes when last-modification-time OR 
+          executionHash has changed.
 
-TODO: more analysis needed to determine design.
-Removing a pattern requires the aspect to be removed from all FileNodes that are no longer applicableFor the
-modified aspect.
-Removing a hasher requires the aspect to be removed from all FileNodes.
+Marking file nodes Dirty on changed aspects configuration.
+Hasher definitions are taken from a configuration file. Whenever this file 
+changes all source and generated FileNodes are marked Dirty.
+Parsing of the file could be done by a dedicated build file node. When this 
+node executes it mark all filenodes Dirty.
 
-When are hashers added/modified/removed?
-Hasher definitions are taken from a configuration file. Whenever this file changes all FileNodes need to be
-inspected.
-Parsing of the file could be done by dedicated build file node. When this node needs re-parse it must put all
-filenodes in suspended state, then reparse, then update filenodes when needed (i.e. when hashers were 
-added/modified/removed), then resume filenodes.
+-- 2022-12-30
+Yesterday the decision was made to create file nodes for all source files in 
+the worktree and to compute their aspect hashes before starting cmd execution.
+This means that relevant aspects must be added to the source file nodes when
+(modified) build files are parsed/processed. The intial idea was to start
+a cmd execution as soon as the cmd was in sync with its build file definition.
+This needs to be adapted to: commmand execution can be started when
+    - all file nodes have been configured with the relevant source file 
+      aspects, as defined in the build files. Given above design this means
+      that the dedicated 'aspect configuration build file node' must have 
+      executed.
+    - the cmd node is in sync with the build file that defined that cmd.
