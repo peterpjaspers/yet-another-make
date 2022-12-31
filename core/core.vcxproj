@@ -100,8 +100,6 @@
     <ClInclude Include="ExecutionContext.h" />
     <ClInclude Include="ExecutionStatistics.h" />
     <ClInclude Include="FileAspect.h" />
-    <ClInclude Include="FileAspectHasher.h" />
-    <ClInclude Include="InputFileAspects.h" />
     <ClInclude Include="RegexSet.h" />
     <ClInclude Include="FileAspectSet.h" />
     <ClInclude Include="GeneratedFileNode.h" />
@@ -120,8 +118,6 @@
     <ClCompile Include="ExecutionContext.cpp" />
     <ClCompile Include="ExecutionStatistics.cpp" />
     <ClCompile Include="FileAspect.cpp" />
-    <ClCompile Include="FileAspectHasher.cpp" />
-    <ClCompile Include="InputFileAspects.cpp" />
     <ClCompile Include="RegexSet.cpp" />
     <ClCompile Include="FileAspectSet.cpp" />
     <ClCompile Include="GeneratedFileNode.cpp" />

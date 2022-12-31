@@ -6,8 +6,12 @@ namespace
 {
 	using namespace YAM;
 
+	Delegate<XXH64_hash_t, std::filesystem::path const&> const& entireFileHasher = FileAspect::entireFileAspect().hashFunction();
+
 	TEST(FileAspectSet, construct) {
-		FileAspectSet set;
+		std::string setName("setName");
+		FileAspectSet set(setName);
+		EXPECT_EQ(setName, set.name());
 		EXPECT_TRUE(set.aspects().empty());
 		EXPECT_FALSE(set.find("entireFile").first);
 		EXPECT_FALSE(set.find("cpp-code").first);
@@ -16,7 +20,7 @@ namespace
 
 	TEST(FileAspectSet, add) {
 		FileAspectSet set;
-		FileAspect aspect("cpp-code", RegexSet({ "\\.cpp$" }));
+		FileAspect aspect("cpp-code", RegexSet({ "\\.cpp$" }), entireFileHasher);
 		set.add(aspect);
 		EXPECT_EQ(1, set.aspects().size());
 		EXPECT_TRUE(set.find("cpp-code").first);
@@ -25,8 +29,8 @@ namespace
 
 	TEST(FileAspectSet, remove) {
 		FileAspectSet set;
-		FileAspect aspect1("cpp-code", RegexSet({ "\\.cpp$" }));
-		FileAspect aspect2("c-code", RegexSet({ "\\.c$" }));
+		FileAspect aspect1("cpp-code", RegexSet({ "\\.cpp$" }), entireFileHasher);
+		FileAspect aspect2("c-code", RegexSet({ "\\.c$" }), entireFileHasher);
 		set.add(aspect1);
 		EXPECT_EQ(1, set.aspects().size());
 		set.remove(aspect2);
@@ -37,26 +41,27 @@ namespace
 
 	TEST(FileAspectSet, clear) {
 		FileAspectSet set;
-		FileAspect aspect1("cpp-code", RegexSet({ "\\.cpp$" }));
-		FileAspect aspect2("c-code", RegexSet({ "\\.c$" }));
+		FileAspect aspect1("cpp-code", RegexSet({ "\\.cpp$" }), entireFileHasher);
+		FileAspect aspect2("c-code", RegexSet({ "\\.c$" }), entireFileHasher);
 		set.clear();
 		EXPECT_EQ(0, set.aspects().size());
 	}
 
 	TEST(FileAspectSet, aspects) {
 		FileAspectSet set;
-		FileAspect aspect1("cpp-code", RegexSet({ "\\.cpp$" }));
-		FileAspect aspect2("c-code", RegexSet({ "\\.c$" }));
+		FileAspect aspect1("cpp-code", RegexSet({ "\\.cpp$" }), entireFileHasher);
+		FileAspect aspect2("c-code", RegexSet({ "\\.c$" }), entireFileHasher);
 		set.add(aspect1);
 		set.add(aspect2);
-		EXPECT_EQ(aspect1.name(), set.aspects()[0].name());
-		EXPECT_EQ(aspect2.name(), set.aspects()[1].name());
+		// set.aspects is ordered by aspect name
+		EXPECT_EQ(aspect2.name(), set.aspects()[0].name());
+		EXPECT_EQ(aspect1.name(), set.aspects()[1].name());
 	}
 
 	TEST(FileAspectSet, find) {
 		FileAspectSet set;
-		FileAspect aspect1("cpp-code", RegexSet({ "\\.cpp$" }));
-		FileAspect aspect2("c-code", RegexSet({ "\\.c$" }));
+		FileAspect aspect1("cpp-code", RegexSet({ "\\.cpp$" }), entireFileHasher);
+		FileAspect aspect2("c-code", RegexSet({ "\\.c$" }), entireFileHasher);
 		set.add(aspect1);
 		set.add(aspect2);
 		EXPECT_EQ(aspect1.name(), set.find(aspect1.name()).second.name());
@@ -65,8 +70,8 @@ namespace
 
 	TEST(FileAspectSet, findApplicableAspect) {
 		FileAspectSet set;
-		FileAspect aspect1("cpp-code", RegexSet({ "\\.cpp$" }));
-		FileAspect aspect2("c-code", RegexSet({ "\\.c$" }));
+		FileAspect aspect1("cpp-code", RegexSet({ "\\.cpp$" }), entireFileHasher);
+		FileAspect aspect2("c-code", RegexSet({ "\\.c$" }), entireFileHasher);
 		set.add(aspect1);
 		set.add(aspect2);
 		EXPECT_EQ(aspect1.name(), set.findApplicableAspect("source.cpp").name());

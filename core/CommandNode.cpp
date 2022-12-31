@@ -14,13 +14,16 @@ namespace YAM
 		ExecutionContext* context,
 		std::filesystem::path const& name)
 		: Node(context, name)
+		, _inputAspectsName(FileAspectSet::entireFileSet().name())
 		, _scriptHash(rand())
 		, _executionHash(rand())
 	{}
 
-	void CommandNode::setInputAspects(FileAspectSet const& newInputAspects) {
-		_inputAspects = newInputAspects;
-		// TODO: must state be set to Dirty? Or only if aspects change?
+	void CommandNode::setInputAspectsName(std::string const& newName) {
+		if (_inputAspectsName != newName) {
+			_inputAspectsName = newName;
+			setState(State::Dirty);
+		}
 	}
 
 	void CommandNode::setOutputs(std::vector<GeneratedFileNode*> const & newOutputs) {
@@ -83,10 +86,13 @@ namespace YAM
 		std::vector<XXH64_hash_t> hashes;
 		hashes.push_back(_scriptHash);
 		for (auto node : _outputs) hashes.push_back(node->hashOf(FileAspect::entireFileAspect().name()));
+		FileAspectSet inputAspects = context()->findFileAspectSet(_inputAspectsName);
 		for (auto node : _inputs) {
-			auto & applibleInputAspect = _inputAspects.findApplicableAspect(node->name());
-			hashes.push_back(node->hashOf(applibleInputAspect.name()));
+			auto & inputAspect = inputAspects.findApplicableAspect(node->name());
+			hashes.push_back(node->hashOf(inputAspect.name()));
 		}
+		// TODO: add hash of inputAspects because changes in input aspects definition
+		// must result in re-execution of the command.
 		XXH64_hash_t hash = XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
 		return hash;	
 	}
@@ -143,6 +149,8 @@ namespace YAM
 		State newState = executeScript();
 		// todo: process detected input files as described in FileNode.h
 		// scenarios 1 and 3.
+		// TODO: the order of the input nodes is important for the hash 
+		// computation. Therefore sort the inputs by name.
 
 		rehashOutputs();
 		_executionHash = computeExecutionHash();

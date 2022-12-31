@@ -1,6 +1,8 @@
 #pragma once
 
 #include "RegexSet.h"
+#include "Delegates.h"
+#include "..\xxhash\xxhash.h"
 
 #include <string>
 #include <vector>
@@ -26,21 +28,27 @@ namespace YAM
 		//
 		FileAspect(
 			std::string const& name,
-			RegexSet const & fileNamePatterns);
+			RegexSet const& fileNamePatterns,
+			Delegate<XXH64_hash_t, std::filesystem::path const&> const& hashFunction);
 
 		std::string const& name() const;
-		RegexSet & fileNamePatterns();
+		RegexSet& fileNamePatterns();
+		Delegate<XXH64_hash_t, std::filesystem::path const&> const& hashFunction() const;
 
-		// Return whether given fileName matches one of the fileNamePatterns().
-		bool matches(std::filesystem::path fileName) const;
+		// Return whether this aspect is applicable for the file with given fileName.
+		// The aspect applies when fileName matches one of the fileNamePatterns().
+		bool appliesTo(std::filesystem::path fileName) const;
 
-		// Return the entire file aspect, i.e. the aspect that
-		// includes all of a file's content and that matches all
-		// file names.
+		// Pre: this.matches(fileName)
+		XXH64_hash_t hash(std::filesystem::path const& fileName) const;
+
+		// Return the aspect whose hash includes all of a file's content and
+		// that matches all file names.
 		static FileAspect const & entireFileAspect();
 
 	private:
 		std::string _name;
 		RegexSet _fileNamePatterns;
+		Delegate<XXH64_hash_t, std::filesystem::path const&> _hashFunction;
 	};
 }

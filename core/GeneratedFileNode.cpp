@@ -10,7 +10,6 @@ namespace YAM
         : FileNode(context, name)
         , _producer(producer) 
     { 
-        addAspect(FileAspect::entireFileAspect().name());
     }
 
     Node* GeneratedFileNode::producer() const { 

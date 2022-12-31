@@ -1,11 +1,10 @@
 #pragma once
 
 #include "Node.h"
-#include "FileAspectHasher.h"
+#include "FileAspect.h"
 #include "../xxHash/xxhash.h"
 
 #include <map>
-#include <mutex>
 
 namespace YAM
 {
@@ -145,28 +144,14 @@ namespace YAM
         virtual bool supportsInputs() const override;
         virtual void appendInputs(std::vector<Node*>& inputs) const override;
 
-        // Add aspect to the set of aspects for which the file node will
-        // compute hashes. Initialize cached hash value for aspect to random
-        // number. The aspect hash will be computed on next execution of node
-        // or on call to rehash(aspect).
-        // Ignore call when aspect was already known.
-        // Return whether aspect was added (i.e. not already known).
-        bool addAspect(std::string const & aspectName);
-
         // Pre: state() == State::Ok
         // Return the cached hash of given aspect.
         // Throw exception when aspect is unknown.
         XXH64_hash_t hashOf(std::string const& aspectName);
 
         // Pre: state() == State::Ok
-        // (Re-)compute the hash of given aspect, cache it and return it.
-        // Do not update the cached last-write-time.
-        // Throw exception when aspect is unknown.
-        XXH64_hash_t rehash(std::string const& aspectName);
-
-        // Pre: state() == State::Ok
-        // Retrieve and cache file's last-write-time, then re-compute and cache 
-        // hashes of all added aspects.
+        // Retrieve and cache file's last-write-time, then compute and cache 
+        // hashes of all applicable file aspects.
         void rehashAll();
 
     protected:
@@ -179,11 +164,11 @@ namespace YAM
         void rehashAll(bool doUpdateLastWriteTime);
         void execute();
 
-        // file modification time as retrieved during last rehashAll()
+        // last seen file modification time
         std::chrono::time_point<std::chrono::utc_clock> _lastWriteTime;
-        std::mutex _mutex; // to serialize access to _hashes and _hashers
-        std::map<std::string, FileAspectHasher> _hashers;
-        // aspect name => hash value. All values computed after _lastWriteTime.
+
+        // aspect name => hash value. All hashes are computed after last
+        // update of _lastWriteTime.
         std::map<std::string, XXH64_hash_t> _hashes;
     };
 }

@@ -43,9 +43,8 @@ namespace
 
         ExecutionContext context;
         FileNode fnode(&context, testPath);
-        fnode.addAspect(entireFile);
-        EXPECT_NE(expectedHash, fnode.hashOf(entireFile));
         EXPECT_EQ(Node::State::Dirty, fnode.state());
+        EXPECT_ANY_THROW(fnode.hashOf(entireFile));
 
         bool completed = YAMTest::executeNode(&fnode);
 
@@ -63,8 +62,8 @@ namespace
 
         ExecutionContext context;
         FileNode fnode(&context, testPath);
-        EXPECT_NE(expectedHash, fnode.hashOf(entireFile));
         EXPECT_EQ(Node::State::Dirty, fnode.state());
+        EXPECT_ANY_THROW(fnode.hashOf(entireFile));
 
         bool completed = YAMTest::executeNode(&fnode);
 

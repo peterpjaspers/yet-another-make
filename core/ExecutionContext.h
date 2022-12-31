@@ -4,8 +4,7 @@
 #include "Dispatcher.h"
 #include "Thread.h"
 #include "ThreadPool.h"
-#include "FileAspectHasher.h"
-#include "InputFileAspects.h"
+#include "FileAspectSet.h"
 #include "ExecutionStatistics.h"
 
 namespace YAM
@@ -23,8 +22,11 @@ namespace YAM
 
 		ExecutionStatistics& statistics();
 
-		FileAspectHasherSet& aspectHashers();
-		InputFileAspectsSet & inputAspects();
+		// Return the file aspects applicable to the file with the given path name.
+		std::vector<FileAspect> findFileAspects(std::filesystem::path const& path) const;
+
+		// Return the file aspect set identified by the given name.
+		FileAspectSet const& findFileAspectSet(std::string const& aspectSetName) const;
 
 		NodeSet& nodes();
 
@@ -34,8 +36,10 @@ namespace YAM
 		Thread _mainThread;
 		ThreadPool _threadPool;
 		ExecutionStatistics _statistics;
-		FileAspectHasherSet _aspectHashers;
-		InputFileAspectsSet _inputAspects;
+
+		//TODO: add interfaces to add/remove aspects and aspectSets
+		std::map<std::string, FileAspect> _fileAspects;
+		std::map<std::string, FileAspectSet> _fileAspectSets;
 
 		NodeSet _nodes;
 		
