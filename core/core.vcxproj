@@ -100,6 +100,7 @@
     <ClInclude Include="ExecutionContext.h" />
     <ClInclude Include="ExecutionStatistics.h" />
     <ClInclude Include="FileAspect.h" />
+    <ClInclude Include="MSBuildTrackerOutputReader.h" />
     <ClInclude Include="RegexSet.h" />
     <ClInclude Include="FileAspectSet.h" />
     <ClInclude Include="GeneratedFileNode.h" />
@@ -118,6 +119,9 @@
     <ClCompile Include="ExecutionContext.cpp" />
     <ClCompile Include="ExecutionStatistics.cpp" />
     <ClCompile Include="FileAspect.cpp" />
+    <ClCompile Include="MSBuildTrackerOutputReader.cpp">
+      <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdcpp20</LanguageStandard>
+    </ClCompile>
     <ClCompile Include="RegexSet.cpp" />
     <ClCompile Include="FileAspectSet.cpp" />
     <ClCompile Include="GeneratedFileNode.cpp" />

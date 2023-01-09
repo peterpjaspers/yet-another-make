@@ -6,36 +6,38 @@ But when to add a source file node to the graph?
 	2) adding (and hashing) all source files in the repository before start
     of command node execution.
 
-  Option 1) has the disadvantage that source file hash is computed after it has 
-  been used as input. When the user modifies the source file after it was used 
-  as input and before its hash is computed (which happens after script 
-  completion) then this invalidates the output file. This would not be a 
-  problem if the command node is re-executed at next build. The current 
-  implementation however will fail to do so:
-      - the lastWriteTime and hash of the modified file are recorded after 
-        script completion.
+  Option 1) has the disadvantage that source file hash is computed after it has
+  been detected as input because the hashes of input files are computed after
+  completion of the cmd script. When the user modifies the source file after it
+  was used as input and before its hash is computed then this out-dates the 
+  output file. This would not be a problem if the command node is re-executed 
+  at next build. This however will not happen because:
+      - the lastWriteTime of the modified file are recorded after script
+        completion.
       - the file modification will be detected by the 'file modification 
         detector' and the file node will be set Dirty at next build.
-      - At next build the filen ode will not recompute hash because 
-        lastWriteTime has not changed. But even if filenode did recompute the
-        file hash then it would still be the same.
-      - Result: command node 'sees' unchanged input file and does not 
+      - At next build the file node will not recompute hash because the file's
+        lastWriteTime has not changed. But even if filen ode did recompute the
+        file hash then it would still be the same (assuming no more changes
+        took place).
+      - Result: command node 'sees' an unchanged input file and does not 
         re-execute itself. 
         
   In mrmake this was solved by forcing a re-compute of all parents of the 
   files-modified-during-build.
 
-  The same problem (and solution) applies to output files that are tampered 
-  with between their time of creation and time of hash computation.
-  This problem however is more complex because output files are (by intent)
-  modified during the build by the command script. This requires YAM to 
-  distinguish between file modification notifications caused by the command 
-  script and caused by other actors. In mrmake that was 'easy' because CBFS
-    - file-access notification is synchronous and provides the id of the 
-      process that accessed the file
+  The same problem applies to output files that are tampered with between their
+  time of creation and time of hash computation. This problem however is more
+  complex because output files are (by intent) modified during the build by the
+  command script. This requires YAM to distinguish between file modification 
+  notifications caused by the command script and notifications caused by other 
+  actors on that file. In mrmake it was 'easy' to distinguish between these two
+  because in CBFS
+    - file-access notification is synchronous and provides the process id of 
+      the process that accessed the file,
     - process-creation/destruction notification is synchronous and allows 
       reconstruction of the process tree in which the file is modified, 
-      allowing the file-accessed to be traced-back to the command script.
+      allowing the file-access to be traced-back to the command script.
   
   Option 2) does not have the complication of option 1). It will however add
   file nodes that will never be used as inputs of command nodes and thus 
@@ -43,32 +45,94 @@ But when to add a source file node to the graph?
   of output files during the build (because output files are modified by the
   build itself).
 
- YAM's promise is that, in absence of file modifications during and since last
- build, all output files are up-to-date and all obsolete output files have been
- deleted. Hence ideally tampering with output files would never be needed. In
- practice however, even with a bug-free YAM, engineers often force a "clean" 
- build by deleting output files. This is not without rationale: even when YAM
- would be bug-free the build scripts themselves may not be bug-free.
+  Why would a user tamper with output files when YAM's promise is that, in 
+  absence of file modifications during and since last build, all output files
+  are up-to-date and all obsolete output files have been deleted?
+  Answer: because in practice engineers sometimes don't trust the build system 
+  In such cases they often force a "clean" build by deleting output files. This
+  is not without rationale because YAM may contain still undetected bugs and 
+  the build scripts (which are outside YAM's control) may not be bug-free.
 
-  Edits of source files during a build happen frequently and are part of normal
-  workflow.
+  Edits of source files during a build are part of normal workflow and happen
+  frequently.
 
   Conclusion: YAM must be robust for both cases.
 
   Decision made by Phil and Peter dd 2022-12-29:
   - implement option 2), add (and hash) source file nodes for all source files
     in the worktree before starting command node execution.
-  - between builds yam server processes file modification requests as follows:
+  - between (not during!) builds yam server processes file modification 
+    notifications for file with fileName as follows:
         fileNode = nodes[fileName]
         if (fileNode == null) fileName = addFileNode(fileName)
         fileNode.state = Dirty; // recursively propagated to fileNode.parents
-  - when a file node is set Dirty yam stores it in a list of dirty filenodes.
-    This to avoid having to access all nodes to find the dirty file nodes.
-  - when a cmd node is set Dirty yam stores it in a list of dirty cmd nodes.
-    This to avoid having to access all nodes to find the dirty cmd nodes.
-  - between builds yam server periodically executes dirty file nodes.
-    This to perform file node hashing as much as possible in background.
+  - when a node is set Dirty yam stores it in a list of dirty filenodes.
+    This to avoid, at next build, having to access all nodes to find the dirty
+    file nodes.
+  - optionally YAM performs file node hashing in the background, e.g. by 
+    periodically executeing dirty file nodes.
   - at build time: yam executes all remaining Dirty file nodes before starting 
-    cmd node execution.
-  - yam only executes dirty cmd nodes that are in build scope
+    execution of cmd nodes that are Dirty and that are in build scope.
+
+Note: the above approach to file node creation and execution also simplifies 
+and speeds-up winkin. Simplifies because when searching for a winkinable cmd
+no new file nodes need to be created, speed-up because during search no file
+hashing needs to be performed.
+
+A disadvantage of the above approach is that YAM cannot register input 
+dependencies on files that are stored outside the worktree, e.g. 3d-party
+header files and libraries. There are ways to cope with this limitation.
+E.g. in MR we use the read-only versioned storage of 3d-party SW in the 
+R-drive. The build files reference the required 3d-party versions.
+
+But preferred is a solution that, optionally, allows such dependencies to be
+registered by YAM (in the build state).
+A solution is to generalize 'worktree' by 'workspace', where a workspace is
+defined by a set of input file storage locations. The user specifies per 
+location whether YAM needs to register input dependencies on files in that
+location.
+
+Note: the workspace locations are defined in a configuration file. This file
+must be stored in a parent directory of the directory from which a build is
+started, e.g. in the root directory of the repo worktree.
+Notice the similarity with MR's workspace_config.xml file which is stored in
+the root directory of the git repo.
+
+Examples of build scenario enabled by workspaces:
+Assume that the source code of a product is stored in repo-1 and repo-2, each
+having build files that specify how to build the source code in that repo.
+Both repo's depend on (partly same) 3d-party components that reside outside the
+repository worktrees. Further assume that build commands in repo-1 depend on
+input files generated by build commands in repo-2.
+
+The input locations of the workspaces for working with these repos:
+Workspace-1:  {dir trees of repo-1, repo-2, 3d-party packages}
+Workspace-2:  {dir trees of repo-2, 3d-party packages}
+
+Note: see how easy it is to build a version of this product from selected 
+versions of the repo-1 and repo-2: simply checkout the selected versions of the
+repos in their respective worktrees and start a build in the worktree of repo-1.
+
+Note: when circular build dependencies between repo-1 and repo-2 exist (e.g. 
+repo-1 uses libs from repo-2 and vice-versa) then both repos contain the
+Workspace-1 configuration file.
+
+Note: as noted earlier a disadvantage of option 2 is that the build state may
+contain many file nodes that are not and will never be used as command inputs. 
+This may slow down build state access and will increase YAM's memory usage.
+This overhead can be controlled by precise definition of the workspace input 
+locations. The definition syntax must be sufficiently 'powerfull' to e.g. 
+specify for the input locations of workspace-1 that only the files in repo-2 
+that match *\externalHeaders\*.h and *\bin\*.dllimportlib must be included.
+
+Note: YAM must fail builds that detect input dependencies on files in locations
+not declared in the workspace configuration file.
+
+Note: YAM must (optionally?) warn for input files that are registered in the 
+build state but that are not used as command inputs.
+
+
+
+
+      
  

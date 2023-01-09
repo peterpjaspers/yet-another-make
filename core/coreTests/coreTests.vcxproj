@@ -42,6 +42,7 @@
     <ClCompile Include="fileAspectSetTest.cpp" />
     <ClCompile Include="fileAspectTest.cpp" />
     <ClCompile Include="fileNodeTest.cpp" />
+    <ClCompile Include="msBuildTrackerOutputReaderTest.cpp" />
     <ClCompile Include="nodeExecutionTest.cpp" />
     <ClCompile Include="nodeSetTest.cpp" />
     <ClCompile Include="NumberNode.cpp" />
