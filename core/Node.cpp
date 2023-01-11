@@ -89,7 +89,7 @@ namespace YAM
     void Node::startPrerequisites() {
         _executionState = ExecutionState::Prerequisites;
         _prerequisites.clear();
-        appendPrerequisites(_prerequisites);
+        getPrerequisites(_prerequisites);
         for (Node* p : _prerequisites) startPrerequisite(p);
         handlePrerequisitesCompletion();
     }

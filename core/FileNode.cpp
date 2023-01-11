@@ -1,11 +1,10 @@
 #include "FileNode.h"
 #include "FileAspect.h"
 #include "ExecutionContext.h"
-#include <cstdio>
 
 namespace YAM
 {
-    FileNode::FileNode(ExecutionContext* context, std::filesystem::path name)
+    FileNode::FileNode(ExecutionContext* context, std::filesystem::path const& name)
         : Node(context, name)
     {}
 
@@ -13,21 +12,21 @@ namespace YAM
         return false;
     }
 
-    void FileNode::appendPrerequisites(std::vector<Node*>& prerequisites) const {
+    void FileNode::getPrerequisites(std::vector<Node*>& prerequisites) const {
     }
 
     bool FileNode::supportsOutputs() const {
         return false;
     }
 
-    void FileNode::appendOutputs(std::vector<Node*>& outputs) const {
+    void FileNode::getOutputs(std::vector<Node*>& outputs) const {
     }
 
     bool FileNode::supportsInputs() const {
         return false;
     }
 
-    void FileNode::appendInputs(std::vector<Node*>& inputs) const {
+    void FileNode::getInputs(std::vector<Node*>& inputs) const {
     }
 
     XXH64_hash_t FileNode::hashOf(std::string const& aspectName) {

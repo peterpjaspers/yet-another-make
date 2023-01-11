@@ -127,3 +127,38 @@ glob) by computing a hash of the directory entry names.
 Note: the output of a build file node are cmd and file nodes. These nodes are 
 not part of the build file node execution hash because users cannot tamper
 with these nodes: users can only change these nodes by changing build files. 
+
+
+From mrmake:
+
+Node.BuildingBlock.Workspace.ContainsFile returns false when queried for
+directories or non-existing files. This is intentional.
+Note that in exceptional cases this may cause incorrect build results. Example:
+For the C++ compilation of source.cpp the include-file directory search path contains
+directories A and B. Source.cpp includes x.h. Only B\x.h exists.
+The compiler first tries to read A\x.h. Because this file does not exist it will read 
+B\x.h. Only B\x.h will be registered as a dependency of source.cpp.
+Now someone creates A\x.h (not equal to B\x.h) with the intent that A\x.h has precedence
+over B\x.h. However, this will not cause a recompilation of source.cpp.
+If both B\x.h and A\x.h had been stored as dependencies, then the change of B\x.h (from
+non-existent to existent) would have been detected and would have resulted in 
+recompilation of source.cpp.
+
+05-Apr-2018: tried to fix above limitation by also accepting non-existing files as
+dependencies. For header file dependencies in C/C++-compilation this turned out not to work.
+The reason is that cl.exe checks existence of include files by querying the include
+file directories instead of by opening the include files. Adding a directory as dependency
+would result in many (unnecessary) rebuilds after adding/removing a file to the directory
+and is therefore not implemented.
+A possible workaround (specific for cl.exe) would be to have the compile script generate 
+dependencies for the non-existing include files using bp_register_as_input_file (analogous
+to bp_register_as_outputfile)
+
+11-Jan-2023: Phil suggested the following:
+Assume compile commands used include dirs A, B, C
+Initially only C contains file x.h
+Assume compile command in set {C1...Cn} have input dependency on C\x.h
+When a new file Z/x.h is added: invalidate output of all commands that have an input 
+dependency on file with name x.h.
+Note: if Z equals A or B then this is exactly what we want.
+Otherwise the recompilations are done unnecessarily.

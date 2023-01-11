@@ -19,13 +19,13 @@ namespace YAMTest
 
 		// Inherited from Node
 		virtual bool supportsPrerequisites() const override;
-		virtual void appendPrerequisites(std::vector<Node*>& prerequisites) const override;
+		virtual void getPrerequisites(std::vector<Node*>& prerequisites) const override;
 
 		virtual bool supportsOutputs() const override;
-		virtual void appendOutputs(std::vector<Node*>& outputs) const override;
+		virtual void getOutputs(std::vector<Node*>& outputs) const override;
 
 		virtual bool supportsInputs() const override;
-		virtual void appendInputs(std::vector<Node*>& inputs) const override;
+		virtual void getInputs(std::vector<Node*>& inputs) const override;
 
 		void rehash();
 		

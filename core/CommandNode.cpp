@@ -61,19 +61,19 @@ namespace YAM
 	}
 
 	bool CommandNode::supportsPrerequisites() const { return true; }
-	void CommandNode::appendPrerequisites(std::vector<Node*>& prerequisites) const {
+	void CommandNode::getPrerequisites(std::vector<Node*>& prerequisites) const {
 		prerequisites.insert(prerequisites.end(), _inputProducers.begin(), _inputProducers.end());
 		appendSourceInputs(prerequisites);
-		appendOutputs(prerequisites);
+		getOutputs(prerequisites);
 	}
 
 	bool CommandNode::supportsOutputs() const { return true; }
-	void CommandNode::appendOutputs(std::vector<Node*>& outputs) const {
+	void CommandNode::getOutputs(std::vector<Node*>& outputs) const {
 		outputs.insert(outputs.end(), _outputs.begin(), _outputs.end());
 	}
 
 	bool CommandNode::supportsInputs() const { return true; }
-	void CommandNode::appendInputs(std::vector<Node*>& inputs) const {
+	void CommandNode::getInputs(std::vector<Node*>& inputs) const {
 		inputs.insert(inputs.end(), _inputs.begin(), _inputs.end());
 	}
 

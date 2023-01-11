@@ -35,18 +35,18 @@ namespace YAMTest
 	NumberNode* AdditionNode::sum() { return &_sum; }
 
 	bool AdditionNode::supportsPrerequisites() const { return true; }
-	void AdditionNode::appendPrerequisites(std::vector<Node*>& prerequisites) const {
-		appendInputs(prerequisites);
-		appendOutputs(prerequisites);
+	void AdditionNode::getPrerequisites(std::vector<Node*>& prerequisites) const {
+		getInputs(prerequisites);
+		getOutputs(prerequisites);
 	}
 
 	bool AdditionNode::supportsOutputs() const { return true; }
-	void AdditionNode::appendOutputs(std::vector<Node*>& outputs) const {
+	void AdditionNode::getOutputs(std::vector<Node*>& outputs) const {
 		outputs.push_back((Node*)(&_sum));
 	}
 
 	bool AdditionNode::supportsInputs() const { return true; }
-	void AdditionNode::appendInputs(std::vector<Node*>& inputs) const {
+	void AdditionNode::getInputs(std::vector<Node*>& inputs) const {
 		inputs.insert(inputs.end(), _operands.begin(), _operands.end());
 	}
 

@@ -9,6 +9,14 @@ namespace YAM
 {
 	class GeneratedFileNode;
 
+	// CommandNode is capable of:
+	//	  - executing a shell script with a given set of output files.
+	//    - detecting which files are accessed during the execution of the script.
+	//    - checking that the script write-accessed the given set of output files.
+	//    - registering the detected read-accessed files as input files.
+	//    - detecting changes in script, input and/or output files.
+	//      Such changes will out-date the outputs of the command node, causing 
+	//      pendingStartSelf() to return true.
     class __declspec(dllexport) CommandNode : public Node
     {
 	public:
@@ -16,18 +24,22 @@ namespace YAM
 
 		virtual bool supportsPrerequisites() const override;
 
-		// appendPrerequisites appends the input producers, the source files
-		// that were read during the last execution of this node and the output
-		// files. Source and output files are prerequisites because their executions 
+		// getPrerequisites appends the input producers (command nodes), the source 
+		// files (SourceFileNode) that were read during the last execution of this 
+		// node and the output files (GeneratedFileNode) to given 'prerequisites'.
+		// Source and output files are prerequisites because their executions 
 		// compute file hashes that are used by pendingStartSelf to check whether 
 		// the outputs of this node are out-dated or have been tampered with.
-		virtual void appendPrerequisites(std::vector<Node*>& prerequisites) const override;
+		// pendingStartSelf also uses the hashes of input files that were generated
+		// by the input producers. The input producers must therefore be included in
+		// 'prerequisites'to make sure that these generated input files are up-to-date.
+		virtual void getPrerequisites(std::vector<Node*>& prerequisites) const override;
 
 		virtual bool supportsOutputs() const override;
-		virtual void appendOutputs(std::vector<Node*>& outputs) const override;
+		virtual void getOutputs(std::vector<Node*>& outputs) const override;
 
 		virtual bool supportsInputs() const override;
-		virtual void appendInputs(std::vector<Node*>& inputs) const override;
+		virtual void getInputs(std::vector<Node*>& inputs) const override;
 
 		virtual bool pendingStartSelf() const override;
 

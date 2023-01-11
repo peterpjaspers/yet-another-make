@@ -11,8 +11,6 @@ namespace
 {
     using namespace YAM;
 
-    std::chrono::seconds timeout(10);
-
 	bool createTestFile(std::filesystem::path testPath, std::string const &content) {
         FILE* fp = std::fopen(testPath.string().c_str(), "w");
         if (!fp) return false;

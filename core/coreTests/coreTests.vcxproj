@@ -37,6 +37,7 @@
     <ClCompile Include="boostProcessTest.cpp" />
     <ClCompile Include="commandNodeTest.cpp" />
     <ClCompile Include="delegatesTest.cpp" />
+    <ClCompile Include="directoryNodeTest.cpp" />
     <ClCompile Include="dispatcherTest.cpp" />
     <ClCompile Include="executeNode.cpp" />
     <ClCompile Include="fileAspectSetTest.cpp" />

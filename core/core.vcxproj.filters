@@ -63,6 +63,12 @@
     <ClInclude Include="MSBuildTrackerOutputReader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="GlobNode.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectoryNode.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -111,6 +117,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="MSBuildTrackerOutputReader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GlobNode.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DirectoryNode.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

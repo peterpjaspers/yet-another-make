@@ -87,7 +87,7 @@ namespace YAM
 
 		// Pre: supportsPrerequisites()
 		// Append prerequisite nodes to 'prerequisites'.
-		virtual void appendPrerequisites(std::vector<Node*>& prerequisites) const = 0;
+		virtual void getPrerequisites(std::vector<Node*>& prerequisites) const = 0;
 
 		// Return parent nodes.
 		// A parent node has this node as a prerequisite. 
@@ -104,7 +104,7 @@ namespace YAM
 		// Pre: supportsOutputs()
         // Append the output nodes in 'outputs'.
 		// Note: outputs are typically, but not necessarily, output files nodes.
-		virtual void appendOutputs(std::vector<Node*>& outputs) const = 0;
+		virtual void getOutputs(std::vector<Node*>& outputs) const = 0;
 
 		// Return whether this node supports input nodes.
 		// This is a class property. 
@@ -114,7 +114,7 @@ namespace YAM
 		// Append the inputs nodes in 'inputs'.
 		// Note: inputs are typically, but not necessarily, source files and/or
 		// output files produced by prerequisite command nodes.
-		virtual void appendInputs(std::vector<Node*>& inputs) const = 0;
+		virtual void getInputs(std::vector<Node*>& inputs) const = 0;
 
 		//
 		// End of interfaces that access inputs and outputs of node execution.

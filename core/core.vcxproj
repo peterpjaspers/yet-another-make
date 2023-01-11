@@ -97,9 +97,11 @@
   <ItemGroup>
     <ClInclude Include="CommandNode.h" />
     <ClInclude Include="Delegates.h" />
+    <ClInclude Include="DirectoryNode.h" />
     <ClInclude Include="ExecutionContext.h" />
     <ClInclude Include="ExecutionStatistics.h" />
     <ClInclude Include="FileAspect.h" />
+    <ClInclude Include="GlobNode.h" />
     <ClInclude Include="MSBuildTrackerOutputReader.h" />
     <ClInclude Include="RegexSet.h" />
     <ClInclude Include="FileAspectSet.h" />
@@ -116,9 +118,11 @@
     <ClCompile Include="CommandNode.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="DirectoryNode.cpp" />
     <ClCompile Include="ExecutionContext.cpp" />
     <ClCompile Include="ExecutionStatistics.cpp" />
     <ClCompile Include="FileAspect.cpp" />
+    <ClCompile Include="GlobNode.cpp" />
     <ClCompile Include="MSBuildTrackerOutputReader.cpp">
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdcpp20</LanguageStandard>
     </ClCompile>
