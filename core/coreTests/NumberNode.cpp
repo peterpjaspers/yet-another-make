@@ -68,7 +68,7 @@ namespace YAMTest
 
 	void NumberNode::execute() {
 		rehash();
-		postCompletion(Node::State::Ok);
+		postSelfCompletion(Node::State::Ok);
 	}
 }
 

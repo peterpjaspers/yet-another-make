@@ -10,19 +10,26 @@ namespace YAMTest
 		std::filesystem::path const& name)
 		: Node(context, name)
 		, _sum(std::make_shared<NumberNode>(context, "sumOf" / name))
-		, _executionHash(rand()) {
+		, _executionHash(rand()) 
+	{
 		_sum->number(rand());
-		_sum->addParent(this);
+		_sum->addPreParent(this);
+	}
+
+	AdditionNode::~AdditionNode() {
+		clearOperands();
+		_sum->removePreParent(this);
 	}
 
 	void AdditionNode::addOperand(std::shared_ptr<NumberNode> operand) {
 		_operands.push_back(operand);
-		operand->addParent(this);
+		operand->addPreParent(this);
 		setState(State::Dirty);
 	}
 
 	void AdditionNode::clearOperands() {
 		if (!_operands.empty()) {
+			for (auto op : _operands) op->removePreParent(this);
 			_operands.clear();
 			setState(State::Dirty);
 		}
@@ -74,6 +81,6 @@ namespace YAMTest
 		}
 		_sum->setNumberRehashAndSetOk(sum);
 		_executionHash = computeExecutionHash();
-		postCompletion(Node::State::Ok);
+		postSelfCompletion(Node::State::Ok);
 	}
 }

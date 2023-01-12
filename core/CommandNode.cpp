@@ -19,6 +19,11 @@ namespace YAM
 		, _executionHash(rand())
 	{}
 
+	CommandNode::~CommandNode() {
+		setOutputs(std::vector<std::shared_ptr<GeneratedFileNode>>());
+		setInputProducers(std::vector<std::shared_ptr<Node>>());
+	}
+
 	void CommandNode::setInputAspectsName(std::string const& newName) {
 		if (_inputAspectsName != newName) {
 			_inputAspectsName = newName;
@@ -28,9 +33,9 @@ namespace YAM
 
 	void CommandNode::setOutputs(std::vector<std::shared_ptr<GeneratedFileNode>> const & newOutputs) {
 		if (_outputs != newOutputs) {
-			for (auto i : _outputs) i->removeParent(this);
+			for (auto i : _outputs) i->removePreParent(this);
 			_outputs = newOutputs;
-			for (auto i : _outputs) i->addParent(this);
+			for (auto i : _outputs) i->addPreParent(this);
 			setState(State::Dirty);
 		}
 	}
@@ -48,9 +53,9 @@ namespace YAM
 
 	void CommandNode::setInputProducers(std::vector<std::shared_ptr<Node>> const& newInputProducers) {
 		if (_inputProducers != newInputProducers) {
-			for (auto i : _inputProducers) i->removeParent(this);
+			for (auto i : _inputProducers) i->removePreParent(this);
 			_inputProducers = newInputProducers;
-			for (auto i : _inputProducers) i->addParent(this);
+			for (auto i : _inputProducers) i->addPreParent(this);
 			setState(State::Dirty);
 		}
 	}
@@ -156,6 +161,6 @@ namespace YAM
 		rehashOutputs();
 		_executionHash = computeExecutionHash();
 
-		postCompletion(newState);
+		postSelfCompletion(newState);
 	}
 }

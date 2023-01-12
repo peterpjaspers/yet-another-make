@@ -26,18 +26,27 @@ namespace YAM
 		if (_state != newState) {
 			_state = newState;
 			if (_state == Node::State::Dirty) {
-				for (auto p : _parents) p->setState(Node::State::Dirty);
+				for (auto p : _preParents) p->setState(Node::State::Dirty);
 			}
 		}
 	}
 
-    void Node::addParent(Node* parent) {
-        auto p = _parents.insert(parent);
-        if (!p.second) throw std::runtime_error("Attempt to add duplicate parent");
+    void Node::addPreParent(Node* parent) {
+        auto p = _preParents.insert(parent);
+        if (!p.second) throw std::runtime_error("Attempt to add duplicate preParent");
     }
 
-    void Node::removeParent(Node* parent) {
-        if (0 == _parents.erase(parent)) throw std::runtime_error("Attempt to remove unknown parent");
+    void Node::removePreParent(Node* parent) {
+        if (0 == _preParents.erase(parent)) throw std::runtime_error("Attempt to remove unknown preParent");
+    }
+
+    void Node::addPostParent(Node* parent) {
+        auto p = _postParents.insert(parent);
+        if (!p.second) throw std::runtime_error("Attempt to add duplicate postParent");
+    }
+
+    void Node::removePostParent(Node* parent) {
+        if (0 == _postParents.erase(parent)) throw std::runtime_error("Attempt to remove unknown postParent");
     }
 
     void Node::suspend() {
@@ -68,14 +77,14 @@ namespace YAM
     void Node::continueStart() {
         if (_state == Node::State::Deleted) {
             postCompletion(State::Deleted);
-        }
-        else if (supportsPrerequisites()) {
+        } else if (supportsPrerequisites()) {
             startPrerequisites();
-        }
-        else if (pendingStartSelf()) {
+        } else if (pendingStartSelf()) {
             _executionState = ExecutionState::Self;
             _context->statistics().registerSelfExecuted(this);
             startSelf();
+        }  else if (supportsPostrequisites()) {
+            startPostrequisites();
         } else {
             postCompletion(State::Ok);
         }
@@ -117,10 +126,9 @@ namespace YAM
     }
 
     void Node::handlePrerequisiteCompletion(Node* prerequisite) {
-        // When a prerequisite completes it's recursive executor calls this
-        // function for all if its parent executors. There may be parents that
-        // are not part of the build scope. So ignore the callback when this
-        // executor is in Idle state.
+        // When a prerequisite completes it calls this function for all if
+        // its preParents. There may be parents that are not part of the build 
+        // scope. So ignore the callback when this node is in Idle state.
         //
         if (_executionState == ExecutionState::Prerequisites) {
 
@@ -175,14 +183,6 @@ namespace YAM
                     // TODO: how to notify all other executors that build must be stopped ?
                     //mainDispatcher().post((_node->LogBook.RaiseStopRequested));
                 }
-
-                // TODO: can prerequisites indeed contain duplicates? Should
-                // that be disallowed?
-                //
-                // Example: a source file node can be both registered as an input 
-                // file and as a prerequisite. In that case this callback can be 
-                // called more than once from the same node. However, registering
-                // a source file as prerequisite make little sense.
                 handlePrerequisitesCompletion();
             }
         }
@@ -216,6 +216,107 @@ namespace YAM
         return allOk;
     }
 
+    void Node::startPostrequisites() {
+        _executionState = ExecutionState::Postrequisites;
+        _postrequisites.clear();
+        getPostrequisites(_postrequisites);
+        for (std::shared_ptr<Node> p : _postrequisites) startPostrequisite(p.get());
+        handlePostrequisitesCompletion();
+    }
+
+    void Node::startPostrequisite(Node* postrequisite) {
+        // No subscription is made to the completed event of the prerequisites 
+        // because the subscription overhead is too large.
+        // Instead completion callback is done via handlePostrequisiteCompletion.
+        switch (postrequisite->state()) {
+        case Node::State::Dirty:
+        {
+            _executingPostrequisites.insert(postrequisite);
+            postrequisite->start();
+            break;
+        }
+        case Node::State::Executing:
+        {
+            // Multiply referenced node, already started by another
+            // executor. Wait for it to complete.
+            _executingPostrequisites.insert(postrequisite);
+            break;
+        }
+        case Node::State::Ok: break;
+        case Node::State::Failed: break;
+        case Node::State::Canceled: break;
+        case Node::State::Deleted: break;
+        default:
+            throw std::runtime_error("Unknown Node::State");
+        }
+    }
+
+    void Node::handlePostrequisiteCompletion(Node* postrequisite) {
+        // When a postrequisite completes it calls this function for all if
+        // its postParents. There may be parents that are not part of the build 
+        // scope. So ignore the callback when this node is in Idle state.
+        //
+        if (_executionState == ExecutionState::Postrequisites) {
+
+            auto preqState = postrequisite->state();
+            bool preqCompleted =
+                preqState == Node::State::Ok
+                || preqState == Node::State::Failed
+                || preqState == Node::State::Canceled
+                || preqState == Node::State::Deleted;
+            if (!preqCompleted) {
+                throw std::runtime_error("Completed postrequisite has invalid Node::State");
+            }
+            if (1 == _executingPostrequisites.erase(postrequisite)) {
+                bool stopBuild = (preqState != Node::State::Ok); // todo: && !_node->logBook()->keepWorking();
+                if (stopBuild) {
+                    // See handlePreRequisiteisCompletion(Node*)
+                    cancel();
+                    // TODO: how to notify all other executors that build must be stopped ?
+                    //mainDispatcher().post((_node->LogBook.RaiseStopRequested));
+                }
+                handlePostrequisitesCompletion();
+            }
+        }
+    }
+
+    void Node::handlePostrequisitesCompletion() {
+        bool allCompleted = _executingPostrequisites.size() == 0;
+        if (allCompleted) {
+            if (_canceling) {
+                postCompletion(State::Canceled);
+            } else if (!allPostrequisitesAreOk()) {
+                postCompletion(State::Failed);
+            } else {
+                postCompletion(State::Ok);
+            }
+        }
+    }
+
+    bool Node::allPostrequisitesAreOk() const {
+        bool allOk = true;
+        for (std::size_t i = 0; i < _postrequisites.size() && allOk; ++i) {
+            allOk = _postrequisites[i]->state() == Node::State::Ok;
+        }
+        return allOk;
+    }
+
+    void Node::postSelfCompletion(Node::State newState) {
+        auto d = Delegate<void>::CreateLambda([this, newState]()
+            {
+                handleSelfCompletion(newState);
+            });
+        _context->mainThreadQueue().push(std::move(d));
+    }
+
+    void Node::handleSelfCompletion(Node::State newState) {
+        if (newState == Node::State::Ok && supportsPostrequisites()) {
+            startPostrequisites();
+        } else {
+            postCompletion(newState);
+        }
+    }
+
     void Node::postCompletion(Node::State newState) {
         auto d = Delegate<void>::CreateLambda([this, newState]()
             {
@@ -229,10 +330,13 @@ namespace YAM
         _canceling = false;
         _prerequisites.clear();
         _executingPrerequisites.clear();
+        _postrequisites.clear();
+        _executingPostrequisites.clear();
 
         setState(newState);
 
-        for (auto p : _parents) p->handlePrerequisiteCompletion(this);
+        for (auto p : _preParents) p->handlePrerequisiteCompletion(this);
+        for (auto p : _postParents) p->handlePostrequisiteCompletion(this);
         _completor.Broadcast(this);
     }
 

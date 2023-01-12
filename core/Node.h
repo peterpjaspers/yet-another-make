@@ -22,9 +22,9 @@ namespace YAM
 	//       Execution produces one or more output files. Execution may read
 	//	     source files and/or output files produced by other nodes.
 	//		 E.g. a C++ compile node produces an object file and reads a cpp and
-	//		 include files.
-	//     - Output file node (or derived file node)
-	//       Associated with an output file of a command node. 
+	//		 header files.
+	//     - Generated file node
+	//       An output file of a command node. 
 	//		 Execution (re-)computes hashes of the file content. 
 	//     - Source file node
 	//       Associated with a source file.
@@ -33,30 +33,59 @@ namespace YAM
 	// A node's name takes the form of a file path. For file nodes this path
 	// indeed references a file. In general however this need not be the case.
 	// E.g. a command node may be given a name like 'name-of-first-output\_cmd'
+	//
+	// The Node class supports a 3-stage execution of a node. This 3-stage
+	// execution is started by the start() member function. 
+	//    stage 1: Execute the prerequisites of the node.
+	//             Prerequisite nodes produce results that are needed as input
+	//			   by stage 2. E.g. the prerequisites of a link command node are
+	//             compilation nodes that produce the object files to be linked.
+	//             The stage 1 execution results in a depth-first traversal of
+	//			   the prerequisites node tree.
+	//    stage 2: Self-execution of the node.
+	//		       In this stage the node can perform node-specific computation.
+	//			   E.g. link C++ object files into a library.
+	//			   This stage is started by the startSelf() virtual member function.
+	//    stage 3: Execute the postrequisites of the node.
+	//             Postrequisite nodes are typically produced by stage 2.
+	//             E.g. the execution of a directory node must create a node 
+	//             hierachy that reflects the content of a directory tree in the
+	//		       filesystem. Further it must compute for each directory and file 
+	//             node a hash of their content. 
+	//             The directory node has no prerequisites.
+	//             The directory node's self-execution iterates a directory and
+	//             creates for each directory entry a file or directory node.
+	//			   The postrequisites are the file and directory nodes created in 
+	//             stage 2. The stage 3 execution results in a breadth-first 
+	//             traversal of the filesystem directory tree.
+	//
+	// Name convention: node execution is synonym for 3-stage node execution.
+	//
 	class __declspec(dllexport) Node
 	{
 	public:
 		enum class State {
-			Dirty = 1,	    // needs recursive execution
-			Executing = 2,	// recursive execution is in progress
-			Ok = 3,	        // recursive execution has succeeded
-			Failed = 4,	 	// recursive execution has failed
-			Canceled = 5,   // recursive execution was canceled
-			Deleted = 6		// node is deleted, to be garbage collected
+			Dirty = 1,	    // needs execution
+			Executing = 2,	// execution is in progress
+			Ok = 3,	        // execution has succeeded
+			Failed = 4,	 	// execution has failed
+			Canceled = 5,   // execution was canceled
+			Deleted = 6		// node is deleted, to be removed from node graph
 
-			// A dirty node is a node whose output may no longer be valid. E.g.
-			// because the output has been tampered with or because input files
-			// may have been modified. A node must be marked Dirty when:
+			// A dirty node is a node whose output filess may no longer be valid. 
+			// E.g. because the output files have been tampered with or because 
+			// input files have been modified. A node must be marked Dirty when:
 			//  - it is created,
-			//	- its execution logic is modified,
+			//	- its self-execution logic is modified,
 			//    e.g. the shell script of a command node is modified,
 			//  - a prerequisite is marked Dirty.
 			// 
 			// Nodes without prerequisites are reset to Dirty depending on their
-			// type. E.g. for a file node:
-			// At start of alpha-build all file nodes are set Dirty.
-			// At start of beta-build only files reported by the filesystem to
-			// have been write-accessed since previous build are set dirty.
+			// type. E.g. for file and directory nodes:
+			// At start of alpha-build all file and directory nodes are set Dirty.
+			// At start of beta-build only files and directories reported by the 
+			// filesystem to have been write-accessed since previous build are set
+			// dirty.
 			//
 			// Failed and Canceled states become meaningless when starting a new
 			// build and must therefore be reset to Dirty at start of build.
@@ -73,8 +102,12 @@ namespace YAM
 		// Return whether this node supports prerequisites.
 		// This is a class property.
 		//
-		// Prerequisites are nodes that need to execute before this node can
-		// execute.
+		// Prerequisites are nodes that are executed before this node 
+		// starts self-execution.
+		virtual bool supportsPrerequisites() const = 0;
+
+		// Pre: supportsPrerequisites()
+		// Append prerequisite nodes to 'prerequisites'.
 		// The prerequisites vector contains one or more of:
 		//		- (command) nodes that produce output nodes. 
 		//	      Output nodes are only allowed to be used as inputs by this
@@ -84,28 +117,60 @@ namespace YAM
 		//		- output nodes of this node.
 		// 
 		// Source/output nodes are typically, but not necessarily, file nodes.
-		virtual bool supportsPrerequisites() const = 0;
-
-		// Pre: supportsPrerequisites()
-		// Append prerequisite nodes to 'prerequisites'.
 		virtual void getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const = 0;
 
-		// Return parent nodes.
-		// A parent node is a node that has this node as a prerequisite. This node 
-		// propagates a change to Dirty state to its parents. 
+		// Return whether this node supports postrequisites.
+		// This is a class property.
+		//
+		// Postrequisites are nodes that are executed after this node 
+		// completed its self-execution.
+		virtual bool supportsPostrequisites() const { return false; }
+
+		// Pre: supportsPostrequisites()
+		// Append postrequisite nodes to 'postrequisites'.
+		virtual void getPostrequisites(std::vector<std::shared_ptr<Node>>& postrequisites) const { return; }
+
+		// A preParent node is a node that has this node as a prerequisite. This node 
+		// propagates its Dirty state to all its preParents. 
 		// E.g. a C++ header file that is set Dirty will propagate the Dirty states to
-		// all  C++ compilation commands that have the header file as input node.
+		// all C++ compilation commands that have the header file as input node.
 		// The compilation command on its turn propagates the Dirty state to all link
 		// command nodes that have the object file as input.
-		// The parent node must:
-		//    - add itself to this node when it uses this node as prerequisite.
-		//    - remove itself to this node when it stops using this node as prerequisite.
-		// The parent relation causes a cyclic dependency between parent and this node.
-		// Therefore raw pointer to parent is used iso shared_ptr. This is safe as long
-		// as parent adheres to the add/remove protocol. 
-		std::unordered_set<Node*> const& parents() const { return _parents; }
-		void addParent(Node* parent);
-		void removeParent(Node* parent);
+		// The preParent node must:
+		//    - add itself to the preParents of this node when it uses this node as 
+		//      prerequisite.
+		//    - remove itself from the preParents of this node when it stops using 
+		//     this node as prerequisite.
+		// The preParent relation causes a cyclic dependency between preParent and this
+		// node. Therefore raw pointer to preParent is used iso shared_ptr. This is safe 
+		// as long as preParent adheres to the add/remove protocol. 
+		std::unordered_set<Node*> const& preParents() const { return _preParents; }
+		void addPreParent(Node* parent);
+		void removePreParent(Node* parent);
+
+		// A postParent node is a node that has this node as a postrequisite. 
+		// This node does NOT propagate its Dirty state to its postParents.
+		// Why not? Example:
+		// A filesystem directory A contains file A\F and directory A\D.
+		// DirectoryNode A creates file node A\F and directory node A\D.
+		// These sub nodes are postrequisites of A: they are executed after 
+		// self-execution of DirectoryNode A has created these subnodes.
+		// A is therefore postParent of both A\F and A\D.
+		// 
+		// The postParent node must:
+		//    - add itself to the postParents of this node when it uses this node as 
+		//      postrequisite.
+		//    - remove itself from the postParents of this node when it stops using 
+		//     this node as postrequisite.
+		// The postParent relation causes a cyclic dependency between postParent and this
+		// node. Therefore raw pointer to postParent is used iso shared_ptr. This is safe 
+		// as long as postParent adheres to the add/remove protocol. 
+		// 
+		// TODO: typically only one postParent will exist. Should we constrain to 1
+		// postParent?
+		std::unordered_set<Node*> const& postParents() const { return _postParents; }
+		void addPostParent(Node* parent);
+		void removePostParent(Node* parent);
 		
 		//
 		// Start of interfaces that access inputs and outputs of node execution.
@@ -116,7 +181,7 @@ namespace YAM
 		virtual bool supportsOutputs() const = 0;
 
 		// Pre: supportsOutputs()
-        // Append the output nodes in 'outputs'.
+        // Append the output nodes to 'outputs'.
 		// Note: outputs are typically, but not necessarily, output files nodes.
 		virtual void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const = 0;
 
@@ -125,7 +190,7 @@ namespace YAM
 		virtual bool supportsInputs() const = 0;
 
 		// Pre: supportsInputs()
-		// Append the inputs nodes in 'inputs'.
+		// Append the inputs nodes to 'inputs'.
 		// Note: inputs are typically, but not necessarily, source files and/or
 		// output files produced by prerequisite command nodes.
 		virtual void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const = 0;
@@ -136,12 +201,13 @@ namespace YAM
 		//
 
 		// Pre: state() == Node::State::Dirty
-		// Start asynchronous execution of prerequisites and self:
-		//		- prerequisites.each(start)
-		//		- on prerequisites completion: if (pendingStartSelf()) startSelf()
-		//		- on self completion: completor().broadcast(this)
-		// All three steps will be done in main thread. Actual self-execution
-		// will be done in thread pool. 
+		// Start asynchronous 3-stage execution:
+		//    1: prerequisites.where(Dirty).each(start)
+		//	  2: on prerequisites completion: if (pendingStartSelf()) startSelf()
+		//	 3a: on startSelf completion: postrequisites.where(Dirty).each(start)
+		//	 3b: on postrequisites completion: completor().broadcast(this)
+		// Starting executions will be done in main thread. Self-execution
+		// shall be done in thread pool. This is a sub-class responsibility.
 		void start();
 
 		// Return delegate to which clients can add callbacks that will be
@@ -251,15 +317,19 @@ namespace YAM
 		// Called when self-execution is busy and cancel() is called.
 		virtual void cancelSelf() { return; }
 
+		// Push handleSelfCompletion(newState) to mainThreadQueue()
+		void postSelfCompletion(Node::State newState);
+		virtual void handleSelfCompletion(Node::State newState);
+
 		// Push notifyCompletion(newState) to mainThreadQueue()
 		void postCompletion(Node::State newState);
-
 		void notifyCompletion(Node::State newState);
 
 	private:
 		std::filesystem::path _name;
 		State _state;
-		std::unordered_set<Node*> _parents;
+		std::unordered_set<Node*> _preParents;
+		std::unordered_set<Node*> _postParents;
 
 		// Node execution members
 		//
@@ -270,19 +340,32 @@ namespace YAM
 		void handlePrerequisitesCompletion();
 		bool allPrerequisitesAreOk() const;
 
+		void startPostrequisites();
+		void startPostrequisite(Node* postrequisite);
+		void handlePostrequisiteCompletion(Node* postrequisite);
+		void handlePostrequisitesCompletion();
+		bool allPostrequisitesAreOk() const;
+
 		enum class ExecutionState
 		{
 			Idle,		   // waiting for start()
 			Suspended,     // started while suspended, waiting for node to be resumed
 			Prerequisites, // waiting for prerequisites to finish execution
-			Self		   // waiting for self-execution to finish
+			Self,		   // waiting for self-execution to finish
+			Postrequisites // waiting for postrequisites to finish execution
 		};
 		ExecutionState _executionState;
 		bool _suspended;
-		// node prerequisites, captured at start-resume time.
+		// prerequisite nodes, captured at start-resume time.
 		std::vector<std::shared_ptr<Node>> _prerequisites;
 		// nodes in _prerequisites that are executing  
 		std::unordered_set<Node*> _executingPrerequisites;
+
+		// postrequisite nodes, captured at completion of self-execution.
+		std::vector<std::shared_ptr<Node>> _postrequisites;
+		// nodes in _postrequisites that are executing  
+		std::unordered_set<Node*> _executingPostrequisites;
+
 		bool _canceling;
 		MulticastDelegate<Node*> _completor;
 	};

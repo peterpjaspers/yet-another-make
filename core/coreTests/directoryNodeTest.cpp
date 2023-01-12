@@ -68,14 +68,8 @@ namespace
 {
     using namespace YAM;
 
-    //TODO: once DirectoryNode is made to construct the entire tree
-    //must be adapted to verify the entire tree.
     void verify(TestDirectoryTree* expected, DirectoryNode* actual) {
 
-        EXPECT_EQ(Node::State::Dirty, actual->state());
-        bool completed = YAMTest::executeNode(actual);
-
-        EXPECT_TRUE(completed);
         EXPECT_EQ(Node::State::Ok, actual->state());
         EXPECT_EQ(expected->getHash(), actual->getHash());
 
@@ -109,6 +103,10 @@ namespace
         ExecutionContext context;
         DirectoryNode dirNode(&context, rootDir);
 
+        EXPECT_EQ(Node::State::Dirty, dirNode.state());
+        bool completed = YAMTest::executeNode(&dirNode);
+        EXPECT_TRUE(completed);
+
         verify(&testTree, &dirNode);
     }
     TEST(DirectoryNode, dirWithThreeSubDirs) {
@@ -117,6 +115,10 @@ namespace
 
         ExecutionContext context;
         DirectoryNode dirNode(&context, rootDir);
+
+        EXPECT_EQ(Node::State::Dirty, dirNode.state());
+        bool completed = YAMTest::executeNode(&dirNode);
+        EXPECT_TRUE(completed);
 
         verify(&testTree, &dirNode);
     }

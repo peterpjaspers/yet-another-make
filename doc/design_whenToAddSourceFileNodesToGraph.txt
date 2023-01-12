@@ -74,6 +74,32 @@ But when to add a source file node to the graph?
   - at build time: yam executes all remaining Dirty file nodes before starting 
     execution of cmd nodes that are Dirty and that are in build scope.
 
+Note: when scanning the repo we must exclude generated (output) files. How to 
+distinguish generated files from source files? Note that output files are declared
+in build files. But parsing of build files cannot start until all source files
+have been found (because build files can depend on arbitrary source files, e.g.
+a file enumerating libraries for which to create commands).
+This is a problem because GeneratedFile references the (command) node that created
+it. We cannot know the command node during scanning because that node has not yet
+been created. 
+Possible approach is to store generated files in e.g. yambin directories.
+Another approach is to change GeneratedFile from:
+    GeneratedFile : public FileNode
+    {
+        private:
+            std::shared_ptr<Node> _producer;
+    }
+to:
+    GeneratedFile : public Node
+    {
+        private:
+            std::shared_ptr<Node> _producer;
+            std::shared_ptr<FileNode> _file;
+    }
+A disadvantage of this approach is that it may cause frequent re-execution of the
+DirectoryNode that contains the generated files because typically output files
+are deleted before being re-generated, resulting in directory updates.
+
 Note: the above approach to file node creation and execution also simplifies 
 and speeds-up winkin. Simplifies because when searching for a winkinable cmd
 no new file nodes need to be created, speed-up because during search no file
@@ -130,9 +156,6 @@ not declared in the workspace configuration file.
 
 Note: YAM must (optionally?) warn for input files that are registered in the 
 build state but that are not used as command inputs.
-
-
-
 
       
  

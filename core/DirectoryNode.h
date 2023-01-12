@@ -26,6 +26,9 @@ namespace YAM
         virtual bool supportsPrerequisites() const override;
         virtual void getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const override;
 
+        virtual bool supportsPostrequisites() const override;
+        virtual void getPostrequisites(std::vector<std::shared_ptr<Node>>& postrequisites) const override;
+
         virtual bool supportsOutputs() const override;
         virtual void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const override;
 

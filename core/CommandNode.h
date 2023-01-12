@@ -21,6 +21,7 @@ namespace YAM
     {
 	public:
 		CommandNode(ExecutionContext* context, std::filesystem::path const& name);
+		~CommandNode();
 
 		virtual bool supportsPrerequisites() const override;
 

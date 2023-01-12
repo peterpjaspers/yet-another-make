@@ -17,7 +17,15 @@ namespace YAM
         return false;
     }
 
-    void DirectoryNode::getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const {
+    void DirectoryNode::getPrerequisites(std::vector<std::shared_ptr<Node>>&prerequisites) const {
+    }
+
+    bool DirectoryNode::supportsPostrequisites() const {
+        return !_content.empty();
+    }
+
+    void DirectoryNode::getPostrequisites(std::vector<std::shared_ptr<Node>>& postrequisites) const {
+        for (auto const& pair : _content) postrequisites.push_back(pair.second);
     }
 
     bool DirectoryNode::supportsOutputs() const {
@@ -114,10 +122,18 @@ namespace YAM
             auto const& path = dirEntry.path();
             if (oldContent.contains(path)) {
                 child = oldContent[path];
+                oldContent[path] = nullptr;
             } else {
                 child = createNode(dirEntry);
+                child->addPostParent(this);
             }
             if (child != nullptr) _content.insert({ child->name(), child });
+        }
+        for (auto const& pair : oldContent) {
+            std::shared_ptr<Node> child;
+            if (child != nullptr) {
+                child->removePostParent(this);
+            }
         }
     }
 
@@ -135,6 +151,6 @@ namespace YAM
             updateContent();
             updateHash();
         }
-        postCompletion(Node::State::Ok);
+        postSelfCompletion(Node::State::Ok);
     }
 }

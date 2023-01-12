@@ -76,6 +76,6 @@ namespace YAM
         if (updateLastWriteTime()) {
             rehashAll(false);
         }
-        postCompletion(Node::State::Ok);
+        postSelfCompletion(Node::State::Ok);
     }
 }

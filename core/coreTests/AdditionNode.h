@@ -12,6 +12,7 @@ namespace YAMTest
 	{
 	public:
 		AdditionNode(ExecutionContext* context, std::filesystem::path const& name);
+		~AdditionNode();
 
 		void addOperand(std::shared_ptr<NumberNode> operand);
 		void clearOperands();
