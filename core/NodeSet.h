@@ -2,6 +2,7 @@
 
 #include <map>
 #include <filesystem>
+#include <memory>
 
 namespace YAM
 {
@@ -17,31 +18,36 @@ namespace YAM
 		NodeSet() = default;
 
 		// Add node to the set.
-		void addIfAbsent(Node* node);
+		void addIfAbsent(std::shared_ptr<Node> node);
 
 		// Add node to the set.
 		// Pre: !Contains(node->Name())
-		void add(Node* node);
+		void add(std::shared_ptr<Node> node);
 
 		// Remove node from the set.
 		// Pre: Contains(node->Name())
-		void remove(Node* node);
+		void remove(std::shared_ptr<Node> node);
 
 		// Remove node from the set.
-		void removeIfPresent(Node* node);
+		void removeIfPresent(std::shared_ptr<Node> node);
+
+		// Remove all nodes from the set.
+		void clear();
 
 		// Find and return node that matches nodeName;
 		// Return null when not found.
-		Node* find(std::filesystem::path const& nodeName) const;
+		std::shared_ptr<Node> find(std::filesystem::path const& nodeName) const;
 
 		// Return whether the set contains a node with given 'nodeName'
 		bool contains(std::filesystem::path const& nodeName) const;
 
 		std::size_t size() const;
 
+		std::map<std::filesystem::path, std::shared_ptr<Node> > const& nodes() const;
+
 	private:
 		// TODO: used unordered_set. However set cannot use std::filesystem::path as keys.
-		std::map<std::filesystem::path, Node*> _nodes;
+		std::map<std::filesystem::path, std::shared_ptr<Node> > _nodes;
 	};
 }
 

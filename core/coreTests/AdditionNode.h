@@ -13,19 +13,19 @@ namespace YAMTest
 	public:
 		AdditionNode(ExecutionContext* context, std::filesystem::path const& name);
 
-		void addOperand(NumberNode* operand);
-		void clearOperands(bool deleteOps);
+		void addOperand(std::shared_ptr<NumberNode> operand);
+		void clearOperands();
 
-		NumberNode* sum();
+		std::shared_ptr<NumberNode> sum();
 
 		virtual bool supportsPrerequisites() const override;
-		virtual void getPrerequisites(std::vector<Node*>& prerequisites) const override;
+		virtual void getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const override;
 
 		virtual bool supportsOutputs() const override;
-		virtual void getOutputs(std::vector<Node*>& outputs) const override;
+		virtual void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const override;
 
 		virtual bool supportsInputs() const override;
-		virtual void getInputs(std::vector<Node*>& inputs) const override;
+		virtual void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const override;
 
 		virtual bool pendingStartSelf() const override;
 
@@ -37,8 +37,8 @@ namespace YAMTest
 	private:
 		void execute();
 
-		std::vector<NumberNode*> _operands;
-		NumberNode _sum;
+		std::vector<std::shared_ptr<NumberNode>> _operands;
+		std::shared_ptr<NumberNode> _sum;
 		XXH64_hash_t _executionHash;
 	};
 }

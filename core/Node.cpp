@@ -31,19 +31,14 @@ namespace YAM
 		}
 	}
 
-	void Node::replaceParents(std::vector<Node*> const& newParents) {
-		_parents.clear();
-		for (auto p : newParents) addParent(p);
-	}
+    void Node::addParent(Node* parent) {
+        auto p = _parents.insert(parent);
+        if (!p.second) throw std::runtime_error("Attempt to add duplicate parent");
+    }
 
-	void Node::addParent(Node* parent) {
-		auto p = _parents.insert(parent);
-		if (!p.second) throw std::runtime_error("Attempt to add duplicate parent");
-	}
-
-	void Node::removeParent(Node* parent) {
-		if (0 == _parents.erase(parent)) throw std::runtime_error("Attempt to remove unknown parent");
-	}
+    void Node::removeParent(Node* parent) {
+        if (0 == _parents.erase(parent)) throw std::runtime_error("Attempt to remove unknown parent");
+    }
 
     void Node::suspend() {
         if (busy()) throw std::runtime_error("Attempt to suspend while busy");
@@ -90,7 +85,7 @@ namespace YAM
         _executionState = ExecutionState::Prerequisites;
         _prerequisites.clear();
         getPrerequisites(_prerequisites);
-        for (Node* p : _prerequisites) startPrerequisite(p);
+        for (std::shared_ptr<Node> p : _prerequisites) startPrerequisite(p.get());
         handlePrerequisitesCompletion();
     }
 

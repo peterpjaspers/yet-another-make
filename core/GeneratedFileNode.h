@@ -8,11 +8,11 @@ namespace YAM
     public:
         // Construct an output file node. Execution of the producer node
         // generates the output file.
-        GeneratedFileNode(ExecutionContext* context, std::filesystem::path const& name, Node* producer);
+        GeneratedFileNode(ExecutionContext* context, std::filesystem::path const& name, std::shared_ptr<Node> producer);
 
-        Node* producer() const;
+        std::shared_ptr<Node> producer() const;
 
     private:
-        Node* _producer;
+        std::shared_ptr<Node> _producer;
     };
 }

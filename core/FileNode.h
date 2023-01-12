@@ -136,13 +136,13 @@ namespace YAM
 
         // Inherited via Node
         virtual bool supportsPrerequisites() const override;
-        virtual void getPrerequisites(std::vector<Node*>& prerequisites) const override;
+        virtual void getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const override;
 
         virtual bool supportsOutputs() const override;
-        virtual void getOutputs(std::vector<Node*>& outputs) const override;
+        virtual void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const override;
 
         virtual bool supportsInputs() const override;
-        virtual void getInputs(std::vector<Node*>& inputs) const override;
+        virtual void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const override;
 
         // Pre: state() == State::Ok
         // Return the cached hash of given aspect.

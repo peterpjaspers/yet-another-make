@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <functional>
+#include <memory>
 #include <vector>
 #include <unordered_set>
 #include <stdexcept>
@@ -87,11 +88,24 @@ namespace YAM
 
 		// Pre: supportsPrerequisites()
 		// Append prerequisite nodes to 'prerequisites'.
-		virtual void getPrerequisites(std::vector<Node*>& prerequisites) const = 0;
+		virtual void getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const = 0;
 
 		// Return parent nodes.
-		// A parent node has this node as a prerequisite. 
+		// A parent node is a node that has this node as a prerequisite. This node 
+		// propagates a change to Dirty state to its parents. 
+		// E.g. a C++ header file that is set Dirty will propagate the Dirty states to
+		// all  C++ compilation commands that have the header file as input node.
+		// The compilation command on its turn propagates the Dirty state to all link
+		// command nodes that have the object file as input.
+		// The parent node must:
+		//    - add itself to this node when it uses this node as prerequisite.
+		//    - remove itself to this node when it stops using this node as prerequisite.
+		// The parent relation causes a cyclic dependency between parent and this node.
+		// Therefore raw pointer to parent is used iso shared_ptr. This is safe as long
+		// as parent adheres to the add/remove protocol. 
 		std::unordered_set<Node*> const& parents() const { return _parents; }
+		void addParent(Node* parent);
+		void removeParent(Node* parent);
 		
 		//
 		// Start of interfaces that access inputs and outputs of node execution.
@@ -104,7 +118,7 @@ namespace YAM
 		// Pre: supportsOutputs()
         // Append the output nodes in 'outputs'.
 		// Note: outputs are typically, but not necessarily, output files nodes.
-		virtual void getOutputs(std::vector<Node*>& outputs) const = 0;
+		virtual void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const = 0;
 
 		// Return whether this node supports input nodes.
 		// This is a class property. 
@@ -114,7 +128,7 @@ namespace YAM
 		// Append the inputs nodes in 'inputs'.
 		// Note: inputs are typically, but not necessarily, source files and/or
 		// output files produced by prerequisite command nodes.
-		virtual void getInputs(std::vector<Node*>& inputs) const = 0;
+		virtual void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const = 0;
 
 		//
 		// End of interfaces that access inputs and outputs of node execution.
@@ -177,10 +191,6 @@ namespace YAM
 		//
 		// End of Node execution interfaces
 		//
-
-		void replaceParents(std::vector<Node*> const& newParents);
-		void addParent(Node* parent);
-		void removeParent(Node* parent);
 
 	protected:
 		ExecutionContext* _context;
@@ -270,7 +280,7 @@ namespace YAM
 		ExecutionState _executionState;
 		bool _suspended;
 		// node prerequisites, captured at start-resume time.
-		std::vector<Node*> _prerequisites; 
+		std::vector<std::shared_ptr<Node>> _prerequisites;
 		// nodes in _prerequisites that are executing  
 		std::unordered_set<Node*> _executingPrerequisites;
 		bool _canceling;

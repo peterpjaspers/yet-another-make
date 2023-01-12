@@ -3,32 +3,36 @@
 
 namespace YAM
 {
-	void NodeSet::addIfAbsent(Node* node) {
+	void NodeSet::addIfAbsent(std::shared_ptr<Node> node) {
 		const auto notUsed = _nodes.insert({ node->name(), node });
 	}
 
-	void NodeSet::add(Node* node) {
+	void NodeSet::add(std::shared_ptr<Node> node) {
 		const auto [it, success] = _nodes.insert({ node->name(), node });
 		if (!success) throw std::runtime_error("failed to add node");
 	}
 
-	void NodeSet::remove(Node* node) {
+	void NodeSet::remove(std::shared_ptr<Node> node) {
 		auto nRemoved = _nodes.erase(node->name());
 		if (nRemoved != 1) throw std::runtime_error("failed to remove node");
 	}
 
-	void NodeSet::removeIfPresent(Node* node) {
+	void NodeSet::removeIfPresent(std::shared_ptr<Node> node) {
 		auto notUsed = _nodes.erase(node->name());
 	}
 
-	Node* NodeSet::find(std::filesystem::path const& nodeName) const
+	void NodeSet::clear() {
+		_nodes.clear();
+	}
+
+	std::shared_ptr<Node> NodeSet::find(std::filesystem::path const& nodeName) const
 	{
 		auto it = _nodes.find(nodeName);
 		if (it != _nodes.end())
 		{
 			return it->second;
 		} else {
-			return nullptr;
+			return std::shared_ptr<Node>();
 		}
 	}
 
@@ -39,4 +43,8 @@ namespace YAM
 	}
 
 	std::size_t NodeSet::size() const { return _nodes.size(); }
+
+	std::map<std::filesystem::path, std::shared_ptr<Node> > const& NodeSet::nodes() const { 
+		return _nodes; 
+	}
 }

@@ -38,14 +38,14 @@ namespace
 
 	TEST(AdditionNode, executeMany) {
 		std::size_t const n = 4;
-		std::vector<NumberNode*> ops;
+		std::vector<std::shared_ptr<NumberNode>> ops;
 		int sum0 = 0;
 		int sum1 = 0;
 
 		ExecutionContext context;
 		AdditionNode addition0(&context, "addition0");
 		for (std::size_t i = 0; i < n; ++i) {
-			NumberNode* nr = new NumberNode(&context, "number");
+			std::shared_ptr<NumberNode> nr = std::make_shared<NumberNode>(&context, "number");
 			nr->number((int)i);
 			ops.push_back(nr);
 			addition0.addOperand(ops[i]);
@@ -72,19 +72,18 @@ namespace
 
 		for (std::size_t i = 0; i < n; ++i) {
 			EXPECT_EQ(Node::State::Ok, ops[i]->state());
-			delete ops[i];
 		}
 	}
 
 	TEST(AdditionNode, reexecute) {
 		std::size_t const nOperands = 4;
-		std::vector<NumberNode*> ops;
+		std::vector<std::shared_ptr<NumberNode>> ops;
 
 		ExecutionContext context;
 		AdditionNode addition(&context, "addition");
 		int sum = 0;
 		for (std::size_t i = 0; i < nOperands; ++i) {
-			ops.push_back(new NumberNode(&context, "number"));
+			ops.push_back(std::make_shared<NumberNode>(&context, "number"));
 			ops[i]->number((int)i);
 			addition.addOperand(ops[i]);
 			sum += (int)i;
@@ -129,7 +128,7 @@ namespace
 			EXPECT_EQ(Node::State::Ok, ops[i]->state());
 		}
 
-		addition.clearOperands(true);
+		addition.clearOperands();
 	}
 
 }

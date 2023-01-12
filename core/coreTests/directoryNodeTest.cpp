@@ -79,27 +79,27 @@ namespace
         EXPECT_EQ(Node::State::Ok, actual->state());
         EXPECT_EQ(expected->getHash(), actual->getHash());
 
-        std::vector<FileNode*> fileNodes;
+        std::vector<std::shared_ptr<FileNode>> fileNodes;
         actual->getFiles(fileNodes);
         EXPECT_EQ(expected->getFiles().size(), fileNodes.size());
         for (std::size_t i = 0; i < fileNodes.size(); ++i) {
             EXPECT_EQ(expected->getFiles()[i], fileNodes[i]->name());
         }
 
-        std::vector<DirectoryNode*> subDirNodes;
+        std::vector<std::shared_ptr<DirectoryNode>> subDirNodes;
         actual->getSubDirs(subDirNodes);
         EXPECT_EQ(expected->getSubDirs().size(), subDirNodes.size());
         for (std::size_t i = 0; i < subDirNodes.size(); ++i) {
             EXPECT_EQ(expected->getSubDirs()[i]->path(), subDirNodes[i]->name());
         }
 
-        std::map<std::filesystem::path, Node*> const& cNodes = actual->getContent();
+        std::map<std::filesystem::path, std::shared_ptr<Node>> const& cNodes = actual->getContent();
         EXPECT_EQ(expected->getFiles().size() + expected->getSubDirs().size(), cNodes.size());
         for (auto f : fileNodes) EXPECT_TRUE(cNodes.contains(f->name()));
         for (auto d : subDirNodes) EXPECT_TRUE(cNodes.contains(d->name()));
 
         for (std::size_t i = 0; i < subDirNodes.size(); ++i) {
-            verify(expected->getSubDirs()[i], subDirNodes[i]);
+            verify(expected->getSubDirs()[i], subDirNodes[i].get());
         }
     }
     TEST(DirectoryNode, dirWithZeroSubDirs) {

@@ -12,21 +12,21 @@ namespace YAM
         return false;
     }
 
-    void FileNode::getPrerequisites(std::vector<Node*>& prerequisites) const {
+    void FileNode::getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const {
     }
 
     bool FileNode::supportsOutputs() const {
         return false;
     }
 
-    void FileNode::getOutputs(std::vector<Node*>& outputs) const {
+    void FileNode::getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const {
     }
 
     bool FileNode::supportsInputs() const {
         return false;
     }
 
-    void FileNode::getInputs(std::vector<Node*>& inputs) const {
+    void FileNode::getInputs(std::vector<std::shared_ptr<Node>>& inputs) const {
     }
 
     XXH64_hash_t FileNode::hashOf(std::string const& aspectName) {

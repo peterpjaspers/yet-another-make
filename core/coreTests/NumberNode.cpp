@@ -31,19 +31,19 @@ namespace YAMTest
 	// Inherited from Node
 	bool NumberNode::supportsPrerequisites() const { return false; }
 
-	void NumberNode::getPrerequisites(std::vector<Node*>& prerequisites) const {
+	void NumberNode::getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const {
 		throw std::runtime_error("precondition violation");
 	}
 
 	bool NumberNode::supportsOutputs() const { return false; }
 
-	void NumberNode::getOutputs(std::vector<Node*>& outputs) const {
+	void NumberNode::getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const {
 		throw std::runtime_error("precondition violation");
 	}
 
 	bool NumberNode::supportsInputs() const { return false; }
 
-	void NumberNode::getInputs(std::vector<Node*>& inputs) const {
+	void NumberNode::getInputs(std::vector<std::shared_ptr<Node>>& inputs) const {
 		throw std::runtime_error("precondition violation");
 	}
 

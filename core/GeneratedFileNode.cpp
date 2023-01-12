@@ -6,13 +6,13 @@ namespace YAM
     GeneratedFileNode::GeneratedFileNode(
         ExecutionContext* context,
         std::filesystem::path const& name,
-        Node* producer)
+        std::shared_ptr<Node> producer)
         : FileNode(context, name)
         , _producer(producer) 
     { 
     }
 
-    Node* GeneratedFileNode::producer() const { 
+    std::shared_ptr<Node> GeneratedFileNode::producer() const {
         return _producer; 
     }
 }

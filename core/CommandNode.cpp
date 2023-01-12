@@ -26,9 +26,8 @@ namespace YAM
 		}
 	}
 
-	void CommandNode::setOutputs(std::vector<GeneratedFileNode*> const & newOutputs) {
+	void CommandNode::setOutputs(std::vector<std::shared_ptr<GeneratedFileNode>> const & newOutputs) {
 		if (_outputs != newOutputs) {
-			// TODO: ownership? What if outputs are still referenced?
 			for (auto i : _outputs) i->removeParent(this);
 			_outputs = newOutputs;
 			for (auto i : _outputs) i->addParent(this);
@@ -47,7 +46,7 @@ namespace YAM
 		}
 	}
 
-	void CommandNode::setInputProducers(std::vector<Node*> const& newInputProducers) {
+	void CommandNode::setInputProducers(std::vector<std::shared_ptr<Node>> const& newInputProducers) {
 		if (_inputProducers != newInputProducers) {
 			for (auto i : _inputProducers) i->removeParent(this);
 			_inputProducers = newInputProducers;
@@ -56,24 +55,24 @@ namespace YAM
 		}
 	}
 
-	void CommandNode::appendInputProducers(std::vector<Node*>& producers) const {
+	void CommandNode::getInputProducers(std::vector<std::shared_ptr<Node>>& producers) const {
 		producers.insert(producers.end(), _inputProducers.begin(), _inputProducers.end());
 	}
 
 	bool CommandNode::supportsPrerequisites() const { return true; }
-	void CommandNode::getPrerequisites(std::vector<Node*>& prerequisites) const {
+	void CommandNode::getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const {
 		prerequisites.insert(prerequisites.end(), _inputProducers.begin(), _inputProducers.end());
-		appendSourceInputs(prerequisites);
+		getSourceInputs(prerequisites);
 		getOutputs(prerequisites);
 	}
 
 	bool CommandNode::supportsOutputs() const { return true; }
-	void CommandNode::getOutputs(std::vector<Node*>& outputs) const {
+	void CommandNode::getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const {
 		outputs.insert(outputs.end(), _outputs.begin(), _outputs.end());
 	}
 
 	bool CommandNode::supportsInputs() const { return true; }
-	void CommandNode::getInputs(std::vector<Node*>& inputs) const {
+	void CommandNode::getInputs(std::vector<std::shared_ptr<Node>>& inputs) const {
 		inputs.insert(inputs.end(), _inputs.begin(), _inputs.end());
 	}
 
@@ -102,9 +101,9 @@ namespace YAM
 		_context->threadPoolQueue().push(std::move(d));
 	}
 
-	void CommandNode::appendSourceInputs(std::vector<Node*> & sourceInputs) const {
+	void CommandNode::getSourceInputs(std::vector<std::shared_ptr<Node>> & sourceInputs) const {
 		for (auto i : _inputs) {
-			auto file = dynamic_cast<SourceFileNode*>(i);
+			auto file = dynamic_pointer_cast<SourceFileNode>(i);
 			if (file != nullptr) sourceInputs.push_back(file);
 		}
 	}
@@ -148,7 +147,9 @@ namespace YAM
 
 		State newState = executeScript();
 		// todo: process detected input files as described in FileNode.h
-		// scenarios 1 and 3.
+		// scenarios 1 and 3. Make sure to set this as parent of source
+		// input files and to assert that generated input files are
+		// outputs of the _inputProducers.
 		// TODO: the order of the input nodes is important for the hash 
 		// computation. Therefore sort the inputs by name.
 
