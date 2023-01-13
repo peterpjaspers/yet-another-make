@@ -150,16 +150,15 @@ namespace
         // Update file system
         TestDirectoryTree* testTree_S1 = testTree.getSubDirs()[1];
         TestDirectoryTree* testTree_S1_S2 = testTree_S1->getSubDirs()[2];
-        testTree.addFile();
-        testTree_S1->addFile();
-        testTree_S1_S2->addDirectory();
-        testTree_S1_S2->addFile();
+        testTree.addFile();// adds 4-th file
+        testTree_S1->addFile();// adds 4-th file
+        testTree_S1_S2->addDirectory(); // adds 1 dir with 3 files and 3 subdirs
+        testTree_S1_S2->addFile(); // adds 4-th file
 
         // Find nodes affected by file system changes...
         std::vector<std::shared_ptr<DirectoryNode>> subDirNodes;
         dirNode.getSubDirs(subDirNodes);
         std::shared_ptr<DirectoryNode> dirNode_S1 = subDirNodes[1];
-        subDirNodes.clear();
         dirNode_S1->getSubDirs(subDirNodes);
         std::shared_ptr<DirectoryNode> dirNode_S1_S2 = subDirNodes[2];
 
@@ -168,10 +167,36 @@ namespace
         dirNode_S1->setState(Node::State::Dirty);
         dirNode_S1_S2->setState(Node::State::Dirty);
 
+
+        context.statistics().reset();
+        context.statistics().registerNodes = true;
         // re-execute directory node tree to sync with changed testTree
         completed = YAMTest::executeNode(&dirNode);
         EXPECT_TRUE(completed);
 
         verify(&testTree, &dirNode);
+
+        EXPECT_EQ(10, context.statistics().nStarted);
+        // 10 because DirectoryNode::pendingStartSelf always returns true.
+        // But only 4 dir nodes will see a modified directory. Only those 4
+        // update their content.
+        EXPECT_EQ(10, context.statistics().nSelfExecuted);
+        EXPECT_EQ(6, context.statistics().nFileUpdates);
+        EXPECT_EQ(4, context.statistics().nDirectoryUpdates);
+        EXPECT_TRUE(context.statistics().updatedDirectories.contains(&dirNode));
+        EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode_S1.get()));
+        EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode_S1_S2.get()));
+        std::vector<std::shared_ptr<FileNode>> files;
+        dirNode.getFiles(files);
+        EXPECT_TRUE(context.statistics().updatedFiles.contains(files[files.size() - 1].get()));
+
+        dirNode_S1->getFiles(files);
+        EXPECT_TRUE(context.statistics().updatedFiles.contains(files[files.size() - 1].get()));
+
+        dirNode_S1_S2->getSubDirs(subDirNodes);
+        auto dirNode_S1_S2_S3 = subDirNodes[subDirNodes.size() - 1];
+        EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode_S1_S2_S3.get()));
+        dirNode_S1_S2_S3->getFiles(files);
+        for (auto f : files) EXPECT_TRUE(context.statistics().updatedFiles.contains(f.get()));
     }
 }

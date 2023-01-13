@@ -47,6 +47,7 @@ namespace YAM
     }
 
     void DirectoryNode::getFiles(std::vector<std::shared_ptr<FileNode>>& filesInDir) {
+        filesInDir.clear();
         for (auto it = _content.begin(); it != _content.end(); ++it) {
             std::shared_ptr<FileNode> n = dynamic_pointer_cast<FileNode>(it->second);
             if (n != nullptr) {
@@ -56,6 +57,7 @@ namespace YAM
     }
 
     void DirectoryNode::getSubDirs(std::vector<std::shared_ptr<DirectoryNode>>& subDirsInDir) {
+        subDirsInDir.clear();
         for (auto it = _content.begin(); it != _content.end(); ++it) {
             std::shared_ptr<DirectoryNode> n = dynamic_pointer_cast<DirectoryNode>(it->second);
             if (n != nullptr) {
@@ -148,6 +150,7 @@ namespace YAM
 
     void DirectoryNode::execute() {
         if (updateLastWriteTime()) {
+            context()->statistics().registerUpdatedDirectory(this);
             updateContent();
             updateHash();
         }
