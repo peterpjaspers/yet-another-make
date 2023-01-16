@@ -78,6 +78,9 @@
     <ClInclude Include="FileWatcherWin32.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="SourceFileRepository.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -137,10 +140,10 @@
     <ClCompile Include="FileWatcher.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="IFileWatcher.cpp">
+    <ClCompile Include="FileWatcherWin32.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="FileWatcherWin32.cpp">
+    <ClCompile Include="SourceFileRepository.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

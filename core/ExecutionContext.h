@@ -7,8 +7,12 @@
 #include "FileAspectSet.h"
 #include "ExecutionStatistics.h"
 
+#include <memory>
+
 namespace YAM
 {
+	class SourceFileRepository;
+
 	class __declspec(dllexport) ExecutionContext
 	{
 	public:
@@ -21,6 +25,15 @@ namespace YAM
 		Dispatcher& mainThreadQueue();
 
 		ExecutionStatistics& statistics();
+
+	    // Add repository, return whether it was added, i..e had a unique name.
+		bool addRepository(std::shared_ptr<SourceFileRepository> repo);
+		// Remove repository, return whether it was removed.
+		bool removeRepository(std::string const& repoName);
+		// Find repository, return found repo, nullptr when not found.
+		std::shared_ptr<SourceFileRepository> findRepository(std::string const& repoName) const;
+		// Return repositories.
+		std::map<std::string, std::shared_ptr<SourceFileRepository>> const& repositories() const;
 
 		// Return the file aspects applicable to the file with the given path name.
 		std::vector<FileAspect> findFileAspects(std::filesystem::path const& path) const;
@@ -36,6 +49,8 @@ namespace YAM
 		Thread _mainThread;
 		ThreadPool _threadPool;
 		ExecutionStatistics _statistics;
+
+		std::map<std::string, std::shared_ptr<SourceFileRepository>> _repositories;
 
 		//TODO: add interfaces to add/remove aspects and aspectSets
 		std::map<std::string, FileAspect> _fileAspects;

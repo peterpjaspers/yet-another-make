@@ -128,6 +128,7 @@ namespace YAM
             } else {
                 child = createNode(dirEntry);
                 child->addPostParent(this);
+                context()->nodes().add(child);
             }
             if (child != nullptr) _content.insert({ child->name(), child });
         }
@@ -135,6 +136,7 @@ namespace YAM
             std::shared_ptr<Node> child;
             if (child != nullptr) {
                 child->removePostParent(this);
+                context()->nodes().remove(child);
             }
         }
     }

@@ -1,4 +1,5 @@
 #include "ExecutionContext.h"
+#include "SourceFileRepository.h"
 
 namespace
 {
@@ -39,6 +40,35 @@ namespace YAM
 
     ExecutionStatistics& ExecutionContext::statistics() {
         return _statistics;
+    }
+
+    bool ExecutionContext::addRepository(std::shared_ptr<SourceFileRepository> repo)
+    {
+        bool duplicateName = nullptr != findRepository(repo->name());
+        if (!duplicateName) {
+            _repositories.insert({ repo->name(), repo });
+        }
+        return !duplicateName;
+    }
+
+    bool ExecutionContext::removeRepository(std::string const& repoName) {
+        auto it = _repositories.find(repoName);
+        bool found = it != _repositories.end();
+        if (found) {
+            _repositories.erase(it);
+        }
+        return found;
+    }
+
+    std::shared_ptr<SourceFileRepository> ExecutionContext::findRepository(std::string const& repoName) const {
+        auto it = _repositories.find(repoName);
+        bool found = it != _repositories.end();
+        if (found) return it->second;
+        return nullptr;
+    }
+
+    std::map<std::string, std::shared_ptr<SourceFileRepository>> const& ExecutionContext::repositories() const {
+        return _repositories;
     }
 
     // Return the file aspects applicable to the file with the given path name.
