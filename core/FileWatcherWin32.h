@@ -15,7 +15,7 @@ namespace YAM
 		FileWatcherWin32(
 			std::filesystem::path const& directory,
 			bool recursive,
-			Delegate<void, FileChange>& changeHandler);
+			Delegate<void, FileChange const&> const& changeHandler);
 
 		~FileWatcherWin32();
 

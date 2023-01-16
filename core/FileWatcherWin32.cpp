@@ -24,10 +24,10 @@ namespace YAM
     FileWatcherWin32::FileWatcherWin32(
         std::filesystem::path const& directory,
         bool recursive,
-        Delegate<void, FileChange>& changeHandler)
+        Delegate<void, FileChange const&> const& changeHandler)
         : IFileWatcher(directory, recursive, changeHandler)
         , _dirHandle(createHandle(directory))
-        , _changeBufferSize(sizeof(FILE_NOTIFY_INFORMATION) + 2 * MAX_PATH)
+        , _changeBufferSize(64*1024)
         , _changeBuffer(new uint8_t[_changeBufferSize])
         , _stop(false)
     {
@@ -64,34 +64,45 @@ namespace YAM
             if (!_stop && result == WAIT_OBJECT_0) {
                 DWORD bytesTransferred;
                 GetOverlappedResult(_dirHandle, &_overlapped, &bytesTransferred, FALSE);
-                std::size_t offset = 0;
-                PFILE_NOTIFY_INFORMATION info;
-                FileChange change;
-                do
-                {
-                    info = reinterpret_cast<PFILE_NOTIFY_INFORMATION>(&_changeBuffer.get()[offset]);
-                    offset += info->NextEntryOffset;
-                    std::wstring fileNameStr(info->FileName, info->FileNameLength/sizeof(wchar_t));
-                    std::filesystem::path fileName(fileNameStr);
-                    if (info->Action == FILE_ACTION_ADDED) {
-                        change.action = FileChange::Action::Added;
-                        change.fileName = fileName;
-                    } else if (info->Action == FILE_ACTION_REMOVED) {
-                        change.action = FileChange::Action::Removed;
-                        change.fileName = fileName;
-                    } else if (info->Action == FILE_ACTION_MODIFIED) {
-                        change.action = FileChange::Action::Modified;
-                        change.fileName = fileName;
-                    } else if (info->Action == FILE_ACTION_RENAMED_OLD_NAME) {
-                        change.action = FileChange::Action::Renamed;
-                        change.oldFileName = fileName;
-                    } else if (info->Action == FILE_ACTION_RENAMED_NEW_NAME) {
-                        change.action = FileChange::Action::Renamed;
-                        change.fileName = fileName;
-                    }
-
-                } while (info->NextEntryOffset != 0);
-                _changeHandler.Execute(change);
+                if (bytesTransferred == 0) {
+                    FileChange overflow;
+                    overflow.action = FileChange::Action::Overflow;
+                    _changeHandler.Execute(overflow);
+                } else {
+                    std::size_t offset = 0;
+                    PFILE_NOTIFY_INFORMATION info;
+                    FileChange rename;
+                    rename.action = FileChange::Action::Renamed;
+                    do
+                    {
+                        FileChange change;
+                        info = reinterpret_cast<PFILE_NOTIFY_INFORMATION>(&_changeBuffer.get()[offset]);
+                        offset += info->NextEntryOffset;
+                        std::wstring fileNameStr(info->FileName, info->FileNameLength / sizeof(wchar_t));
+                        std::filesystem::path fileName(fileNameStr);
+                        if (info->Action == FILE_ACTION_ADDED) {
+                            change.action = FileChange::Action::Added;
+                            change.fileName = fileName;
+                        } else if (info->Action == FILE_ACTION_REMOVED) {
+                            change.action = FileChange::Action::Removed;
+                            change.fileName = fileName;
+                        } else if (info->Action == FILE_ACTION_MODIFIED) {
+                            change.action = FileChange::Action::Modified;
+                            change.fileName = fileName;
+                        } else if (info->Action == FILE_ACTION_RENAMED_OLD_NAME) {
+                            rename.oldFileName = fileName;
+                        } else if (info->Action == FILE_ACTION_RENAMED_NEW_NAME) {
+                            rename.fileName = fileName;
+                        }
+                        if (!rename.fileName.empty() && !rename.oldFileName.empty()) {
+                            _changeHandler.Execute(rename);
+                            rename.fileName = "";
+                            rename.oldFileName = "";
+                        } else {
+                            _changeHandler.Execute(change);
+                        }
+                    } while (info->NextEntryOffset != 0);
+                }
                 queueReadChangeRequest();
             }
         }

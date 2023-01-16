@@ -11,12 +11,12 @@ namespace YAM
 		//	- Removed file A/F + Added file B/G
 		//  - Renamed file B/G, oldFile A/F 
 		//	- Removed file A/F + modified directory B
-		//
 		enum Action {
 			Added = 1,    // file/dir is created
 			Removed = 2,  // file/dir is removed
 			Modified = 3, // file/dir is modified
-			Renamed = 4   // file/dir is renamed
+			Renamed = 4,  // file/dir is renamed
+			Overflow = 5  // lost track of changes due to buffer overflow
 		};
 		Action action;
 		std::filesystem::path fileName;
@@ -33,11 +33,12 @@ namespace YAM
 		// Create a watcher that monitors the given directory in a
 		// watcher thread that is started/controlled by the watcher.
 		// Execute the given delegate when a change is detected.
+		// File names in FileChanges are relative to the watched directory.
 		// Take care: execution is done in watcher thread context.
 		IFileWatcher(
 			std::filesystem::path const& directory,
 			bool recursive,
-			Delegate<void, FileChange>& changeHandler)
+			Delegate<void, FileChange const&> const& changeHandler)
 			: _directory(directory)
 			, _recursive(recursive)
 			, _changeHandler(changeHandler)
@@ -50,7 +51,7 @@ namespace YAM
 	protected:
 		std::filesystem::path _directory;
 		bool _recursive;
-		Delegate<void, FileChange> _changeHandler;
+		Delegate<void, FileChange const&> _changeHandler;
 	};
 }
 

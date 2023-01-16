@@ -12,7 +12,7 @@ namespace YAM
 	FileWatcher::FileWatcher(
 		std::filesystem::path const& directory,
 		bool recursive,
-		Delegate<void, FileChange>& changeHandler) 
+		Delegate<void, FileChange const&> const& changeHandler)
 		: IFileWatcher(directory, recursive, changeHandler)
 	{
 		_impl = std::make_shared<FW_IMPL_CLASS>(_directory, _recursive, _changeHandler);
