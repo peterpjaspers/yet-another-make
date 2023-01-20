@@ -69,13 +69,13 @@
     <ClInclude Include="DirectoryNode.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="FileWatcher.h">
+    <ClInclude Include="DirectoryWatcher.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="IFileWatcher.h">
+    <ClInclude Include="IDirectoryWatcher.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="FileWatcherWin32.h">
+    <ClInclude Include="DirectoryWatcherWin32.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="SourceFileRepository.h">
@@ -137,10 +137,10 @@
     <ClCompile Include="DirectoryNode.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="FileWatcher.cpp">
+    <ClCompile Include="DirectoryWatcher.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="FileWatcherWin32.cpp">
+    <ClCompile Include="DirectoryWatcherWin32.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="SourceFileRepository.cpp">

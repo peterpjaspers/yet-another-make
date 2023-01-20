@@ -46,6 +46,13 @@ namespace YAM
         // Return the directory hash.
         XXH64_hash_t getHash() const;
 
+        // Recursively remove the directory node from context->nodes().
+        // Intended to be used when the repo is no longer to be mirrored
+        // by YAM.
+        void clear();
+
+        void execute();
+
     protected:
         // Inherited via Node
         virtual bool pendingStartSelf() const override;
@@ -56,7 +63,7 @@ namespace YAM
         bool updateLastWriteTime();
         void updateContent();
         void updateHash();
-        void execute();
+        void _removeChildRecursively(std::shared_ptr<Node> child);
 
         // last seen modification time of the directory
         std::chrono::time_point<std::chrono::utc_clock> _lastWriteTime;

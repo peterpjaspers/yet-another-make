@@ -101,10 +101,10 @@
     <ClInclude Include="ExecutionContext.h" />
     <ClInclude Include="ExecutionStatistics.h" />
     <ClInclude Include="FileAspect.h" />
-    <ClInclude Include="FileWatcher.h" />
-    <ClInclude Include="FileWatcherWin32.h" />
+    <ClInclude Include="DirectoryWatcher.h" />
+    <ClInclude Include="DirectoryWatcherWin32.h" />
     <ClInclude Include="GlobNode.h" />
-    <ClInclude Include="IFileWatcher.h" />
+    <ClInclude Include="IDirectoryWatcher.h" />
     <ClInclude Include="MSBuildTrackerOutputReader.h" />
     <ClInclude Include="RegexSet.h" />
     <ClInclude Include="FileAspectSet.h" />
@@ -126,8 +126,8 @@
     <ClCompile Include="ExecutionContext.cpp" />
     <ClCompile Include="ExecutionStatistics.cpp" />
     <ClCompile Include="FileAspect.cpp" />
-    <ClCompile Include="FileWatcher.cpp" />
-    <ClCompile Include="FileWatcherWin32.cpp" />
+    <ClCompile Include="DirectoryWatcher.cpp" />
+    <ClCompile Include="DirectoryWatcherWin32.cpp" />
     <ClCompile Include="GlobNode.cpp" />
     <ClCompile Include="MSBuildTrackerOutputReader.cpp">
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdcpp20</LanguageStandard>

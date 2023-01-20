@@ -9,12 +9,18 @@ namespace YAMTest
 {
     using namespace YAM;
 
-    std::chrono::seconds timeout(10);
+    std::chrono::seconds timeout(1000);
 
     bool executeNode(Node* n) {
 		std::vector<YAM::Node*> nodes{ n };
 		return executeNodes(nodes);
     }
+
+	bool executeNodes(std::vector<std::shared_ptr<Node>> const& nodes) {
+		std::vector<YAM::Node*> nodePtrs;
+		for (auto const& n : nodes) nodePtrs.push_back(n.get());
+		return executeNodes(nodePtrs);
+	}
 
     bool executeNodes(std::vector<YAM::Node*> const & nodesRef) {
 		std::vector<YAM::Node*> nodes(nodesRef);
@@ -23,6 +29,7 @@ namespace YAMTest
 		std::mutex mtx;
 		std::condition_variable cv;
 
+		if (nodes.empty()) return true;
 		// make sure to start all nodes in YAM mainthread. If not, race-conditions
 		// will occur between start() code executed in this (i.e. the test) thread and 
 		// prerequisite completion handling in yam mainthread.

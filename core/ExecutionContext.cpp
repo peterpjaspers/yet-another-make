@@ -1,4 +1,5 @@
 #include "ExecutionContext.h"
+#include "Node.h"
 #include "SourceFileRepository.h"
 
 namespace
@@ -67,8 +68,23 @@ namespace YAM
         return nullptr;
     }
 
+    std::shared_ptr<SourceFileRepository> ExecutionContext::findRepository(std::filesystem::path const& path) const {
+        for (auto pair : _repositories) {
+            auto repo = pair.second;
+            if (repo->contains(path)) return repo;
+        }
+        return nullptr;
+    }
+
     std::map<std::string, std::shared_ptr<SourceFileRepository>> const& ExecutionContext::repositories() const {
         return _repositories;
+    }
+
+    RegexSet const& ExecutionContext::findExcludes(std::filesystem::path const& path) const {
+        static RegexSet noExcludes;
+        auto repo = findRepository(path);
+        if (repo != nullptr) return repo->excludes();
+        return noExcludes;
     }
 
     // Return the file aspects applicable to the file with the given path name.
@@ -88,7 +104,27 @@ namespace YAM
         return s->second;
     }
 
-    NodeSet& ExecutionContext::nodes() {
+    NodeSet & ExecutionContext::nodes() {
         return _nodes;
+    }
+
+    void ExecutionContext::getDirtyNodes(std::vector<std::shared_ptr<Node>>& dirtyNodes) const {
+        dirtyNodes.clear();
+        for (auto const& pair : _nodes.nodes()) {
+            auto node = pair.second;
+            if (node->state() == Node::State::Dirty) {
+                dirtyNodes.push_back(node);
+            }
+        }
+    }
+
+    void ExecutionContext::getDirtyNodes(std::map<std::filesystem::path, std::shared_ptr<Node>>& dirtyNodes) const {
+        dirtyNodes.clear();
+        for (auto const& pair : _nodes.nodes()) {
+            auto node = pair.second;
+            if (node->state() == Node::State::Dirty) {
+                dirtyNodes.insert(pair);
+            }
+        }
     }
 }

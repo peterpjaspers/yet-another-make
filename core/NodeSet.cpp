@@ -47,4 +47,11 @@ namespace YAM
 	std::map<std::filesystem::path, std::shared_ptr<Node> > const& NodeSet::nodes() const { 
 		return _nodes; 
 	}
+
+	void NodeSet::nodesVector(std::vector<std::shared_ptr<Node>>& nodes) {
+		nodes.clear();
+		for (auto const& pair : _nodes) {
+			nodes.push_back(pair.second);
+		}
+	}
 }

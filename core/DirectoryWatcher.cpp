@@ -1,19 +1,19 @@
-#include "FileWatcher.h"
+#include "DirectoryWatcher.h"
 
 #if defined( _WIN32 )
-    #include "FileWatcherWin32.h"
-#define FW_IMPL_CLASS FileWatcherWin32
+    #include "DirectoryWatcherWin32.h"
+#define FW_IMPL_CLASS DirectoryWatcherWin32
 #elif
     #error "platform is not supported"
 #endif
 
 namespace YAM
 {
-	FileWatcher::FileWatcher(
+	DirectoryWatcher::DirectoryWatcher(
 		std::filesystem::path const& directory,
 		bool recursive,
 		Delegate<void, FileChange const&> const& changeHandler)
-		: IFileWatcher(directory, recursive, changeHandler)
+		: IDirectoryWatcher(directory, recursive, changeHandler)
 	{
 		_impl = std::make_shared<FW_IMPL_CLASS>(_directory, _recursive, _changeHandler);
 	}

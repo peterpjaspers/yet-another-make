@@ -27,7 +27,7 @@ namespace YAM
 			_state = newState;
 			if (_state == Node::State::Dirty) {
 				for (auto p : _preParents) p->setState(Node::State::Dirty);
-			}
+            }
 		}
 	}
 

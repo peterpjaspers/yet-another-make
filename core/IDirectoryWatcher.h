@@ -7,7 +7,16 @@
 namespace YAM
 {
 	struct __declspec(dllexport) FileChange {
-		// Renaming a file A/F to B/G can be notified in various ways: 
+		// Take care: changes can be reported in various ways.
+		// Adding a file F to dir A can be reported in various ways:
+		//  - Added A/F
+		//  - Modified A
+		//  - Added A/F and Modified A
+		// Remove a file F from dir A can be reported in various ways:
+		//  - Removed A/F
+		//  - Modified A
+		//  - Removed A/F and Modified A
+		// Renaming a file A/F to B/G can be reported in various ways: 
 		//	- Removed file A/F + Added file B/G
 		//  - Renamed file B/G, oldFile A/F 
 		//	- Removed file A/F + modified directory B
@@ -23,11 +32,11 @@ namespace YAM
 		std::filesystem::path oldFileName; // only applicable when Renamed
 	};
 
-	// A file watcher detects changes to the files and sub-directories in
-	// a directory. It informs the application of such changes by execution
-	// a delegate to which it passes a FileChange object.
+	// A directory watcher monitors a directory tree for changes and informs
+	// the application of such changes by execution a delegate to which it
+	// passes a FileChange object.
 	//
-	class __declspec(dllexport) IFileWatcher
+	class __declspec(dllexport) IDirectoryWatcher
 	{
 	public:
 		// Create a watcher that monitors the given directory in a
@@ -35,7 +44,7 @@ namespace YAM
 		// Execute the given delegate when a change is detected.
 		// File names in FileChanges are relative to the watched directory.
 		// Take care: execution is done in watcher thread context.
-		IFileWatcher(
+		IDirectoryWatcher(
 			std::filesystem::path const& directory,
 			bool recursive,
 			Delegate<void, FileChange const&> const& changeHandler)
@@ -44,7 +53,7 @@ namespace YAM
 			, _changeHandler(changeHandler)
 		{}
 
-		virtual ~IFileWatcher() {}
+		virtual ~IDirectoryWatcher() {}
 		std::filesystem::path const& directory() const { return _directory; }
 		bool recursive() const { return _recursive; }
 

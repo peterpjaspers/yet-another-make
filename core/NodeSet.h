@@ -3,6 +3,7 @@
 #include <map>
 #include <filesystem>
 #include <memory>
+#include <unordered_set>
 
 namespace YAM
 {
@@ -43,7 +44,11 @@ namespace YAM
 
 		std::size_t size() const;
 
-		std::map<std::filesystem::path, std::shared_ptr<Node> > const& nodes() const;
+		std::map<std::filesystem::path, std::shared_ptr<Node>> const& nodes() const;
+
+		// Return nodes in given 'nodes' 
+		void nodesVector(std::vector<std::shared_ptr<Node>>& nodes);
+
 
 	private:
 		// TODO: used unordered_set. However set cannot use std::filesystem::path as keys.

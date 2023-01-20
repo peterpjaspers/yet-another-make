@@ -1,4 +1,4 @@
-#include "FileWatcherWin32.h"
+#include "DirectoryWatcherWin32.h"
 
 #include <string>
 
@@ -21,32 +21,36 @@ namespace
 
 namespace YAM
 {
-    FileWatcherWin32::FileWatcherWin32(
+    DirectoryWatcherWin32::DirectoryWatcherWin32(
         std::filesystem::path const& directory,
         bool recursive,
         Delegate<void, FileChange const&> const& changeHandler)
-        : IFileWatcher(directory, recursive, changeHandler)
+        : IDirectoryWatcher(directory, recursive, changeHandler)
         , _dirHandle(createHandle(directory))
-        , _changeBufferSize(64*1024)
-        , _changeBuffer(new uint8_t[_changeBufferSize])
+        , _changeBufferSize(32*1024)
+        , _changeBuffer(new DWORD[_changeBufferSize / sizeof(DWORD)])
+        , _running(false)
         , _stop(false)
     {
         _overlapped.hEvent = CreateEvent(NULL, FALSE, 0, NULL);
         assert(_dirHandle != INVALID_HANDLE_VALUE);
         assert(_overlapped.hEvent != INVALID_HANDLE_VALUE);
-        _watcher = std::make_unique<std::thread>(&FileWatcherWin32::run, this);
+        _watcher = std::make_unique<std::thread>(&DirectoryWatcherWin32::run, this);
+
+        std::unique_lock<std::mutex> lock(_mutex);
+        while (!_running) _cond.wait(lock);
     }
 
-    FileWatcherWin32::~FileWatcherWin32() {
+    DirectoryWatcherWin32::~DirectoryWatcherWin32() {
         _stop = true;
         SetEvent(_overlapped.hEvent); // to wakeup WaitForSingleObject
-        _overlapped.hEvent;
         _watcher->join();
+        CancelIo(_dirHandle);
         CloseHandle(_overlapped.hEvent);
         CloseHandle(_dirHandle);
     }
 
-    void FileWatcherWin32::queueReadChangeRequest() {
+    void DirectoryWatcherWin32::queueReadChangeRequest() {
         BOOL success = ReadDirectoryChangesW(
             _dirHandle, _changeBuffer.get(), _changeBufferSize, TRUE,
             FILE_NOTIFY_CHANGE_FILE_NAME |
@@ -56,9 +60,14 @@ namespace YAM
         assert(success);
     }
 
-    void FileWatcherWin32::run() {
+    void DirectoryWatcherWin32::run() {
         const DWORD waitTimeoutInMs = 100;
         queueReadChangeRequest();
+        {
+            std::lock_guard<std::mutex> lock(_mutex);
+            _running = true;
+            _cond.notify_one();
+        }
         while (!_stop) {
             DWORD result = WaitForSingleObject(_overlapped.hEvent, INFINITE);
             if (!_stop && result == WAIT_OBJECT_0) {

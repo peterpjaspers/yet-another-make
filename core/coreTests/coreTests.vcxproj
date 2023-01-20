@@ -38,11 +38,13 @@
     <ClCompile Include="commandNodeTest.cpp" />
     <ClCompile Include="delegatesTest.cpp" />
     <ClCompile Include="directoryNodeTest.cpp" />
+    <ClCompile Include="DirectoryTree.cpp" />
     <ClCompile Include="dispatcherTest.cpp" />
     <ClCompile Include="executeNode.cpp" />
     <ClCompile Include="fileAspectSetTest.cpp" />
     <ClCompile Include="fileAspectTest.cpp" />
     <ClCompile Include="fileNodeTest.cpp" />
+    <ClCompile Include="directoryWatcherTest.cpp" />
     <ClCompile Include="msBuildTrackerOutputReaderTest.cpp" />
     <ClCompile Include="nodeExecutionTest.cpp" />
     <ClCompile Include="nodeSetTest.cpp" />
@@ -51,17 +53,22 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="sourceFileRepositoryTest.cpp" />
     <ClCompile Include="threadPoolTest.cpp" />
     <ClCompile Include="threadTest.cpp" />
     <ClCompile Include="main_gtest.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\xxHash\xxHash.vcxproj">
+      <Project>{8bdd054e-da14-4e2b-8fc1-033afa27e26b}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\core.vcxproj">
       <Project>{2156af8d-ff04-4b0b-8a73-52440e5f63d0}</Project>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AdditionNode.h" />
+    <ClInclude Include="DirectoryTree.h" />
     <ClInclude Include="executeNode.h" />
     <ClInclude Include="NumberNode.h" />
   </ItemGroup>

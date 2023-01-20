@@ -1,4 +1,4 @@
-#include "../core/FileWatcher.h"
+#include "../core/DirectoryWatcher.h"
 
 #include <iostream>
 
@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
 	}
 	std::cout << "watching " << dir << std::endl;
 	auto handler = Delegate<void, FileChange const&>::CreateStatic(handle);
-	FileWatcher watcher(dir, true, handler);
+	DirectoryWatcher watcher(dir, true, handler);
 	std::string input;	
 	while (input.empty()) std::cin >> input;
 

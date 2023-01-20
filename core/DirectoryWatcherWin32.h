@@ -1,33 +1,38 @@
 #pragma once
 
-#include "IFileWatcher.h"
+#include "IDirectoryWatcher.h"
 #include "Delegates.h"
 
 #include <windows.h>
 #include <atomic>
 #include <thread>
+#include <mutex>
+#include <condition_variable>
 
 namespace YAM
 {
-	class __declspec(dllexport) FileWatcherWin32 : public IFileWatcher
+	class __declspec(dllexport) DirectoryWatcherWin32 : public IDirectoryWatcher
 	{
 	public:
-		FileWatcherWin32(
+		DirectoryWatcherWin32(
 			std::filesystem::path const& directory,
 			bool recursive,
 			Delegate<void, FileChange const&> const& changeHandler);
 
-		~FileWatcherWin32();
+		~DirectoryWatcherWin32();
 
 	private:
 		void queueReadChangeRequest();
 		void run(); // runs in _thread
 
 		HANDLE _dirHandle;
-		DWORD _changeBufferSize;
-		std::unique_ptr<uint8_t> _changeBuffer;
+		DWORD _changeBufferSize; // in bytes
+		std::unique_ptr<DWORD> _changeBuffer;
 		OVERLAPPED _overlapped;
 
+		std::mutex _mutex;
+		std::condition_variable _cond;
+		bool _running;
 		std::atomic<bool> _stop;
 		std::unique_ptr<std::thread> _watcher;
 	};

@@ -1,11 +1,11 @@
 #include "DirectoryNode.h"
 #include "FileNode.h"
 #include "ExecutionContext.h"
+#include "RegexSet.h"
 
 namespace
 {
     using namespace YAM;
-
 }
 namespace YAM
 {
@@ -17,7 +17,7 @@ namespace YAM
         return false;
     }
 
-    void DirectoryNode::getPrerequisites(std::vector<std::shared_ptr<Node>>&prerequisites) const {
+    void DirectoryNode::getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const {
     }
 
     bool DirectoryNode::supportsPostrequisites() const {
@@ -107,38 +107,62 @@ namespace YAM
     }
 
     void DirectoryNode::updateContent() {
-
-        // TODO: 
-        //     - add nodes to ExecutionContext
-        //     - consider using ref-counting to do garbage collection
-        //       In this scenario many command nodes can still reference
-        //       a garbage file node. Ref count decreases as command nodes
-        //       (that ref that file node) re-execute.
-        //       A node that reaches ref-count 0 must be removed from context
-        //       and deleted.
-        //
+        RegexSet const& excludes = context()->findExcludes(name());
         auto oldContent = _content;
         _content.clear();
-        for (auto const& dirEntry : std::filesystem::directory_iterator{ name()}) {
-            std::shared_ptr<Node> child;
+        for (auto const& dirEntry : std::filesystem::directory_iterator{ name() }) {
             auto const& path = dirEntry.path();
-            if (oldContent.contains(path)) {
-                child = oldContent[path];
-                oldContent[path] = nullptr;
-            } else {
-                child = createNode(dirEntry);
-                child->addPostParent(this);
-                context()->nodes().add(child);
+            if (!excludes.matches(path.string())) {
+                std::shared_ptr<Node> child;
+                if (oldContent.contains(path)) {
+                    child = oldContent[path];
+                    oldContent[path] = nullptr;
+                } else {
+                    child = createNode(dirEntry);
+                    if (child != nullptr) {
+                        child->addPostParent(this);
+                        context()->nodes().add(child);
+                    }
+                }
+                if (child != nullptr) _content.insert({ child->name(), child });
             }
-            if (child != nullptr) _content.insert({ child->name(), child });
         }
         for (auto const& pair : oldContent) {
             std::shared_ptr<Node> child;
             if (child != nullptr) {
-                child->removePostParent(this);
-                context()->nodes().remove(child);
+                _removeChildRecursively(child);
             }
         }
+    } 
+
+    void DirectoryNode::_removeChildRecursively(std::shared_ptr<Node> child) {
+        // Nodes (e.g. command nodes) may still reference child as input. These
+        // nodes must re-execute to dereference child to find that 
+        //    - either the node no longer depends on the removed child
+        //    - or the node still depends on child. In that case and re-execution
+        //      fails because yam will fail a build that depends on source files
+        //      or directories that are not in the ExecutionContext.
+        // Setting child state to Dirty will cause these nodes to re-execute.
+        // 
+        child->setState(Node::State::Dirty);
+        child->removePostParent(this);
+        context()->nodes().remove(child);
+        auto dirChild = dynamic_pointer_cast<DirectoryNode>(child);
+        if (dirChild != nullptr) {
+            for (auto const& pair : dirChild->getContent()) {
+                _removeChildRecursively(pair.second);
+            }
+        }
+    }
+
+    void DirectoryNode::clear() {
+        for (auto const& pair : _content) {
+            std::shared_ptr<Node> child;
+            if (child != nullptr) {
+                _removeChildRecursively(child);
+            }
+        }
+        _content.clear();
     }
 
     void DirectoryNode::updateHash() {

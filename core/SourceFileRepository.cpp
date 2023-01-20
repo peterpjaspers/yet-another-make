@@ -8,7 +8,7 @@ namespace
 {
 	using namespace YAM;
 
-	const std::size_t queueCapacity = 4092;
+	const std::size_t queueCapacity = 32*1024;
 
 	bool isDirNode(Node* node) {
 		return dynamic_cast<DirectoryNode*>(node) != nullptr;
@@ -46,21 +46,23 @@ namespace YAM
 		, _context(context)
 		, _excludes(excludePatterns)
 		, _suspended(false)
-		, _changeOverflow(false)
 		, _watcher(
 			directory,
 			true,
 			Delegate<void, FileChange const&>::CreateLambda(
-				[&](FileChange change)
+				[&](FileChange const& change)
 				{
-					// Access to nodes is only allowed to be done in main thread context.
+					FileChange c(change);
+					// Access to nodes is only allowed in main thread context.
 					// Therefore post change handling to main thread.
-	               _context->mainThreadQueue().push(
-					   Delegate<void>::CreateLambda([&]() { _enqueueChange(change); }));
+	                _context->mainThreadQueue().push(
+			        Delegate<void>::CreateLambda([c, this]() { _enqueueChange(c); }));
 
 				})
 			)
-	{}
+	{
+		_context->nodes().add(_directory);
+	}
 
 	std::string const& SourceFileRepository::name() const { return _name; }
 	std::filesystem::path const& SourceFileRepository::directoryName() const { return _directory->name(); }
@@ -154,6 +156,7 @@ namespace YAM
 		if (node == nullptr) {
 			// happens when path was excluded from repo or when
 			// _directory has not yet been executed
+			;
 		} else {
 			node->setState(Node::State::Dirty);
 		}
@@ -161,20 +164,9 @@ namespace YAM
 	}
 
 	void SourceFileRepository::clear() {
-		_removeNodeRecursively(_directory);
-	}
-
-	void SourceFileRepository::_removeNodeRecursively(std::shared_ptr<Node> node) {
-		// node can still be referenced by command nodes. By setting node state to
-		// Dirty the command nodes will re-execute and dereference the removed node.
-		node->setState(Node::State::Dirty);
-		_context->nodes().remove(node);
-		auto dirNode = dynamic_pointer_cast<DirectoryNode>(node);
-		if (dirNode != nullptr) {
-			for (auto const& pair : dirNode->getContent()) {
-				_removeNodeRecursively(pair.second);
-			}
-		}
+		_context->nodes().remove(_directory);
+		_directory->clear();
+		_directory->setState(Node::State::Dirty);
 	}
 
 	void SourceFileRepository::_invalidateNodeRecursively(std::filesystem::path const& path) {
@@ -192,7 +184,7 @@ namespace YAM
 		}
 	}
 
-	bool SourceFileRepository::isSubpath(std::filesystem::path const& path) const {
+	bool SourceFileRepository::contains(std::filesystem::path const& path) const {
 		auto base = directoryName();
 		const auto pair = std::mismatch(path.begin(), path.end(), base.begin(), base.end());
 		return pair.second == base.end();
