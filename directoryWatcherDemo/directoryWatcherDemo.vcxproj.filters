@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="fileWatcherDemo.cpp">
+    <ClCompile Include="directoryWatcherDemo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

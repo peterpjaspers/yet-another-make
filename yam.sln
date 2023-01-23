@@ -7,11 +7,14 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "xxHash", "xxHash\xxHash.vcx
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "coreTests", "core\coreTests\coreTests.vcxproj", "{49F43A6D-BB47-4EF5-B4F1-6BABE6117E19}"
 	ProjectSection(ProjectDependencies) = postProject
-		{8BDD054E-DA14-4E2B-8FC1-033AFA27E26B} = {8BDD054E-DA14-4E2B-8FC1-033AFA27E26B}
 		{21CF549B-F3C3-4C1D-9589-F186493122EE} = {21CF549B-F3C3-4C1D-9589-F186493122EE}
+		{8BDD054E-DA14-4E2B-8FC1-033AFA27E26B} = {8BDD054E-DA14-4E2B-8FC1-033AFA27E26B}
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "core", "core\core.vcxproj", "{21CF549B-F3C3-4C1D-9589-F186493122EE}"
+	ProjectSection(ProjectDependencies) = postProject
+		{8BDD054E-DA14-4E2B-8FC1-033AFA27E26B} = {8BDD054E-DA14-4E2B-8FC1-033AFA27E26B}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "btree", "btree\btree.vcxproj", "{489E3615-D0A7-45C6-B6F5-35AEEF994160}"
 EndProject
@@ -28,7 +31,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		doc\todo.txt = doc\todo.txt
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fileWatcherDemo", "fileWatcherDemo\fileWatcherDemo.vcxproj", "{615A568A-BC33-4237-B358-DEA590F8E31E}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "directoryWatcherDemo", "directoryWatcherDemo\directoryWatcherDemo.vcxproj", "{615A568A-BC33-4237-B358-DEA590F8E31E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

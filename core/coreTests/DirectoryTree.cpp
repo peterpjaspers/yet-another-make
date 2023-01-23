@@ -67,6 +67,29 @@ namespace YAMTest
         updateHash();
     }
 
+    void DirectoryTree::modifyFile(std::string const& fileName) {
+        std::filesystem::path path(_path / fileName);
+        std::ofstream file(path);
+        file.write(fileName.c_str(), fileName.length());
+        file.close();
+    }
+
+    void DirectoryTree::deleteFile(std::string const& fileName) {
+        std::filesystem::path path(_path / fileName);
+        std::filesystem::remove(path);
+    }
+
+    void DirectoryTree::renameFile(std::string const& fileName, std::string const& newFileName) {
+        std::filesystem::path oldPath(_path / fileName);
+        std::filesystem::path newPath(_path / newFileName);
+        std::filesystem::rename(oldPath, newPath);
+        auto it = std::find(_files.begin(), _files.end(), oldPath);
+        if (it != _files.end()) {
+            _files.erase(it);
+            _files.push_back(newFileName);
+        }
+    }
+
     std::filesystem::path const& DirectoryTree::path() const { return _path; }
     unsigned int DirectoryTree::nLevels() const { return _nLevels; }
 

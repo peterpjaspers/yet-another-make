@@ -32,6 +32,9 @@ namespace YAMTest
 
         void addFile();
         void addDirectory();
+        void modifyFile(std::string const& fileName); // relative to dir
+        void deleteFile(std::string const& fileName); // relative to dir
+        void renameFile(std::string const& fileName, std::string const& newFileName); // relative to dir
 
         std::filesystem::path const& path() const;
         unsigned int nLevels() const;

@@ -28,7 +28,7 @@ namespace YAM
         : IDirectoryWatcher(directory, recursive, changeHandler)
         , _dirHandle(createHandle(directory))
         , _changeBufferSize(32*1024)
-        , _changeBuffer(new DWORD[_changeBufferSize / sizeof(DWORD)])
+        , _changeBuffer(new uint8_t[_changeBufferSize])
         , _running(false)
         , _stop(false)
     {
@@ -68,10 +68,12 @@ namespace YAM
             _running = true;
             _cond.notify_one();
         }
+        FileChange rename{ FileChange::Action::None };
+        FileChange change{ FileChange::Action::None };
         while (!_stop) {
             DWORD result = WaitForSingleObject(_overlapped.hEvent, INFINITE);
             if (!_stop && result == WAIT_OBJECT_0) {
-                DWORD bytesTransferred;
+                DWORD bytesTransferred = 0;
                 GetOverlappedResult(_dirHandle, &_overlapped, &bytesTransferred, FALSE);
                 if (bytesTransferred == 0) {
                     FileChange overflow;
@@ -80,11 +82,8 @@ namespace YAM
                 } else {
                     std::size_t offset = 0;
                     PFILE_NOTIFY_INFORMATION info;
-                    FileChange rename;
-                    rename.action = FileChange::Action::Renamed;
                     do
                     {
-                        FileChange change;
                         info = reinterpret_cast<PFILE_NOTIFY_INFORMATION>(&_changeBuffer.get()[offset]);
                         offset += info->NextEntryOffset;
                         std::wstring fileNameStr(info->FileName, info->FileNameLength / sizeof(wchar_t));
@@ -99,16 +98,24 @@ namespace YAM
                             change.action = FileChange::Action::Modified;
                             change.fileName = fileName;
                         } else if (info->Action == FILE_ACTION_RENAMED_OLD_NAME) {
+                            rename.action = FileChange::Action::Renamed;
                             rename.oldFileName = fileName;
                         } else if (info->Action == FILE_ACTION_RENAMED_NEW_NAME) {
+                            rename.action = FileChange::Action::Renamed;
                             rename.fileName = fileName;
                         }
-                        if (!rename.fileName.empty() && !rename.oldFileName.empty()) {
+                        if (
+                            rename.action == FileChange::Action::Renamed 
+                            && !rename.fileName.empty() 
+                            && !rename.oldFileName.empty()
+                        ) {
                             _changeHandler.Execute(rename);
+                            rename.action = FileChange::Action::None;
                             rename.fileName = "";
                             rename.oldFileName = "";
-                        } else {
+                        } else if (change.action != FileChange::Action::None) {
                             _changeHandler.Execute(change);
+                            change.action = FileChange::Action::None;
                         }
                     } while (info->NextEntryOffset != 0);
                 }

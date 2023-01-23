@@ -24,6 +24,7 @@
     <ProjectGuid>{615a568a-bc33-4237-b358-dea590f8e31e}</ProjectGuid>
     <RootNamespace>fileWatcherDemo</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>directoryWatcherDemo</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -131,7 +132,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="fileWatcherDemo.cpp" />
+    <ClCompile Include="directoryWatcherDemo.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\core\core.vcxproj">

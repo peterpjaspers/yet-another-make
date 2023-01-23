@@ -30,6 +30,18 @@ namespace
 
     // This test demonstrates spurious change events on first-time iterating
     // over just created directories.
+    // According to ReadDirectoryChangesW for FILE_NOTIFY_CHANGE_LAST_WRITE:
+    //    Any change to the last write - time of files in the watched directory 
+    //    or subtree causes a change notification wait operation to return. The 
+    //    operating system detects a change to the last write - time only when the 
+    //    file is written to the disk.For operating systems that use extensive caching,
+    //    detection occurs only when the cache is sufficiently flushed.
+    // It seems that flushing the directory files to cache is triggered by the
+    // iteration over these directories. This is confirmed by the following experiment:
+    //      - create directory tree
+    //      - flush filesystem cache using sysinternals sync.exe
+    //      - start watching the directory tree
+    //      - iterate the directories.
     TEST(DirectoryWatcher, spuriousChangeEvents) {
         std::string tmpDir(std::tmpnam(nullptr));
         std::filesystem::path rootDir(std::string(tmpDir + "_dirNodeTest"));
@@ -80,6 +92,8 @@ namespace
         std::mutex mutex;
         std::condition_variable cond;
         DirectoryTree testTree(rootDir, 3, RegexSet());
+        DirectoryTree* sd2 = testTree.getSubDirs()[1];
+        DirectoryTree* sd2_sd3 = sd2->getSubDirs()[2];
 
         DirectoryWatcher watcher(
             rootDir, true,
@@ -90,9 +104,8 @@ namespace
                     cond.notify_one();
                 })
         );
-        DirectoryTree* sd2 = testTree.getSubDirs()[1];
-        DirectoryTree* sd2_sd3 = sd2->getSubDirs()[2];
 
+        // consume spurious events, see test spuriousChangeEvents
         {
             std::filesystem::path s2(rootDir/"SubDir2");
             for (auto const& entry : std::filesystem::directory_iterator(s2)) {
@@ -101,7 +114,6 @@ namespace
                     for (auto const& subentry : std::filesystem::directory_iterator(s3)) {
                         std::cout << subentry.path();
                     }
-
                 }
             }
             EXPECT_EQ(3, detectedChanges.size());
@@ -110,7 +122,7 @@ namespace
 
         // Update file system and create expected changes
         testTree.addFile();
-        FileChange c1{ FA::Added, path("File4") };
+        FileChange c1a{ FA::Added, path("File4") };
 
         sd2->addFile();
         FileChange c2b{ FA::Modified, path("SubDir2") };
@@ -131,13 +143,22 @@ namespace
         FileChange c4a{ FA::Added, path("SubDir2\\SubDir3\\File4") };
         FileChange c4b{ FA::Modified, path("SubDir2\\SubDir3") };
 
+        sd2_sd3->modifyFile("File4");
+        FileChange c5a{ FA::Modified, path("SubDir2\\SubDir3\\File4") };
+
+        sd2_sd3->renameFile("File4", "File5");
+        FileChange c6a{ FA::Renamed, path("SubDir2\\SubDir3\\File5"), path("SubDir2\\SubDir3\\File4") };
+
+        sd2_sd3->deleteFile("File1");
+        FileChange c7a{ FA::Removed, path("SubDir2\\SubDir3\\File1") };
+
         auto deadline = std::chrono::system_clock::now() + std::chrono::seconds(5);       
         std::vector<FileChange>& dcs = detectedChanges;
         std::unique_lock<std::mutex> lock(mutex);
         bool done = false;
         do {
             done =
-                (contains(dcs, c1))
+                (contains(dcs, c1a))
                 && (contains(dcs, c2a) || contains(dcs, c2b))
                 && (contains(dcs, c3a) || contains(dcs, c3b))
                 && (contains(dcs, c3c) || contains(dcs, c3d))
@@ -147,11 +168,14 @@ namespace
                 && (contains(dcs, c3c) || contains(dcs, c3h))
                 && (contains(dcs, c3c) || contains(dcs, c3i))
                 && (contains(dcs, c4a) || contains(dcs, c4b))
+                && (contains(dcs, c5a))
+                && (contains(dcs, c6a))
+                && (contains(dcs, c7a))
                 ;
         } while (!done && cond.wait_until(lock, deadline) != std::cv_status::timeout);
 
         EXPECT_TRUE(done);
-        EXPECT_TRUE(contains(dcs, c1));
+        EXPECT_TRUE(contains(dcs, c1a));
         EXPECT_TRUE(contains(dcs, c2a) || contains(dcs, c2b));
         EXPECT_TRUE(contains(dcs, c3a) || contains(dcs, c3b));
         EXPECT_TRUE(contains(dcs, c3c) || contains(dcs, c3d));
@@ -161,5 +185,8 @@ namespace
         EXPECT_TRUE(contains(dcs, c3c) || contains(dcs, c3h));
         EXPECT_TRUE(contains(dcs, c3c) || contains(dcs, c3i));
         EXPECT_TRUE(contains(dcs, c4a) || contains(dcs, c4b));
+        EXPECT_TRUE(contains(dcs, c5a));
+        EXPECT_TRUE(contains(dcs, c6a));
+        EXPECT_TRUE(contains(dcs, c7a));
     }
 }

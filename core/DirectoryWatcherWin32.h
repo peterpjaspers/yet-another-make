@@ -26,8 +26,8 @@ namespace YAM
 		void run(); // runs in _thread
 
 		HANDLE _dirHandle;
-		DWORD _changeBufferSize; // in bytes
-		std::unique_ptr<DWORD> _changeBuffer;
+		DWORD _changeBufferSize;
+		std::unique_ptr<uint8_t> _changeBuffer;
 		OVERLAPPED _overlapped;
 
 		std::mutex _mutex;

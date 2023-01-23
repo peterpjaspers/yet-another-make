@@ -21,6 +21,7 @@ namespace YAM
 		//  - Renamed file B/G, oldFile A/F 
 		//	- Removed file A/F + modified directory B
 		enum Action {
+			None = 0,
 			Added = 1,    // file/dir is created
 			Removed = 2,  // file/dir is removed
 			Modified = 3, // file/dir is modified
