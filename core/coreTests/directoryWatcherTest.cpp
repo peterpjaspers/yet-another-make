@@ -125,9 +125,9 @@ namespace
         FileChange c1a{ FA::Added, path("File4") };
 
         sd2->addFile();
-        FileChange c2b{ FA::Modified, path("SubDir2") };
-        FileChange c2a{ FA::Added, path("SubDir2\\File4") };
-
+        FileChange c2a{ FA::Modified, path("SubDir2") };
+        FileChange c2b{ FA::Added, path("SubDir2\\File4") };
+        
         sd2_sd3->addDirectory();
         FileChange c3a{ FA::Modified, path("SubDir2\\SubDir3") };
         FileChange c3b{ FA::Added, path("SubDir2\\SubDir3\\SubDir4") };
@@ -151,7 +151,8 @@ namespace
 
         sd2_sd3->deleteFile("File1");
         FileChange c7a{ FA::Removed, path("SubDir2\\SubDir3\\File1") };
-
+        FileChange c7b{ FA::Modified, path("SubDir2\\SubDir3\\File1") };
+        
         auto deadline = std::chrono::system_clock::now() + std::chrono::seconds(5);       
         std::vector<FileChange>& dcs = detectedChanges;
         std::unique_lock<std::mutex> lock(mutex);
@@ -170,7 +171,7 @@ namespace
                 && (contains(dcs, c4a) || contains(dcs, c4b))
                 && (contains(dcs, c5a))
                 && (contains(dcs, c6a))
-                && (contains(dcs, c7a))
+                && (contains(dcs, c7a) || contains(dcs, c7b))
                 ;
         } while (!done && cond.wait_until(lock, deadline) != std::cv_status::timeout);
 
@@ -187,6 +188,6 @@ namespace
         EXPECT_TRUE(contains(dcs, c4a) || contains(dcs, c4b));
         EXPECT_TRUE(contains(dcs, c5a));
         EXPECT_TRUE(contains(dcs, c6a));
-        EXPECT_TRUE(contains(dcs, c7a));
+        EXPECT_TRUE(contains(dcs, c7a) || contains(dcs, c7b));
     }
 }

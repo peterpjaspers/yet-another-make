@@ -29,16 +29,14 @@ namespace YAM
         , _dirHandle(createHandle(directory))
         , _changeBufferSize(32*1024)
         , _changeBuffer(new uint8_t[_changeBufferSize])
-        , _running(false)
         , _stop(false)
     {
+        if (_dirHandle == INVALID_HANDLE_VALUE) throw std::exception("Dir handle creation failed");
         _overlapped.hEvent = CreateEvent(NULL, FALSE, 0, NULL);
-        assert(_dirHandle != INVALID_HANDLE_VALUE);
-        assert(_overlapped.hEvent != INVALID_HANDLE_VALUE);
+        if (_overlapped.hEvent == INVALID_HANDLE_VALUE) throw std::exception("Event handle creation failed");
+        
+        queueReadChangeRequest();
         _watcher = std::make_unique<std::thread>(&DirectoryWatcherWin32::run, this);
-
-        std::unique_lock<std::mutex> lock(_mutex);
-        while (!_running) _cond.wait(lock);
     }
 
     DirectoryWatcherWin32::~DirectoryWatcherWin32() {
@@ -61,13 +59,6 @@ namespace YAM
     }
 
     void DirectoryWatcherWin32::run() {
-        const DWORD waitTimeoutInMs = 100;
-        queueReadChangeRequest();
-        {
-            std::lock_guard<std::mutex> lock(_mutex);
-            _running = true;
-            _cond.notify_one();
-        }
         FileChange rename{ FileChange::Action::None };
         FileChange change{ FileChange::Action::None };
         while (!_stop) {

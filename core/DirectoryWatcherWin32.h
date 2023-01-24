@@ -30,9 +30,6 @@ namespace YAM
 		std::unique_ptr<uint8_t> _changeBuffer;
 		OVERLAPPED _overlapped;
 
-		std::mutex _mutex;
-		std::condition_variable _cond;
-		bool _running;
 		std::atomic<bool> _stop;
 		std::unique_ptr<std::thread> _watcher;
 	};
