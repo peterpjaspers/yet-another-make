@@ -81,6 +81,12 @@
     <ClInclude Include="SourceFileRepository.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="IMonitoredProcess.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MonitoredProcessWin32.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -144,6 +150,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="SourceFileRepository.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MonitoredProcessWin32.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
