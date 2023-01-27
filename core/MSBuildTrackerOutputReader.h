@@ -23,6 +23,10 @@ namespace YAM
 		std::set<std::filesystem::path> const& writtenFiles() const;
 		std::set<std::filesystem::path> const& readOnlyFiles() const;
 
+	    void getReadFilesVec(std::vector<std::filesystem::path>& files) const;
+		void getWrittenFilesVec(std::vector<std::filesystem::path>& files) const;
+		void getReadOnlyFilesVec(std::vector<std::filesystem::path>& files) const;
+
 	private:
 		void parseDependencies(
 			std::filesystem::path const& logFile,

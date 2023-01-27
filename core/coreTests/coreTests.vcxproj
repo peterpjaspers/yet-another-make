@@ -45,6 +45,7 @@
     <ClCompile Include="fileAspectTest.cpp" />
     <ClCompile Include="fileNodeTest.cpp" />
     <ClCompile Include="directoryWatcherTest.cpp" />
+    <ClCompile Include="monitoredProcessWin32Test.cpp" />
     <ClCompile Include="msBuildTrackerOutputReaderTest.cpp" />
     <ClCompile Include="nodeExecutionTest.cpp" />
     <ClCompile Include="nodeSetTest.cpp" />

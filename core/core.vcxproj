@@ -131,7 +131,10 @@
     <ClCompile Include="DirectoryWatcher.cpp" />
     <ClCompile Include="DirectoryWatcherWin32.cpp" />
     <ClCompile Include="GlobNode.cpp" />
-    <ClCompile Include="MonitoredProcessWin32.cpp" />
+    <ClCompile Include="MonitoredProcessWin32.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4251;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4251;4996</DisableSpecificWarnings>
+    </ClCompile>
     <ClCompile Include="MSBuildTrackerOutputReader.cpp">
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdcpp20</LanguageStandard>
     </ClCompile>

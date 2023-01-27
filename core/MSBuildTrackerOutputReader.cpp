@@ -76,20 +76,22 @@ namespace YAM
 {
 	// Read the Tracker.exe logfiles from the given directory.
 	MSBuildTrackerOutputReader::MSBuildTrackerOutputReader(std::filesystem::path const& logDir) {
-		auto di = std::filesystem::directory_iterator(logDir);
-		for (auto const& dir_entry : di)
-		{
-			std::string p = dir_entry.path().string();
-			if (std::regex_search(p, readPattern)) {
-				parseDependencies(p, _readFiles);
-			} else if (std::regex_search(p, writePattern)) {
-				parseDependencies(p, _writtenFiles);
+		if (std::filesystem::exists(logDir)) {
+			auto di = std::filesystem::directory_iterator(logDir);
+			for (auto const& dir_entry : di)
+			{
+				std::string p = dir_entry.path().string();
+				if (std::regex_search(p, readPattern)) {
+					parseDependencies(p, _readFiles);
+				} else if (std::regex_search(p, writePattern)) {
+					parseDependencies(p, _writtenFiles);
+				}
 			}
+			std::set_difference(
+				_readFiles.begin(), _readFiles.end(),
+				_writtenFiles.begin(), _writtenFiles.end(),
+				std::inserter(_readOnlyFiles, _readOnlyFiles.begin()));
 		}
-		std::set_difference(
-			_readFiles.begin(), _readFiles.end(),
-			_writtenFiles.begin(), _writtenFiles.end(),
-			std::inserter(_readOnlyFiles, _readOnlyFiles.begin()));
 	}
 
 	void MSBuildTrackerOutputReader::parseDependencies(
@@ -118,5 +120,14 @@ namespace YAM
 	std::set<std::filesystem::path> const& MSBuildTrackerOutputReader::readOnlyFiles() const {
 		return _readOnlyFiles;
 	}
+
+	void MSBuildTrackerOutputReader::getReadFilesVec(std::vector<std::filesystem::path>& files) const {
+		for (auto const& f : _readFiles) files.push_back(f);
+	}
+	void MSBuildTrackerOutputReader::getWrittenFilesVec(std::vector<std::filesystem::path>& files) const {
+		for (auto const& f : _writtenFiles) files.push_back(f);
+	}
+	void MSBuildTrackerOutputReader::getReadOnlyFilesVec(std::vector<std::filesystem::path>& files) const {
+		for (auto const& f : _readOnlyFiles) files.push_back(f);
+	}
 }
-;

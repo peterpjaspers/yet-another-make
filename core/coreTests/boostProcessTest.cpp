@@ -37,11 +37,12 @@ namespace
 		// empty environment not accepted by child (at least not on Windows).
 		env["rubbish"] = "nonsense";
 
-		auto ping = search_path("ping");
-		// passing ping args in this way fails for some unknown reason...
-		//child c(ping, "-n 3 127.0.0.1", g, std_out > stdoutOfPing);
-
-		// ...while passing the args this way works.
+		auto ping = search_path("ping"); 
+		// child c(ping, "-n 3 127.0.0.1", g, std_out > stdoutOfPing);
+		// child c(ping.string(), args({ " -n 3 127.0.0.1" }), env, std_out > stdoutOfPing);
+		// Passing args as in previous lines fails because in these cases the args are
+		// quoted ("") on the command line which is not accepted by ping.
+		// Passing args, in what boost calls cmd style, as in next line works.
 		child c(ping.string() + " -n 3 127.0.0.1", env, std_out > stdoutOfPing);
 
 		std::vector<std::string> data;
@@ -56,6 +57,7 @@ namespace
 		}
 		//ping should take ~n (==3) seconds. Use larger timeout.
 		EXPECT_TRUE(c.wait_for(std::chrono::seconds(15)));
+		c.wait();
 		EXPECT_EQ(3, data.size());
 	}
 

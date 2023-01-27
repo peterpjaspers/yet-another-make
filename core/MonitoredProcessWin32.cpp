@@ -1,14 +1,53 @@
 #include "MonitoredProcessWin32.h"
+#include "MSBuildTrackerOutputReader.h"
 
 #include <iostream>
 #include <chrono>
 
+namespace
+{
+	std::string trackerExe("""D:\\Programs\\Microsoft Visual Studio\\2022\\community\\MSBuild\\Current\\Bin\\amd64\\Tracker.exe""");
+
+	std::filesystem::path trackerLogDir(std::filesystem::path const& tmpDir) {
+		return tmpDir / "trackerLogDir";
+	}
+
+	std::string generateCmd(
+		std::string const& program, 
+		std::string const& arguments,
+		std::filesystem::path const& tmpDir
+	) {
+		std::stringstream ss;
+		ss
+			<< trackerExe << " /I " << trackerLogDir(tmpDir).string() << " /c " 
+			<< program << " " << arguments; 
+		return ss.str();
+	}
+
+	boost::process::environment generateEnv(
+		std::filesystem::path const& tmpDir, 
+		std::map<std::string, std::string> const& env) {
+		boost::process::environment bpenv;
+		bpenv["TMP"] = tmpDir.string();
+		for (auto const& pair : env) {
+			bpenv[pair.first] = pair.second;
+		}
+		return bpenv;
+	}
+}
+
 namespace YAM
 {
-	MonitoredProcessWin32::MonitoredProcessWin32(std::string const& program, std::map<std::string, std::string> env)
-		: IMonitoredProcess(program, env)
+	MonitoredProcessWin32::MonitoredProcessWin32(
+		std::string const& program,
+		std::string const& arguments,
+		std::map<std::string, std::string> const& env)
+		: IMonitoredProcess(program, arguments, env)
+		, _tempDir(std::tmpnam(nullptr))
+		, _groupExited(false)
 		, _child(
-			program,
+			generateCmd(_program, _arguments, _tempDir),
+			generateEnv(_tempDir, _env),
 			_group,
 			boost::process::std_out > _stdout, 
 			boost::process::std_err > _stderr,
@@ -18,18 +57,27 @@ namespace YAM
 
 	MonitoredProcessResult const& MonitoredProcessWin32::wait() {
 		_ios.run();
-		_group.wait();
+		if (!_groupExited) {
+			_group.wait();
+		}
 		_child.wait();
 		_result.exitCode = _child.exit_code();
 		_result.stdOut = _stdout.get();
 		_result.stdErr = _stderr.get();
+		MSBuildTrackerOutputReader reader(trackerLogDir(_tempDir));
+		reader.getReadFilesVec(_result.inputFiles);
+		reader.getWrittenFilesVec(_result.outputFiles);
+		reader.getReadOnlyFilesVec(_result.inputOnlyFiles);
 		return _result;
 	}
 
 	bool MonitoredProcessWin32::wait_for(unsigned int timoutInMilliSeconds) {
-		auto deadline = std::chrono::system_clock::now() + std::chrono::milliseconds(timoutInMilliSeconds);
-		_ios.run_until(deadline);
-		return _group.wait_until(deadline);
+		if (!_groupExited) {
+			auto deadline = std::chrono::system_clock::now() + std::chrono::milliseconds(timoutInMilliSeconds);
+			_ios.run_until(deadline);
+			_groupExited = _group.wait_until(deadline);
+		}
+		return _groupExited;
 	}
 
 	void MonitoredProcessWin32::terminate() {

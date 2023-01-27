@@ -14,6 +14,7 @@ namespace YAM
 		std::string stdErr;
 		std::vector<std::filesystem::path> inputFiles;
 		std::vector<std::filesystem::path> outputFiles;
+		std::vector<std::filesystem::path> inputOnlyFiles; // = inputFile - outputFiles
 
 		void toLines(std::string const& str, std::vector<std::string>& lines) {
 			auto ss = std::stringstream(str);
@@ -29,9 +30,14 @@ namespace YAM
 	class __declspec(dllexport) IMonitoredProcess
 	{
 	public:
-		// Start execution of 'program' using 'env' as environment.
-		IMonitoredProcess(std::string const& program, std::map<std::string, std::string> env)
+		// Start execution of 'program' using 'env' as environment and passing
+		// 'arguments' to program.
+		IMonitoredProcess(
+			std::string const& program,
+			std::string const& arguments,
+			std::map<std::string, std::string> const & env)
 			: _program(program)
+			, _arguments(arguments)
 			, _env(env)
 		{}
 
@@ -51,6 +57,7 @@ namespace YAM
 
 	protected:
 		std::string _program;
+		std::string _arguments;
 		std::map<std::string, std::string> _env;
 	};
 }
