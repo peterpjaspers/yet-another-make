@@ -1,6 +1,7 @@
 #include "FileNode.h"
 #include "FileAspect.h"
 #include "ExecutionContext.h"
+#include "SourceFileRepository.h"
 
 namespace YAM
 {
@@ -34,6 +35,16 @@ namespace YAM
         return _hashes[aspectName];
     }
 
+    std::shared_ptr<SourceFileRepository> FileNode::fileRepository() const {
+        return context()->findRepository(name());
+    }
+
+    std::filesystem::path FileNode::relativePath() const {
+        std::shared_ptr<SourceFileRepository> repo = fileRepository();
+        if (repo == nullptr) return name();
+        return name().lexically_relative(repo->directoryName());
+    }
+
     // Note that pendingStartSelf is only called during node execution, i.e. when
     // state() == State::Executing. A node execution only starts when the node was
     // Dirty, i.e. when it is not sure that previously computed hashes are still
@@ -62,6 +73,7 @@ namespace YAM
 
     void FileNode::rehashAll(bool doUpdateLastWriteTime) {
         if (doUpdateLastWriteTime) updateLastWriteTime();
+        _hashes.clear();
         std::vector<FileAspect> aspects = context()->findFileAspects(name());
         for (auto const& aspect : aspects) {
             _hashes[aspect.name()] = aspect.hash(name());

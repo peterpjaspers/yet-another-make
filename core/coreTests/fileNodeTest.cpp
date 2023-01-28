@@ -2,6 +2,7 @@
 #include "executeNode.h"
 #include "../FileNode.h"
 #include "../ExecutionContext.h"
+#include "../SourceFileRepository.h"
 #include "../../xxhash/xxhash.h"
 
 #include <chrono>
@@ -68,5 +69,26 @@ namespace
         EXPECT_TRUE(completed);
         EXPECT_EQ(Node::State::Ok, fnode.state());
         EXPECT_NE(expectedHash, fnode.hashOf(entireFile));
+    }
+
+    TEST(FileNode, relativePath) {
+
+        std::filesystem::path repoDir(std::tmpnam(nullptr));
+        std::filesystem::create_directories(repoDir);
+        ExecutionContext context;
+        auto repo = std::make_shared<SourceFileRepository>(
+            std::string("repo"), 
+            repoDir,
+            RegexSet(),
+            &context);
+        context.addRepository(repo);
+
+        std::filesystem::path expectedRelativePath("sources\\file.cpp");
+        FileNode fnode(&context, repoDir / expectedRelativePath);
+        EXPECT_EQ(expectedRelativePath, fnode.relativePath());
+
+        context.removeRepository(repo->name());
+        repo.reset();
+        std::filesystem::remove_all(repoDir);
     }
 }

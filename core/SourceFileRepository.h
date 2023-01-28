@@ -21,8 +21,7 @@ namespace YAM
 	// DirectoryNode that contains (sub-)DirectoryNodes and SourceFileNodes.
 	// It stores these nodes in an ExecutionContext. YAM will fail a build
 	// when it detects an input dependency on a source file that is not in
-	// one of YAM's SourceFileRepositories, i.e. when the SourceFileNode
-	// associated with the input file is not in the ExecutionContext. 
+	// one of YAM's SourceFileRepositories. 
 	// 
 	// The user can specify a subset of the directories and files in the 
 	// repository to be excluded from the SourceFileRepository. The user 
@@ -51,6 +50,44 @@ namespace YAM
 	// comparison because it allows absolute paths to be converted to a 
 	// 'symbolic' path of form <repoName>/<path relative to repo directory>
 	// 
+	// The intended use of SourceFileRepository is to create source file
+	// nodes before executing command nodes.
+	// Rationale: assume that the source file node for file F would be created 
+	// (and its hashes computed) when it is detected as input of command node C.
+	// In this scenario the following race condition may occur: the user edits F
+	// in the time interval between completion of the command script of C and 
+	// the subsequent retrieval of F's last-write-time and computation of F's 
+	// aspect hashes. In this case the next build will not detect that F has 
+	// changed (because F's last-write-time has not changed). As a result C will 
+	// not re-execute, resulting in wrong content of C's output files.
+	// 
+	// This problem can be fixed in several ways:
+	//    1- Do not allow modification of source files during the build.
+	//    2- Capture last-write-time and hash code of F before using it.
+	//       Because input files are detected during command node execution
+	//       this can can only be implemented by creating file nodes for all 
+	//       files in the worktree before starting command node execution (as
+	//       intended by SourceFileRepository).
+	//    3- Detect which source files are modified during the build.
+	//       At next build force the commands that used these files as input
+	//       to re-execute.      
+	// Option 1 is not user-friendly and not easy to implement.
+	// Option 2 is easy to implement and simplifies handling input file
+	// detection during command node execution because the file node and its 
+	// hashes already exist at that time. Disadvantage is that it may result in
+	// more file nodes than actually used as inputs.
+	// Option 3 may cause unnecessary re-builds in case the file was modified 
+	// before it was used as input. Also different commands may use the same 
+	// input at different times. This complicates the implementation.
+	//
+	// Option 2 does not apply to generated files. Generated files are, like
+	// source files, created and hashed before command execution. But after 
+	// command execution their hashes have to be re-computed because the 
+	// execution changes their content. This creates the possibility for the
+	// earlier described race condition. Option 3 is hard to implement because
+	// it is hard to distinguish between modifications resulting from command
+	// execution and from the user tampering with the output files.
+	//
 	class __declspec(dllexport) SourceFileRepository
 	{
 	public:
@@ -73,8 +110,8 @@ namespace YAM
 		void excludes(RegexSet const& newExcludes); 
 
 		// Return whether path is a path in the repo directory tree, 
-		// E.g. if directoryName() = /a/b/, then path = /a/b/c/e
-		// is a sub path. This is also true when /a/b/c/e does not
+		// E.g. if repo directoryName() = /a/b/ and path = /a/b/c/e then
+		// repo contains path. This is also true when /a/b/c/e does not
 		// exist in the file system or when it was excluded by the
 		// exclude patterns. 
 		bool contains(std::filesystem::path const& path) const;

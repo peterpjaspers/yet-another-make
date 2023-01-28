@@ -1,5 +1,4 @@
 #include "SourceFileRepository.h"
-
 #include "DirectoryNode.h"
 #include "SourceFileNode.h"
 #include "ExecutionContext.h"
@@ -185,8 +184,7 @@ namespace YAM
 	}
 
 	bool SourceFileRepository::contains(std::filesystem::path const& path) const {
-		auto base = directoryName();
-		const auto pair = std::mismatch(path.begin(), path.end(), base.begin(), base.end());
-		return pair.second == base.end();
+		bool const contains = path != path.lexically_proximate(directoryName());
+		return contains;
 	}
 }
