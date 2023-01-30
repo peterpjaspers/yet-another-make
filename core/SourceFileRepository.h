@@ -1,7 +1,7 @@
 #pragma once
 
-#include "DirectoryWatcher.h"
 #include "RegexSet.h"
+#include "IDirectoryWatcher.h"
 
 #include <memory>
 #include <filesystem>
@@ -103,6 +103,17 @@ namespace YAM
 			RegexSet const& _excludePatterns,
 			ExecutionContext* context);
 
+		// Construct a read-only repository. A read-only repository is not
+		// mirrored in memory and directory() is a nullptr. Command nodes
+		// are allowed to depend on files in a read-only repository but 
+		// do not (and cannot because file nodes are not created) register 
+		// dependencies on these files.
+		//
+		SourceFileRepository(
+			std::string const& repoName,
+			std::filesystem::path const& directory);
+
+		bool readOnly() const;
 		std::string const& name() const;
 		std::filesystem::path const& directoryName() const;
 		std::shared_ptr<DirectoryNode> directory() const;
@@ -144,12 +155,13 @@ namespace YAM
 		void _invalidateNodeRecursively(std::filesystem::path const& path);
 		void _invalidateNodeRecursively(std::shared_ptr<Node> node);
 
+		bool _readOnly;
 		std::string _name;
 		std::shared_ptr<DirectoryNode> _directory;
 		ExecutionContext* _context;
 		RegexSet _excludes;
 		bool _suspended;
 		std::queue<FileChange> _changeQueue;
-		DirectoryWatcher _watcher;
+		std::shared_ptr<IDirectoryWatcher> _watcher;
 	};
 }

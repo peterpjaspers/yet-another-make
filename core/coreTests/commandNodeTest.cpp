@@ -4,6 +4,7 @@
 #include "../GeneratedFileNode.h"
 #include "../ThreadPool.h"
 #include "../ExecutionContext.h"
+#include "../FileSystem.h"
 #include "../../xxhash/xxhash.h"
 
 #include "gtest/gtest.h"
@@ -24,52 +25,92 @@ namespace
 		return content;		
 	}
 
+	std::filesystem::path np(std::filesystem::path const& path) {
+		if (!std::filesystem::exists(path)) {
+			std::filesystem::create_directories(path.parent_path());
+			std::ofstream file(path);
+		}
+		return FileSystem::normalizePath(path);
+	}
+
 	class Commands
 	{
 	public:
+		std::filesystem::path tmpDir;
 		ExecutionContext context;
 		std::shared_ptr<CommandNode> pietCmd;
 		std::shared_ptr<CommandNode> janCmd;
 		std::shared_ptr<CommandNode> pietjanCmd;
-		std::shared_ptr<GeneratedFileNode> piet;
-		std::shared_ptr<GeneratedFileNode> jan;
-		std::shared_ptr<GeneratedFileNode> pietjan;
+		std::shared_ptr<GeneratedFileNode> pietOut;
+		std::shared_ptr<GeneratedFileNode> janOut;
+		std::shared_ptr<GeneratedFileNode> pietjanOut;
+		std::shared_ptr<SourceFileNode> pietSrc;
+		std::shared_ptr<SourceFileNode> janSrc;
 		ExecutionStatistics& stats;
 
 		Commands()
-			: pietCmd(std::make_shared<CommandNode>(&context, "piet/_cmd"))
-			, janCmd(std::make_shared<CommandNode>(& context, "jan/_cmd"))
-			, pietjanCmd(std::make_shared<CommandNode>(& context, "pietjan/_cmd"))
-			, piet(std::make_shared<GeneratedFileNode>(& context, "piet.txt", pietCmd))
-			, jan(std::make_shared<GeneratedFileNode>(&context, "jan.txt", janCmd))
-			, pietjan(std::make_shared<GeneratedFileNode>(&context, "pietjan.txt", pietjanCmd))
+			: tmpDir(YAM::FileSystem::createUniqueDirectory())
+			, pietCmd(std::make_shared<CommandNode>(&context, np(tmpDir / "piet/_cmd")))
+			, janCmd(std::make_shared<CommandNode>(& context, np(tmpDir / "jan/_cmd")))
+			, pietjanCmd(std::make_shared<CommandNode>(& context, np(tmpDir / "pietjan/_cmd")))
+			, pietOut(std::make_shared<GeneratedFileNode>(& context, np(tmpDir / "generated\\pietOut.txt"), pietCmd))
+			, janOut(std::make_shared<GeneratedFileNode>(&context, np(tmpDir / "generated\\janOut.txt"), janCmd))
+			, pietjanOut(std::make_shared<GeneratedFileNode>(&context, np(tmpDir / "generated\\pietjanOut.txt"), pietjanCmd))
+			, pietSrc(std::make_shared<SourceFileNode>(&context, np(tmpDir / "pietSrc.txt")))
+			, janSrc(std::make_shared<SourceFileNode>(&context, np(tmpDir / "janSrc.txt")))
 			, stats(context.statistics())
 		{
-			auto shell = boost::process::search_path("cmd").string();
-			clean();
-			stats.reset();
 			stats.registerNodes = true;
+			context.threadPool().size(1); // to ease debugging
+			std::filesystem::create_directories(tmpDir);
+			std::filesystem::create_directories(np(tmpDir / "generated"));
 
-			pietCmd->setOutputs({ piet });
-			pietCmd->setScript(shell + " /c echo piet > piet.txt");
+			std::ofstream pietSrcFile(pietSrc->name().string());
+			pietSrcFile << "piet";
+			pietSrcFile.close();
+			std::ofstream janSrcFile(janSrc->name().string());
+			janSrcFile << "jan";
+			janSrcFile.close();
 
-			janCmd->setOutputs({ jan });
-			janCmd->setScript(shell + " /c echo jan > jan.txt");
+			{
+				std::stringstream script;
+				script << "type " << pietSrc->name().string() << " > " << pietOut->name().string();
+				pietCmd->setOutputs({ pietOut });
+				pietCmd->setScript(script.str());
+			}
+			{
+				std::stringstream script;
+				script << "type " << janSrc->name().string() << " > " << janOut->name().string();
+				janCmd->setOutputs({ janOut });
+				janCmd->setScript(script.str());
+			}
+			{
+				std::stringstream script;
+				pietjanCmd->setOutputs({ pietjanOut });
+				pietjanCmd->setInputProducers({ pietCmd, janCmd });
+				script
+					<< "type " << pietOut->name().string() << " > " << pietjanOut->name().string()
+					<< " & type " << janOut->name().string() << " >> " << pietjanOut->name().string();
+				pietjanCmd->setScript(script.str());
+			}
 
-			pietjanCmd->setOutputs({ pietjan });
-			pietjanCmd->setInputProducers({ pietCmd, janCmd });
-			pietjanCmd->setScript(shell + " /c type piet.txt > pietjan.txt & type jan.txt >> pietjan.txt");
+			context.nodes().add(pietCmd);
+			context.nodes().add(janCmd);
+			context.nodes().add(pietjanCmd);
+			context.nodes().add(pietOut);
+			context.nodes().add(janOut);
+			context.nodes().add(pietjanOut);
+			context.nodes().add(pietSrc);
+			context.nodes().add(janSrc);
 
 			EXPECT_EQ(Node::State::Dirty, pietCmd->state());
 			EXPECT_EQ(Node::State::Dirty, janCmd->state());
 			EXPECT_EQ(Node::State::Dirty, pietjanCmd->state());
-			EXPECT_EQ(Node::State::Dirty, piet->state());
-			EXPECT_EQ(Node::State::Dirty, jan->state());
-			EXPECT_EQ(Node::State::Dirty, pietjan->state());
-
-			// convenient for debugging: limit threadpool to 1 thread
-			//
-			//context.threadPool().size(1);
+			EXPECT_EQ(Node::State::Dirty, pietOut->state());
+			EXPECT_EQ(Node::State::Dirty, janOut->state());
+			EXPECT_EQ(Node::State::Dirty, pietjanOut->state());
+			EXPECT_EQ(Node::State::Dirty, pietSrc->state());
+			EXPECT_EQ(Node::State::Dirty, janSrc->state());
 		}
 
 		~Commands() {
@@ -77,12 +118,15 @@ namespace
 		}
 
 		void clean() {
-			std::filesystem::remove("piet.txt");
-			std::filesystem::remove("jan.txt");
-			std::filesystem::remove("pietjan.txt");
+			std::filesystem::remove_all(tmpDir);
 		}
 
 		bool execute() {
+			if (pietSrc->state() == Node::State::Dirty) executeNode(pietSrc.get());
+			if (janSrc->state() == Node::State::Dirty) executeNode(janSrc.get());
+			EXPECT_EQ(Node::State::Ok, pietSrc->state());
+			EXPECT_EQ(Node::State::Ok, janSrc->state());
+			stats.reset();
 			return executeNode(pietjanCmd.get());
 		}
 	};
@@ -94,29 +138,38 @@ namespace
 		EXPECT_EQ(Node::State::Ok, cmds.pietCmd->state());
 		EXPECT_EQ(Node::State::Ok, cmds.janCmd->state());
 		EXPECT_EQ(Node::State::Ok, cmds.pietjanCmd->state());
-		EXPECT_EQ(Node::State::Ok, cmds.piet->state());
-		EXPECT_EQ(Node::State::Ok, cmds.jan->state());
-		EXPECT_EQ(Node::State::Ok, cmds.pietjan->state());
+		EXPECT_EQ(Node::State::Ok, cmds.pietOut->state());
+		EXPECT_EQ(Node::State::Ok, cmds.janOut->state());
+		EXPECT_EQ(Node::State::Ok, cmds.pietjanOut->state());
+
+		std::vector<std::shared_ptr<Node>> inputs;
+		cmds.pietCmd->getInputs(inputs);
+		EXPECT_EQ(1, inputs.size());
+		EXPECT_EQ(cmds.pietSrc, inputs[0]);
+		inputs.clear();
+		cmds.janCmd->getInputs(inputs);
+		EXPECT_EQ(1, inputs.size());
+		EXPECT_EQ(cmds.janSrc, inputs[0]);
 
 		EXPECT_EQ(6, cmds.stats.started.size());
-		EXPECT_TRUE(cmds.stats.started.contains(cmds.piet.get()));
-		EXPECT_TRUE(cmds.stats.started.contains(cmds.jan.get()));
-		EXPECT_TRUE(cmds.stats.started.contains(cmds.pietjan.get()));
+		EXPECT_TRUE(cmds.stats.started.contains(cmds.pietOut.get()));
+		EXPECT_TRUE(cmds.stats.started.contains(cmds.janOut.get()));
+		EXPECT_TRUE(cmds.stats.started.contains(cmds.pietjanOut.get()));
 		EXPECT_TRUE(cmds.stats.started.contains(cmds.janCmd.get()));
 		EXPECT_TRUE(cmds.stats.started.contains(cmds.pietCmd.get()));
 		EXPECT_TRUE(cmds.stats.started.contains(cmds.pietjanCmd.get()));
 
 		EXPECT_EQ(6, cmds.stats.selfExecuted.size());
-		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.piet.get()));
-		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.jan.get()));
-		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietjan.get()));
+		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietOut.get()));
+		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.janOut.get()));
+		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietjanOut.get()));
 		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.janCmd.get()));
 		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietCmd.get()));
 		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietjanCmd.get()));
 			
-		EXPECT_EQ("piet ", readFile("piet.txt"));
-		EXPECT_EQ("jan ", readFile("jan.txt"));
-		EXPECT_EQ("piet jan ", readFile("pietjan.txt"));
+		EXPECT_EQ("piet", readFile(cmds.pietOut->name()));
+		EXPECT_EQ("jan", readFile(cmds.janOut->name()));
+		EXPECT_EQ("pietjan", readFile(cmds.pietjanOut->name()));
 	}
 
 	TEST(CommandNode, incrementalBuildWhileNoModifications) {
@@ -124,35 +177,34 @@ namespace
 
 		EXPECT_TRUE(cmds.execute());
 
-		cmds.piet->setState(Node::State::Dirty);
-		cmds.jan->setState(Node::State::Dirty);
+		cmds.pietSrc->setState(Node::State::Dirty);
+		cmds.janSrc->setState(Node::State::Dirty);
+
 		EXPECT_EQ(Node::State::Dirty, cmds.pietCmd->state());
 		EXPECT_EQ(Node::State::Dirty, cmds.janCmd->state());
 		EXPECT_EQ(Node::State::Dirty, cmds.pietjanCmd->state());
-		EXPECT_EQ(Node::State::Dirty, cmds.piet->state());
-		EXPECT_EQ(Node::State::Dirty, cmds.jan->state());
-		EXPECT_EQ(Node::State::Ok, cmds.pietjan->state());
+		EXPECT_EQ(Node::State::Dirty, cmds.pietOut->state());
+		EXPECT_EQ(Node::State::Dirty, cmds.janOut->state());
+		EXPECT_EQ(Node::State::Dirty, cmds.pietjanOut->state());
 
-		cmds.stats.reset();
 		EXPECT_TRUE(cmds.execute());
 
-		EXPECT_EQ(5, cmds.stats.started.size());
-		EXPECT_TRUE(cmds.stats.started.contains(cmds.piet.get()));
-		EXPECT_TRUE(cmds.stats.started.contains(cmds.jan.get()));
+		EXPECT_EQ(6, cmds.stats.started.size());
 		EXPECT_TRUE(cmds.stats.started.contains(cmds.janCmd.get()));
 		EXPECT_TRUE(cmds.stats.started.contains(cmds.pietCmd.get()));
 		EXPECT_TRUE(cmds.stats.started.contains(cmds.pietjanCmd.get()));
+		EXPECT_TRUE(cmds.stats.started.contains(cmds.janOut.get()));
+		EXPECT_TRUE(cmds.stats.started.contains(cmds.pietOut.get()));
+		EXPECT_TRUE(cmds.stats.started.contains(cmds.pietjanOut.get()));
 
-		EXPECT_EQ(2, cmds.stats.selfExecuted.size());
-		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.piet.get()));
-		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.jan.get()));
+		EXPECT_EQ(3, cmds.stats.selfExecuted.size());
 
 		EXPECT_EQ(Node::State::Ok, cmds.pietCmd->state());
 		EXPECT_EQ(Node::State::Ok, cmds.janCmd->state());
 		EXPECT_EQ(Node::State::Ok, cmds.pietjanCmd->state());
-		EXPECT_EQ(Node::State::Ok, cmds.piet->state());
-		EXPECT_EQ(Node::State::Ok, cmds.jan->state());
-		EXPECT_EQ(Node::State::Ok, cmds.pietjan->state());
+		EXPECT_EQ(Node::State::Ok, cmds.pietOut->state());
+		EXPECT_EQ(Node::State::Ok, cmds.janOut->state());
+		EXPECT_EQ(Node::State::Ok, cmds.pietjanOut->state());
 	}
 
 	TEST(CommandNode, incrementalBuildAfterFileModification) {
@@ -160,90 +212,90 @@ namespace
 
 		EXPECT_TRUE(cmds.execute());
 
-		std::ofstream myfile;
-		myfile.open("jan.txt");
-		myfile << "Modified this file.\n";
-		myfile.close();
-		cmds.jan->setState(Node::State::Dirty);
+		std::ofstream janSrcFile(cmds.janSrc->name().string());
+		janSrcFile << "janjan" << std::endl;
+		janSrcFile.close();
+		cmds.janSrc->setState(Node::State::Dirty);
 
 		EXPECT_EQ(Node::State::Ok, cmds.pietCmd->state());
 		EXPECT_EQ(Node::State::Dirty, cmds.janCmd->state());
 		EXPECT_EQ(Node::State::Dirty, cmds.pietjanCmd->state());
-		EXPECT_EQ(Node::State::Ok, cmds.piet->state());
-		EXPECT_EQ(Node::State::Dirty, cmds.jan->state());
-		EXPECT_EQ(Node::State::Ok, cmds.pietjan->state());
-
-		cmds.stats.reset();
+		EXPECT_EQ(Node::State::Ok, cmds.pietOut->state());
+		EXPECT_EQ(Node::State::Dirty, cmds.janOut->state());
+		EXPECT_EQ(Node::State::Dirty, cmds.pietjanOut->state());
+		
 		EXPECT_TRUE(cmds.execute());
 
-		EXPECT_EQ(3, cmds.stats.started.size());
-		EXPECT_TRUE(cmds.stats.started.contains(cmds.jan.get()));
+		EXPECT_EQ(4, cmds.stats.started.size());
 		EXPECT_TRUE(cmds.stats.started.contains(cmds.janCmd.get()));
 		EXPECT_TRUE(cmds.stats.started.contains(cmds.pietjanCmd.get()));
-		
-		// 1: self-execution of jan => from hash("jan") to hash("Modified this file.\n") 
-		// 2: pendingStartSelf of janCmd sees changed hash of jan => execute janCmd
-		// 3: execution of janCmd restores jan.txt to "jan", rehashes jan, recomputes
-		//    execution hash of janCmd-> Note that previous and new execution hashes are
-		//    both computed from jan 'seeing' content "jan" in jan.txt, hence execution 
-		//    hash of janCmd does not change.
-		// 4: pendingStartSelf of pietjanCmd->d sees no changes in the hashes of its prerequisites,
-		//    hence no self-execution of pietjanCmd->d
-		EXPECT_EQ(2, cmds.stats.selfExecuted.size());
-		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.jan.get()));
+		EXPECT_TRUE(cmds.stats.started.contains(cmds.janOut.get()));
+		EXPECT_TRUE(cmds.stats.started.contains(cmds.pietjanOut.get()));
+
+		// 1: pendingStartSelf of janCmd sees changed hash of janSrc
+		// 2: self-execution of janCmd => updates and rehashes janOut 
+		// 3: pendingStartSelf of pietjanCmd sees changed hash of janOut
+		// 4: execution of pietjanCmd updates and rehashes pietjanOut
+		// Note that janOut and pietjanOut are executed because Dirty
+		// but that their time stamps have not changes and hence have
+		// not added themselves to updateFiles.
+		EXPECT_EQ(4, cmds.stats.selfExecuted.size());
+		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.janOut.get()));
 		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.janCmd.get()));
+		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietjanOut.get()));
+		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietjanCmd.get()));
+		EXPECT_EQ(0, cmds.stats.rehashedFiles.size());
 
 		EXPECT_EQ(Node::State::Ok, cmds.pietCmd->state());
 		EXPECT_EQ(Node::State::Ok, cmds.janCmd->state());
 		EXPECT_EQ(Node::State::Ok, cmds.pietjanCmd->state());
-		EXPECT_EQ(Node::State::Ok, cmds.piet->state());
-		EXPECT_EQ(Node::State::Ok, cmds.jan->state());
-		EXPECT_EQ(Node::State::Ok, cmds.pietjan->state());
+		EXPECT_EQ(Node::State::Ok, cmds.pietOut->state());
+		EXPECT_EQ(Node::State::Ok, cmds.janOut->state());
+		EXPECT_EQ(Node::State::Ok, cmds.pietjanOut->state());
 	}
 
 	TEST(CommandNode, incrementalBuildAfterFileDeletion) {
 		Commands cmds;
 
 		EXPECT_TRUE(cmds.execute());
-		std::filesystem::remove("jan.txt");
-		cmds.jan->setState(Node::State::Dirty);
+		std::filesystem::remove(cmds.janOut->name());
+		cmds.janOut->setState(Node::State::Dirty);
 
 		EXPECT_EQ(Node::State::Ok, cmds.pietCmd->state());
 		EXPECT_EQ(Node::State::Dirty, cmds.janCmd->state());
 		EXPECT_EQ(Node::State::Dirty, cmds.pietjanCmd->state());
-		EXPECT_EQ(Node::State::Ok, cmds.piet->state());
-		EXPECT_EQ(Node::State::Dirty, cmds.jan->state());
-		EXPECT_EQ(Node::State::Ok, cmds.pietjan->state());
+		EXPECT_EQ(Node::State::Ok, cmds.pietOut->state());
+		EXPECT_EQ(Node::State::Dirty, cmds.janOut->state());
+		EXPECT_EQ(Node::State::Dirty, cmds.pietjanOut->state());
 
-		cmds.stats.reset();
 		EXPECT_TRUE(cmds.execute());
 
-		EXPECT_EQ(3, cmds.stats.started.size());
-		EXPECT_TRUE(cmds.stats.started.contains(cmds.jan.get()));
+		EXPECT_EQ(4, cmds.stats.started.size());
 		EXPECT_TRUE(cmds.stats.started.contains(cmds.janCmd.get()));
 		EXPECT_TRUE(cmds.stats.started.contains(cmds.pietjanCmd.get()));
+		EXPECT_TRUE(cmds.stats.started.contains(cmds.janOut.get()));
+		EXPECT_TRUE(cmds.stats.started.contains(cmds.pietjanOut.get()));
 
-		// Note: execution of janCmd restores jan => execution hash of janCmd 
-		// does not change => pietjanCmd->d not pendingSelfStart
-
-		// 1: self-execution of jan => from hash("jan") to hash of deleted file) 
-		// 2: pendingStartSelf of janCmd sees changed hash of jan => execute janCmd
-		// 3: execution of janCmd restores jan.txt to "jan", rehashes jan, recomputes
-		//    execution hash of janCmd-> Note that previous and new execution hashes are
-		//    both computed from jan 'seeing' content "jan" in jan.txt, hence execution 
-		//    hash of janCmd does not change.
-		// 4: pendingStartSelf of pietjanCmd->d sees no changes in the hashes of its prerequisites,
-		//    hence no self-execution of pietjanCmd->d
-		EXPECT_EQ(2, cmds.stats.selfExecuted.size());
-		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.jan.get()));
+		// 1: pendingStartSelf of janCmd sees changed hash of janOut
+		// 2: self-execution of janCmd => restores janOut, no change in hash 
+		// 3: pendingStartSelf of pietjanCmd sees unchanged hash of janOut,
+		//    hence no re-execution
+		// Note that janOut and pietjanOut are executed because Dirty
+		// but that their time stamps have not changes and hence have
+		// not added themselves to updateFiles.
+		EXPECT_EQ(3, cmds.stats.selfExecuted.size());
+		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.janOut.get()));
 		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.janCmd.get()));
+		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietjanOut.get()));
+		EXPECT_EQ(1, cmds.stats.rehashedFiles.size());
+		EXPECT_TRUE(cmds.stats.rehashedFiles.contains(cmds.janOut.get()));
 
 		EXPECT_EQ(Node::State::Ok, cmds.pietCmd->state());
 		EXPECT_EQ(Node::State::Ok, cmds.janCmd->state());
 		EXPECT_EQ(Node::State::Ok, cmds.pietjanCmd->state());
-		EXPECT_EQ(Node::State::Ok, cmds.piet->state());
-		EXPECT_EQ(Node::State::Ok, cmds.jan->state());
-		EXPECT_EQ(Node::State::Ok, cmds.pietjan->state());
+		EXPECT_EQ(Node::State::Ok, cmds.pietOut->state());
+		EXPECT_EQ(Node::State::Ok, cmds.janOut->state());
+		EXPECT_EQ(Node::State::Ok, cmds.pietjanOut->state());;
 	}
 }
 

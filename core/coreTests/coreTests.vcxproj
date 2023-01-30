@@ -35,7 +35,10 @@
   <ItemGroup>
     <ClCompile Include="AdditionNode.cpp" />
     <ClCompile Include="boostProcessTest.cpp" />
-    <ClCompile Include="commandNodeTest.cpp" />
+    <ClCompile Include="commandNodeTest.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </DisableSpecificWarnings>
+    </ClCompile>
     <ClCompile Include="delegatesTest.cpp" />
     <ClCompile Include="directoryNodeTest.cpp" />
     <ClCompile Include="DirectoryTree.cpp" />

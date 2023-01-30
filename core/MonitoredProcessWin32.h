@@ -28,6 +28,7 @@ namespace YAM
 		std::future<std::string> _stdout;
 		std::future<std::string> _stderr;
 		bool _groupExited;
+		bool _childExited;
 		boost::process::group _group;
 		boost::process::child _child;
 		MonitoredProcessResult _result;

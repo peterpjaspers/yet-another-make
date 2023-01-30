@@ -18,7 +18,7 @@ namespace YAM
         nDirectoryUpdates = 0;
         started.clear();
         selfExecuted.clear();
-        updatedFiles.clear();
+        rehashedFiles.clear();
         updatedDirectories.clear();
     }
 
@@ -38,11 +38,11 @@ namespace YAM
     }
 
 
-    void ExecutionStatistics::registerUpdatedFile(FileNode* node) {
+    void ExecutionStatistics::registerRehashedFile(FileNode* node) {
         nFileUpdates++;
         if (registerNodes) {
             std::lock_guard<std::mutex> lock(mutex);
-            updatedFiles.insert(node);
+            rehashedFiles.insert(node);
         }
     }
 

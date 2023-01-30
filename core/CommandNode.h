@@ -2,12 +2,12 @@
 
 #include "Node.h"
 #include "FileNode.h"
-#include "FileAspectSet.h"
 #include "../xxHash/xxhash.h"
 
 namespace YAM
 {
 	class GeneratedFileNode;
+	class IMonitoredProcess;
 
 	// CommandNode is capable of:
 	//	  - executing a shell script with a given set of output files.
@@ -22,7 +22,8 @@ namespace YAM
 	public:
 		CommandNode(ExecutionContext* context, std::filesystem::path const& name);
 		~CommandNode();
-
+		
+		virtual void setState(State newState) override;
 		virtual bool supportsPrerequisites() const override;
 
 		// getPrerequisites appends the input producers (command nodes), the source 
@@ -45,6 +46,7 @@ namespace YAM
 		virtual bool pendingStartSelf() const override;
 
 		virtual void startSelf() override;
+		virtual void cancelSelf() override;
 
 		XXH64_hash_t computeExecutionHash() const;
 
@@ -75,6 +77,7 @@ namespace YAM
 
 	private:
 		void getSourceInputs(std::vector<std::shared_ptr<Node>> & sourceInputs) const;
+		void setInputs(std::vector<std::shared_ptr<FileNode>> const& newInputs);
 		void rehashOutputs();
 		Node::State executeScript();
 		void execute();
@@ -101,5 +104,6 @@ namespace YAM
 		// the relevant aspects of the input files.
 		XXH64_hash_t _executionHash;
 
+		std::shared_ptr<IMonitoredProcess> _scriptExecutor;
     };
 }

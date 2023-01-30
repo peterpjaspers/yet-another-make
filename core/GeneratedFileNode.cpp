@@ -12,6 +12,15 @@ namespace YAM
     { 
     }
 
+    void GeneratedFileNode::setState(State newState) {
+        if (state() != newState) {
+            Node::setState(newState);
+            if (state() == Node::State::Dirty) {
+                _producer->setState(Node::State::Dirty);
+            }
+        }
+    }
+
     std::shared_ptr<Node> GeneratedFileNode::producer() const {
         return _producer; 
     }

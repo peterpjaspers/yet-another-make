@@ -20,7 +20,7 @@ namespace YAM
 		void registerStarted(Node * node);
 		void registerSelfExecuted(Node* node);
 
-		void registerUpdatedFile(FileNode* node);
+		void registerRehashedFile(FileNode* node);
 		void registerUpdatedDirectory(DirectoryNode* node);
 
 		// number of nodes started
@@ -42,7 +42,7 @@ namespace YAM
 		std::mutex mutex;
 		// These 2 fields are updated from threadpool.
 		// Use mutex to do MT-safe update.
-		std::unordered_set<FileNode*> updatedFiles;
+		std::unordered_set<FileNode*> rehashedFiles;
 		std::unordered_set<DirectoryNode*> updatedDirectories;
 	};
 }

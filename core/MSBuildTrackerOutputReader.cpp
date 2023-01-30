@@ -1,4 +1,5 @@
 #include "MSBuildTrackerOutputReader.h"
+#include "FileSystem.h"
 
 #include <regex>
 #include <string>
@@ -7,6 +8,8 @@
 #include <fstream>
 #include <locale>
 #include <codecvt>
+#include <Windows.h>
+#include <fileapi.h>
 
 namespace
 {
@@ -106,7 +109,7 @@ namespace YAM
 		while (std::getline(ws, line)) {
 			line.erase(line.find_last_not_of(L" \t\r") + 1);
 			if (line[0] != L'#' && line[0] != L'^') {
-				dependencies.emplace(std::filesystem::path(line));
+				dependencies.emplace(YAM::FileSystem::normalizePath(line));
 			}
 		}	
 	}

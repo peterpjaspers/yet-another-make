@@ -86,7 +86,7 @@ namespace YAM
 
     void FileNode::execute() {
         if (updateLastWriteTime()) {
-            context()->statistics().registerUpdatedFile(this);
+            context()->statistics().registerRehashedFile(this);
             rehashAll(false);
         }
         postSelfCompletion(Node::State::Ok);

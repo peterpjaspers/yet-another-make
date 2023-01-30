@@ -104,15 +104,15 @@ namespace
         EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode_S1_S2.get()));
         std::vector<std::shared_ptr<FileNode>> files;
         dirNode->getFiles(files);
-        EXPECT_TRUE(context.statistics().updatedFiles.contains(files[files.size() - 1].get()));
+        EXPECT_TRUE(context.statistics().rehashedFiles.contains(files[files.size() - 1].get()));
 
         dirNode_S1->getFiles(files);
-        EXPECT_TRUE(context.statistics().updatedFiles.contains(files[files.size() - 1].get()));
+        EXPECT_TRUE(context.statistics().rehashedFiles.contains(files[files.size() - 1].get()));
 
         dirNode_S1_S2->getSubDirs(subDirNodes);
         auto dirNode_S1_S2_S3 = subDirNodes[subDirNodes.size() - 1];
         EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode_S1_S2_S3.get()));
         dirNode_S1_S2_S3->getFiles(files);
-        for (auto f : files) EXPECT_TRUE(context.statistics().updatedFiles.contains(f.get()));
+        for (auto f : files) EXPECT_TRUE(context.statistics().rehashedFiles.contains(f.get()));
     }
 }

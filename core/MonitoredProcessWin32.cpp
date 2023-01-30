@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <chrono>
+#include <limits>
 
 namespace
 {
@@ -45,6 +46,7 @@ namespace YAM
 		: IMonitoredProcess(program, arguments, env)
 		, _tempDir(std::tmpnam(nullptr))
 		, _groupExited(false)
+		, _childExited(false)
 		, _child(
 			generateCmd(_program, _arguments, _tempDir),
 			generateEnv(_tempDir, _env),
@@ -59,15 +61,20 @@ namespace YAM
 		_ios.run();
 		if (!_groupExited) {
 			_group.wait();
+			_groupExited = true;
 		}
-		_child.wait();
-		_result.exitCode = _child.exit_code();
-		_result.stdOut = _stdout.get();
-		_result.stdErr = _stderr.get();
-		MSBuildTrackerOutputReader reader(trackerLogDir(_tempDir));
-		reader.getReadFilesVec(_result.inputFiles);
-		reader.getWrittenFilesVec(_result.outputFiles);
-		reader.getReadOnlyFilesVec(_result.inputOnlyFiles);
+		if (!_childExited) {
+			_child.wait();
+			_childExited = true;
+			_result.exitCode = _child.exit_code();
+			_result.stdOut = _stdout.get();
+			_result.stdErr = _stderr.get();
+			MSBuildTrackerOutputReader reader(trackerLogDir(_tempDir));
+			reader.getReadFilesVec(_result.inputFiles);
+			reader.getWrittenFilesVec(_result.outputFiles);
+			reader.getReadOnlyFilesVec(_result.inputOnlyFiles);
+			std::filesystem::remove_all(_tempDir);
+		}
 		return _result;
 	}
 

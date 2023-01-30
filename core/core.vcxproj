@@ -103,9 +103,11 @@
     <ClInclude Include="FileAspect.h" />
     <ClInclude Include="DirectoryWatcher.h" />
     <ClInclude Include="DirectoryWatcherWin32.h" />
+    <ClInclude Include="FileSystem.h" />
     <ClInclude Include="GlobNode.h" />
     <ClInclude Include="IDirectoryWatcher.h" />
     <ClInclude Include="IMonitoredProcess.h" />
+    <ClInclude Include="MonitoredProcess.h" />
     <ClInclude Include="MonitoredProcessWin32.h" />
     <ClInclude Include="MSBuildTrackerOutputReader.h" />
     <ClInclude Include="RegexSet.h" />
@@ -123,6 +125,8 @@
   <ItemGroup>
     <ClCompile Include="CommandNode.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4251;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4251;4996</DisableSpecificWarnings>
     </ClCompile>
     <ClCompile Include="DirectoryNode.cpp" />
     <ClCompile Include="ExecutionContext.cpp" />
@@ -130,7 +134,12 @@
     <ClCompile Include="FileAspect.cpp" />
     <ClCompile Include="DirectoryWatcher.cpp" />
     <ClCompile Include="DirectoryWatcherWin32.cpp" />
+    <ClCompile Include="FileSystem.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4251;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4251;4996</DisableSpecificWarnings>
+    </ClCompile>
     <ClCompile Include="GlobNode.cpp" />
+    <ClCompile Include="MonitoredProcess.cpp" />
     <ClCompile Include="MonitoredProcessWin32.cpp">
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4251;4996</DisableSpecificWarnings>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4251;4996</DisableSpecificWarnings>

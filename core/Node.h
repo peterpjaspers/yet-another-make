@@ -97,7 +97,7 @@ namespace YAM
 		std::filesystem::path const& name() const;
 
 		State state() const { return _state; }
-		void setState(State newState);
+		virtual void setState(State newState);
 
 		// Return whether this node supports prerequisites.
 		// This is a class property.

@@ -1,5 +1,6 @@
 #include "SourceFileRepository.h"
 #include "DirectoryNode.h"
+#include "DirectoryWatcher.h"
 #include "SourceFileNode.h"
 #include "ExecutionContext.h"
 
@@ -40,12 +41,13 @@ namespace YAM
 		std::filesystem::path const& directory,
 		RegexSet const& excludePatterns,
 		ExecutionContext* context)
-		: _name(repoName)
+		: _readOnly(false)
+		, _name(repoName)
 		, _directory(std::make_shared<DirectoryNode>(context, directory))
 		, _context(context)
 		, _excludes(excludePatterns)
 		, _suspended(false)
-		, _watcher(
+		, _watcher(std::make_shared<DirectoryWatcher>(
 			directory,
 			true,
 			Delegate<void, FileChange const&>::CreateLambda(
@@ -59,18 +61,34 @@ namespace YAM
 
 				})
 			)
-	{
+	) {
 		_context->nodes().add(_directory);
 	}
 
+	SourceFileRepository::
+		SourceFileRepository(
+			std::string const& repoName,
+			std::filesystem::path const& directory)
+		: _readOnly(true)
+		, _name(repoName)
+		, _directory(nullptr)
+		, _context(nullptr)
+		, _excludes()
+		, _suspended(false)
+		, _watcher(nullptr)
+	{}
+
+	bool SourceFileRepository::readOnly() const { return _readOnly; }
 	std::string const& SourceFileRepository::name() const { return _name; }
 	std::filesystem::path const& SourceFileRepository::directoryName() const { return _directory->name(); }
 	std::shared_ptr<DirectoryNode> SourceFileRepository::directory() const { return _directory; }
 	RegexSet const& SourceFileRepository::excludes() const { return _excludes; }
 
 	void SourceFileRepository::excludes(RegexSet const& newExcludes) {
-		_excludes = newExcludes;
-		_invalidateNodeRecursively(_directory);
+		if (!_readOnly) {
+			_excludes = newExcludes;
+			_invalidateNodeRecursively(_directory);
+		}
 	}
 
 	void SourceFileRepository::suspend() { _suspended = true; }
@@ -163,9 +181,11 @@ namespace YAM
 	}
 
 	void SourceFileRepository::clear() {
-		_context->nodes().remove(_directory);
-		_directory->clear();
-		_directory->setState(Node::State::Dirty);
+		if (!_readOnly) {
+			_context->nodes().remove(_directory);
+			_directory->clear();
+			_directory->setState(Node::State::Dirty);
+		}
 	}
 
 	void SourceFileRepository::_invalidateNodeRecursively(std::filesystem::path const& path) {
