@@ -80,12 +80,12 @@ namespace
 		EXPECT_TRUE(cmd.wait_for(15000));
 		MonitoredProcessResult result = cmd.wait();
 		ASSERT_EQ(0, result.exitCode);
-		std::filesystem::path expectedFile ("C:\\TEMP\\JUNK.TXT");
-		EXPECT_EQ(1, result.inputFiles.size());
-		EXPECT_EQ(expectedFile, result.inputFiles[0]);
-		EXPECT_EQ(1, result.outputFiles.size());
-		EXPECT_EQ(expectedFile, result.outputFiles[0]);
-		EXPECT_EQ(0, result.inputOnlyFiles.size());
+		std::filesystem::path expectedFile ("c:\\temp\\junk.txt");
+		EXPECT_EQ(1, result.readFiles.size());
+		EXPECT_EQ(expectedFile, result.readFiles[0]);
+		EXPECT_EQ(1, result.writtenFiles.size());
+		EXPECT_EQ(expectedFile, result.writtenFiles[0]);
+		EXPECT_EQ(0, result.readOnlyFiles.size());
 
 	}
 }

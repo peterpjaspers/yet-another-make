@@ -1,5 +1,6 @@
 #include "gtest/gtest.h"
 #include "../DirectoryWatcher.h"
+#include "../FileSystem.h"
 #include "DirectoryTree.h"
 #include <queue>
 #include <thread>
@@ -43,7 +44,7 @@ namespace
     //      - start watching the directory tree
     //      - iterate the directories.
     TEST(DirectoryWatcher, spuriousChangeEvents) {
-        std::string tmpDir(std::tmpnam(nullptr));
+        std::string tmpDir= FileSystem::createUniqueDirectory().string();
         std::filesystem::path rootDir(std::string(tmpDir + "_dirNodeTest"));
         std::vector<FileChange> detectedChanges;
         std::mutex mutex;
@@ -86,7 +87,7 @@ namespace
         EXPECT_EQ(0, detectedChanges.size());
     }
     TEST(DirectoryWatcher, update_DirectoryTree) {
-        std::string tmpDir(std::tmpnam(nullptr));
+        std::string tmpDir = FileSystem::createUniqueDirectory().string();
         std::filesystem::path rootDir(std::string(tmpDir + "_dirNodeTest"));
         std::vector<FileChange> detectedChanges;
         std::mutex mutex;

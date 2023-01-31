@@ -26,10 +26,10 @@ namespace
 	}
 
 	std::filesystem::path np(std::filesystem::path const& path) {
-		if (!std::filesystem::exists(path)) {
-			std::filesystem::create_directories(path.parent_path());
-			std::ofstream file(path);
-		}
+		//if (!std::filesystem::exists(path)) {
+		//	std::filesystem::create_directories(path.parent_path());
+		//	std::ofstream file(path);
+		//}
 		return FileSystem::normalizePath(path);
 	}
 
@@ -50,9 +50,9 @@ namespace
 
 		Commands()
 			: tmpDir(YAM::FileSystem::createUniqueDirectory())
-			, pietCmd(std::make_shared<CommandNode>(&context, np(tmpDir / "piet/_cmd")))
-			, janCmd(std::make_shared<CommandNode>(& context, np(tmpDir / "jan/_cmd")))
-			, pietjanCmd(std::make_shared<CommandNode>(& context, np(tmpDir / "pietjan/_cmd")))
+			, pietCmd(std::make_shared<CommandNode>(&context, np(tmpDir / "piet\\_cmd")))
+			, janCmd(std::make_shared<CommandNode>(& context, np(tmpDir / "jan\\_cmd")))
+			, pietjanCmd(std::make_shared<CommandNode>(& context, np(tmpDir / "pietjan\\_cmd")))
 			, pietOut(std::make_shared<GeneratedFileNode>(& context, np(tmpDir / "generated\\pietOut.txt"), pietCmd))
 			, janOut(std::make_shared<GeneratedFileNode>(&context, np(tmpDir / "generated\\janOut.txt"), janCmd))
 			, pietjanOut(std::make_shared<GeneratedFileNode>(&context, np(tmpDir / "generated\\pietjanOut.txt"), pietjanCmd))

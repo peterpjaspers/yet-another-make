@@ -12,9 +12,9 @@ namespace YAM
 		int exitCode;
 		std::string stdOut;
 		std::string stdErr;
-		std::vector<std::filesystem::path> inputFiles;
-		std::vector<std::filesystem::path> outputFiles;
-		std::vector<std::filesystem::path> inputOnlyFiles; // = inputFile - outputFiles
+		std::vector<std::filesystem::path> readFiles;     // read-accessed files
+		std::vector<std::filesystem::path> writtenFiles;  // write-accessed files
+		std::vector<std::filesystem::path> readOnlyFiles; // read- and not write-accessed files
 
 		void toLines(std::string const& str, std::vector<std::string>& lines) {
 			auto ss = std::stringstream(str);

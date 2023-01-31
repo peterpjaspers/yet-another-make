@@ -10,20 +10,29 @@
 
 namespace
 {	
-	std::wstring normalize(const wchar_t* path) {
+	bool isShortPath(std::wstring const& path) {
+		auto it = std::find(path.begin(), path.end(), '~');
+	    return it != path.end();
+	}
+
+	std::wstring normalize(std::wstring const& path) {
 		std::wstring nPath;
-		wchar_t buf[MAX_PATH];
-		DWORD length = GetShortPathNameW(
-			(LPCWSTR)(path),
-			(LPWSTR)(&buf),
-			MAX_PATH);
-		if (length > MAX_PATH) throw std::exception("path too long");
-		if (length == 0) {
-			nPath = std::wstring(path);
+		if (!isShortPath(path)) {
+			nPath = path;
 		} else {
-			nPath = std::wstring(buf, length);
+			wchar_t buf[MAX_PATH];
+			DWORD length = GetLongPathNameW(
+				(LPCWSTR)(path.c_str()),
+				(LPWSTR)(&buf),
+				MAX_PATH);
+			if (length > MAX_PATH) throw std::exception("path too long");
+			if (length == 0) {
+				nPath = std::wstring(path);
+			} else {
+				nPath = std::wstring(buf, length);
+			}
 		}
-		std::transform(nPath.begin(), nPath.end(), nPath.begin(), std::towupper);
+		std::transform(nPath.begin(), nPath.end(), nPath.begin(), std::towlower);
 		return nPath;
 	}
 	
@@ -40,13 +49,6 @@ namespace YAM
 		return normalizePath(d);
 	}
 
-	std::filesystem::path FileSystem::createUniqueFile() {
-		std::lock_guard<std::mutex> lock(mutex);
-		char* name = std::tmpnam(nullptr);
-		if (name == nullptr) throw std::exception("std::tmpnam failed");
-		return std::filesystem::path(name);
-	}
-
 	std::filesystem::path FileSystem::uniquePath() {
 		std::lock_guard<std::mutex> lock(mutex);
 		char* name = std::tmpnam(nullptr);
@@ -55,7 +57,7 @@ namespace YAM
 	}
 
 	std::filesystem::path FileSystem::normalizePath(std::wstring const& path) {
-		std::wstring p = normalize(path.c_str());
+		std::wstring p = normalize(path);
 		return std::filesystem::path(p);
 	}
 

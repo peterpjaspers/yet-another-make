@@ -2,12 +2,12 @@
 
 #include "Node.h"
 #include "FileNode.h"
+#include "IMonitoredProcess.h"
 #include "../xxHash/xxhash.h"
 
 namespace YAM
 {
 	class GeneratedFileNode;
-	class IMonitoredProcess;
 
 	// CommandNode is capable of:
 	//	  - executing a shell script with a given set of output files.
@@ -79,7 +79,23 @@ namespace YAM
 		void getSourceInputs(std::vector<std::shared_ptr<Node>> & sourceInputs) const;
 		void setInputs(std::vector<std::shared_ptr<FileNode>> const& newInputs);
 		void rehashOutputs();
-		Node::State executeScript();
+
+		std::shared_ptr<FileNode> findInputNode(
+			std::filesystem::path const& input,
+			std::filesystem::path const& exclude);
+		bool findInputNodes(
+			MonitoredProcessResult const& result,
+			std::filesystem::path const& exclude,
+			std::vector<std::shared_ptr<FileNode>>& inputNodes);
+
+		std::shared_ptr<GeneratedFileNode> findOutputNode(
+			std::filesystem::path const& output);
+		bool findOutputNodes(
+			MonitoredProcessResult const& result,
+			std::vector<std::shared_ptr<GeneratedFileNode>>& outputNodes);
+		bool verifyOutputNodes(std::vector<std::shared_ptr<GeneratedFileNode>>& newOutputNodes);
+
+		MonitoredProcessResult executeScript(std::filesystem::path& scriptFile);
 		void execute();
 
 		// The name of the FileAspectSet that contains the aspects relevant for this
