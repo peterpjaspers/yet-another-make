@@ -111,8 +111,7 @@ namespace YAM
 		// to be reparsed  to re-initialize command scripts. A change in 
 		// script can then be detected by comparing its hash with hash 
 		// of previous script (that was streamed to build state).
-		std::string _script;
-		XXH64_hash_t _scriptHash; 
+		std::string _script; 
 
 		std::vector<std::shared_ptr<FileNode>> _inputs; // inputs detected during last script execution
 

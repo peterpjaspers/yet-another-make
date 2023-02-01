@@ -367,6 +367,7 @@ namespace YAM
                 break;
             case ExecutionState::Self:
                 cancelSelf();
+                break;
             default:
                 throw std::runtime_error("invalid _executionState");
             }

@@ -8,6 +8,7 @@
 #include <vector>
 #include <unordered_set>
 #include <stdexcept>
+#include <atomic>
 #include <initializer_list>
 
 namespace YAM
@@ -260,6 +261,8 @@ namespace YAM
 
 	protected:
 		ExecutionContext* _context;
+		std::filesystem::path _name;
+		std::atomic<bool> _canceling;
 
 		// Pre: state() == State::Executing && all prerequisites are in State::Ok.
 		// Return true when self-execution is needed. 
@@ -326,7 +329,6 @@ namespace YAM
 		void notifyCompletion(Node::State newState);
 
 	private:
-		std::filesystem::path _name;
 		State _state;
 		std::unordered_set<Node*> _preParents;
 		std::unordered_set<Node*> _postParents;
@@ -366,7 +368,6 @@ namespace YAM
 		// nodes in _postrequisites that are executing  
 		std::unordered_set<Node*> _executingPostrequisites;
 
-		bool _canceling;
 		MulticastDelegate<Node*> _completor;
 	};
 }

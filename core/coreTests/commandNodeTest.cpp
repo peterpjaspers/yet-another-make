@@ -36,7 +36,7 @@ namespace
 	class Commands
 	{
 	public:
-		std::filesystem::path tmpDir;
+		std::filesystem::path repoDir;
 		ExecutionContext context;
 		std::shared_ptr<CommandNode> pietCmd;
 		std::shared_ptr<CommandNode> janCmd;
@@ -49,21 +49,21 @@ namespace
 		ExecutionStatistics& stats;
 
 		Commands()
-			: tmpDir(YAM::FileSystem::createUniqueDirectory())
-			, pietCmd(std::make_shared<CommandNode>(&context, np(tmpDir / "piet\\_cmd")))
-			, janCmd(std::make_shared<CommandNode>(& context, np(tmpDir / "jan\\_cmd")))
-			, pietjanCmd(std::make_shared<CommandNode>(& context, np(tmpDir / "pietjan\\_cmd")))
-			, pietOut(std::make_shared<GeneratedFileNode>(& context, np(tmpDir / "generated\\pietOut.txt"), pietCmd))
-			, janOut(std::make_shared<GeneratedFileNode>(&context, np(tmpDir / "generated\\janOut.txt"), janCmd))
-			, pietjanOut(std::make_shared<GeneratedFileNode>(&context, np(tmpDir / "generated\\pietjanOut.txt"), pietjanCmd))
-			, pietSrc(std::make_shared<SourceFileNode>(&context, np(tmpDir / "pietSrc.txt")))
-			, janSrc(std::make_shared<SourceFileNode>(&context, np(tmpDir / "janSrc.txt")))
+			: repoDir(YAM::FileSystem::createUniqueDirectory())
+			, pietCmd(std::make_shared<CommandNode>(&context, np(repoDir / "piet\\_cmd")))
+			, janCmd(std::make_shared<CommandNode>(& context, np(repoDir / "jan\\_cmd")))
+			, pietjanCmd(std::make_shared<CommandNode>(& context, np(repoDir / "pietjan\\_cmd")))
+			, pietOut(std::make_shared<GeneratedFileNode>(& context, np(repoDir / "generated\\pietOut.txt"), pietCmd))
+			, janOut(std::make_shared<GeneratedFileNode>(&context, np(repoDir / "generated\\janOut.txt"), janCmd))
+			, pietjanOut(std::make_shared<GeneratedFileNode>(&context, np(repoDir / "generated\\pietjanOut.txt"), pietjanCmd))
+			, pietSrc(std::make_shared<SourceFileNode>(&context, np(repoDir / "pietSrc.txt")))
+			, janSrc(std::make_shared<SourceFileNode>(&context, np(repoDir / "janSrc.txt")))
 			, stats(context.statistics())
 		{
 			stats.registerNodes = true;
 			context.threadPool().size(1); // to ease debugging
-			std::filesystem::create_directories(tmpDir);
-			std::filesystem::create_directories(np(tmpDir / "generated"));
+			std::filesystem::create_directories(repoDir);
+			std::filesystem::create_directories(np(repoDir / "generated"));
 
 			std::ofstream pietSrcFile(pietSrc->name().string());
 			pietSrcFile << "piet";
@@ -118,7 +118,7 @@ namespace
 		}
 
 		void clean() {
-			std::filesystem::remove_all(tmpDir);
+			std::filesystem::remove_all(repoDir);
 		}
 
 		bool execute() {
@@ -295,7 +295,75 @@ namespace
 		EXPECT_EQ(Node::State::Ok, cmds.pietjanCmd->state());
 		EXPECT_EQ(Node::State::Ok, cmds.pietOut->state());
 		EXPECT_EQ(Node::State::Ok, cmds.janOut->state());
-		EXPECT_EQ(Node::State::Ok, cmds.pietjanOut->state());;
+		EXPECT_EQ(Node::State::Ok, cmds.pietjanOut->state());
 	}
+
+	TEST(CommandNode, fail_inputFromMissingInputProducer) {
+		Commands cmds;
+
+		EXPECT_TRUE(cmds.execute());
+
+		// pietjanCmd reads output files of pietCmd and janCmd.
+		// Execution fails because janCmd is not in input producers
+		// of pietjanCmd
+		cmds.pietjanCmd->setInputProducers({ cmds.pietCmd });
+		EXPECT_TRUE(cmds.execute());
+		EXPECT_EQ(Node::State::Failed, cmds.pietjanCmd->state());
+	}
+
+	TEST(CommandNode, fail_outputToSourceFile) {
+		Commands cmds;
+
+		EXPECT_TRUE(cmds.execute());
+
+		// Execution fails because pietCmd writes to source file.
+		std::stringstream script;
+		script << "echo piet > " << cmds.pietSrc->name().string();
+		cmds.pietCmd->setScript(script.str());
+		EXPECT_TRUE(cmds.execute());
+		EXPECT_EQ(Node::State::Failed, cmds.pietCmd->state());
+	}
+
+	TEST(CommandNode, fail_outputNotDeclared) {
+		Commands cmds;
+
+		EXPECT_TRUE(cmds.execute());
+
+		// Execution fails because pietjanCmd writes to not declared 
+		// output file
+		cmds.pietCmd->setOutputs({ });
+		EXPECT_TRUE(cmds.execute());
+		EXPECT_EQ(Node::State::Failed, cmds.pietCmd->state());
+	}
+
+	TEST(CommandNode, fail_inputNotInARepository) {
+		Commands cmds;
+
+		EXPECT_TRUE(cmds.execute());
+
+		std::ofstream janSrcFile(cmds.janSrc->name().string());
+		janSrcFile << "janjan" << std::endl;
+		janSrcFile.close();
+		cmds.janSrc->setState(Node::State::Dirty);
+		cmds.context.nodes().remove(cmds.janSrc);
+		// Execution fails because janCmd reads a file that has
+		// no associated file node in the execution context.
+		EXPECT_TRUE(cmds.execute());
+		EXPECT_EQ(Node::State::Failed, cmds.janCmd->state());
+	}
+
+	TEST(CommandNode, fail_notExpectedOutputProducer) {
+		Commands cmds;
+
+		EXPECT_TRUE(cmds.execute());
+
+		// Execution fails because pietCmd produces same output file as janCmd.
+		std::stringstream script;
+		script << "type " << cmds.pietSrc->name().string() << " > " << cmds.janOut->name().string();
+		cmds.pietCmd->setScript(script.str());
+		EXPECT_TRUE(cmds.execute());
+		EXPECT_EQ(Node::State::Failed, cmds.pietCmd->state());
+	}
+
 }
 

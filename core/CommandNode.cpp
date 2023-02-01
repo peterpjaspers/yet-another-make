@@ -33,7 +33,6 @@ namespace YAM
 		std::filesystem::path const& name)
 		: Node(context, name)
 		, _inputAspectsName(FileAspectSet::entireFileSet().name())
-		, _scriptHash(rand())
 		, _executionHash(rand())
 	{}
 
@@ -65,6 +64,7 @@ namespace YAM
 			for (auto i : _outputs) i->removePreParent(this);
 			_outputs = newOutputs;
 			for (auto i : _outputs) i->addPreParent(this);
+			_executionHash = rand();
 			setState(State::Dirty);
 		}
 	}
@@ -72,11 +72,8 @@ namespace YAM
 	void CommandNode::setScript(std::string const& newScript) {
 		if (newScript != _script) {
 			_script = newScript;
-			auto newHash = XXH64_string(_script);
-			if (_scriptHash != newHash) {
-				_scriptHash = newHash;
-				setState(State::Dirty);
-			}
+			_executionHash = rand();
+			setState(State::Dirty);
 		}
 	}
 
@@ -85,6 +82,7 @@ namespace YAM
 			for (auto i : _inputProducers) i->removePreParent(this);
 			_inputProducers = newInputProducers;
 			for (auto i : _inputProducers) i->addPreParent(this);
+			_executionHash = rand();
 			setState(State::Dirty);
 		}
 	}
@@ -117,7 +115,7 @@ namespace YAM
 
 	XXH64_hash_t CommandNode::computeExecutionHash() const {
 		std::vector<XXH64_hash_t> hashes;
-		hashes.push_back(_scriptHash);
+		hashes.push_back(XXH64_string(_script));
 		for (auto node : _outputs) hashes.push_back(node->hashOf(FileAspect::entireFileAspect().name()));
 		FileAspectSet inputAspects = context()->findFileAspectSet(_inputAspectsName);
 		for (auto node : _inputs) {
@@ -195,11 +193,7 @@ namespace YAM
 						<< std::endl;
 				}
 			} else if (srcFileNode == nullptr) {
-				valid = false;
-				std::cout
-					<< "Not an allowed input: " << input.string() << std::endl
-					<< "Reason: path not associated with a file node."
-					<< std::endl;
+				throw std::exception("Unexpected node type");
 			}
 		}
 		return valid ? fileNode : nullptr;
@@ -348,24 +342,32 @@ namespace YAM
 
 	void CommandNode::execute() {
 		Node::State newState;
-		std::filesystem::path scriptFilePath;
-		MonitoredProcessResult result = executeScript(scriptFilePath);
-		if (result.exitCode != 0) {
-			newState = Node::State::Failed;
-			_executionHash = rand();
+		if (_canceling) {
+			newState = Node::State::Canceled;
 		} else {
-			std::vector<std::shared_ptr<FileNode>> newInputs;
-			bool validInputs = findInputNodes(result, scriptFilePath, newInputs);
+			std::filesystem::path scriptFilePath;
+			MonitoredProcessResult result = executeScript(scriptFilePath);
+		    if (result.exitCode != 0) {
+				if (_canceling) {
+					newState = Node::State::Canceled;
+				} else {
+					newState = Node::State::Failed;
+					_executionHash = rand();
+				}
+			} else {
+				std::vector<std::shared_ptr<FileNode>> newInputs;
+				bool validInputs = findInputNodes(result, scriptFilePath, newInputs);
 
-			std::vector<std::shared_ptr<GeneratedFileNode>> newOutputs;
-			bool validOutputs = findOutputNodes(result, newOutputs);
-			validOutputs = validOutputs && verifyOutputNodes(newOutputs);
+				std::vector<std::shared_ptr<GeneratedFileNode>> newOutputs;
+				bool validOutputs = findOutputNodes(result, newOutputs);
+				validOutputs = validOutputs && verifyOutputNodes(newOutputs);
 
-			newState = (validInputs && validOutputs) ? Node::State::Ok : Node::State::Failed;
-			if (newState == Node::State::Ok) {
-				setInputs(newInputs);
-				rehashOutputs();
-				_executionHash = computeExecutionHash();
+				newState = (validInputs && validOutputs) ? Node::State::Ok : Node::State::Failed;
+				if (newState == Node::State::Ok) {
+					setInputs(newInputs);
+					rehashOutputs();
+					_executionHash = computeExecutionHash();
+				}
 			}
 		}
 		postSelfCompletion(newState);
