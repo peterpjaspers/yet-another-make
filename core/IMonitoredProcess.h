@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include <vector>
+#include <set>
 #include <filesystem>
 #include <map>
 
@@ -12,9 +12,9 @@ namespace YAM
 		int exitCode;
 		std::string stdOut;
 		std::string stdErr;
-		std::vector<std::filesystem::path> readFiles;     // read-accessed files
-		std::vector<std::filesystem::path> writtenFiles;  // write-accessed files
-		std::vector<std::filesystem::path> readOnlyFiles; // read- and not write-accessed files
+		std::set<std::filesystem::path> readFiles;     // read-accessed files
+		std::set<std::filesystem::path> writtenFiles;  // write-accessed files
+		std::set<std::filesystem::path> readOnlyFiles; // readFiles-writtenFils
 
 		void toLines(std::string const& str, std::vector<std::string>& lines) {
 			auto ss = std::stringstream(str);

@@ -5,7 +5,6 @@
 #include "../ThreadPool.h"
 #include "../ExecutionContext.h"
 #include "../FileSystem.h"
-#include "../../xxhash/xxhash.h"
 
 #include "gtest/gtest.h"
 #include <boost/process.hpp>
@@ -26,10 +25,6 @@ namespace
 	}
 
 	std::filesystem::path np(std::filesystem::path const& path) {
-		//if (!std::filesystem::exists(path)) {
-		//	std::filesystem::create_directories(path.parent_path());
-		//	std::ofstream file(path);
-		//}
 		return FileSystem::normalizePath(path);
 	}
 

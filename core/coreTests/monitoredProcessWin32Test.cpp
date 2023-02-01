@@ -82,9 +82,9 @@ namespace
 		ASSERT_EQ(0, result.exitCode);
 		std::filesystem::path expectedFile ("c:\\temp\\junk.txt");
 		EXPECT_EQ(1, result.readFiles.size());
-		EXPECT_EQ(expectedFile, result.readFiles[0]);
+		EXPECT_TRUE(result.readFiles.contains(expectedFile));
 		EXPECT_EQ(1, result.writtenFiles.size());
-		EXPECT_EQ(expectedFile, result.writtenFiles[0]);
+		EXPECT_TRUE(result.writtenFiles.contains(expectedFile));
 		EXPECT_EQ(0, result.readOnlyFiles.size());
 
 	}

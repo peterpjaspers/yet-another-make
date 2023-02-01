@@ -123,14 +123,4 @@ namespace YAM
 	std::set<std::filesystem::path> const& MSBuildTrackerOutputReader::readOnlyFiles() const {
 		return _readOnlyFiles;
 	}
-
-	void MSBuildTrackerOutputReader::getReadFilesVec(std::vector<std::filesystem::path>& files) const {
-		for (auto const& f : _readFiles) files.push_back(f);
-	}
-	void MSBuildTrackerOutputReader::getWrittenFilesVec(std::vector<std::filesystem::path>& files) const {
-		for (auto const& f : _writtenFiles) files.push_back(f);
-	}
-	void MSBuildTrackerOutputReader::getReadOnlyFilesVec(std::vector<std::filesystem::path>& files) const {
-		for (auto const& f : _readOnlyFiles) files.push_back(f);
-	}
 }

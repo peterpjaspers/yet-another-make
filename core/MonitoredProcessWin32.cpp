@@ -70,9 +70,9 @@ namespace YAM
 			_result.stdOut = _stdout.get();
 			_result.stdErr = _stderr.get();
 			MSBuildTrackerOutputReader reader(trackerLogDir(_tempDir));
-			reader.getReadFilesVec(_result.readFiles);
-			reader.getWrittenFilesVec(_result.writtenFiles);
-			reader.getReadOnlyFilesVec(_result.readOnlyFiles);
+			_result.readFiles = reader.readFiles();
+			_result.writtenFiles = reader.writtenFiles();
+			_result.readOnlyFiles = reader.readOnlyFiles();
 			std::filesystem::remove_all(_tempDir);
 		}
 		return _result;
