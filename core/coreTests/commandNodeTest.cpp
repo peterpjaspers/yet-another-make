@@ -306,6 +306,21 @@ namespace
 		EXPECT_EQ(Node::State::Failed, cmds.pietjanCmd->state());
 	}
 
+	TEST(CommandNode, warning_inputFromIndirectInputProducer) {
+		Commands cmds;
+
+		EXPECT_TRUE(cmds.execute());
+
+		// pietjanCmd reads output files of pietCmd and janCmd.
+		// Execution warns for indirect prerequisites because pietCmd is 
+		// not an indirect prerequisite of pietjanCmd.
+		cmds.janCmd->setInputProducers({ cmds.pietCmd });
+		cmds.pietjanCmd->setInputProducers({ cmds.janCmd });
+		EXPECT_TRUE(cmds.execute());
+		// TODO: verify that proper warning message is logged
+		EXPECT_EQ(Node::State::Ok, cmds.pietjanCmd->state());
+	}
+
 	TEST(CommandNode, fail_outputToSourceFile) {
 		Commands cmds;
 

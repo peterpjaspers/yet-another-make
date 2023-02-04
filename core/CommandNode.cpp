@@ -10,6 +10,7 @@
 #include <fstream>
 #include <algorithm>
 #include <utility>
+#include <unordered_set>
 #include <boost/process.hpp>
 
 namespace
@@ -21,6 +22,22 @@ namespace
 	template <typename V>
 	bool contains(std::vector<V> const& vec, V el) {
 		return std::find(vec.begin(), vec.end(), el) != vec.end();
+	}
+
+	// Return whether 'node' is a prerequisite (recursive) of 'command'.
+	// If node is a prerequisite then return the distance the between command
+	// and node in 'distance'.
+	bool isPrerequisite(Node* command, Node* node, std::unordered_set<Node*>& visited, int& distance)	{
+		if (!visited.insert(node).second) return false; // node was already checked
+
+		std::unordered_set<Node*> parents = node->preParents();
+		if (parents.contains(command)) return true;
+
+	    distance++;
+		for (auto parent : parents) {
+			if (isPrerequisite(command, parent, visited, distance)) return true;
+		}
+		return false;
 	}
 }
 
@@ -174,22 +191,37 @@ namespace YAM
 		if (fileNode == nullptr) {
 			if (input != exclude) {
 				valid = false;
-				std::cout
+				std::cerr
 					<< "Not an allowed input: " << input.string() << std::endl
-					<< "Reason: it is not contained in a known file repository."
+					<< "Reason: the file is not contained in a known file repository."
 					<< std::endl;
 			}
 		} else {
 			auto genFileNode = dynamic_pointer_cast<GeneratedFileNode>(fileNode);
 			auto srcFileNode = dynamic_pointer_cast<SourceFileNode>(fileNode);
 			if (genFileNode != nullptr) {
-				if (!contains(_inputProducers, genFileNode->producer())) {
-					valid = false;
+				int distance = 0;
+				std::unordered_set<Node*> visitedNodes;
+				valid = isPrerequisite(this, genFileNode->producer().get(), visitedNodes, distance);
+				if (!valid) {
+					std::cerr
+						<< "Not an allowed input file: " << input.string() << std::endl
+						<< "Reason: the input that produces the input:" << std::endl
+						<< "    " << genFileNode->producer()->name().string() << std::endl
+						<< "is not a prerequisite of the command that uses the input: " << std::endl
+						<< "    " << name().string() << std::endl
+						<< "and therefore proper build order is not guaranteed (i.e." << std::endl
+						<< "the input may not yet be up-to-date)."
+						<< std::endl;
+				} else if (distance > 0) {
 					std::cout
-						<< "Not an allowed input: " << input.string() << std::endl
-						<< "Reason: file may not yet be up-to-date because its producer(" << genFileNode->producer()->name().string()
-						<< ") is not a prerequisite of producer(" << name().string() << ")"
-						<< " and therefore proper build order is not guaranteed."
+						<< "Suspect input: " << input.string() << std::endl
+						<< "Reason: the command that produces the input:" << std::endl
+						<< "    " << genFileNode->producer()->name().string() << std::endl
+						<< "is an indirect prerequisite of the command that uses the input:" << std::endl
+						<< "    " << name().string() << std::endl
+						<< "Although this guarantees proper build order it is recommended to" << std::endl
+						<< "guarantee build order through direct prerequisites only."
 						<< std::endl;
 				}
 			} else if (srcFileNode == nullptr) {
@@ -215,7 +247,7 @@ namespace YAM
 		}
 		if (illegals != 0) {
 			char buf[32];
-			std::cout << name().string() << " has " << itoa(illegals, buf, 10) << " not-allowed input files" << std::endl;
+			std::cerr << name().string() << " has " << itoa(illegals, buf, 10) << " not-allowed input files" << std::endl;
 		}
 		return illegals == 0;
 	}
@@ -230,23 +262,25 @@ namespace YAM
 			auto srcFileNode = dynamic_pointer_cast<SourceFileNode>(node);
 			if (srcFileNode != nullptr) {
 				valid = false;
-				std::cout
+				std::cerr
 					<< "Not an allowed output: " << output.string() << std::endl
 					<< "Reason: source files must be accessed read-only."
 					<< std::endl;
 			} else {
 				valid = false;
-				std::cout
+				std::cerr
 					<< "Not an allowed output: " << output.string() << std::endl
-					<< "Reason: not declared as output of " << name().string()
+					<< "Reason: not declared as output of command " << name().string()
 					<< std::endl;
 			}
 		} else if (genFileNode->producer().get() != this) {
 			valid = false;
-			std::cout
+			std::cerr
 				<< "Not an allowed output: " << output.string() << std::endl
-				<< "Reason: output producer(" << genFileNode->producer()->name().string()
-				<< ") is not the expected producer(" << name().string() << ")."
+				<< "Reason: the output is produced by 2 commands:" << std::endl
+				<< "    " << genFileNode->producer()->name().string() << std::endl
+				<< "    " << name().string() << std::endl
+				<< "while an output file is allowed to be produced by 1 command only."
 				<< std::endl;
 		}
 		return valid ? genFileNode : nullptr;
@@ -267,7 +301,7 @@ namespace YAM
 		}
 		if (illegals != 0) {
 			char buf[32];
-			std::cout << name().string() << " has " << itoa(illegals, buf, 10) << " not-allowed input files" << std::endl;
+			std::cerr << name().string() << " has " << itoa(illegals, buf, 10) << " not-allowed input files" << std::endl;
 		}
 		return illegals == 0;
 	}
@@ -293,11 +327,11 @@ namespace YAM
 			std::inserter(inNewOnly, inNewOnly.begin()));
 		if (!inThisOnly.empty() || !inNewOnly.empty()) {
 			valid = false;
-			std::cout << "Unexpected outputs for " << name().string() << std::endl;
-			std::cout << "Expected outputs: ";
-			for (auto const& n : _outputs) std::cout << "    " << n->name().string() << std::endl;
-		    std::cout << "Actual outputs: ";
-			for (auto const& n : newOutputs) std::cout << "    " << n->name().string() << std::endl;
+			std::cerr << "Unexpected outputs for " << name().string() << std::endl;
+			std::cerr << "Expected outputs: ";
+			for (auto const& n : _outputs) std::cerr << "    " << n->name().string() << std::endl;
+		    std::cerr << "Actual outputs: ";
+			for (auto const& n : newOutputs) std::cerr << "    " << n->name().string() << std::endl;
 		}
 		return valid;
 	}
@@ -325,19 +359,19 @@ namespace YAM
 		_scriptExecutor = nullptr;
 
 		if (result.exitCode != 0) {
-			std::cout << "Failed to execute cmd: " << name().string() << std::endl;
-			std::cout << "Temporary result directory: " << tmpDir.string() << std::endl;
+			std::cerr << "Failed to execute cmd: " << name().string() << std::endl;
+			std::cerr << "Temporary result directory: " << tmpDir.string() << std::endl;
 			if (!result.stdOut.empty()) {
-				std::cout << "stdout: " << std::endl << result.stdOut << std::endl;
+				std::cerr << "stdout: " << std::endl << result.stdOut << std::endl;
 			}
 			if (!result.stdErr.empty()) {
-				std::cout << "stderr: " << std::endl << result.stdErr << std::endl;
+				std::cerr << "stderr: " << std::endl << result.stdErr << std::endl;
 			}
 		} else {
 			std::cout << "Succesfully executed cmd " << name().string() << std::endl;
 			std::filesystem::remove_all(tmpDir);
 		}
-		return std::move(result);
+		return result;
 	}
 
 	void CommandNode::execute() {
