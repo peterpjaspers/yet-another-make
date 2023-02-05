@@ -1,18 +1,16 @@
 #pragma once
 
-#include "Dispatcher.h"
-
 #include <thread>
 #include <string>
 
 namespace YAM
 {
+	class Dispatcher;
 	class __declspec(dllexport) Thread
 	{
 	public:
+		// Construct (and start) a thread that executes dispatcher->run().
 		Thread(Dispatcher* dispatcher, std::string const & name);
-
-		// Destructs and joins with _thread if joinable.
 		~Thread();
 
 		std::string const& name() const;
@@ -22,8 +20,6 @@ namespace YAM
 		void join();
 
 	private:
-		void main();
-
 		Dispatcher* _dispatcher;
 		std::string _name;
 		std::thread _thread;

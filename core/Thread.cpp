@@ -1,14 +1,19 @@
 #include "Thread.h"
+#include "Dispatcher.h"
 
-#include <exception>
-#include <chrono>
+namespace
+{
+	void run(YAM::Dispatcher* dispatcher) {
+		dispatcher->run();
+	}
+}
 
 namespace YAM
 {
 	Thread::Thread(Dispatcher* dispatcher, std::string const& name)
 		: _dispatcher(dispatcher)
 		, _name(name)
-		, _thread(&Thread::main, this)
+		, _thread(&run, _dispatcher)
 	{}
 
 	Thread::~Thread() {
@@ -31,13 +36,6 @@ namespace YAM
 
 	void Thread::join() {
 		_thread.join();
-	}
-
-	void Thread::main() {
-		while (!_dispatcher->stopped()) {
-			Delegate<void> d = _dispatcher->pop();
-			if (d.IsBound()) d.Execute();
-		}
 	}
 }
 

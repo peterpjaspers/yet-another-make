@@ -1,5 +1,6 @@
 #include "../Delegates.h"
 #include "../Dispatcher.h"
+#include "../DispatcherFrame.h"
 
 #include "gtest/gtest.h"
 
@@ -15,14 +16,8 @@ namespace
 		Delegate<int, int> d;
 		int r1 = -1;
 		int r2 = -1;
-		auto l1add = [&r1]()
-		{
-			r1 = x + y;
-		};
-		auto l2add = [&r2]()
-		{
-			r2 = x + y;
-		};
+		auto l1add = [&r1](){r1 = x + y;};
+		auto l2add = [&r2](){r2 = x + y;};
 		Dispatcher q;
 		q.push(Delegate<void>::CreateLambda(l1add));
 		q.push(Delegate<void>::CreateLambda(l2add));
@@ -40,10 +35,7 @@ namespace
 	TEST(Dispatcher, startStop) {
 		Delegate<int, int> d;
 		int r1 = -1;
-		auto l1add = [&r1]()
-		{
-			r1 = x + y;
-		};
+		auto l1add = [&r1]() {r1 = x + y; };
 		Dispatcher q;
 
 		q.stop();
@@ -55,6 +47,20 @@ namespace
 		Delegate<void> d1 = q.pop();
 		EXPECT_TRUE(d1.IsBound());
 		d1.Execute();
+		EXPECT_EQ(sum, r1);
+	}
+
+	TEST(Dispatcher, runFrame) {
+		DispatcherFrame frame;
+		Delegate<int, int> d;
+		int r1 = -1;
+		auto l1add = [&r1]() { r1 = x + y; };
+		auto stop = [&frame]() { frame.stop(); };
+		Dispatcher q;
+
+		q.push(Delegate<void>::CreateLambda(l1add));
+	    q.push(Delegate<void>::CreateLambda(stop));
+		q.run(&frame);
 		EXPECT_EQ(sum, r1);
 	}
 }

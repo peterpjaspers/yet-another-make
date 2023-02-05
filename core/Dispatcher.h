@@ -7,6 +7,8 @@
 
 namespace YAM
 {
+    class DispatcherFrame;
+
     // Thread-safe FIFO queue.
     class __declspec(dllexport) Dispatcher
     {
@@ -42,6 +44,30 @@ namespace YAM
         // Return wether dispatcher is started/stopped.
         bool started() { return !stopped(); }
         bool stopped();
+
+        // Pop a delegate from queue and execute it.
+        void popAndExecute();
+
+        // Execute the following loop: 
+        //     while (!stopped()) popAndExecute();
+        void run();
+
+        // Execute the following loop: 
+        //     while (!frame.stopped() && !stopped()) popAndExecute();
+        //
+        // This function allows reentrant calls to be finished without having
+        // to stop the entire dispatcher. It can be used to run the event loop
+        // until a specific event occurred.
+        // Example:
+        //     public void doEvents(Dispatcher* dispatcher) {
+        //         DispatcherFrame frame;
+        //         // queue a delegate that stops the frame.
+        //         dispatcher->push([frame]() { frame->stop(); });
+        //         // block until all events (delegates) until and including
+        //         // the stop event have been processed.
+        //         dispatcher->run(frame);
+        //     }
+        void run(DispatcherFrame* frame);
 
     private:
         bool _suspended;

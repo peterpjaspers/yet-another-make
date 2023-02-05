@@ -12,17 +12,11 @@ namespace
 	int y = 10;
 	int sum = x + y;
 
-	TEST(Thread, processAndStop) {
+	TEST(Thread, run) {
 		int r1 = -1;
 		int r2 = -1;
-		auto l1add = [&r1]()
-		{
-			r1 = x + y;
-		};
-		auto l2add = [&r2]()
-		{
-			r2 = x + y;
-		};
+		auto l1add = [&r1]() { r1 = x + y; };
+		auto l2add = [&r2]() { r2 = x + y; };
 
 		Dispatcher q;
 		Thread t1(&q, std::string("t1"));
