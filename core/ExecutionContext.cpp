@@ -80,6 +80,8 @@ namespace YAM
         return _repositories;
     }
 
+    // TODO: remove this function once DirectoryNode takes excludes patterns from .yamignore
+    // file.
     RegexSet const& ExecutionContext::findExcludes(std::filesystem::path const& path) const {
         static RegexSet noExcludes;
         auto repo = findRepository(path);

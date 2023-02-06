@@ -6,6 +6,16 @@ namespace YAM
 		for (auto & re : regexStrings) add(re);
 	}
 
+	std::string RegexSet::matchDirectory(std::string const& directory) {
+		// The slash regex pattern matches both / as well as \ and thus 
+		// supports matching a directory separator on both Linux and 
+		// Windows (thanks to / and \ not being permitted in Windows and
+		// Linux respectively).
+		std::string slash("[/\\\\]");
+		std::string generatedPath = ".*" + slash + directory + slash + ".*";
+		return generatedPath;
+	}
+
 	bool RegexSet::matches(std::string const & s) const {
 		for (auto& re : _regexes) {
 			if (std::regex_search(s, re)) return true;

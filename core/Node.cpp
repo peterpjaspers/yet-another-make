@@ -68,8 +68,7 @@ namespace YAM
         setState(Node::State::Executing);
         if (_suspended) {
             _executionState = ExecutionState::Suspended;
-        }
-        else {
+        } else {
             continueStart();
         }
     }

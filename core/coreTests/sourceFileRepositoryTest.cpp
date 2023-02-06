@@ -6,6 +6,8 @@
 #include "../SourceFileNode.h"
 #include "../ExecutionContext.h"
 #include "../RegexSet.h"
+#include "../GraphWalker.h"
+#include "../FileSystem.h"
 #include "../../xxhash/xxhash.h"
 
 #include <chrono>
@@ -17,12 +19,18 @@ namespace
 {
     using namespace YAMTest;
     using namespace YAM;
+
+    auto isDirtyNode = Delegate<bool, Node*>::CreateLambda([](Node* n) { return n->state() == Node::State::Dirty; });
+
+    std::vector<Node*> getDirtyNodes(DirectoryNode* dirNode) {
+        GraphWalker walker(dirNode, GraphWalker::Postrequisites, isDirtyNode);
+        return walker.included();
+    }
     TEST(SourceFileRepository, update_threeDeepDirectoryTree) {
-        std::string tmpDir(std::tmpnam(nullptr));
-        std::filesystem::path rootDir(std::string(tmpDir + "_dirNodeTest"));
+        std::filesystem::path tmpDir = FileSystem::createUniqueDirectory();
+        std::filesystem::path rootDir(tmpDir.string() + "_dirNodeTest");
         RegexSet excludes;
         DirectoryTree testTree(rootDir, 3, excludes);
-
 
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
@@ -34,19 +42,19 @@ namespace
         context.addRepository(repo);
         DirectoryNode* dirNode = repo->directory().get();
 
-        std::vector<std::shared_ptr<Node>> dirtyNodes;
-        context.getDirtyNodes(dirtyNodes);
-        EXPECT_EQ(1, dirtyNodes.size()); 
-        EXPECT_EQ(dirNode, dirtyNodes[0].get());
+        std::vector<Node*> dirtyNodes = getDirtyNodes(dirNode);
+        EXPECT_EQ(1, dirtyNodes.size());
+        EXPECT_EQ(dirNode, dirtyNodes[0]);
         repo->suspend();
         bool completed = YAMTest::executeNodes(dirtyNodes);
         EXPECT_TRUE(completed);
         verify(&testTree, dirNode);
         repo->resume();
+
         // Although no dirty nodes are expected added an EXPECT_EQ to
         // to be notified of any future change in behavior.
         // See spuriousChangeEvents in directoryWatcherTest.cpp.
-        context.getDirtyNodes(dirtyNodes);
+        dirtyNodes = getDirtyNodes(dirNode);
         // Although there are 39 (3+9+27)subdirs we only get change events for
         // the 36 (9+27) subdirs below rootDir\SubDir1..3
         EXPECT_EQ(36, dirtyNodes.size());
@@ -55,13 +63,13 @@ namespace
         // spurious change events. See spuriousChangeEvents in directoryWatcherTest.cpp.
         // Note that the DirectoryNodes, although Dirty, will not re-iterate
         // the directories because directory modification times have not changed.
-        context.getDirtyNodes(dirtyNodes);
+        dirtyNodes = getDirtyNodes(dirNode);
         repo->suspend();
         completed = YAMTest::executeNodes(dirtyNodes);
         EXPECT_TRUE(completed);
         verify(&testTree, dirNode);
         repo->resume();
-        context.getDirtyNodes(dirtyNodes);
+        dirtyNodes = getDirtyNodes(dirNode);
         EXPECT_EQ(0, dirtyNodes.size());
 
         // Update file system
@@ -80,8 +88,8 @@ namespace
         std::shared_ptr<DirectoryNode> dirNode_S1_S2 = subDirNodes[2];
 
         context.statistics().reset();
-        context.statistics().registerNodes = true; 
-        context.getDirtyNodes(dirtyNodes);
+        context.statistics().registerNodes = true;
+        dirtyNodes = getDirtyNodes(dirNode);
         repo->suspend();
         completed = YAMTest::executeNodes(dirtyNodes);
         EXPECT_TRUE(completed);

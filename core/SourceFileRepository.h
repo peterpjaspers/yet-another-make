@@ -100,6 +100,9 @@ namespace YAM
 		SourceFileRepository(
 			std::string const& repoName,
 			std::filesystem::path const& directory,
+			// TODO: do not pass exclude patterns here.
+			// Instead let each DirectoryNode retrieve exclude patterns from 
+			// .yamignore, or if absent, from .gitignore.
 			RegexSet const& _excludePatterns,
 			ExecutionContext* context);
 

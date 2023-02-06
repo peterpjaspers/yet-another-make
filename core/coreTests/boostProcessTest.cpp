@@ -1,6 +1,3 @@
-#include "../NodeSet.h"
-#include "NumberNode.h"
-
 #include "gtest/gtest.h"
 #include <boost/process.hpp>
 #include <boost/asio.hpp>
@@ -9,8 +6,6 @@
 
 namespace
 {
-	using namespace YAM;
-	using namespace YAMTest;
 	using namespace boost::process;
 
 	void toLines(std::string const& str, std::vector<std::string>& outLines) {

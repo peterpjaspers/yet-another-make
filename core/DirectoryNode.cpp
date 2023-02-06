@@ -107,6 +107,8 @@ namespace YAM
     }
 
     void DirectoryNode::updateContent() {
+        // TODO: retrieve exclude patterns from .yamignore or
+        // .gitignore
         RegexSet const& excludes = context()->findExcludes(name());
         auto oldContent = _content;
         _content.clear();

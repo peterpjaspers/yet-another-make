@@ -14,6 +14,12 @@ namespace YAM
 		// set of regular expressions
 		RegexSet() = default;
 
+		// Return a portable (across Windows, Linus, MaxOs) regex string that matches
+		// filesystem paths that contain given 'directory' component.
+		// 'directory' must be a name, not a path, i.e. not contain directory 
+		// seperators.
+		static std::string matchDirectory(std::string const& directory);
+
 		RegexSet(std::initializer_list<std::string> regexString);
 		RegexSet(const RegexSet& other) = default;
 

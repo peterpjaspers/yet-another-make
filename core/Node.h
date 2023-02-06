@@ -207,8 +207,8 @@ namespace YAM
 		//	  2: on prerequisites completion: if (pendingStartSelf()) startSelf()
 		//	 3a: on startSelf completion: postrequisites.where(Dirty).each(start)
 		//	 3b: on postrequisites completion: completor().broadcast(this)
-		// Starting executions will be done in main thread. Self-execution
-		// shall be done in thread pool. This is a sub-class responsibility.
+		// All start() and startSelf() calls are made in current thread. 
+		// completor().broadcast(this) call is made in context()->mainThread(). 
 		void start();
 
 		// Return delegate to which clients can add callbacks that will be
@@ -309,23 +309,22 @@ namespace YAM
 		// the comments from being hashed.
 		virtual bool pendingStartSelf() const { return false; }
 
-		// Pre:pendingStartSelf(), current thread is main thread.
-		// Start self-execution of this node. E.g. for a compile command node
-		// start the compilation. Perform as much processing as possible by
-		// posting operations to threadPoolQueue.
-		// On completion: push notifyCompletion() to mainThreadQueue.
+		// Pre:pendingStartSelf().
+		// Delegate self-execution of the node to context()->threadPool().
+		// On completion: call notifyCompletion() in context()->mainThread().
 		virtual void startSelf() { throw std::runtime_error("not implemented"); }
 
-		// Pre:current thread is main thread.
 		// Called when self-execution is busy and cancel() is called.
 		virtual void cancelSelf() { return; }
 
 		// Push handleSelfCompletion(newState) to mainThreadQueue()
 		void postSelfCompletion(Node::State newState);
+
 		virtual void handleSelfCompletion(Node::State newState);
 
 		// Push notifyCompletion(newState) to mainThreadQueue()
 		void postCompletion(Node::State newState);
+
 		void notifyCompletion(Node::State newState);
 
 	private:
