@@ -35,6 +35,7 @@
   <ItemGroup>
     <ClCompile Include="AdditionNode.cpp" />
     <ClCompile Include="boostProcessTest.cpp" />
+    <ClCompile Include="builderTest.cpp" />
     <ClCompile Include="commandNodeTest.cpp">
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </DisableSpecificWarnings>

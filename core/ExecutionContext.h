@@ -12,6 +12,7 @@
 namespace YAM
 {
 	class SourceFileRepository;
+	class BuildRequest;
 
 	class __declspec(dllexport) ExecutionContext
 	{
@@ -54,6 +55,9 @@ namespace YAM
 		void getDirtyNodes(std::vector<std::shared_ptr<Node>>& dirtyNodes) const;
 		void getDirtyNodes(std::map<std::filesystem::path, std::shared_ptr<Node>>& dirtyNodes) const;
 
+		void buildRequest(std::shared_ptr<BuildRequest> request);
+		std::shared_ptr<BuildRequest> buildRequest();
+
 	private:
 		Dispatcher _mainThreadQueue;
 		Dispatcher _threadPoolQueue;
@@ -68,11 +72,10 @@ namespace YAM
 		std::map<std::string, FileAspectSet> _fileAspectSets;
 
 		NodeSet _nodes;
-		NodeSet _dirtyNodes;
 		
 		// TODO: 
 		// LogBook _logBook;
-		// BuildOptions _options;
+		std::shared_ptr<BuildRequest> _request;
 
 	};
 }

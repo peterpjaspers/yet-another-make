@@ -972,6 +972,7 @@ public:
 					if (IsLocked())
 					{
 						m_Events[i].Callback.Clear();
+						m_Events[i].Handle.Reset();
 					}
 					else
 					{
@@ -1032,6 +1033,7 @@ public:
 			for (DelegateHandlerPair& handler : m_Events)
 			{
 				handler.Callback.Clear();
+				handler.Handle.Reset();
 			}
 		}
 		else

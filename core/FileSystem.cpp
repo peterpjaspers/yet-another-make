@@ -50,10 +50,13 @@ namespace YAM
 	}
 
 	std::filesystem::path FileSystem::uniquePath() {
+		static std::string prefix("yam_");
 		std::lock_guard<std::mutex> lock(mutex);
 		char* name = std::tmpnam(nullptr);
 		if (name == nullptr) throw std::exception("std::tmpnam failed");
-		return std::filesystem::path(name);
+		std::filesystem::path p(name);
+		std::filesystem::path up(p.parent_path() / (prefix + p.filename().string()));
+		return up;
 	}
 
 	std::filesystem::path FileSystem::normalizePath(std::wstring const& path) {

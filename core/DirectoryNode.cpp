@@ -1,5 +1,5 @@
 #include "DirectoryNode.h"
-#include "FileNode.h"
+#include "SourceFileNode.h"
 #include "ExecutionContext.h"
 #include "RegexSet.h"
 
@@ -101,7 +101,7 @@ namespace YAM
         if (dirEntry.is_directory()) {
             n = std::make_shared<DirectoryNode>(context(), dirEntry.path());
         } else if (dirEntry.is_regular_file()) {
-            n = std::make_shared<FileNode>(context(), dirEntry.path());
+            n = std::make_shared<SourceFileNode>(context(), dirEntry.path());
         }
         return n;
     }

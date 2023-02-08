@@ -57,4 +57,10 @@ namespace
 		EXPECT_FALSE(set.matches("aap\\.cpp\\mies\\source.cppc"));
 		EXPECT_TRUE(set.matches("aap\\.cpp\\mies\\source.c"));
 	}
+
+	TEST(RegexSet, matchDirectory) {
+		RegexSet set({ RegexSet::matchDirectory(std::string("generated")) });
+		EXPECT_TRUE(set.matches(std::string("C:\\repo\\module\\generated\\file.obj")));
+		EXPECT_TRUE(set.matches(std::string("/repo/module/generated/file.obj")));
+	}
 }

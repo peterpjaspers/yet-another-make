@@ -251,6 +251,8 @@ namespace YAM
 		// Note: nodes not suspended in step 1) execute concurrently with step 3). 
 		// Suspended nodes will resume in step 3c).
 		void suspend();
+		
+		bool suspended() const;
 
 		// Pre: true
 		// When busy(): resume execution

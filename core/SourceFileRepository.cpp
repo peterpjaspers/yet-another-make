@@ -102,10 +102,19 @@ namespace YAM
 	void SourceFileRepository::_enqueueChange(FileChange change) {
 		if (_changeQueue.size() > queueCapacity) {
 			while (_changeQueue.size() > 0) _changeQueue.pop();
+			change.fileName.clear();
 			change.action = FileChange::Action::Overflow;
 		}
-		_changeQueue.push(change);
-		if (!_suspended) _processChangeQueue();
+		if (_suspended) {
+			std::filesystem::path absPath(directory()->name() / change.fileName);
+			// Ignore changes to generated files during a build
+			if (!_excludes.matches(absPath.string())) {
+				_changeQueue.push(change);
+			}
+		} else {
+			_changeQueue.push(change);
+			_processChangeQueue();
+		}
 	}
 
 	void SourceFileRepository::_processChangeQueue() {

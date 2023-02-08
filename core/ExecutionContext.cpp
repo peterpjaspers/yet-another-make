@@ -1,13 +1,14 @@
 #include "ExecutionContext.h"
 #include "Node.h"
 #include "SourceFileRepository.h"
+#include "BuildRequest.h"
 
 namespace
 {
     using namespace YAM;
     // TODO: retrieve number of cores from operating system
     std::size_t getDefaultPoolSize() {
-        return 1; // 4;
+        return 4;
     }
 }
 
@@ -128,5 +129,14 @@ namespace YAM
                 dirtyNodes.insert(pair);
             }
         }
+    }
+
+
+    void ExecutionContext::buildRequest(std::shared_ptr<BuildRequest> request) {
+        _request = request;
+    }
+
+    std::shared_ptr<BuildRequest> ExecutionContext::buildRequest() {
+        return _request;
     }
 }

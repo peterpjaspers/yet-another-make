@@ -358,18 +358,20 @@ namespace YAM
 		MonitoredProcessResult result = _scriptExecutor->wait();
 		_scriptExecutor = nullptr;
 
-		if (result.exitCode != 0) {
+		if (result.exitCode == 0) {
+			std::cout << "Succesfully executed cmd " << name().string() << std::endl;
+			std::filesystem::remove_all(tmpDir);
+		} else if (!_canceling) {
 			std::cerr << "Failed to execute cmd: " << name().string() << std::endl;
 			std::cerr << "Temporary result directory: " << tmpDir.string() << std::endl;
 			if (!result.stdOut.empty()) {
-				std::cerr << "stdout: " << std::endl << result.stdOut << std::endl;
+				std::cerr << "script stdout: " << std::endl << result.stdOut << std::endl;
 			}
 			if (!result.stdErr.empty()) {
-				std::cerr << "stderr: " << std::endl << result.stdErr << std::endl;
+				std::cerr << "script stderr: " << std::endl << result.stdErr << std::endl;
 			}
 		} else {
-			std::cout << "Succesfully executed cmd " << name().string() << std::endl;
-			std::filesystem::remove_all(tmpDir);
+			std::cout << "Canceled execution of cmd: " << name().string() << std::endl;
 		}
 		return result;
 	}

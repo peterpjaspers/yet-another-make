@@ -54,6 +54,10 @@ namespace YAM
         _suspended = true;
     }
 
+    bool Node::suspended() const {
+        return _suspended;
+    }
+
     void Node::resume() {
         _suspended = false;
         if (_executionState == ExecutionState::Suspended) {
@@ -75,7 +79,7 @@ namespace YAM
 
     void Node::continueStart() {
         if (_state == Node::State::Deleted) {
-            postCompletion(State::Deleted);
+            postCompletion(Node::State::Deleted);
         } else if (supportsPrerequisites()) {
             startPrerequisites();
         } else if (pendingStartSelf()) {
