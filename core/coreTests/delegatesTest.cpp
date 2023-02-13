@@ -62,7 +62,7 @@ namespace
 		EXPECT_EQ(sum, clone.Execute(x, y));
 	}
 
-	TEST(MultiCastDelegate, SubscribeBroadcastUnsubscribe) {
+	TEST(Delegate, MultiCast) {
 		MulticastDelegate<int, int> d;
 		int r1 = -1;
 		int r2 = -1;

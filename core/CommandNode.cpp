@@ -202,7 +202,7 @@ namespace YAM
 			if (genFileNode != nullptr) {
 				int distance = 0;
 				std::unordered_set<Node*> visitedNodes;
-				valid = isPrerequisite(this, genFileNode->producer().get(), visitedNodes, distance);
+				valid = isPrerequisite(this, genFileNode->producer(), visitedNodes, distance);
 				if (!valid) {
 					std::cerr
 						<< "Not an allowed input file: " << input.string() << std::endl
@@ -273,7 +273,7 @@ namespace YAM
 					<< "Reason: not declared as output of command " << name().string()
 					<< std::endl;
 			}
-		} else if (genFileNode->producer().get() != this) {
+		} else if (genFileNode->producer() != this) {
 			valid = false;
 			std::cerr
 				<< "Not an allowed output: " << output.string() << std::endl
@@ -359,7 +359,7 @@ namespace YAM
 		_scriptExecutor = nullptr;
 
 		if (result.exitCode == 0) {
-			std::cout << "Succesfully executed cmd " << name().string() << std::endl;
+			//std::cout << "Succesfully executed cmd " << name().string() << std::endl;
 			std::filesystem::remove_all(tmpDir);
 		} else if (!_canceling) {
 			std::cerr << "Failed to execute cmd: " << name().string() << std::endl;

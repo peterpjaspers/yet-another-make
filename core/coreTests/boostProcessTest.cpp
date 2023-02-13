@@ -33,12 +33,12 @@ namespace
 		env["rubbish"] = "nonsense";
 
 		auto ping = search_path("ping"); 
-		// child c(ping, "-n 3 127.0.0.1", g, std_out > stdoutOfPing);
+		// child c(ping, "-n 1 127.0.0.1", g, std_out > stdoutOfPing);
 		// child c(ping.string(), args({ " -n 3 127.0.0.1" }), env, std_out > stdoutOfPing);
 		// Passing args as in previous lines fails because in these cases the args are
 		// quoted ("") on the command line which is not accepted by ping.
 		// Passing args, in what boost calls cmd style, as in next line works.
-		child c(ping.string() + " -n 3 127.0.0.1", env, std_out > stdoutOfPing);
+		child c(ping.string() + " -n 1 127.0.0.1", env, std_out > stdoutOfPing);
 
 		std::vector<std::string> data;
 		std::string line;
@@ -53,7 +53,7 @@ namespace
 		//ping should take ~n (==3) seconds. Use larger timeout.
 		EXPECT_TRUE(c.wait_for(std::chrono::seconds(15)));
 		c.wait();
-		EXPECT_EQ(3, data.size());
+		EXPECT_EQ(1, data.size());
 	}
 
 	TEST(Process, pingInShell) {
@@ -61,7 +61,7 @@ namespace
 
 		auto cmd = search_path("cmd");
 		group g;
-		child c(cmd.string() + " /c ping -n 3 localhost", g, std_out > stdoutOfPing);
+		child c(cmd.string() + " /c ping -n 1 localhost", g, std_out > stdoutOfPing);
 
 		std::vector<std::string> data;
 		std::string line;
@@ -73,9 +73,9 @@ namespace
 			) {
 			if (line.starts_with("Reply from")) data.push_back(line);
 		}
-		// n==3 => ping should take ~3 seconds. Use larger timeout.
-		EXPECT_TRUE(g.wait_for(std::chrono::seconds(15)));
-		EXPECT_EQ(3, data.size());
+		// n==3 => ping should take ~1 seconds. Use larger timeout.
+		EXPECT_TRUE(g.wait_for(std::chrono::seconds(10)));
+		EXPECT_EQ(1, data.size());
 	}
 	TEST(Process, asyncIO) {
 		boost::asio::io_service ios;
@@ -85,16 +85,16 @@ namespace
 
 		group g;
 		child c(
-			cmd.string() + " /c ping -n 3 localhost",
+			cmd.string() + " /c ping -n 1 localhost",
 			g,
 			std_out > f_stdout,
 			std_err > f_stderr,
 			ios);
 
 
-		auto deadline = std::chrono::system_clock::now() + std::chrono::seconds(15);
+		auto deadline = std::chrono::system_clock::now() + std::chrono::seconds(10);
 		ios.run_until(deadline);
-		// n==3 => ping should take ~3 seconds. Use larger timeout.
+		// n==1 => ping should take ~1 seconds. Use larger timeout.
 		ASSERT_TRUE(g.wait_until(deadline));
 		c.wait();
 		ASSERT_EQ(0, c.exit_code());
@@ -105,7 +105,7 @@ namespace
 		for (auto const& line : stdoutLines) {
 			if (line.starts_with("Reply from")) nReplyLines++;
 		}
-		EXPECT_EQ(3, nReplyLines);
+		EXPECT_EQ(1, nReplyLines);
 
 		std::vector<std::string> stderrLines;
 		toLines(f_stderr.get(), stderrLines);

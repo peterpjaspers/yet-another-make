@@ -154,9 +154,11 @@ namespace YAM
 		void _handleModification(FileChange const& change);
 		void _handleRename(FileChange const& change);
 		void _handleOverflow();
-		std::shared_ptr<Node> _invalidateNode(std::filesystem::path const& path);
+		std::shared_ptr<Node> _invalidateNode(
+			std::filesystem::path const& path,
+			std::chrono::time_point<std::chrono::utc_clock> const& lastWriteTime);
 		void _invalidateNodeRecursively(std::filesystem::path const& path);
-		void _invalidateNodeRecursively(std::shared_ptr<Node> node);
+		void _invalidateNodeRecursively(std::shared_ptr<Node> const& node);
 
 		bool _readOnly;
 		std::string _name;

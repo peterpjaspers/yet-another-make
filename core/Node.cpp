@@ -14,6 +14,9 @@ namespace YAM
         , _canceling(false)
 	{} 
 
+    Node::~Node() {
+    }
+
 	std::filesystem::path const& Node::name() const {
 		return _name; 
 	}

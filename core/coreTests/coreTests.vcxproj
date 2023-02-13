@@ -48,7 +48,7 @@
     <ClCompile Include="fileAspectSetTest.cpp" />
     <ClCompile Include="fileAspectTest.cpp" />
     <ClCompile Include="fileNodeTest.cpp" />
-    <ClCompile Include="directoryWatcherTest.cpp" />
+    <ClCompile Include="directoryWatcherWin32Test.cpp" />
     <ClCompile Include="monitoredProcessWin32Test.cpp" />
     <ClCompile Include="msBuildTrackerOutputReaderTest.cpp" />
     <ClCompile Include="nodeExecutionTest.cpp" />
@@ -85,7 +85,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>X64;_DEBUG;_CONSOLE;_WIN32_WINNT=0x0601;_%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>X64;_DEBUG;_CONSOLE;_WIN32_WINNT=0x0601;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <WarningLevel>Level3</WarningLevel>
@@ -93,6 +93,7 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <DisableSpecificWarnings>4251</DisableSpecificWarnings>
+      <ForcedIncludeFiles>..\dbgMemLeaks.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>

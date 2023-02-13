@@ -17,6 +17,8 @@ namespace YAM
 			bool recursive,
 			Delegate<void, FileChange const&> const& changeHandler);
 
+		void stop() override;
+
 	private:
 		std::shared_ptr<IDirectoryWatcher> _impl;
 	};

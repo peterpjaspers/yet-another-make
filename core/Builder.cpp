@@ -14,8 +14,6 @@ namespace
 {
 	using namespace YAM;
 
-	const std::filesystem::path scopePath("__scope__");
-
 	void appendDirtyFileAndDirectoryNodes(
 		std::shared_ptr<Node> node,
 		std::vector<std::shared_ptr<Node>>& dirtyNodes
@@ -44,20 +42,21 @@ namespace
 		for (auto n : postRequisites) appendBuildFileFileNodes(n, buildFiles);
 	}
 
-	void appendDirtyCommands(NodeSet const& nodes, std::vector<std::shared_ptr<Node>>& dirtyCommands) {
-		for (auto const& pair : nodes.nodes()) {
-			auto cmd = dynamic_pointer_cast<CommandNode>(pair.second);
-			if (cmd != nullptr && cmd->state() == Node::State::Dirty) {
-				dirtyCommands.push_back(cmd);
-			}
-		}
+	auto includeNode = Delegate<bool, std::shared_ptr<Node> const&>::CreateLambda(
+		[](std::shared_ptr<Node> const& node) {
+			auto cmd = dynamic_pointer_cast<CommandNode>(node);
+	        return (cmd != nullptr && cmd->state() == Node::State::Dirty);
+		});
+
+	void appendDirtyCommands(NodeSet& nodes, std::vector<std::shared_ptr<Node>>& dirtyCommands) {
+		nodes.find(includeNode, dirtyCommands);
 	}
 }
 
 namespace YAM
 {
 	Builder::Builder()
-		: _scope(nullptr)
+		: _scope(std::make_shared<CommandNode>(&_context, "__scope__"))
 		, _result(nullptr)
 	{}
 
@@ -66,6 +65,7 @@ namespace YAM
 	}
 
 	void Builder::start(std::shared_ptr<BuildRequest> request) {
+		if (running()) throw std::exception("cannot start a build while one is running");
 		_result = std::make_shared<BuildResult>();
 		if (request->requestType() == BuildRequest::Init) {
 			_init(request->directory(), true);
@@ -95,7 +95,7 @@ namespace YAM
 				directory,
 				RegexSet({ 
 					RegexSet::matchDirectory("generated"),
-			        RegexSet::matchDirectory(".yam"),
+			        RegexSet::matchDirectory(".yam")
 					}),
 				&_context);
 			_context.addRepository(repo);
@@ -116,8 +116,7 @@ namespace YAM
 	}
 
 	void Builder::_start() {
-		if (running()) throw std::exception("cannot start a build while one is running");
-		_scope = std::make_shared<CommandNode>(&_context, scopePath);
+		_scope->setState(Node::State::Ok);
 		std::vector<std::shared_ptr<Node>> dirtyDirsAndFiles;
 		for (auto const& pair : _context.repositories()) {
 			auto repo = pair.second;
@@ -125,9 +124,13 @@ namespace YAM
 			repo->suspend(); // suspend processing of dir&file modified events
 			appendDirtyFileAndDirectoryNodes(dirNode, dirtyDirsAndFiles);
 		}
-		_scope->setInputProducers(dirtyDirsAndFiles);
-		_scope->completor().AddRaw(this, &Builder::_handleRepoCompletion);
-		_scope->start();
+		if (dirtyDirsAndFiles.empty()) {
+			_handleRepoCompletion(_scope.get());
+		} else {
+			_scope->setInputProducers(dirtyDirsAndFiles);
+			_scope->completor().AddRaw(this, &Builder::_handleRepoCompletion);
+			_scope->start();
+		}
 	}
 
 	void Builder::_handleRepoCompletion(Node* n) {
@@ -151,9 +154,14 @@ namespace YAM
 			// as per design in Miro board.
 			std::vector<std::shared_ptr<Node>> dirtyCommands;
 			appendDirtyCommands(_context.nodes(), dirtyCommands);
-			_scope->setInputProducers(dirtyCommands); // + dirtyBuildFileParsers
-			_scope->completor().AddRaw(this, &Builder::_handleBuildCompletion);
-			_scope->start();
+			if (dirtyCommands.empty()) {
+				_result->succeeded(_scope->state() == Node::State::Ok);
+				_notifyCompletion();
+			} else {
+				_scope->setInputProducers(dirtyCommands); // + dirtyBuildFileParsers
+				_scope->completor().AddRaw(this, &Builder::_handleBuildCompletion);
+				_scope->start();
+			}
 		}
 	}
 
@@ -168,7 +176,7 @@ namespace YAM
 	void Builder::_notifyCompletion() {
 		auto result = _result;
 		_result = nullptr;
-		_scope = nullptr;
+		_context.buildRequest(nullptr);
 		for (auto const& pair : _context.repositories()) {
 			auto repo = pair.second;
 			repo->resume(); // resume processing of dir&file modified events
@@ -177,7 +185,7 @@ namespace YAM
 	}
 
 	bool Builder::running() const {
-		return _scope != nullptr;
+		return _context.buildRequest() != nullptr;
 	}
 
 	void Builder::stop() {

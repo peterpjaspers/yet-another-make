@@ -17,6 +17,15 @@ namespace
             NULL);
         return handle;
     }
+
+    std::chrono::time_point<std::chrono::utc_clock> toUtc(std::filesystem::file_time_type ftime) {
+        return decltype(ftime)::clock::to_utc(ftime);
+    }
+
+    std::chrono::time_point<std::chrono::utc_clock> readLastWriteTime(std::filesystem::path const& path) {
+        std::error_code ec;
+        return toUtc(std::filesystem::last_write_time(path, ec));
+    }
 }
 
 namespace YAM
@@ -24,28 +33,83 @@ namespace YAM
     DirectoryWatcherWin32::DirectoryWatcherWin32(
         std::filesystem::path const& directory,
         bool recursive,
-        Delegate<void, FileChange const&> const& changeHandler)
+        Delegate<void, FileChange const&> const& changeHandler,
+        bool suppressSpuriousEvents)
         : IDirectoryWatcher(directory, recursive, changeHandler)
         , _dirHandle(createHandle(directory))
         , _changeBufferSize(32*1024)
         , _changeBuffer(new uint8_t[_changeBufferSize])
+        , _suppressSpuriousEvents(suppressSpuriousEvents)
         , _stop(false)
     {
         if (_dirHandle == INVALID_HANDLE_VALUE) throw std::exception("Dir handle creation failed");
         _overlapped.hEvent = CreateEvent(NULL, FALSE, 0, NULL);
         if (_overlapped.hEvent == INVALID_HANDLE_VALUE) throw std::exception("Event handle creation failed");
-        
+        if (_suppressSpuriousEvents) {
+            fillDirUpdateTimes(_directory, readLastWriteTime(_directory));
+        }
+
         queueReadChangeRequest();
         _watcher = std::make_unique<std::thread>(&DirectoryWatcherWin32::run, this);
     }
 
     DirectoryWatcherWin32::~DirectoryWatcherWin32() {
-        _stop = true;
-        SetEvent(_overlapped.hEvent); // to wakeup WaitForSingleObject
-        _watcher->join();
-        CancelIo(_dirHandle);
-        CloseHandle(_overlapped.hEvent);
-        CloseHandle(_dirHandle);
+        stop();
+    }
+
+    void DirectoryWatcherWin32::stop() {
+        if (!_stop) {
+            _stop = true;
+            SetEvent(_overlapped.hEvent); // to wakeup WaitForSingleObject
+            _watcher->join();
+            CancelIo(_dirHandle);
+            CloseHandle(_overlapped.hEvent);
+            CloseHandle(_dirHandle);
+        }
+    }
+
+    void DirectoryWatcherWin32::fillDirUpdateTimes(
+        std::filesystem::path const& absPath,
+        std::chrono::time_point<std::chrono::utc_clock> const& lwt
+    ) {
+        if (std::filesystem::is_directory(absPath)) {
+            isSpuriousDirModifiedEvent(absPath, lwt);
+            for (auto const& entry : std::filesystem::directory_iterator(absPath)) {
+                auto flwt = entry.last_write_time();
+                fillDirUpdateTimes(absPath / entry.path(), decltype(flwt)::clock::to_utc(flwt));
+            }
+        }
+    }
+
+    bool DirectoryWatcherWin32::isSpuriousDirModifiedEvent(
+        std::filesystem::path const& absPath,
+        std::chrono::time_point<std::chrono::utc_clock> const& lwt
+    ) {
+        auto dit = _dirUpdateTimes.find(absPath);
+        if (dit != _dirUpdateTimes.end()) {
+            if (dit->second == lwt) {
+                return true;
+            }
+        }
+        _dirUpdateTimes[absPath] = lwt;
+        return false;
+    }
+
+    bool DirectoryWatcherWin32::isSpuriousModifiedEvent(
+        std::filesystem::path const& absPath,
+        std::chrono::time_point<std::chrono::utc_clock>& lwt
+    ) {
+        if (std::filesystem::is_directory(absPath)) {
+            return isSpuriousDirModifiedEvent(absPath, lwt);
+        }
+        return false;
+    }
+
+    void DirectoryWatcherWin32::removeFromDirUpdateTimes(std::filesystem::path const& absPath) {
+        auto it = _dirUpdateTimes.find(absPath);
+        if (it != _dirUpdateTimes.end()) {
+            _dirUpdateTimes.erase(it);
+        }
     }
 
     void DirectoryWatcherWin32::queueReadChangeRequest() {
@@ -79,21 +143,34 @@ namespace YAM
                         offset += info->NextEntryOffset;
                         std::wstring fileNameStr(info->FileName, info->FileNameLength / sizeof(wchar_t));
                         std::filesystem::path fileName(fileNameStr);
+                        std::filesystem::path absFileName = _directory / fileName;
+                        std::error_code ec;
+                        change.lastWriteTime = readLastWriteTime(absFileName);
                         if (info->Action == FILE_ACTION_ADDED) {
                             change.action = FileChange::Action::Added;
                             change.fileName = fileName;
+                            if (_suppressSpuriousEvents) isSpuriousModifiedEvent(absFileName, change.lastWriteTime);
                         } else if (info->Action == FILE_ACTION_REMOVED) {
                             change.action = FileChange::Action::Removed;
                             change.fileName = fileName;
+                            if (_suppressSpuriousEvents) removeFromDirUpdateTimes(absFileName);
                         } else if (info->Action == FILE_ACTION_MODIFIED) {
                             change.action = FileChange::Action::Modified;
                             change.fileName = fileName;
+                            if (
+                                _suppressSpuriousEvents &&
+                                isSpuriousModifiedEvent(absFileName, change.lastWriteTime)
+                            ) {
+                                change.action = FileChange::Action::None;
+                            }
                         } else if (info->Action == FILE_ACTION_RENAMED_OLD_NAME) {
                             rename.action = FileChange::Action::Renamed;
                             rename.oldFileName = fileName;
+                            if (_suppressSpuriousEvents) removeFromDirUpdateTimes(_directory / fileName);
                         } else if (info->Action == FILE_ACTION_RENAMED_NEW_NAME) {
                             rename.action = FileChange::Action::Renamed;
                             rename.fileName = fileName;
+                            if (_suppressSpuriousEvents) isSpuriousModifiedEvent(absFileName, change.lastWriteTime);
                         }
                         if (
                             rename.action == FileChange::Action::Renamed 

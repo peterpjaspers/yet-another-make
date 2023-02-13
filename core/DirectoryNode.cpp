@@ -70,6 +70,10 @@ namespace YAM
         return _content;
     }
 
+    std::chrono::time_point<std::chrono::utc_clock> const& DirectoryNode::lastWriteTime() {
+        return _lastWriteTime;
+    }
+
     // Note that pendingStartSelf is only called during node execution, i.e. when
     // state() == State::Executing. A node execution only starts when the node was
     // Dirty, i.e. when it is not sure that previously computed hash is still

@@ -11,10 +11,10 @@ namespace
 	using namespace YAM;
 	using namespace YAMTest;
 
-	ExecutionContext context;
-	std::shared_ptr<Node> n1 = std::make_shared<NumberNode>(&context, "aap/noot");
-	std::shared_ptr<Node> n1dup = std::make_shared<NumberNode>(&context, "aap/noot");
-	std::shared_ptr<Node> n2 = std::make_shared<NumberNode>(&context, "aap/noot/mies");
+	ExecutionContext* context = nullptr;
+	std::shared_ptr<Node> n1 = std::make_shared<NumberNode>(context, "aap/noot");
+	std::shared_ptr<Node> n1dup = std::make_shared<NumberNode>(context, "aap/noot");
+	std::shared_ptr<Node> n2 = std::make_shared<NumberNode>(context, "aap/noot/mies");
 
 	TEST(NodeSet, Add) {
 		NodeSet set;

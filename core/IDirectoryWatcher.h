@@ -20,6 +20,10 @@ namespace YAM
 		//	- Removed file A/F + Added file B/G
 		//  - Renamed file B/G, oldFile A/F 
 		//	- Removed file A/F + modified directory B
+		//
+		// Take care: some implementations may report for a given file
+		// multiple events with same lastWriteTime.
+		//
 		enum Action {
 			None = 0,
 			Added = 1,    // file/dir is created
@@ -29,8 +33,10 @@ namespace YAM
 			Overflow = 5  // lost track of changes due to buffer overflow
 		};
 		Action action;
+		// The file names are relative to the watched directory.
 		std::filesystem::path fileName;
 		std::filesystem::path oldFileName; // only applicable when Renamed
+		std::chrono::time_point<std::chrono::utc_clock> lastWriteTime; // of fileName
 	};
 
 	// A directory watcher monitors a directory tree for changes and informs
@@ -57,6 +63,9 @@ namespace YAM
 		virtual ~IDirectoryWatcher() {}
 		std::filesystem::path const& directory() const { return _directory; }
 		bool recursive() const { return _recursive; }
+
+		// stop watching the directory
+		virtual void stop() = 0;
 
 	protected:
 		std::filesystem::path _directory;

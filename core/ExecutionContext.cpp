@@ -10,6 +10,13 @@ namespace
     std::size_t getDefaultPoolSize() {
         return 4;
     }
+
+    Delegate<bool, std::shared_ptr<Node> const&> includeIfDirty = 
+        Delegate<bool, std::shared_ptr<Node> const&>::CreateLambda(
+            [](std::shared_ptr<Node> const& node) 
+            { 
+                return node->state() == Node::State::Dirty; 
+            });
 }
 
 namespace YAM
@@ -24,6 +31,9 @@ namespace YAM
     }
 
     ExecutionContext::~ExecutionContext() {
+        // destroy repositories to stop directory watching before stopping 
+        // main thread
+        _repositories.clear();
         _mainThreadQueue.stop(); // this will cause _mainThread to finish
     }
 
@@ -111,32 +121,15 @@ namespace YAM
         return _nodes;
     }
 
-    void ExecutionContext::getDirtyNodes(std::vector<std::shared_ptr<Node>>& dirtyNodes) const {
-        dirtyNodes.clear();
-        for (auto const& pair : _nodes.nodes()) {
-            auto node = pair.second;
-            if (node->state() == Node::State::Dirty) {
-                dirtyNodes.push_back(node);
-            }
-        }
+    void ExecutionContext::getDirtyNodes(std::vector<std::shared_ptr<Node>>& dirtyNodes) {
+        _nodes.find(includeIfDirty, dirtyNodes);
     }
-
-    void ExecutionContext::getDirtyNodes(std::map<std::filesystem::path, std::shared_ptr<Node>>& dirtyNodes) const {
-        dirtyNodes.clear();
-        for (auto const& pair : _nodes.nodes()) {
-            auto node = pair.second;
-            if (node->state() == Node::State::Dirty) {
-                dirtyNodes.insert(pair);
-            }
-        }
-    }
-
 
     void ExecutionContext::buildRequest(std::shared_ptr<BuildRequest> request) {
         _request = request;
     }
 
-    std::shared_ptr<BuildRequest> ExecutionContext::buildRequest() {
+    std::shared_ptr<BuildRequest> ExecutionContext::buildRequest() const {
         return _request;
     }
 }

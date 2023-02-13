@@ -1,5 +1,6 @@
 #include "SourceFileRepository.h"
 #include "DirectoryNode.h"
+#include "FileNode.h"
 #include "DirectoryWatcher.h"
 #include "SourceFileNode.h"
 #include "ExecutionContext.h"
@@ -144,7 +145,9 @@ namespace YAM
 	void SourceFileRepository::_handleAdd(FileChange const& change) {
 		std::filesystem::path dirOrFile(directory()->name() / change.fileName);
 		std::filesystem::path parentDir = dirOrFile.parent_path();
-		std::shared_ptr<Node> node = _invalidateNode(parentDir);
+		// take care: cannot use change.lastWriteTime because it applies to
+		// change.fileName, not to parentDir.
+		std::shared_ptr<Node> node = _invalidateNode(parentDir, std::chrono::utc_clock::now());
 		if (node != nullptr && dynamic_cast<DirectoryNode*>(node.get()) == nullptr) {
 			throw std::exception("unexpected node type");
 		}
@@ -157,7 +160,7 @@ namespace YAM
 
 	void SourceFileRepository::_handleModification(FileChange const& change) {
 		std::filesystem::path dirOrFile(directory()->name() / change.fileName);
-		_invalidateNode(dirOrFile);
+		_invalidateNode(dirOrFile, change.lastWriteTime);
 	}
 
 	void SourceFileRepository::_handleRename(FileChange const& change) {
@@ -168,23 +171,41 @@ namespace YAM
 	}
 
 	void SourceFileRepository::_handleOverflow() {
+		std::vector<std::shared_ptr<Node>> nodesInRepo;
 		std::filesystem::path const& repoDir = directoryName();
-		for (auto pair : _context->nodes().nodes()) {
-			std::shared_ptr<Node> node = pair.second;
-			if (isNodeInRepo(node.get(), repoDir)) {
-				node->setState(Node::State::Dirty);
-			}
-		}
+		auto includeNode = Delegate<bool, std::shared_ptr<Node> const&>::CreateLambda(
+			[&repoDir](std::shared_ptr<Node> const& node) {
+				return isNodeInRepo(node.get(), repoDir);
+			});
+		_context->nodes().find(includeNode, nodesInRepo);
+		for (auto node : nodesInRepo) {
+		    node->setState(Node::State::Dirty);
+	    }
 	}
 
-	std::shared_ptr<Node> SourceFileRepository::_invalidateNode(std::filesystem::path const& path) {
+	std::shared_ptr<Node> SourceFileRepository::_invalidateNode(
+		std::filesystem::path const& path,
+		std::chrono::time_point<std::chrono::utc_clock> const& lastWriteTime
+	) {
 		std::shared_ptr<Node> node = _context->nodes().find(path);
 		if (node == nullptr) {
 			// happens when path was excluded from repo or when
 			// _directory has not yet been executed
 			;
 		} else {
-			node->setState(Node::State::Dirty);
+			bool dirty = true;
+			auto fileNode = dynamic_pointer_cast<FileNode>(node);
+			if (fileNode != nullptr) {
+				dirty = fileNode->lastWriteTime() != lastWriteTime;
+			} else {
+				auto dirNode = dynamic_pointer_cast<DirectoryNode>(node);
+				if (dirNode != nullptr) {
+					dirty = dirNode->lastWriteTime() != lastWriteTime;
+				}
+			}
+			if (dirty) {
+				node->setState(Node::State::Dirty);
+			}
 		}
 		return node;
 	}
@@ -202,7 +223,7 @@ namespace YAM
 		if (node != nullptr) _invalidateNodeRecursively(node);
 	}
 
-	void SourceFileRepository::_invalidateNodeRecursively(std::shared_ptr<Node> node) {
+	void SourceFileRepository::_invalidateNodeRecursively(std::shared_ptr<Node> const& node) {
 		node->setState(Node::State::Dirty);
 		auto dirNode = dynamic_pointer_cast<DirectoryNode>(node);
 		if (dirNode != nullptr) {

@@ -1,5 +1,5 @@
 #include "gtest/gtest.h"
-#include "../DirectoryWatcher.h"
+#include "../DirectoryWatcherWin32.h"
 #include "../FileSystem.h"
 #include "DirectoryTree.h"
 #include <queue>
@@ -30,7 +30,7 @@ namespace
     }
 
     // This test demonstrates spurious change events on first-time iterating
-    // over just created directories.
+    // over just created directories in the Windows implementation
     // According to ReadDirectoryChangesW for FILE_NOTIFY_CHANGE_LAST_WRITE:
     //    Any change to the last write - time of files in the watched directory 
     //    or subtree causes a change notification wait operation to return. The 
@@ -43,7 +43,7 @@ namespace
     //      - flush filesystem cache using sysinternals sync.exe
     //      - start watching the directory tree
     //      - iterate the directories.
-    TEST(DirectoryWatcher, spuriousChangeEvents) {
+    TEST(DirectoryWatcherWin32, spuriousChangeEvents) {
         std::string tmpDir= FileSystem::createUniqueDirectory().string();
         std::filesystem::path rootDir(std::string(tmpDir + "_dirNodeTest"));
         std::vector<FileChange> detectedChanges;
@@ -51,7 +51,7 @@ namespace
         std::condition_variable cond;
         DirectoryTree testTree(rootDir, 3, RegexSet());
 
-        DirectoryWatcher watcher(
+        DirectoryWatcherWin32 watcher(
             rootDir, true,
             Delegate<void, FileChange const&>::CreateLambda([&](FileChange const& c)
                 {
@@ -60,7 +60,6 @@ namespace
                     cond.notify_one();
                 })
         );
-        EXPECT_EQ(0, detectedChanges.size());
 
         // Now iterate some directories in testTree.
         // Although no changes are expected there are changes for three directories:
@@ -73,7 +72,14 @@ namespace
                 }
             }
         }
-        EXPECT_TRUE(0 <= detectedChanges.size() && detectedChanges.size() <= 3);
+
+        auto deadline = std::chrono::system_clock::now() + std::chrono::seconds(5);
+        std::unique_lock<std::mutex> lock(mutex);
+        bool done;
+        do {
+            done = 3 == detectedChanges.size();
+        } while (!done && cond.wait_until(lock, deadline) != std::cv_status::timeout);
+        EXPECT_EQ(3,  detectedChanges.size());
 
         // Repeat the above, now no changes found.
         detectedChanges.clear();
@@ -84,9 +90,52 @@ namespace
                 }
             }
         }
+        deadline = std::chrono::system_clock::now() + std::chrono::seconds(1);
+        do {
+            done = !detectedChanges.empty();
+        } while (!done && cond.wait_until(lock, deadline) != std::cv_status::timeout);
         EXPECT_EQ(0, detectedChanges.size());
     }
-    TEST(DirectoryWatcher, update_DirectoryTree) {
+
+    TEST(DirectoryWatcherWin32, suppressSpuriousChangeEvents) {
+        std::string tmpDir = FileSystem::createUniqueDirectory().string();
+        std::filesystem::path rootDir(std::string(tmpDir + "_dirNodeTest"));
+        std::vector<FileChange> detectedChanges;
+        std::mutex mutex;
+        std::condition_variable cond;
+        DirectoryTree testTree(rootDir, 3, RegexSet());
+
+        DirectoryWatcherWin32 watcher(
+            rootDir, true,
+            Delegate<void, FileChange const&>::CreateLambda([&](FileChange const& c)
+                {
+                    std::lock_guard<std::mutex> lock(mutex);
+                    detectedChanges.push_back(c);
+                    cond.notify_one();
+                }),
+            true
+        );
+
+        // Now iterate some directories in testTree.
+        // No spurious events should be notified.
+        std::filesystem::path s2(rootDir / "SubDir2");
+        for (auto const& entry : std::filesystem::directory_iterator(s2)) {
+            if (entry.is_directory()) {
+                std::filesystem::path s3(s2 / entry.path());
+                for (auto const& subentry : std::filesystem::directory_iterator(s3)) {
+                }
+            }
+        }
+
+        auto deadline = std::chrono::system_clock::now() + std::chrono::seconds(1);
+        std::unique_lock<std::mutex> lock(mutex);
+        bool done;
+        do { 
+            done = !detectedChanges.empty();
+        } while (!done && cond.wait_until(lock, deadline) != std::cv_status::timeout);
+        EXPECT_EQ(0, detectedChanges.size());
+    }
+    TEST(DirectoryWatcherWin32, update_DirectoryTree) {
         std::string tmpDir = FileSystem::createUniqueDirectory().string();
         std::filesystem::path rootDir(std::string(tmpDir + "_dirNodeTest"));
         std::vector<FileChange> detectedChanges;
@@ -96,7 +145,7 @@ namespace
         DirectoryTree* sd2 = testTree.getSubDirs()[1];
         DirectoryTree* sd2_sd3 = sd2->getSubDirs()[2];
 
-        DirectoryWatcher watcher(
+        DirectoryWatcherWin32 watcher(
             rootDir, true,
             Delegate<void, FileChange const&>::CreateLambda([&](FileChange const& c)
                 {
@@ -105,21 +154,6 @@ namespace
                     cond.notify_one();
                 })
         );
-
-        // consume spurious events, see test spuriousChangeEvents
-        {
-            std::filesystem::path s2(rootDir/"SubDir2");
-            for (auto const& entry : std::filesystem::directory_iterator(s2)) {
-                if (entry.is_directory()) {
-                    std::filesystem::path s3(s2/entry.path());
-                    for (auto const& subentry : std::filesystem::directory_iterator(s3)) {
-                        std::cout << subentry.path();
-                    }
-                }
-            }
-            EXPECT_TRUE(0 <= detectedChanges.size() && detectedChanges.size() <= 3);
-            detectedChanges.clear();
-        }
 
         // Update file system and create expected changes
         testTree.addFile();

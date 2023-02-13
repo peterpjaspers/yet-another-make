@@ -62,6 +62,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <DisableSpecificWarnings>4251</DisableSpecificWarnings>
+      <ForcedIncludeFiles>dbgMemLeaks.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -100,6 +101,7 @@
     <ClInclude Include="BuildResult.h" />
     <ClInclude Include="BuildService.h" />
     <ClInclude Include="CommandNode.h" />
+    <ClInclude Include="dbgMemLeaks.h" />
     <ClInclude Include="Delegates.h" />
     <ClInclude Include="DirectoryNode.h" />
     <ClInclude Include="DispatcherFrame.h" />

@@ -62,5 +62,8 @@ namespace
 		RegexSet set({ RegexSet::matchDirectory(std::string("generated")) });
 		EXPECT_TRUE(set.matches(std::string("C:\\repo\\module\\generated\\file.obj")));
 		EXPECT_TRUE(set.matches(std::string("/repo/module/generated/file.obj")));
+		EXPECT_TRUE(set.matches(std::string("/repo/module/generated")));
+		EXPECT_TRUE(set.matches(std::string("/repo/module/generated/")));
+		EXPECT_FALSE(set.matches(std::string("/repo/module/generated ")));
 	}
 }

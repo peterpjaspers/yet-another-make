@@ -12,7 +12,9 @@ namespace YAM
 		// Windows (thanks to / and \ not being permitted in Windows and
 		// Linux respectively).
 		std::string slash("[/\\\\]");
-		std::string generatedPath = ".*" + slash + directory + slash + ".*";
+		std::string generatedPath = 
+			"(.*" + slash + directory + slash + ".*)" +
+			"|(.*" + slash + directory + "$)";
 		return generatedPath;
 	}
 

@@ -1,15 +1,19 @@
 #pragma once
 
+#include "Delegates.h"
 #include <map>
+#include <vector>
 #include <filesystem>
 #include <memory>
 #include <unordered_set>
+#include <mutex>
 
 namespace YAM
 {
 	class Node;
 	class Dispatcher;
 
+	// MT-safe class to store nodes that have unique names.
 	class __declspec(dllexport) NodeSet
 	{
 	public:
@@ -37,20 +41,22 @@ namespace YAM
 
 		// Find and return node that matches nodeName;
 		// Return null when not found.
-		std::shared_ptr<Node> find(std::filesystem::path const& nodeName) const;
+		std::shared_ptr<Node> find(std::filesystem::path const& nodeName);
+
+		// Return in 'foundNodes' all nodes for which includeNode(node)==true.
+		void find(
+			Delegate<bool, std::shared_ptr<Node> const&> includeNode,
+			std::vector<std::shared_ptr<Node>>& foundNodes);
 
 		// Return whether the set contains a node with given 'nodeName'
-		bool contains(std::filesystem::path const& nodeName) const;
+		bool contains(std::filesystem::path const& nodeName);
 
-		std::size_t size() const;
-
-		std::map<std::filesystem::path, std::shared_ptr<Node>> const& nodes() const;
-
-		// Return nodes in given 'nodes' 
-		void nodesVector(std::vector<std::shared_ptr<Node>>& nodes);
-
+		std::size_t size();
 
 	private:
+
+		std::mutex _mutex;
+
 		// TODO: used unordered_set. However set cannot use std::filesystem::path as keys.
 		std::map<std::filesystem::path, std::shared_ptr<Node> > _nodes;
 	};

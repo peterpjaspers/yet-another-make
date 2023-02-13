@@ -115,6 +115,8 @@ namespace YAM
         // of the file repository that contains this file.
         std::filesystem::path relativePath() const;
 
+        std::chrono::time_point<std::chrono::utc_clock> const& lastWriteTime();
+
     protected:
         // Inherited via Node
         virtual bool pendingStartSelf() const override;

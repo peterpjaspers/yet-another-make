@@ -42,6 +42,8 @@ namespace YAM
 
         std::map<std::filesystem::path, std::shared_ptr<Node>> const& getContent(); // file + dir nodes
 
+        std::chrono::time_point<std::chrono::utc_clock> const& lastWriteTime();
+
         // Pre: state() == State::Ok
         // Return the directory hash.
         XXH64_hash_t getHash() const;

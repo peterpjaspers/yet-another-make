@@ -9,6 +9,14 @@ namespace YAM
         , _stopped(false)
     {}
 
+    void Dispatcher::push(Delegate<void> & action) {
+        {
+            std::lock_guard lk(_mtx);
+            _queue.push(action);
+        }
+        _cv.notify_one();
+    }
+
     void Dispatcher::push(Delegate<void>&& action) {
         {
             std::lock_guard lk(_mtx);
@@ -89,7 +97,7 @@ namespace YAM
         while (!stopped()) popAndExecute();
     }
 
-    void Dispatcher::run(DispatcherFrame* frame) {
+    void Dispatcher::run(IDispatcherFrame* frame) {
         while (!frame->stopped() && !stopped()) popAndExecute();
     }
 }

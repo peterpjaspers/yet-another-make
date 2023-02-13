@@ -7,7 +7,7 @@
 
 namespace YAM
 {
-    class DispatcherFrame;
+    class IDispatcherFrame;
 
     // Thread-safe FIFO queue.
     class __declspec(dllexport) Dispatcher
@@ -17,6 +17,7 @@ namespace YAM
         Dispatcher();
 
         // Append element to end of queue
+        void push(Delegate<void>& newAction);
         void push(Delegate<void>&& newAction);
 
         // Block calling thread until (!empty() && !suspended()) || stopped(). 
@@ -67,7 +68,7 @@ namespace YAM
         //         // the stop event have been processed.
         //         dispatcher->run(frame);
         //     }
-        void run(DispatcherFrame* frame);
+        void run(IDispatcherFrame* frame);
 
     private:
         bool _suspended;

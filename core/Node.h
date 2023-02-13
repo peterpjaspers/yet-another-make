@@ -93,6 +93,7 @@ namespace YAM
 		};
 
 		Node(ExecutionContext* context, std::filesystem::path const & name);
+		virtual ~Node();
 
 		ExecutionContext* context() const;
 		std::filesystem::path const& name() const;

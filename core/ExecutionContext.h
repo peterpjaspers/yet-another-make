@@ -52,11 +52,10 @@ namespace YAM
 
 		NodeSet & nodes();
 		// Return the nodes that are in state Node::State::Dirty
-		void getDirtyNodes(std::vector<std::shared_ptr<Node>>& dirtyNodes) const;
-		void getDirtyNodes(std::map<std::filesystem::path, std::shared_ptr<Node>>& dirtyNodes) const;
+		void getDirtyNodes(std::vector<std::shared_ptr<Node>>& dirtyNodes);
 
 		void buildRequest(std::shared_ptr<BuildRequest> request);
-		std::shared_ptr<BuildRequest> buildRequest();
+		std::shared_ptr<BuildRequest> buildRequest() const;
 
 	private:
 		Dispatcher _mainThreadQueue;
