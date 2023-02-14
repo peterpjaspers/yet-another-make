@@ -2,6 +2,7 @@
 #include "Node.h"
 #include "SourceFileRepository.h"
 #include "BuildRequest.h"
+#include "ILogBook.h"
 
 namespace
 {
@@ -22,9 +23,10 @@ namespace
 namespace YAM
 {
 
-    ExecutionContext::ExecutionContext()
+    ExecutionContext::ExecutionContext(std::shared_ptr<ILogBook> logBook)
         : _mainThread(&_mainThreadQueue, "YAM_main")
         , _threadPool(&_threadPoolQueue, "YAM_threadpool", getDefaultPoolSize()) 
+        , _logBook(logBook)
     {
         auto const& entireFileSet = FileAspectSet::entireFileSet();
         _fileAspectSets.insert({ entireFileSet.name(), entireFileSet});
@@ -127,6 +129,13 @@ namespace YAM
 
     void ExecutionContext::buildRequest(std::shared_ptr<BuildRequest> request) {
         _request = request;
+    }
+
+    std::shared_ptr<ILogBook> ExecutionContext::logBook() const {
+        return _logBook;
+    }
+    void ExecutionContext::addToLogBook(LogRecord const& record) {
+        _logBook->add(record);
     }
 
     std::shared_ptr<BuildRequest> ExecutionContext::buildRequest() const {

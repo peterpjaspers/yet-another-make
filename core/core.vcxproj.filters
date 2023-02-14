@@ -114,6 +114,21 @@
     <ClInclude Include="dbgMemLeaks.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ILogBook.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TimePoint.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MemoryLogBook.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BasicOStreamLogBook.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="LogRecord.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -204,6 +219,18 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="GraphWalker.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="TimePoint.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MemoryLogBook.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BasicOStreamLogBook.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="LogRecord.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

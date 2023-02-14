@@ -6,18 +6,21 @@
 #include "ThreadPool.h"
 #include "FileAspectSet.h"
 #include "ExecutionStatistics.h"
+#include "BasicOStreamLogBook.h"
 
 #include <memory>
+#include <iostream>
 
 namespace YAM
 {
 	class SourceFileRepository;
 	class BuildRequest;
+	class ILogBook;
 
 	class __declspec(dllexport) ExecutionContext
 	{
 	public:
-		ExecutionContext();
+		ExecutionContext(std::shared_ptr<ILogBook> logBook = std::make_shared<BasicOStreamLogBook>(&std::cout));
 		~ExecutionContext();
 
 		ThreadPool& threadPool();
@@ -54,6 +57,9 @@ namespace YAM
 		// Return the nodes that are in state Node::State::Dirty
 		void getDirtyNodes(std::vector<std::shared_ptr<Node>>& dirtyNodes);
 
+		std::shared_ptr<ILogBook> logBook() const;
+		void addToLogBook(LogRecord const& record);
+
 		void buildRequest(std::shared_ptr<BuildRequest> request);
 		std::shared_ptr<BuildRequest> buildRequest() const;
 
@@ -72,8 +78,7 @@ namespace YAM
 
 		NodeSet _nodes;
 		
-		// TODO: 
-		// LogBook _logBook;
+		std::shared_ptr<ILogBook> _logBook;
 		std::shared_ptr<BuildRequest> _request;
 
 	};

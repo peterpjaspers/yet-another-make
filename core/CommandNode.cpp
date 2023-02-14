@@ -39,6 +39,141 @@ namespace
 		}
 		return false;
 	}
+
+	void logBuildOrderNotGuaranteed(
+		CommandNode* cmd,
+		GeneratedFileNode* inputFile
+	) {
+		std::stringstream ss;
+		ss
+			<< "Build order is not guaranteed." << std::endl
+			<< "Fix: declare input as input of command." << std::endl
+			<< "Input  : " << inputFile->name().string() << std::endl
+			<< "Command: " << cmd->name().string() << std::endl;
+		LogRecord record(LogRecord::Error, ss.str());
+		cmd->context()->addToLogBook(record);
+	}
+
+	void logDiscouragedBuildOrderGuarantee(
+		CommandNode* cmd,
+		GeneratedFileNode* inputFile
+	) {
+		std::stringstream ss;
+		ss
+			<< "Build order guaranteed by discouraged indirect input declaration." << std::endl
+			<< "Fix: declare input as (direct) input of command." << std::endl
+			<< "Input  : " << inputFile->name().string() << std::endl
+			<< "Command: " << cmd->name().string() << std::endl;
+		LogRecord record(LogRecord::Warning, ss.str());
+		cmd->context()->addToLogBook(record);
+	}
+
+	void logInputNotInARepository(
+		CommandNode* cmd,
+		FileNode* inputFile
+	) {
+		std::stringstream ss;
+		ss
+			<< "File not allowed to be used as input of build." << std::endl
+			<< "Fix: declare the file repository that contains the input." << std::endl
+			<< "Input  : " << inputFile->name().string() << std::endl
+			<< std::endl;
+	}
+	void logWriteAccessedSourceFile(
+		CommandNode* cmd,
+		SourceFileNode* outputFile
+	) {
+		std::stringstream ss;
+		ss
+			<< "Source file not allowed to be updated by build." << std::endl
+			<< "Fix: change command script to not update source file." << std::endl
+			<< "Source: " << outputFile->name().string() << std::endl
+			<< "Command: " << cmd->name().string() << std::endl;
+		LogRecord record(LogRecord::Error, ss.str());
+		cmd->context()->addToLogBook(record);
+	}
+	
+	void logOutputFileNotDeclared(
+		CommandNode* cmd,
+		std::filesystem::path const& outputFile
+	) {
+		std::stringstream ss;
+		ss
+			<< "Unknown output file: " << outputFile.string() << std::endl
+			<< "Fix: declare file as output of command." << std::endl
+			<< std::endl;
+		LogRecord record(LogRecord::Error, ss.str());
+		cmd->context()->addToLogBook(record);
+	}
+
+	void logNumberOfIllegalInputFiles(CommandNode* cmd, unsigned int nIllegals) {
+		char buf[32];
+		std::stringstream ss;
+		ss 
+			<< itoa(nIllegals, buf, 10) << " illegal input files were detected during execution of command." << std::endl
+			<< "Command: " << cmd->name().string() << std::endl;
+		LogRecord record(LogRecord::Error, ss.str());
+		cmd->context()->addToLogBook(record);
+	}
+
+	void logNumberOfIllegalOutputFiles(CommandNode* cmd, unsigned int nIllegals) {
+		char buf[32];
+		std::stringstream ss;
+		ss
+			<< itoa(nIllegals, buf, 10) << " illegal output files were detected during execution of command." << std::endl
+			<< "Command: " << cmd->name().string() << std::endl;
+		LogRecord record(LogRecord::Error, ss.str());
+		cmd->context()->addToLogBook(record);
+	}
+
+	void logAlreadyProducedByOtherCommand(
+		CommandNode* cmd,
+		GeneratedFileNode* outputFile
+	) {
+		std::stringstream ss;
+		ss
+			<< "Output file produced by 2 commands." << std::endl
+			<< "Fix: modify scripts and/or output file names."
+			<< "Output: " << outputFile->name().string() << std::endl
+			<< "Command 1: " << outputFile->name().string() << std::endl
+		    << "Command 2: " << cmd->name().string() << std::endl;
+		LogRecord record(LogRecord::Error, ss.str());
+		cmd->context()->addToLogBook(record);
+	}
+
+	void logUnexpectedOutputs(
+		CommandNode* cmd,
+		std::vector<std::shared_ptr<GeneratedFileNode>> const& expected,
+		std::vector<std::shared_ptr<GeneratedFileNode>> const& actual
+	) {
+		std::stringstream ss;
+		ss
+			<< "Unexpected outputs." << std::endl
+		    << "Command : " << cmd->name().string() << std::endl
+			<< "Expected outputs: ";
+		for (auto const& n : expected) ss << "    " << n->name().string() << std::endl;
+		ss << "Actual outputs: ";
+		for (auto const& n : actual) ss << "    " << n->name().string() << std::endl;
+		ss << "Fix: modify scripts and/or output file names." << std::endl;
+	}
+
+	void logScriptFailure(
+		CommandNode* cmd,
+		MonitoredProcessResult const& result,
+		std::filesystem::path tmpDir
+	) {
+		std::stringstream ss;
+		ss
+		    << "Command script failed." << std::endl
+		    << "Command: " << cmd->name().string() << std::endl
+		    << "Temporary result directory: " << tmpDir.string() << std::endl;
+		if (!result.stdOut.empty()) {
+			ss << "script stdout: " << std::endl << result.stdOut << std::endl;
+		}
+		if (!result.stdErr.empty()) {
+			ss << "script stderr: " << std::endl << result.stdErr << std::endl;
+		}
+	}
 }
 
 namespace YAM
@@ -191,41 +326,21 @@ namespace YAM
 		if (fileNode == nullptr) {
 			if (input != exclude) {
 				valid = false;
-				std::cerr
-					<< "Not an allowed input: " << input.string() << std::endl
-					<< "Reason: the file is not contained in a known file repository."
-					<< std::endl;
+				logInputNotInARepository(this, fileNode.get());
 			}
 		} else {
-			auto genFileNode = dynamic_pointer_cast<GeneratedFileNode>(fileNode);
-			auto srcFileNode = dynamic_pointer_cast<SourceFileNode>(fileNode);
-			if (genFileNode != nullptr) {
+			auto genInputFileNode = dynamic_pointer_cast<GeneratedFileNode>(fileNode);
+			if (genInputFileNode != nullptr) {
 				int distance = 0;
 				std::unordered_set<Node*> visitedNodes;
-				valid = isPrerequisite(this, genFileNode->producer(), visitedNodes, distance);
+				valid = isPrerequisite(this, genInputFileNode->producer(), visitedNodes, distance);
 				if (!valid) {
-					std::cerr
-						<< "Not an allowed input file: " << input.string() << std::endl
-						<< "Reason: the input that produces the input:" << std::endl
-						<< "    " << genFileNode->producer()->name().string() << std::endl
-						<< "is not a prerequisite of the command that uses the input: " << std::endl
-						<< "    " << name().string() << std::endl
-						<< "and therefore proper build order is not guaranteed (i.e." << std::endl
-						<< "the input may not yet be up-to-date)."
-						<< std::endl;
+					logBuildOrderNotGuaranteed(this, genInputFileNode.get());
 				} else if (distance > 0) {
-					std::cout
-						<< "Suspect input: " << input.string() << std::endl
-						<< "Reason: the command that produces the input:" << std::endl
-						<< "    " << genFileNode->producer()->name().string() << std::endl
-						<< "is an indirect prerequisite of the command that uses the input:" << std::endl
-						<< "    " << name().string() << std::endl
-						<< "Although this guarantees proper build order it is recommended to" << std::endl
-						<< "guarantee build order through direct prerequisites only."
-						<< std::endl;
+					logDiscouragedBuildOrderGuarantee(this, genInputFileNode.get());
 				}
-			} else if (srcFileNode == nullptr) {
-				throw std::exception("Unexpected node type");
+			} else if (dynamic_pointer_cast<SourceFileNode>(fileNode) == nullptr) {
+				throw std::exception("Unexpected input file node type");
 			}
 		}
 		return valid ? fileNode : nullptr;
@@ -245,9 +360,8 @@ namespace YAM
 				inputNodes.push_back(fileNode);
 			}
 		}
-		if (illegals != 0) {
-			char buf[32];
-			std::cerr << name().string() << " has " << itoa(illegals, buf, 10) << " not-allowed input files" << std::endl;
+		if (illegals > 1) {
+			logNumberOfIllegalInputFiles(this, illegals);
 		}
 		return illegals == 0;
 	}
@@ -261,27 +375,14 @@ namespace YAM
 		if (genFileNode == nullptr) {
 			auto srcFileNode = dynamic_pointer_cast<SourceFileNode>(node);
 			if (srcFileNode != nullptr) {
-				valid = false;
-				std::cerr
-					<< "Not an allowed output: " << output.string() << std::endl
-					<< "Reason: source files must be accessed read-only."
-					<< std::endl;
+				logWriteAccessedSourceFile(this, srcFileNode.get());
 			} else {
 				valid = false;
-				std::cerr
-					<< "Not an allowed output: " << output.string() << std::endl
-					<< "Reason: not declared as output of command " << name().string()
-					<< std::endl;
+				logOutputFileNotDeclared(this, output);
 			}
 		} else if (genFileNode->producer() != this) {
 			valid = false;
-			std::cerr
-				<< "Not an allowed output: " << output.string() << std::endl
-				<< "Reason: the output is produced by 2 commands:" << std::endl
-				<< "    " << genFileNode->producer()->name().string() << std::endl
-				<< "    " << name().string() << std::endl
-				<< "while an output file is allowed to be produced by 1 command only."
-				<< std::endl;
+			logAlreadyProducedByOtherCommand(this, genFileNode.get());
 		}
 		return valid ? genFileNode : nullptr;
 	}
@@ -299,15 +400,14 @@ namespace YAM
 				outputNodes.push_back(fileNode);
 			}
 		}
-		if (illegals != 0) {
-			char buf[32];
-			std::cerr << name().string() << " has " << itoa(illegals, buf, 10) << " not-allowed input files" << std::endl;
+		if (illegals > 1) {
+			logNumberOfIllegalOutputFiles(this, illegals);
 		}
 		return illegals == 0;
 	}
 
 	bool CommandNode::verifyOutputNodes(
-		std::vector<std::shared_ptr<GeneratedFileNode>>& newOutputs
+		std::vector<std::shared_ptr<GeneratedFileNode>> const& newOutputs
 	) {
 		bool valid = true;
 		std::vector<std::shared_ptr<GeneratedFileNode>> inBoth;
@@ -327,11 +427,7 @@ namespace YAM
 			std::inserter(inNewOnly, inNewOnly.begin()));
 		if (!inThisOnly.empty() || !inNewOnly.empty()) {
 			valid = false;
-			std::cerr << "Unexpected outputs for " << name().string() << std::endl;
-			std::cerr << "Expected outputs: ";
-			for (auto const& n : _outputs) std::cerr << "    " << n->name().string() << std::endl;
-		    std::cerr << "Actual outputs: ";
-			for (auto const& n : newOutputs) std::cerr << "    " << n->name().string() << std::endl;
+			logUnexpectedOutputs(this, _outputs, newOutputs);
 		}
 		return valid;
 	}
@@ -362,16 +458,7 @@ namespace YAM
 			//std::cout << "Succesfully executed cmd " << name().string() << std::endl;
 			std::filesystem::remove_all(tmpDir);
 		} else if (!_canceling) {
-			std::cerr << "Failed to execute cmd: " << name().string() << std::endl;
-			std::cerr << "Temporary result directory: " << tmpDir.string() << std::endl;
-			if (!result.stdOut.empty()) {
-				std::cerr << "script stdout: " << std::endl << result.stdOut << std::endl;
-			}
-			if (!result.stdErr.empty()) {
-				std::cerr << "script stderr: " << std::endl << result.stdErr << std::endl;
-			}
-		} else {
-			std::cout << "Canceled execution of cmd: " << name().string() << std::endl;
+			logScriptFailure(this, result, tmpDir);
 		}
 		return result;
 	}

@@ -93,7 +93,7 @@ namespace YAM
 		bool findOutputNodes(
 			MonitoredProcessResult const& result,
 			std::vector<std::shared_ptr<GeneratedFileNode>>& outputNodes);
-		bool verifyOutputNodes(std::vector<std::shared_ptr<GeneratedFileNode>>& newOutputNodes);
+		bool verifyOutputNodes(std::vector<std::shared_ptr<GeneratedFileNode>> const& newOutputNodes);
 
 		MonitoredProcessResult executeScript(std::filesystem::path& scriptFile);
 		void execute();

@@ -96,6 +96,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="BasicOStreamLogBook.h" />
     <ClInclude Include="Builder.h" />
     <ClInclude Include="BuildRequest.h" />
     <ClInclude Include="BuildResult.h" />
@@ -114,7 +115,10 @@
     <ClInclude Include="GlobNode.h" />
     <ClInclude Include="GraphWalker.h" />
     <ClInclude Include="IDirectoryWatcher.h" />
+    <ClInclude Include="ILogBook.h" />
     <ClInclude Include="IMonitoredProcess.h" />
+    <ClInclude Include="LogRecord.h" />
+    <ClInclude Include="MemoryLogBook.h" />
     <ClInclude Include="MonitoredProcess.h" />
     <ClInclude Include="MonitoredProcessWin32.h" />
     <ClInclude Include="MSBuildTrackerOutputReader.h" />
@@ -129,8 +133,10 @@
     <ClInclude Include="SourceFileRepository.h" />
     <ClInclude Include="Thread.h" />
     <ClInclude Include="ThreadPool.h" />
+    <ClInclude Include="TimePoint.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="BasicOStreamLogBook.cpp" />
     <ClCompile Include="Builder.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
     </ClCompile>
@@ -155,6 +161,8 @@
     </ClCompile>
     <ClCompile Include="GlobNode.cpp" />
     <ClCompile Include="GraphWalker.cpp" />
+    <ClCompile Include="LogRecord.cpp" />
+    <ClCompile Include="MemoryLogBook.cpp" />
     <ClCompile Include="MonitoredProcess.cpp" />
     <ClCompile Include="MonitoredProcessWin32.cpp">
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4251;4996</DisableSpecificWarnings>
@@ -179,6 +187,7 @@
     <ClCompile Include="SourceFileRepository.cpp" />
     <ClCompile Include="Thread.cpp" />
     <ClCompile Include="ThreadPool.cpp" />
+    <ClCompile Include="TimePoint.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

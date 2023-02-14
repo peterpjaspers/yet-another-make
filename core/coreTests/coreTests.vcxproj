@@ -62,6 +62,7 @@
     <ClCompile Include="threadPoolTest.cpp" />
     <ClCompile Include="threadTest.cpp" />
     <ClCompile Include="main_gtest.cpp" />
+    <ClCompile Include="timePointTest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\xxHash\xxHash.vcxproj">
