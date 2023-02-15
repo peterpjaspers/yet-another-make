@@ -129,6 +129,9 @@
     <ClInclude Include="LogRecord.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="MultiwayLogBook.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -231,6 +234,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="LogRecord.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MultiwayLogBook.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

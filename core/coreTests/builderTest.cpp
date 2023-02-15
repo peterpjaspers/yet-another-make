@@ -2,6 +2,7 @@
 #include "../CommandNode.h"
 #include "../SourceFileNode.h"
 #include "../GeneratedFileNode.h"
+#include "../DirectoryNode.h"
 #include "../SourceFileRepository.h"
 #include "../ThreadPool.h"
 #include "../ExecutionContext.h"
@@ -279,7 +280,8 @@ namespace
 		EXPECT_EQ(14, driver.stats.nStarted); // __scope is started twice..
 		EXPECT_EQ(13, driver.stats.started.size()); // ..started contains unique nodes
 		EXPECT_EQ(2, driver.stats.nDirectoryUpdates);
-		EXPECT_EQ(7, driver.stats.nFileUpdates); // 4 source + 3 generated
+		// 4 source + 3 generated (before cmd exec) + 3 generated (after cmd exec)
+		EXPECT_EQ(10, driver.stats.nRehashedFiles); 
 
 		// Note: __scope has been already been destroyed by Builder
 		EXPECT_TRUE(driver.stats.started.contains(driver.findNode(driver.repo.dir)));
@@ -326,103 +328,113 @@ namespace
 		std::shared_ptr<BuildResult> result = driver.build();
 		EXPECT_TRUE(result->succeeded());
 		EXPECT_EQ(0, driver.stats.nDirectoryUpdates);
-		EXPECT_EQ(0, driver.stats.nFileUpdates);
+		EXPECT_EQ(0, driver.stats.nRehashedFiles);
 		EXPECT_EQ(0, driver.stats.started.size());
 		EXPECT_EQ(0, driver.stats.selfExecuted.size());
 	}
 	
-/*
 	TEST(Builder, incrementalBuildAfterFileModification) {
-		Commands cmds;
+		TestDriver driver;
+		
+		// First build
+		driver.initializeYam();
+		driver.build();
+		driver.stats.reset();
 
-		EXPECT_TRUE(cmds.execute());
-
-		std::ofstream janSrcFile(cmds.janSrc->name().string());
+		std::ofstream janSrcFile(driver.repo.janCpp.string());
 		janSrcFile << "janjan" << std::endl;
 		janSrcFile.close();
-		cmds.janSrc->setState(Node::State::Dirty);
+		// allow some time for Builder process the (asynchronous) file change
+		// event for janCpp
+		std::this_thread::sleep_for(std::chrono::seconds(1));
 
-		EXPECT_EQ(Node::State::Ok, cmds.pietCmd->state());
-		EXPECT_EQ(Node::State::Dirty, cmds.janCmd->state());
-		EXPECT_EQ(Node::State::Dirty, cmds.pietjanCmd->state());
-		EXPECT_EQ(Node::State::Ok, cmds.pietOut->state());
-		EXPECT_EQ(Node::State::Dirty, cmds.janOut->state());
-		EXPECT_EQ(Node::State::Dirty, cmds.pietjanOut->state());
+		EXPECT_EQ(Node::State::Ok, driver.ccPiet->state());
+		EXPECT_EQ(Node::State::Dirty, driver.ccJan->state());
+		EXPECT_EQ(Node::State::Dirty, driver.linkPietJan->state());
+		EXPECT_EQ(Node::State::Ok, driver.pietOut->state());
+		EXPECT_EQ(Node::State::Dirty, driver.janOut->state());
+		EXPECT_EQ(Node::State::Dirty, driver.pietjanOut->state());
 
-		EXPECT_TRUE(cmds.execute());
+		// Incremental build
+		std::shared_ptr<BuildResult> result = driver.build();
+		EXPECT_TRUE(result->succeeded());
+		EXPECT_EQ(Node::State::Ok, driver.ccPiet->state());
+		EXPECT_EQ(Node::State::Ok, driver.ccJan->state());
+		EXPECT_EQ(Node::State::Ok, driver.linkPietJan->state());
+		EXPECT_EQ(Node::State::Ok, driver.pietOut->state());
+		EXPECT_EQ(Node::State::Ok, driver.janOut->state());
+		EXPECT_EQ(Node::State::Ok, driver.pietjanOut->state());
 
-		EXPECT_EQ(4, cmds.stats.started.size());
-		EXPECT_TRUE(cmds.stats.started.contains(cmds.janCmd.get()));
-		EXPECT_TRUE(cmds.stats.started.contains(cmds.pietjanCmd.get()));
-		EXPECT_TRUE(cmds.stats.started.contains(cmds.janOut.get()));
-		EXPECT_TRUE(cmds.stats.started.contains(cmds.pietjanOut.get()));
+		EXPECT_EQ(0, driver.stats.nDirectoryUpdates);
+		EXPECT_EQ(3, driver.stats.nRehashedFiles);
+		EXPECT_EQ(6, driver.stats.started.size());
 
-		// 1: pendingStartSelf of janCmd sees changed hash of janSrc
-		// 2: self-execution of janCmd => updates and rehashes janOut 
-		// 3: pendingStartSelf of pietjanCmd sees changed hash of janOut
-		// 4: execution of pietjanCmd updates and rehashes pietjanOut
-		// Note that janOut and pietjanOut are executed because Dirty
-		// but that their time stamps have not changes and hence have
-		// not added themselves to updateFiles.
-		EXPECT_EQ(4, cmds.stats.selfExecuted.size());
-		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.janOut.get()));
-		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.janCmd.get()));
-		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietjanOut.get()));
-		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietjanCmd.get()));
-		EXPECT_EQ(0, cmds.stats.rehashedFiles.size());
-
-		EXPECT_EQ(Node::State::Ok, cmds.pietCmd->state());
-		EXPECT_EQ(Node::State::Ok, cmds.janCmd->state());
-		EXPECT_EQ(Node::State::Ok, cmds.pietjanCmd->state());
-		EXPECT_EQ(Node::State::Ok, cmds.pietOut->state());
-		EXPECT_EQ(Node::State::Ok, cmds.janOut->state());
-		EXPECT_EQ(Node::State::Ok, cmds.pietjanOut->state());
+		// selfExecuted also contains: __scope (from Builder)
+		// 1: pendingStartSelf of ccJan sees changed hash of janCpp
+		// 2: self-execution of ccJan => updates and rehashes janOut 
+		// 3: pendingStartSelf of linkPietJan sees changed hash of janOut
+		// 4: execution of linkPietJan updates and rehashes pietjanOut
+		auto janCppNode = driver.context->nodes().find(driver.repo.janCpp);
+		EXPECT_EQ(6, driver.stats.selfExecuted.size());
+		EXPECT_TRUE(driver.stats.selfExecuted.contains(janCppNode.get()));
+		EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.ccJan.get()));
+		EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.janOut.get()));
+		EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.linkPietJan.get()));
+		EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.pietjanOut.get()));
 	}
 
 	TEST(Builder, incrementalBuildAfterFileDeletion) {
-		Commands cmds;
+		TestDriver driver;
 
-		EXPECT_TRUE(cmds.execute());
-		std::filesystem::remove(cmds.janOut->name());
-		cmds.janOut->setState(Node::State::Dirty);
+		// First build
+		driver.initializeYam();
+		driver.build();
+		driver.stats.reset();
 
-		EXPECT_EQ(Node::State::Ok, cmds.pietCmd->state());
-		EXPECT_EQ(Node::State::Dirty, cmds.janCmd->state());
-		EXPECT_EQ(Node::State::Dirty, cmds.pietjanCmd->state());
-		EXPECT_EQ(Node::State::Ok, cmds.pietOut->state());
-		EXPECT_EQ(Node::State::Dirty, cmds.janOut->state());
-		EXPECT_EQ(Node::State::Dirty, cmds.pietjanOut->state());
+		// Delete janCpp, this will fail ccJan (jan.cpp not found).
+		std::filesystem::remove(driver.repo.janCpp);
+		// allow some time for Builder process the (asynchronous) file change
+		// event for janCpp
+		std::this_thread::sleep_for(std::chrono::seconds(1));
 
-		EXPECT_TRUE(cmds.execute());
+		auto janCppNode = dynamic_pointer_cast<FileNode>(driver.context->nodes().find(driver.repo.janCpp));
+		auto srcDirNode = dynamic_pointer_cast<DirectoryNode>(driver.context->nodes().find(driver.repo.dir / "src"));
+		EXPECT_EQ(Node::State::Ok, driver.ccPiet->state());
+		EXPECT_EQ(Node::State::Dirty, janCppNode->state());
+		EXPECT_EQ(Node::State::Dirty, driver.ccJan->state());
+		EXPECT_EQ(Node::State::Dirty, driver.linkPietJan->state());
+		EXPECT_EQ(Node::State::Ok, driver.pietOut->state());
+		EXPECT_EQ(Node::State::Dirty, driver.janOut->state());
+		EXPECT_EQ(Node::State::Dirty, driver.pietjanOut->state());
 
-		EXPECT_EQ(4, cmds.stats.started.size());
-		EXPECT_TRUE(cmds.stats.started.contains(cmds.janCmd.get()));
-		EXPECT_TRUE(cmds.stats.started.contains(cmds.pietjanCmd.get()));
-		EXPECT_TRUE(cmds.stats.started.contains(cmds.janOut.get()));
-		EXPECT_TRUE(cmds.stats.started.contains(cmds.pietjanOut.get()));
+		// Incremental build
+		std::shared_ptr<BuildResult> result = driver.build();
+		EXPECT_FALSE(result->succeeded());
+		EXPECT_EQ(Node::State::Ok, driver.ccPiet->state());
+		EXPECT_EQ(Node::State::Failed, driver.ccJan->state());
+		EXPECT_EQ(Node::State::Ok, janCppNode->state());
+		EXPECT_EQ(Node::State::Canceled, driver.linkPietJan->state());
+		EXPECT_EQ(Node::State::Ok, driver.pietOut->state());
+		EXPECT_EQ(Node::State::Ok, driver.janOut->state());
+		EXPECT_EQ(Node::State::Ok, driver.pietjanOut->state());
 
-		// 1: pendingStartSelf of janCmd sees changed hash of janOut
-		// 2: self-execution of janCmd => restores janOut, no change in hash 
-		// 3: pendingStartSelf of pietjanCmd sees unchanged hash of janOut,
-		//    hence no re-execution
-		// Note that janOut and pietjanOut are executed because Dirty
-		// but that their time stamps have not changes and hence have
-		// not added themselves to updateFiles.
-		EXPECT_EQ(3, cmds.stats.selfExecuted.size());
-		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.janOut.get()));
-		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.janCmd.get()));
-		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietjanOut.get()));
-		EXPECT_EQ(1, cmds.stats.rehashedFiles.size());
-		EXPECT_TRUE(cmds.stats.rehashedFiles.contains(cmds.janOut.get()));
+		EXPECT_EQ(1, driver.stats.nDirectoryUpdates); // dir that contains janCpp
+		EXPECT_EQ(1, driver.stats.nRehashedFiles);
+		EXPECT_TRUE(driver.stats.rehashedFiles.contains(janCppNode.get()));
 
-		EXPECT_EQ(Node::State::Ok, cmds.pietCmd->state());
-		EXPECT_EQ(Node::State::Ok, cmds.janCmd->state());
-		EXPECT_EQ(Node::State::Ok, cmds.pietjanCmd->state());
-		EXPECT_EQ(Node::State::Ok, cmds.pietOut->state());
-		EXPECT_EQ(Node::State::Ok, cmds.janOut->state());
-		EXPECT_EQ(Node::State::Ok, cmds.pietjanOut->state());
+		// 0: __scope__ (from Builder) is started
+		//    prerequisites repo src dir, janCpp, ccJan, linkPietJan, janOut and 
+		//    pietjanOut started
+		// 1: janCpp executed and rehashed, janOut and pietjanOut executed and not
+		//    rehashed (because last-write-time not changed). 
+		// 2: pendingStartSelf of ccJan sees changed hash of janCpp
+		// 3: self-execution of ccJan => fails (janCpp not found)
+		EXPECT_EQ(6, driver.stats.selfExecuted.size());
+		EXPECT_TRUE(driver.stats.selfExecuted.contains(srcDirNode.get()));
+		EXPECT_TRUE(driver.stats.selfExecuted.contains(janCppNode.get()));
+		EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.janOut.get()));
+		EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.ccJan.get()));
+		EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.pietjanOut.get()));
 	}
-*/
-
 }
 

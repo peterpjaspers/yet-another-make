@@ -47,9 +47,9 @@ namespace
 		std::stringstream ss;
 		ss
 			<< "Build order is not guaranteed." << std::endl
-			<< "Fix: declare input as input of command." << std::endl
-			<< "Input  : " << inputFile->name().string() << std::endl
-			<< "Command: " << cmd->name().string() << std::endl;
+			<< "Fix: declare input file as input of command." << std::endl
+			<< "Input file: " << inputFile->name().string() << std::endl
+			<< "Command   : " << cmd->name().string() << std::endl;
 		LogRecord record(LogRecord::Error, ss.str());
 		cmd->context()->addToLogBook(record);
 	}
@@ -61,23 +61,26 @@ namespace
 		std::stringstream ss;
 		ss
 			<< "Build order guaranteed by discouraged indirect input declaration." << std::endl
-			<< "Fix: declare input as (direct) input of command." << std::endl
-			<< "Input  : " << inputFile->name().string() << std::endl
-			<< "Command: " << cmd->name().string() << std::endl;
+			<< "Fix: declare input file as direct input of command." << std::endl
+			<< "Input file: " << inputFile->name().string() << std::endl
+			<< "Command   : " << cmd->name().string() << std::endl;
 		LogRecord record(LogRecord::Warning, ss.str());
 		cmd->context()->addToLogBook(record);
 	}
 
 	void logInputNotInARepository(
 		CommandNode* cmd,
-		FileNode* inputFile
+		std::filesystem::path const& inputFile
 	) {
 		std::stringstream ss;
 		ss
-			<< "File not allowed to be used as input of build." << std::endl
-			<< "Fix: declare the file repository that contains the input." << std::endl
-			<< "Input  : " << inputFile->name().string() << std::endl
+			<< "Input file not in a known file repository." << std::endl
+			<< "Fix: declare the file repository that contains the input," << std::endl
+			<< "or change command script to not depend on the input file." << std::endl
+			<< "Input file: " << inputFile.string() << std::endl
 			<< std::endl;
+		LogRecord record(LogRecord::Warning, ss.str());
+		cmd->context()->addToLogBook(record);
 	}
 	void logWriteAccessedSourceFile(
 		CommandNode* cmd,
@@ -85,10 +88,10 @@ namespace
 	) {
 		std::stringstream ss;
 		ss
-			<< "Source file not allowed to be updated by build." << std::endl
-			<< "Fix: change command script to not update source file." << std::endl
-			<< "Source: " << outputFile->name().string() << std::endl
-			<< "Command: " << cmd->name().string() << std::endl;
+			<< "Source file is updated by build." << std::endl
+			<< "Fix: change command script to not update the source file." << std::endl
+			<< "Source file: " << outputFile->name().string() << std::endl
+			<< "Command    : " << cmd->name().string() << std::endl;
 		LogRecord record(LogRecord::Error, ss.str());
 		cmd->context()->addToLogBook(record);
 	}
@@ -99,8 +102,9 @@ namespace
 	) {
 		std::stringstream ss;
 		ss
-			<< "Unknown output file: " << outputFile.string() << std::endl
-			<< "Fix: declare file as output of command." << std::endl
+			<< "Unknown output file."
+			<< "Fix: declare the file as output of command." << std::endl
+			<< "Output file: " << outputFile.string() << std::endl
 			<< std::endl;
 		LogRecord record(LogRecord::Error, ss.str());
 		cmd->context()->addToLogBook(record);
@@ -132,11 +136,11 @@ namespace
 	) {
 		std::stringstream ss;
 		ss
-			<< "Output file produced by 2 commands." << std::endl
-			<< "Fix: modify scripts and/or output file names."
-			<< "Output: " << outputFile->name().string() << std::endl
-			<< "Command 1: " << outputFile->name().string() << std::endl
-		    << "Command 2: " << cmd->name().string() << std::endl;
+			<< "Output file is produced by 2 commands." << std::endl
+			<< "Fix: adapt command script to ensure that file is produced by one command only." << std::endl
+			<< "Output file: " << outputFile->name().string() << std::endl
+			<< "Command 1  : " << outputFile->producer()->name().string() << std::endl
+		    << "Command 2  : " << cmd->name().string() << std::endl;
 		LogRecord record(LogRecord::Error, ss.str());
 		cmd->context()->addToLogBook(record);
 	}
@@ -148,13 +152,15 @@ namespace
 	) {
 		std::stringstream ss;
 		ss
-			<< "Unexpected outputs." << std::endl
-		    << "Command : " << cmd->name().string() << std::endl
-			<< "Expected outputs: ";
+			<< "Mismatch between declared outputs and actual outputs." << std::endl
+			<< "Fix: declare outputs and/or modify scripts and/or modify output file names." << std::endl
+			<< "Command : " << cmd->name().string() << std::endl
+			<< "Declared outputs: " << std::endl;
 		for (auto const& n : expected) ss << "    " << n->name().string() << std::endl;
-		ss << "Actual outputs: ";
+		 ss << "Actual outputs  : " << std::endl;
 		for (auto const& n : actual) ss << "    " << n->name().string() << std::endl;
-		ss << "Fix: modify scripts and/or output file names." << std::endl;
+		LogRecord record(LogRecord::Error, ss.str());
+		cmd->context()->addToLogBook(record);
 	}
 
 	void logScriptFailure(
@@ -173,6 +179,8 @@ namespace
 		if (!result.stdErr.empty()) {
 			ss << "script stderr: " << std::endl << result.stdErr << std::endl;
 		}
+		LogRecord record(LogRecord::Error, ss.str());
+		cmd->context()->addToLogBook(record);
 	}
 }
 
@@ -326,7 +334,7 @@ namespace YAM
 		if (fileNode == nullptr) {
 			if (input != exclude) {
 				valid = false;
-				logInputNotInARepository(this, fileNode.get());
+				logInputNotInARepository(this, input);
 			}
 		} else {
 			auto genInputFileNode = dynamic_pointer_cast<GeneratedFileNode>(fileNode);
@@ -434,7 +442,9 @@ namespace YAM
 
 	void CommandNode::cancelSelf() {
 		auto executor = _scriptExecutor;
-		if (executor != nullptr) executor->terminate();
+		if (executor != nullptr) {
+			executor->terminate();
+		}
 	}
 
 	MonitoredProcessResult CommandNode::executeScript(std::filesystem::path& scriptFilePath) {

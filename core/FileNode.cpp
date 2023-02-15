@@ -82,6 +82,7 @@ namespace YAM
         for (auto const& aspect : aspects) {
             _hashes[aspect.name()] = aspect.hash(name());
         }
+        context()->statistics().registerRehashedFile(this);
     }
 
     void FileNode::rehashAll() {
@@ -90,7 +91,6 @@ namespace YAM
 
     void FileNode::execute() {
         if (updateLastWriteTime()) {
-            context()->statistics().registerRehashedFile(this);
             rehashAll(false);
         }
         postSelfCompletion(Node::State::Ok);

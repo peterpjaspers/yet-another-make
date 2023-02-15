@@ -36,7 +36,7 @@ namespace YAM
 
 		// These two fields are incremented from threadpool,
 		// hence use atomics.
-		std::atomic<unsigned int> nFileUpdates;
+		std::atomic<unsigned int> nRehashedFiles;
 		std::atomic<unsigned int> nDirectoryUpdates;
 
 		std::mutex mutex;

@@ -5,6 +5,9 @@
 #include "../ThreadPool.h"
 #include "../ExecutionContext.h"
 #include "../FileSystem.h"
+#include "../MultiwayLogBook.h"
+#include "../MemoryLogBook.h"
+#include "../BasicOStreamLogBook.h"
 
 #include "gtest/gtest.h"
 #include <boost/process.hpp>
@@ -32,6 +35,9 @@ namespace
 	{
 	public:
 		std::filesystem::path repoDir;
+		std::shared_ptr<MemoryLogBook> memLogBook;
+		std::shared_ptr<BasicOStreamLogBook> stdoutLogBook;
+		std::shared_ptr<MultiwayLogBook> logBook;
 		ExecutionContext context;
 		std::shared_ptr<CommandNode> pietCmd;
 		std::shared_ptr<CommandNode> janCmd;
@@ -45,6 +51,10 @@ namespace
 
 		Commands()
 			: repoDir(YAM::FileSystem::createUniqueDirectory())
+			, memLogBook(std::make_shared<MemoryLogBook>())
+			, stdoutLogBook(std::make_shared<BasicOStreamLogBook>(&std::cout))
+			, logBook(std::make_shared<MultiwayLogBook>())
+			, context(logBook)
 			, pietCmd(std::make_shared<CommandNode>(&context, np(repoDir / "piet\\_cmd")))
 			, janCmd(std::make_shared<CommandNode>(& context, np(repoDir / "jan\\_cmd")))
 			, pietjanCmd(std::make_shared<CommandNode>(& context, np(repoDir / "pietjan\\_cmd")))
@@ -55,8 +65,10 @@ namespace
 			, janSrc(std::make_shared<SourceFileNode>(&context, np(repoDir / "janSrc.txt")))
 			, stats(context.statistics())
 		{
+			logBook->add(memLogBook);
+			logBook->add(stdoutLogBook);
 			stats.registerNodes = true;
-			context.threadPool().size(1); // to ease debugging
+			// context.threadPool().size(1); // to ease debugging
 			std::filesystem::create_directories(repoDir);
 			std::filesystem::create_directories(np(repoDir / "generated"));
 
@@ -117,12 +129,18 @@ namespace
 		}
 
 		bool execute() {
-			if (pietSrc->state() == Node::State::Dirty) executeNode(pietSrc.get());
-			if (janSrc->state() == Node::State::Dirty) executeNode(janSrc.get());
+			std::vector<Node*> dirtyNodes;
+			if (pietSrc->state() == Node::State::Dirty) dirtyNodes.push_back(pietSrc.get());
+			if (janSrc->state() == Node::State::Dirty) dirtyNodes.push_back(janSrc.get());
+			executeNodes(dirtyNodes);
 			EXPECT_EQ(Node::State::Ok, pietSrc->state());
 			EXPECT_EQ(Node::State::Ok, janSrc->state());
+			dirtyNodes.clear();
+			if (pietCmd->state() == Node::State::Dirty) dirtyNodes.push_back(pietCmd.get());
+			if (janCmd->state() == Node::State::Dirty) dirtyNodes.push_back(janCmd.get());
+			if (pietjanCmd->state() == Node::State::Dirty) dirtyNodes.push_back(pietjanCmd.get());
 			stats.reset();
-			return executeNode(pietjanCmd.get());
+			return executeNodes(dirtyNodes);
 		}
 	};
 
@@ -239,7 +257,7 @@ namespace
 		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.janCmd.get()));
 		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietjanOut.get()));
 		EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietjanCmd.get()));
-		EXPECT_EQ(0, cmds.stats.rehashedFiles.size());
+		EXPECT_EQ(2, cmds.stats.rehashedFiles.size()); // janSrc and pietjanOut
 
 		EXPECT_EQ(Node::State::Ok, cmds.pietCmd->state());
 		EXPECT_EQ(Node::State::Ok, cmds.janCmd->state());
@@ -293,6 +311,26 @@ namespace
 		EXPECT_EQ(Node::State::Ok, cmds.pietjanOut->state());
 	}
 
+	TEST(CommandNode, fail_script) {
+		auto ping = boost::process::search_path("ping");
+		Commands cmds;
+
+		// make sure that pietCmd and janCmd are executed in parallel
+		if (cmds.context.threadPool().size() < 2) {
+			cmds.context.threadPool().size(3);
+		}
+		EXPECT_TRUE(cmds.execute());
+
+		// Execution fails because syntax error in script.
+		cmds.pietCmd->setScript("prut piet > ");
+		// ping -n 10 takes 10 seconds, so will be terminated when pietCmd fails.
+		cmds.janCmd->setScript(ping.string() + " -n 10 localhost");
+		EXPECT_TRUE(cmds.execute());
+		EXPECT_EQ(Node::State::Failed, cmds.pietCmd->state());
+		EXPECT_TRUE(Node::State::Canceled == cmds.janCmd->state());
+		EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Command script failed"));
+	}
+
 	TEST(CommandNode, fail_inputFromMissingInputProducer) {
 		Commands cmds;
 
@@ -304,6 +342,7 @@ namespace
 		cmds.pietjanCmd->setInputProducers({ cmds.pietCmd });
 		EXPECT_TRUE(cmds.execute());
 		EXPECT_EQ(Node::State::Failed, cmds.pietjanCmd->state());
+		EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Build order is not guaranteed"));
 	}
 
 	TEST(CommandNode, warning_inputFromIndirectInputProducer) {
@@ -319,6 +358,7 @@ namespace
 		EXPECT_TRUE(cmds.execute());
 		// TODO: verify that proper warning message is logged
 		EXPECT_EQ(Node::State::Ok, cmds.pietjanCmd->state());
+		EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Build order guaranteed by discouraged indirect input declaration"));
 	}
 
 	TEST(CommandNode, fail_outputToSourceFile) {
@@ -332,6 +372,7 @@ namespace
 		cmds.pietCmd->setScript(script.str());
 		EXPECT_TRUE(cmds.execute());
 		EXPECT_EQ(Node::State::Failed, cmds.pietCmd->state());
+		EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Source file is updated by build"));
 	}
 
 	TEST(CommandNode, fail_outputNotDeclared) {
@@ -344,6 +385,7 @@ namespace
 		cmds.pietCmd->setOutputs({ });
 		EXPECT_TRUE(cmds.execute());
 		EXPECT_EQ(Node::State::Failed, cmds.pietCmd->state());
+		EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Mismatch between declared outputs and actual outputs"));
 	}
 
 	TEST(CommandNode, fail_inputNotInARepository) {
@@ -360,6 +402,7 @@ namespace
 		// no associated file node in the execution context.
 		EXPECT_TRUE(cmds.execute());
 		EXPECT_EQ(Node::State::Failed, cmds.janCmd->state());
+		EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Input file not in a known file repository"));
 	}
 
 	TEST(CommandNode, fail_notExpectedOutputProducer) {
@@ -373,6 +416,7 @@ namespace
 		cmds.pietCmd->setScript(script.str());
 		EXPECT_TRUE(cmds.execute());
 		EXPECT_EQ(Node::State::Failed, cmds.pietCmd->state());
+		EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Output file is produced by 2 commands"));
 	}
 
 }

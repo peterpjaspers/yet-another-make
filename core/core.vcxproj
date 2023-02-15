@@ -122,6 +122,7 @@
     <ClInclude Include="MonitoredProcess.h" />
     <ClInclude Include="MonitoredProcessWin32.h" />
     <ClInclude Include="MSBuildTrackerOutputReader.h" />
+    <ClInclude Include="MultiwayLogBook.h" />
     <ClInclude Include="RegexSet.h" />
     <ClInclude Include="FileAspectSet.h" />
     <ClInclude Include="GeneratedFileNode.h" />
@@ -171,6 +172,7 @@
     <ClCompile Include="MSBuildTrackerOutputReader.cpp">
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdcpp20</LanguageStandard>
     </ClCompile>
+    <ClCompile Include="MultiwayLogBook.cpp" />
     <ClCompile Include="RegexSet.cpp" />
     <ClCompile Include="FileAspectSet.cpp" />
     <ClCompile Include="GeneratedFileNode.cpp" />

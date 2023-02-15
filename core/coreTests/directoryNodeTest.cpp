@@ -74,7 +74,7 @@ namespace
         // But only 4 dir nodes will see a modified directory. Only those 4
         // update their content.
         EXPECT_EQ(10, context.statistics().nSelfExecuted);
-        EXPECT_EQ(6, context.statistics().nFileUpdates);
+        EXPECT_EQ(6, context.statistics().nRehashedFiles);
         EXPECT_EQ(4, context.statistics().nDirectoryUpdates);
         EXPECT_TRUE(context.statistics().updatedDirectories.contains(&dirNode));
         EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode_S1.get()));

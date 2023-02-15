@@ -6,7 +6,7 @@ namespace YAM
         : nStarted(0)
         , nSelfExecuted(0)
         , registerNodes(false)
-        , nFileUpdates(0)
+        , nRehashedFiles(0)
         , nDirectoryUpdates(0)
     {
     }
@@ -14,7 +14,7 @@ namespace YAM
     void ExecutionStatistics::reset() {
         nStarted = 0;
         nSelfExecuted = 0;
-        nFileUpdates = 0;
+        nRehashedFiles = 0;
         nDirectoryUpdates = 0;
         started.clear();
         selfExecuted.clear();
@@ -39,7 +39,7 @@ namespace YAM
 
 
     void ExecutionStatistics::registerRehashedFile(FileNode* node) {
-        nFileUpdates++;
+        nRehashedFiles++;
         if (registerNodes) {
             std::lock_guard<std::mutex> lock(mutex);
             rehashedFiles.insert(node);

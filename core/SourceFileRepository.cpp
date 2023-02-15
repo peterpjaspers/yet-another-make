@@ -155,6 +155,13 @@ namespace YAM
 
 	void SourceFileRepository::_handleRemove(FileChange const& change) {
 		std::filesystem::path dirOrFile(directory()->name() / change.fileName);
+		std::filesystem::path parentDir = dirOrFile.parent_path();
+		// take care: cannot use change.lastWriteTime because it applies to
+		// change.fileName, not to parentDir.
+		std::shared_ptr<Node> node = _invalidateNode(parentDir, std::chrono::utc_clock::now());
+		if (node != nullptr && dynamic_cast<DirectoryNode*>(node.get()) == nullptr) {
+			throw std::exception("unexpected node type");
+		}
 		_invalidateNodeRecursively(dirOrFile);
 	}
 
