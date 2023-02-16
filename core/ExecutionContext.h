@@ -6,10 +6,9 @@
 #include "ThreadPool.h"
 #include "FileAspectSet.h"
 #include "ExecutionStatistics.h"
-#include "BasicOStreamLogBook.h"
+#include "ConsoleLogBook.h"
 
 #include <memory>
-#include <iostream>
 
 namespace YAM
 {
@@ -20,7 +19,7 @@ namespace YAM
 	class __declspec(dllexport) ExecutionContext
 	{
 	public:
-		ExecutionContext(std::shared_ptr<ILogBook> logBook = std::make_shared<BasicOStreamLogBook>(&std::cout));
+		ExecutionContext(std::shared_ptr<ILogBook> logBook = std::make_shared<ConsoleLogBook>());
 		~ExecutionContext();
 
 		ThreadPool& threadPool();

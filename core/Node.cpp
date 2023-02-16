@@ -355,9 +355,7 @@ namespace YAM
     }
 
     void Node::cancel() {
-        if (!busy()) {
-            throw std::runtime_error("Attempt to cancel while not busy");
-        }
+        if (!busy()) return;
         if (!_canceling) {
             _canceling = true;
             switch (_executionState) {

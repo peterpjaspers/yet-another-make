@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <fstream>
+#include <boost/process.hpp>
 
 namespace
 {
@@ -215,8 +216,8 @@ namespace
 					received = srcFileRepo->hasChanged(path);
 					if (received) {
 						srcFileRepo->consumeChanges();
-						dispatcher.stop();
 					}
+					dispatcher.stop();
 				});
 			const auto retryInterval = std::chrono::milliseconds(100);
 			const unsigned int maxRetries = 10;
@@ -461,5 +462,43 @@ namespace
 		EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.ccJan.get()));
 		EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.pietjanOut.get()));
 	}
+
+
+	TEST(Builder, stopBuild) {
+		TestDriver driver;
+
+		// Set-up command scripts to take ~10 seconds execution time as to
+		// have sufficient time to stop a build-in-progress
+		auto ping = boost::process::search_path("ping");
+		driver.ccPiet->setOutputs({ });
+		driver.ccPiet->setScript(ping.string() + " -n 10 127.0.0.1");
+		driver.ccJan->setOutputs({ });
+		driver.ccJan->setScript(ping.string() + " -n 10 127.0.0.1");
+		driver.linkPietJan->setScript(ping.string() + " -n 10 127.0.0.1");
+		driver.linkPietJan->setOutputs({ });
+
+		auto request = std::make_shared< BuildRequest>(BuildRequest::RequestType::Build);
+		request->directory(driver.repo.dir);
+		std::atomic<std::shared_ptr<BuildResult>> result;
+		Dispatcher dispatcher;
+		driver.builder.completor().AddLambda(
+			[&result, &dispatcher](std::shared_ptr<BuildResult> r) {
+				result = r;
+		        dispatcher.stop();
+			});
+		driver.builder.start(request);
+		// wait a bit to get the ping commands running...
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+		// ... then request build to stop (cancel)...
+		driver.builder.stop();
+		// ... and wait for build completion
+		dispatcher.run();
+		driver.builder.completor().RemoveAll();
+
+		EXPECT_EQ(Node::State::Canceled, driver.ccPiet->state());
+		EXPECT_EQ(Node::State::Canceled, driver.ccJan->state());
+		EXPECT_EQ(Node::State::Canceled, driver.linkPietJan->state());
+	}
+
 }
 

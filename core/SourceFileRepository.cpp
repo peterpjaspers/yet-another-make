@@ -103,9 +103,11 @@ namespace YAM
 				if (_buildInProgress && _excludes.matches(absPath.string())) {
 					// Ignore changes to generated files during a build
 				} else {
+					//std::cout << "Inserted change for " << absPath.string() << std::endl;
 					_changes.insert({ absPath, change });
 				}
 			} else {
+				//std::cout << "Updated change for " << absPath.string() << std::endl;
 				it->second = change;
 			}
 		}
@@ -123,7 +125,9 @@ namespace YAM
 	}
 
 	bool SourceFileRepository::hasChanged(std::filesystem::path const& path) const {
-		return _changes.contains(path) || _changes.contains(overflowPath);
+		bool contains = _changes.contains(path) || _changes.contains(overflowPath);
+		//std::cout << "hasChanged(" << path.string() << "=" << (contains ? "true" : "false") << std::endl;
+		return contains;
 	}
 
 	void SourceFileRepository::_handleChange(FileChange const& change) {

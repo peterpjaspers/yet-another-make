@@ -35,6 +35,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "directoryWatcherDemo", "dir
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "detectMemLeaks", "detectMemLeaks\detectMemLeaks.vcxproj", "{D1C0E0FB-247A-40D6-B0D4-054C2663DCC9}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "testConsoleLogBook", "testConsoleLogBook\testConsoleLogBook.vcxproj", "{2F0EB85A-2952-4B35-A39A-248A86B7E53E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -117,6 +119,18 @@ Global
 		{D1C0E0FB-247A-40D6-B0D4-054C2663DCC9}.Release|x64.Build.0 = Release|x64
 		{D1C0E0FB-247A-40D6-B0D4-054C2663DCC9}.Release|x86.ActiveCfg = Release|Win32
 		{D1C0E0FB-247A-40D6-B0D4-054C2663DCC9}.Release|x86.Build.0 = Release|Win32
+		{2F0EB85A-2952-4B35-A39A-248A86B7E53E}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{2F0EB85A-2952-4B35-A39A-248A86B7E53E}.Debug|Any CPU.Build.0 = Debug|x64
+		{2F0EB85A-2952-4B35-A39A-248A86B7E53E}.Debug|x64.ActiveCfg = Debug|x64
+		{2F0EB85A-2952-4B35-A39A-248A86B7E53E}.Debug|x64.Build.0 = Debug|x64
+		{2F0EB85A-2952-4B35-A39A-248A86B7E53E}.Debug|x86.ActiveCfg = Debug|Win32
+		{2F0EB85A-2952-4B35-A39A-248A86B7E53E}.Debug|x86.Build.0 = Debug|Win32
+		{2F0EB85A-2952-4B35-A39A-248A86B7E53E}.Release|Any CPU.ActiveCfg = Release|x64
+		{2F0EB85A-2952-4B35-A39A-248A86B7E53E}.Release|Any CPU.Build.0 = Release|x64
+		{2F0EB85A-2952-4B35-A39A-248A86B7E53E}.Release|x64.ActiveCfg = Release|x64
+		{2F0EB85A-2952-4B35-A39A-248A86B7E53E}.Release|x64.Build.0 = Release|x64
+		{2F0EB85A-2952-4B35-A39A-248A86B7E53E}.Release|x86.ActiveCfg = Release|Win32
+		{2F0EB85A-2952-4B35-A39A-248A86B7E53E}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -182,6 +182,15 @@ namespace
 		LogRecord record(LogRecord::Error, ss.str());
 		cmd->context()->addToLogBook(record);
 	}
+
+	void logDirRemovalError(ILogBook* logBook, std::filesystem::path const& dir, std::error_code ec) {
+		std::stringstream ss;
+		ss
+			<< "Failed to delete temporary script directory " << dir.string() << std::endl
+			<< "Reason: " << ec.message() << std::endl;
+		LogRecord record(LogRecord::Error, ss.str());
+		logBook->add(record);
+	}
 }
 
 namespace YAM
@@ -465,8 +474,11 @@ namespace YAM
 		_scriptExecutor = nullptr;
 
 		if (result.exitCode == 0) {
-			//std::cout << "Succesfully executed cmd " << name().string() << std::endl;
-			std::filesystem::remove_all(tmpDir);
+			std::error_code ec;
+			bool removed = std::filesystem::remove_all(tmpDir, ec);
+			if (!removed) {
+				logDirRemovalError(context()->logBook().get(), tmpDir, ec);
+			}
 		} else if (!_canceling) {
 			logScriptFailure(this, result, tmpDir);
 		}
