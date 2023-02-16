@@ -9,7 +9,7 @@ namespace
 {
 	using namespace YAM;
 
-	const std::size_t queueCapacity = 32*1024;
+	const std::filesystem::path overflowPath("overflow");
 
 	bool isDirNode(Node* node) {
 		return dynamic_cast<DirectoryNode*>(node) != nullptr;
@@ -47,7 +47,7 @@ namespace YAM
 		, _directory(std::make_shared<DirectoryNode>(context, directory))
 		, _context(context)
 		, _excludes(excludePatterns)
-		, _suspended(false)
+		, _buildInProgress(false)
 		, _watcher(std::make_shared<DirectoryWatcher>(
 			directory,
 			true,
@@ -58,7 +58,7 @@ namespace YAM
 					// Access to nodes is only allowed in main thread context.
 					// Therefore post change handling to main thread.
 	                _context->mainThreadQueue().push(
-			        Delegate<void>::CreateLambda([c, this]() { _enqueueChange(c); }));
+			        Delegate<void>::CreateLambda([c, this]() { _addChange(c); }));
 
 				})
 			)
@@ -75,7 +75,7 @@ namespace YAM
 		, _directory(nullptr)
 		, _context(nullptr)
 		, _excludes()
-		, _suspended(false)
+		, _buildInProgress(false)
 		, _watcher(nullptr)
 	{}
 
@@ -92,38 +92,38 @@ namespace YAM
 		}
 	}
 
-	void SourceFileRepository::suspend() { _suspended = true; }
-	void SourceFileRepository::resume() {
-		if (_suspended) {
-			_suspended = false;
-			_processChangeQueue();
-		}
-	}
-
-	void SourceFileRepository::_enqueueChange(FileChange change) {
-		if (_changeQueue.size() > queueCapacity) {
-			while (_changeQueue.size() > 0) _changeQueue.pop();
-			change.fileName.clear();
-			change.action = FileChange::Action::Overflow;
-		}
-		if (_suspended) {
+	void SourceFileRepository::_addChange(FileChange change) {
+		if (change.action == FileChange::Action::Overflow) {
+			_changes.clear();
+			_changes.insert({ overflowPath, change });
+		} else if (!_changes.contains(overflowPath)) {
 			std::filesystem::path absPath(directory()->name() / change.fileName);
-			// Ignore changes to generated files during a build
-			if (!_excludes.matches(absPath.string())) {
-				_changeQueue.push(change);
+			auto it = _changes.find(absPath);
+			if (it == _changes.end()) {
+				if (_buildInProgress && _excludes.matches(absPath.string())) {
+					// Ignore changes to generated files during a build
+				} else {
+					_changes.insert({ absPath, change });
+				}
+			} else {
+				it->second = change;
 			}
-		} else {
-			_changeQueue.push(change);
-			_processChangeQueue();
 		}
 	}
 
-	void SourceFileRepository::_processChangeQueue() {
-		while (!_changeQueue.empty()) {
-			FileChange const& change = _changeQueue.front();
-			_handleChange(change);
-			_changeQueue.pop();
+	void SourceFileRepository::buildInProgress(bool inProgress) {
+		_buildInProgress = inProgress;
+	}
+		
+	void SourceFileRepository::consumeChanges() {
+		for (auto const& pair : _changes) {
+			_handleChange(pair.second);
 		}
+		_changes.clear();
+	}
+
+	bool SourceFileRepository::hasChanged(std::filesystem::path const& path) const {
+		return _changes.contains(path) || _changes.contains(overflowPath);
 	}
 
 	void SourceFileRepository::_handleChange(FileChange const& change) {

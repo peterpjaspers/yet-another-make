@@ -202,6 +202,35 @@ namespace
 			return executeRequest(request);
 		}
 
+		// Wait for file change event to be received for given path.
+		// When event is received then consume the changes.
+		// Return whether event was consumed.
+		bool consumeFileChangeEvent(std::filesystem::path const& path)
+		{
+			auto srcFileRepo = context->findRepository(repo.dir);
+			std::atomic<bool> received = false;
+			Dispatcher dispatcher;
+			auto pollChange = Delegate<void>::CreateLambda(
+				[&]() {
+					received = srcFileRepo->hasChanged(path);
+					if (received) {
+						srcFileRepo->consumeChanges();
+						dispatcher.stop();
+					}
+				});
+			const auto retryInterval = std::chrono::milliseconds(100);
+			const unsigned int maxRetries = 10;
+			unsigned int nRetries = 0;
+			do {
+				nRetries++;
+				dispatcher.start();
+				context->mainThreadQueue().push(pollChange);
+				dispatcher.run();
+				if (!received) std::this_thread::sleep_for(retryInterval);
+			} while (nRetries < maxRetries && !received);
+			return received;
+		}
+
 		std::string expectedPietOutContent() { return repo.pietHContent + repo.janHContent + repo.pietCppContent; }
 		std::string expectedJanOutContent() { return repo.janHContent + repo.janCppContent; }
 		std::string expectedPietjanOutContent() { return expectedPietOutContent() + expectedJanOutContent();}
@@ -344,10 +373,8 @@ namespace
 		std::ofstream janSrcFile(driver.repo.janCpp.string());
 		janSrcFile << "janjan" << std::endl;
 		janSrcFile.close();
-		// allow some time for Builder process the (asynchronous) file change
-		// event for janCpp
-		std::this_thread::sleep_for(std::chrono::seconds(1));
 
+		ASSERT_TRUE(driver.consumeFileChangeEvent(driver.repo.janCpp));
 		EXPECT_EQ(Node::State::Ok, driver.ccPiet->state());
 		EXPECT_EQ(Node::State::Dirty, driver.ccJan->state());
 		EXPECT_EQ(Node::State::Dirty, driver.linkPietJan->state());
@@ -393,10 +420,8 @@ namespace
 
 		// Delete janCpp, this will fail ccJan (jan.cpp not found).
 		std::filesystem::remove(driver.repo.janCpp);
-		// allow some time for Builder process the (asynchronous) file change
-		// event for janCpp
-		std::this_thread::sleep_for(std::chrono::seconds(1));
 
+		ASSERT_TRUE(driver.consumeFileChangeEvent(driver.repo.janCpp));
 		auto janCppNode = dynamic_pointer_cast<FileNode>(driver.context->nodes().find(driver.repo.janCpp));
 		auto srcDirNode = dynamic_pointer_cast<DirectoryNode>(driver.context->nodes().find(driver.repo.dir / "src"));
 		EXPECT_EQ(Node::State::Ok, driver.ccPiet->state());

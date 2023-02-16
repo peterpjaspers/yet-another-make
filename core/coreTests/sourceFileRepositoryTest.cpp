@@ -45,14 +45,15 @@ namespace
         context.addRepository(repo);
         DirectoryNode* dirNode = repo->directory().get();
 
+        repo->consumeChanges();
         std::vector<Node*> dirtyNodes = getDirtyNodes(dirNode);
         EXPECT_EQ(1, dirtyNodes.size());
         EXPECT_EQ(dirNode, dirtyNodes[0]);
-        repo->suspend();
+        repo->buildInProgress(true);
         bool completed = YAMTest::executeNodes(dirtyNodes);
         EXPECT_TRUE(completed);
         verify(&testTree, dirNode);
-        repo->resume();
+        repo->buildInProgress(false);
 
         std::vector<std::shared_ptr<DirectoryNode>> subDirNodes;
         dirNode->getSubDirs(subDirNodes);
@@ -75,6 +76,7 @@ namespace
         Dispatcher dispatcher;
         auto fillDirtyNodes = Delegate<void>::CreateLambda(
             [&]() {
+                repo->consumeChanges();
                 dirtyNodes = getDirtyNodes(dirNode);
                 dispatcher.stop();
             });
@@ -93,13 +95,13 @@ namespace
         } while (nRetries < maxRetries && !done);
         ASSERT_EQ(3, dirtyNodes.size());
 
-        repo->suspend();
+        repo->buildInProgress(true);
         context.statistics().reset();
         context.statistics().registerNodes = true;
         completed = YAMTest::executeNodes(dirtyNodes);
         EXPECT_TRUE(completed);
         verify(&testTree, dirNode);
-        repo->resume();
+        repo->buildInProgress(false);
         
         EXPECT_EQ(10, context.statistics().nStarted);
         // 10 because DirectoryNode::pendingStartSelf always returns true.

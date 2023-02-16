@@ -121,7 +121,8 @@ namespace YAM
 		for (auto const& pair : _context.repositories()) {
 			auto repo = pair.second;
 			auto dirNode = repo->directory();
-			repo->suspend(); // suspend processing of dir&file modified events
+			repo->buildInProgress(true);
+			repo->consumeChanges();
 			appendDirtyFileAndDirectoryNodes(dirNode, dirtyDirsAndFiles);
 		}
 		if (dirtyDirsAndFiles.empty()) {
@@ -179,7 +180,7 @@ namespace YAM
 		_context.buildRequest(nullptr);
 		for (auto const& pair : _context.repositories()) {
 			auto repo = pair.second;
-			repo->resume(); // resume processing of dir&file modified events
+			repo->buildInProgress(false);
 		}
 		_completor.Broadcast(result);
 	}

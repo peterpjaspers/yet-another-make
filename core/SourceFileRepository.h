@@ -5,7 +5,7 @@
 
 #include <memory>
 #include <filesystem>
-#include <queue>
+#include <map>
 
 namespace YAM
 {
@@ -23,11 +23,19 @@ namespace YAM
 	// when it detects an input dependency on a source file that is not in
 	// one of YAM's SourceFileRepositories. 
 	// 
+	// SourceFileRepository continuously monitors the tree for directory and
+	// file changes. The changes are queued for consumption via the function
+	// consumeChanges(). On consumption the directory and file nodes associated
+	// with the changes are marked Dirty. Dirty nodes can be synced with the
+	// fileystem state by executing them. Syncing will update the repo directory
+	// node to reflect the latest state of the repo directory tree.
+	// Syncing is not performed by SourceFileRepository.
+	// 
 	// The user can specify a subset of the directories and files in the 
 	// repository to be excluded from the SourceFileRepository. The user 
 	// can do so by specifying a set of exclude patterns. File/directory
-	// names that match one of these  patterns will be excluded from the 
-	// SourceFileRepository and hence will not be present in ExecutionContext.
+	// names that match one of these patterns will be excluded from the 
+	// the directory node tree.
 	// 
 	// A SourceFileRepository must not mirror generated files. It is not
 	// possible however to distinguish between source and generated files
@@ -37,11 +45,6 @@ namespace YAM
 	// when that file is declared as an output file in a build file. In that
 	// case the build file parser will fail to create a GeneratedFileNode for
 	// that file because there is already a SourceFileNode with that name.
-	// 
-	// SourceFileRepository monitors the tree for sub-directory and file 
-	// changes and marks changed directory and file nodes as Dirty. Dirty 
-	// nodes can be synced with the fileystem state by executing them. 
-	// Syncing is not performed by SourceFileRepository.
 	// 
 	// Comparing build states
 	// Node names are absolute path names. This complicates comparing two
@@ -130,15 +133,23 @@ namespace YAM
 		// exclude patterns. 
 		bool contains(std::filesystem::path const& path) const;
 		
-		// Suspend/resume repository change monitoring.
-		// While suspended: queue dir and file changes.
-		// When resumed: dequeue the changes and mark associated file
-		// and dir nodes Dirty.
-		// Rationale: change monitoring will result in nodes to become
-		// Dirty. Doing so during an on-going build will confuse node
-		// execution. Therefore suspend monitoring during a build.
-		void suspend();
-		void resume();
+		// Inform that a build is yes/no in progress. During a build ignore
+		// changes to generated files because these changes are most likely
+		// caused by the build. Note that this implies that tampering with
+		// generated files during a build may cause YAM to produce incorrect
+		// build results.
+		void buildInProgress(bool inProgress);
+
+		// Consume the changes that occurred in the filesystem since the previous
+		// consumption by marking directory and file nodes associated with these 
+		// changes as Dirty.
+		// Only call this function from yam main thread to ensure that consumption
+		// is an atomic action.
+		void consumeChanges();
+
+		// Return whether dir/file identified by path has changes since previous
+		// consumeChanges().
+		bool hasChanged(std::filesystem::path const& path) const;
 
 		// Recursively remove the directory node from context->nodes().
 		// Intended to be used when the repo is no longer to be mirrored
@@ -146,8 +157,7 @@ namespace YAM
 		void clear();
 
 	private: 
-		void _enqueueChange(FileChange change);
-		void _processChangeQueue();
+		void _addChange(FileChange change);
 		void _handleChange(FileChange const& change);
 		void _handleAdd(FileChange const& change);
 		void _handleRemove(FileChange const& change);
@@ -165,8 +175,8 @@ namespace YAM
 		std::shared_ptr<DirectoryNode> _directory;
 		ExecutionContext* _context;
 		RegexSet _excludes;
-		bool _suspended;
-		std::queue<FileChange> _changeQueue;
+		bool _buildInProgress;
+		std::map<std::filesystem::path, FileChange> _changes;
 		std::shared_ptr<IDirectoryWatcher> _watcher;
 	};
 }
