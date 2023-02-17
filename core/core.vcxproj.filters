@@ -144,6 +144,12 @@
     <ClInclude Include="ConsoleLogBook.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="FileRepository.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="WatchedFileRepository.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -258,6 +264,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ConsoleLogBook.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="FileRepository.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="WatchedFileRepository.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

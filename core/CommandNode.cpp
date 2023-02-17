@@ -5,6 +5,7 @@
 #include "MonitoredProcess.h"
 #include "FileAspectSet.h"
 #include "FileSystem.h"
+#include "SourceFileRepository.h"
 
 #include <iostream>
 #include <fstream>
@@ -79,9 +80,10 @@ namespace
 			<< "or change command script to not depend on the input file." << std::endl
 			<< "Input file: " << inputFile.string() << std::endl
 			<< std::endl;
-		LogRecord record(LogRecord::Warning, ss.str());
+		LogRecord record(LogRecord::Error, ss.str());
 		cmd->context()->addToLogBook(record);
 	}
+
 	void logWriteAccessedSourceFile(
 		CommandNode* cmd,
 		SourceFileNode* outputFile
@@ -341,7 +343,8 @@ namespace YAM
 		auto node = context()->nodes().find(input);
 		auto fileNode = dynamic_pointer_cast<FileNode>(node);
 		if (fileNode == nullptr) {
-			if (input != exclude) {
+			auto repo = dynamic_pointer_cast<SourceFileRepository>(context()->findRepositoryContaining(input));
+			if (input != exclude && repo == nullptr) {
 				valid = false;
 				logInputNotInARepository(this, input);
 			}

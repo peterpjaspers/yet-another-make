@@ -56,7 +56,7 @@ namespace YAM
         return _statistics;
     }
 
-    bool ExecutionContext::addRepository(std::shared_ptr<SourceFileRepository> repo)
+    bool ExecutionContext::addRepository(std::shared_ptr<FileRepository> repo)
     {
         bool duplicateName = nullptr != findRepository(repo->name());
         if (!duplicateName) {
@@ -74,14 +74,14 @@ namespace YAM
         return found;
     }
 
-    std::shared_ptr<SourceFileRepository> ExecutionContext::findRepository(std::string const& repoName) const {
+    std::shared_ptr<FileRepository> ExecutionContext::findRepository(std::string const& repoName) const {
         auto it = _repositories.find(repoName);
         bool found = it != _repositories.end();
         if (found) return it->second;
         return nullptr;
     }
 
-    std::shared_ptr<SourceFileRepository> ExecutionContext::findRepository(std::filesystem::path const& path) const {
+    std::shared_ptr<FileRepository> ExecutionContext::findRepositoryContaining(std::filesystem::path const& path) const {
         for (auto pair : _repositories) {
             auto repo = pair.second;
             if (repo->contains(path)) return repo;
@@ -89,7 +89,7 @@ namespace YAM
         return nullptr;
     }
 
-    std::map<std::string, std::shared_ptr<SourceFileRepository>> const& ExecutionContext::repositories() const {
+    std::map<std::string, std::shared_ptr<FileRepository>> const& ExecutionContext::repositories() const {
         return _repositories;
     }
 
@@ -97,7 +97,7 @@ namespace YAM
     // file.
     RegexSet const& ExecutionContext::findExcludes(std::filesystem::path const& path) const {
         static RegexSet noExcludes;
-        auto repo = findRepository(path);
+        auto repo = findRepositoryContaining(path);
         if (repo != nullptr) return repo->excludes();
         return noExcludes;
     }

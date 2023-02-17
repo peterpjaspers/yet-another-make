@@ -169,7 +169,7 @@ namespace
 		}
 
 		std::shared_ptr<SourceFileRepository> sourceRepo() {
-			return context->findRepository(repo.dir.filename());
+			return dynamic_pointer_cast<SourceFileRepository>(context->findRepository(repo.dir.filename().string()));
 		}
 
 		Node* findNode(std::filesystem::path const& path) {
@@ -203,17 +203,20 @@ namespace
 			return executeRequest(request);
 		}
 
-		// Wait for file change event to be received for given path.
+		// Wait for file change event to be received for given paths.
 		// When event is received then consume the changes.
 		// Return whether event was consumed.
-		bool consumeFileChangeEvent(std::filesystem::path const& path)
+		bool consumeFileChangeEvent(std::initializer_list<std::filesystem::path> paths)
 		{
-			auto srcFileRepo = context->findRepository(repo.dir);
+			auto srcFileRepo = sourceRepo();
 			std::atomic<bool> received = false;
 			Dispatcher dispatcher;
 			auto pollChange = Delegate<void>::CreateLambda(
 				[&]() {
-					received = srcFileRepo->hasChanged(path);
+					for (auto path : paths) {
+						received = srcFileRepo->hasChanged(path);
+						if (!received) break;
+					}
 					if (received) {
 						srcFileRepo->consumeChanges();
 					}
@@ -247,7 +250,7 @@ namespace
 		EXPECT_TRUE(result->succeeded());
 		auto srcRepo = driver.builder.context()->findRepository(driver.repo.dir.filename().string());
 		EXPECT_NE(nullptr, srcRepo);
-		EXPECT_EQ(driver.repo.dir, srcRepo->directoryName());
+		EXPECT_EQ(driver.repo.dir, srcRepo->directory());
 	}
 	TEST(Builder, initTwice) {
 		TestDriver driver;
@@ -345,6 +348,35 @@ namespace
 		EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.pietjanOut.get()));
 	}
 
+	TEST(Builder, noDirtyNodesAfterConsumeChangesAfterBuild) {
+		TestDriver driver;
+
+		driver.initializeYam();
+		driver.build();
+
+		// Assert that the source file repository has detected the changes made
+		// by the build to the generated files.
+		ASSERT_TRUE(driver.consumeFileChangeEvent({ 
+			driver.pietOut->name(),
+			driver.janOut->name(),
+			driver.pietjanOut->name(),
+		}));
+
+		// Because the generated files have not been modified since the last
+		// detected file changes we expect all generated files to be still Ok.
+		EXPECT_EQ(Node::State::Ok, driver.janOut->state());
+		EXPECT_EQ(Node::State::Ok, driver.pietOut->state());
+		EXPECT_EQ(Node::State::Ok, driver.pietjanOut->state());
+
+		// And also all other nodes are expected to be still Ok.
+		EXPECT_EQ(Node::State::Ok, driver.ccPiet->state());
+		EXPECT_EQ(Node::State::Ok, driver.ccJan->state());
+		EXPECT_EQ(Node::State::Ok, driver.linkPietJan->state());
+		EXPECT_EQ(Node::State::Ok, driver.findNode(driver.repo.pietCpp)->state());
+		EXPECT_EQ(Node::State::Ok, driver.findNode(driver.repo.pietH)->state());
+		EXPECT_EQ(Node::State::Ok, driver.findNode(driver.repo.janCpp)->state());
+		EXPECT_EQ(Node::State::Ok, driver.findNode(driver.repo.janH)->state());
+	}
 
 	TEST(Builder, incrementalBuildWhileNoModifications) {
 		TestDriver driver;
@@ -375,7 +407,7 @@ namespace
 		janSrcFile << "janjan" << std::endl;
 		janSrcFile.close();
 
-		ASSERT_TRUE(driver.consumeFileChangeEvent(driver.repo.janCpp));
+		ASSERT_TRUE(driver.consumeFileChangeEvent({ driver.repo.janCpp }));
 		EXPECT_EQ(Node::State::Ok, driver.ccPiet->state());
 		EXPECT_EQ(Node::State::Dirty, driver.ccJan->state());
 		EXPECT_EQ(Node::State::Dirty, driver.linkPietJan->state());
@@ -422,7 +454,7 @@ namespace
 		// Delete janCpp, this will fail ccJan (jan.cpp not found).
 		std::filesystem::remove(driver.repo.janCpp);
 
-		ASSERT_TRUE(driver.consumeFileChangeEvent(driver.repo.janCpp));
+		ASSERT_TRUE(driver.consumeFileChangeEvent({ driver.repo.janCpp }));
 		auto janCppNode = dynamic_pointer_cast<FileNode>(driver.context->nodes().find(driver.repo.janCpp));
 		auto srcDirNode = dynamic_pointer_cast<DirectoryNode>(driver.context->nodes().find(driver.repo.dir / "src"));
 		EXPECT_EQ(Node::State::Ok, driver.ccPiet->state());

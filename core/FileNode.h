@@ -8,7 +8,7 @@
 
 namespace YAM
 {
-    class SourceFileRepository;
+    class FileRepository;
 
     // A file node computes hashes of aspects of its associated file. The list
     // of aspects applicable to the file is retrieved from the node's execution 
@@ -109,11 +109,14 @@ namespace YAM
         void rehashAll();
 
         // Return the file repository that contains this file.
-        std::shared_ptr<SourceFileRepository> fileRepository() const;
+        std::shared_ptr<FileRepository> fileRepository() const;
 
         // Return the file path (this->name()) relative to the root directory
         // of the file repository that contains this file.
         std::filesystem::path relativePath() const;
+
+        // Return fileRepository->symbolicPathOf(name()).
+        std::filesystem::path symbolicPath() const;
 
         std::chrono::time_point<std::chrono::utc_clock> const& lastWriteTime();
 
