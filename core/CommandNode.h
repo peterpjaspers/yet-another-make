@@ -17,6 +17,14 @@ namespace YAM
 	//    - detecting changes in script, input and/or output files.
 	//      Such changes will out-date the outputs of the command node, causing 
 	//      pendingStartSelf() to return true.
+	// 
+	// CommandNode will lookup the file node associated with a detected input
+	// file in the execution context. If found the node will be registered in
+	// the command node's input set. If not found CommandNode will check
+	// whether the input file is contained in one of the FileRepositories 
+	// registered in the execution context. CommandNode execution will fail when
+	// this is not the case.
+	//      
     class __declspec(dllexport) CommandNode : public Node
     {
 	public:

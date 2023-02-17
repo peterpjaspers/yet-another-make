@@ -119,11 +119,12 @@ namespace YAM
 		_scope->setState(Node::State::Ok);
 		std::vector<std::shared_ptr<Node>> dirtyDirsAndFiles;
 		for (auto const& pair : _context.repositories()) {
-			auto repo = pair.second;
-			auto dirNode = repo->directory();
-			repo->buildInProgress(true);
-			repo->consumeChanges();
-			appendDirtyFileAndDirectoryNodes(dirNode, dirtyDirsAndFiles);
+			auto repo = dynamic_pointer_cast<SourceFileRepository>(pair.second);
+			if (repo != nullptr) {
+				auto dirNode = repo->directoryNode();
+				repo->consumeChanges();
+				appendDirtyFileAndDirectoryNodes(dirNode, dirtyDirsAndFiles);
+			}
 		}
 		if (dirtyDirsAndFiles.empty()) {
 			_handleRepoCompletion(_scope.get());
@@ -144,9 +145,11 @@ namespace YAM
 		} else {
 			std::vector<std::shared_ptr<SourceFileNode>> buildFiles;
 			for (auto const& pair : _context.repositories()) {
-				auto repo = pair.second;
-				auto dirNode = repo->directory();
-				appendBuildFileFileNodes(dirNode, buildFiles);
+				auto repo = dynamic_pointer_cast<SourceFileRepository>(pair.second);
+				if (repo != nullptr) {
+					auto dirNode = repo->directoryNode();
+					appendBuildFileFileNodes(dirNode, buildFiles);
+				}
 			}
 			// TODO: update set of BuildFileParserNodes to be in sync with
 			// buildFiles. Then request dirty BuildFileParserNodes to suspend 
@@ -178,10 +181,6 @@ namespace YAM
 		auto result = _result;
 		_result = nullptr;
 		_context.buildRequest(nullptr);
-		for (auto const& pair : _context.repositories()) {
-			auto repo = pair.second;
-			repo->buildInProgress(false);
-		}
 		_completor.Broadcast(result);
 	}
 

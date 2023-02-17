@@ -114,6 +114,7 @@
     <ClInclude Include="FileAspect.h" />
     <ClInclude Include="DirectoryWatcher.h" />
     <ClInclude Include="DirectoryWatcherWin32.h" />
+    <ClInclude Include="FileRepository.h" />
     <ClInclude Include="FileSystem.h" />
     <ClInclude Include="GlobNode.h" />
     <ClInclude Include="GraphWalker.h" />
@@ -123,6 +124,7 @@
     <ClInclude Include="IMonitoredProcess.h" />
     <ClInclude Include="LogRecord.h" />
     <ClInclude Include="MemoryLogBook.h" />
+    <ClInclude Include="WatchedFileRepository.h" />
     <ClInclude Include="MonitoredProcess.h" />
     <ClInclude Include="MonitoredProcessWin32.h" />
     <ClInclude Include="MSBuildTrackerOutputReader.h" />
@@ -163,6 +165,7 @@
     <ClCompile Include="FileAspect.cpp" />
     <ClCompile Include="DirectoryWatcher.cpp" />
     <ClCompile Include="DirectoryWatcherWin32.cpp" />
+    <ClCompile Include="FileRepository.cpp" />
     <ClCompile Include="FileSystem.cpp">
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4251;4996</DisableSpecificWarnings>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4251;4996</DisableSpecificWarnings>
@@ -171,6 +174,7 @@
     <ClCompile Include="GraphWalker.cpp" />
     <ClCompile Include="LogRecord.cpp" />
     <ClCompile Include="MemoryLogBook.cpp" />
+    <ClCompile Include="WatchedFileRepository.cpp" />
     <ClCompile Include="MonitoredProcess.cpp" />
     <ClCompile Include="MonitoredProcessWin32.cpp">
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4251;4996</DisableSpecificWarnings>

@@ -28,6 +28,8 @@ Todo
 - build file format (follow tup, follow mrmake, something completely different?)
     - decide
     - implement parsers and DAG updater
+- SourceFileRepository: also include patterns needed?
+
 
 Done
 - ExecutionContext

@@ -1,4 +1,3 @@
-#include "gtest/gtest.h"
 #include "executeNode.h"
 #include "DirectoryTree.h"
 #include "../SourceFileRepository.h"
@@ -12,6 +11,7 @@
 #include "../DispatcherFrame.h"
 #include "../../xxhash/xxhash.h"
 
+#include "gtest/gtest.h"
 #include <chrono>
 #include <string>
 #include <fstream>
@@ -43,17 +43,15 @@ namespace
             excludes,
             &context);
         context.addRepository(repo);
-        DirectoryNode* dirNode = repo->directory().get();
+        DirectoryNode* dirNode = repo->directoryNode().get();
 
         repo->consumeChanges();
         std::vector<Node*> dirtyNodes = getDirtyNodes(dirNode);
         EXPECT_EQ(1, dirtyNodes.size());
         EXPECT_EQ(dirNode, dirtyNodes[0]);
-        repo->buildInProgress(true);
         bool completed = YAMTest::executeNodes(dirtyNodes);
         EXPECT_TRUE(completed);
         verify(&testTree, dirNode);
-        repo->buildInProgress(false);
 
         std::vector<std::shared_ptr<DirectoryNode>> subDirNodes;
         dirNode->getSubDirs(subDirNodes);
@@ -95,13 +93,11 @@ namespace
         } while (nRetries < maxRetries && !done);
         ASSERT_EQ(3, dirtyNodes.size());
 
-        repo->buildInProgress(true);
         context.statistics().reset();
         context.statistics().registerNodes = true;
         completed = YAMTest::executeNodes(dirtyNodes);
         EXPECT_TRUE(completed);
         verify(&testTree, dirNode);
-        repo->buildInProgress(false);
         
         EXPECT_EQ(10, context.statistics().nStarted);
         // 10 because DirectoryNode::pendingStartSelf always returns true.

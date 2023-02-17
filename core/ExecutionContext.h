@@ -12,7 +12,7 @@
 
 namespace YAM
 {
-	class SourceFileRepository;
+	class FileRepository;
 	class BuildRequest;
 	class ILogBook;
 
@@ -30,18 +30,18 @@ namespace YAM
 		ExecutionStatistics& statistics();
 
 	    // Add repository, return whether it was added, i..e had a unique name.
-		bool addRepository(std::shared_ptr<SourceFileRepository> repo);
+		bool addRepository(std::shared_ptr<FileRepository> repo);
 		// Remove repository, return whether it was removed.
 		bool removeRepository(std::string const& repoName);
 
 		// Find repository by name, return found repo, nullptr when not found.
-		std::shared_ptr<SourceFileRepository> findRepository(std::string const& repoName) const;
+		std::shared_ptr<FileRepository> findRepository(std::string const& repoName) const;
 
 		// Find repository that contains path, return found repo, nullptr when not found.
-		std::shared_ptr<SourceFileRepository> findRepository(std::filesystem::path const& path) const;
+		std::shared_ptr<FileRepository> findRepositoryContaining(std::filesystem::path const& path) const;
 
 		// Return repositories.
-		std::map<std::string, std::shared_ptr<SourceFileRepository>> const& repositories() const;
+		std::map<std::string, std::shared_ptr<FileRepository>> const& repositories() const;
 
 		// Return the file aspects applicable to the file with the given path name.
 		std::vector<FileAspect> findFileAspects(std::filesystem::path const& path) const;
@@ -69,7 +69,7 @@ namespace YAM
 		ThreadPool _threadPool;
 		ExecutionStatistics _statistics;
 
-		std::map<std::string, std::shared_ptr<SourceFileRepository>> _repositories;
+		std::map<std::string, std::shared_ptr<FileRepository>> _repositories;
 
 		//TODO: add interfaces to add/remove aspects and aspectSets
 		std::map<std::string, FileAspect> _fileAspects;

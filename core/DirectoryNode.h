@@ -11,12 +11,17 @@ namespace YAM
     class ExecutionContext;
     class FileNode;
 
-	// A DirectoryNode keeps track of the content of a directory:
-	//    - creates a FileNode for each file in the directory
-	//	  - creates a DirectoryNode for each subdir in the directory
+	// A DirectoryNode keeps track of the source files in a directory:
+	//    - creates a SourceFileNode for each file in the directory that
+    //      is not excluded by the FileRepository that contains that
+    //      file.
+	//	  - creates a DirectoryNode for each subdir in the directory that
+    //      is not excluded by the FileRepository that contains that
+    //      subdir.
 	//    - maintains the directory hash. This hash is computed from the
     //      names of the files and subdirs in the directory.
-	//
+	// FileRepositories are registered in the execution context of the node.
+    //
 	class __declspec(dllexport) DirectoryNode : public Node
 	{
 	public:

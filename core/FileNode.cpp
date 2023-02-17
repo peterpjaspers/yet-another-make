@@ -35,14 +35,19 @@ namespace YAM
         return _hashes[aspectName];
     }
 
-    std::shared_ptr<SourceFileRepository> FileNode::fileRepository() const {
-        return context()->findRepository(name());
+    std::shared_ptr<FileRepository> FileNode::fileRepository() const {
+        return context()->findRepositoryContaining(name());
     }
 
     std::filesystem::path FileNode::relativePath() const {
-        std::shared_ptr<SourceFileRepository> repo = fileRepository();
+        std::shared_ptr<FileRepository> repo = fileRepository();
         if (repo == nullptr) return name();
-        return name().lexically_relative(repo->directoryName());
+        return repo->relativePathOf(name());
+    }
+    std::filesystem::path FileNode::symbolicPath() const {
+        std::shared_ptr<FileRepository> repo = fileRepository();
+        if (repo == nullptr) return name();
+        return repo->symbolicPathOf(name());
     }
 
     std::chrono::time_point<std::chrono::utc_clock> const& FileNode::lastWriteTime() {
