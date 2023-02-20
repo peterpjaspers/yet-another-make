@@ -1,5 +1,5 @@
 #include "WatchedFileRepository.h"
-#include "DirectoryNode.h"
+#include "SourceDirectoryNode.h"
 #include "FileNode.h"
 #include "DirectoryWatcher.h"
 #include "SourceFileNode.h"
@@ -12,7 +12,7 @@ namespace
 	const std::filesystem::path overflowPath("overflow");
 
 	bool isDirNode(Node* node) {
-		return dynamic_cast<DirectoryNode*>(node) != nullptr;
+		return dynamic_cast<SourceDirectoryNode*>(node) != nullptr;
 	}
 
 	bool isFileNode(Node* node) {
@@ -36,9 +36,8 @@ namespace YAM
 	WatchedFileRepository::WatchedFileRepository(
 		std::string const& repoName,
 		std::filesystem::path const& directory,
-		RegexSet const& excludes,
 		ExecutionContext* context)
-		: FileRepository(repoName, directory, excludes)
+		: FileRepository(repoName, directory)
 		, _context(context)
 		, _watcher(std::make_shared<DirectoryWatcher>(
 			directory,
@@ -79,7 +78,6 @@ namespace YAM
 
 	bool WatchedFileRepository::hasChanged(std::filesystem::path const& path) const {
 		bool contains = _changes.contains(path) || _changes.contains(overflowPath);
-		//std::cout << "hasChanged(" << path.string() << "=" << (contains ? "true" : "false") << std::endl;
 		return contains;
 	}
 
@@ -105,7 +103,7 @@ namespace YAM
 		// take care: cannot use change.lastWriteTime because it applies to
 		// change.fileName, not to parentDir.
 		std::shared_ptr<Node> node = _invalidateNode(parentDir, std::chrono::utc_clock::now());
-		if (node != nullptr && dynamic_cast<DirectoryNode*>(node.get()) == nullptr) {
+		if (node != nullptr && dynamic_cast<SourceDirectoryNode*>(node.get()) == nullptr) {
 			throw std::exception("unexpected node type");
 		}
 	}
@@ -116,7 +114,7 @@ namespace YAM
 		// take care: cannot use change.lastWriteTime because it applies to
 		// change.fileName, not to parentDir.
 		std::shared_ptr<Node> node = _invalidateNode(parentDir, std::chrono::utc_clock::now());
-		if (node != nullptr && dynamic_cast<DirectoryNode*>(node.get()) == nullptr) {
+		if (node != nullptr && dynamic_cast<SourceDirectoryNode*>(node.get()) == nullptr) {
 			throw std::exception("unexpected node type");
 		}
 		_invalidateNodeRecursively(dirOrFile);
@@ -158,7 +156,7 @@ namespace YAM
 			if (fileNode != nullptr) {
 				dirty = fileNode->lastWriteTime() != lastWriteTime;
 			} else {
-				auto dirNode = dynamic_pointer_cast<DirectoryNode>(node);
+				auto dirNode = dynamic_pointer_cast<SourceDirectoryNode>(node);
 				if (dirNode != nullptr) {
 					dirty = dirNode->lastWriteTime() != lastWriteTime;
 				}
@@ -177,7 +175,7 @@ namespace YAM
 
 	void WatchedFileRepository::_invalidateNodeRecursively(std::shared_ptr<Node> const& node) {
 		node->setState(Node::State::Dirty);
-		auto dirNode = dynamic_pointer_cast<DirectoryNode>(node);
+		auto dirNode = dynamic_pointer_cast<SourceDirectoryNode>(node);
 		if (dirNode != nullptr) {
 			for (auto const& pair : dirNode->getContent()) {
 				_invalidateNodeRecursively(pair.second);

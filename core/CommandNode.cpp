@@ -49,8 +49,8 @@ namespace
 		ss
 			<< "Build order is not guaranteed." << std::endl
 			<< "Fix: declare input file as input of command." << std::endl
-			<< "Input file: " << inputFile->name().string() << std::endl
-			<< "Command   : " << cmd->name().string() << std::endl;
+			<< "Command   : " << cmd->name().string() << std::endl
+			<< "Input file: " << inputFile->name().string() << std::endl;
 		LogRecord record(LogRecord::Error, ss.str());
 		cmd->context()->addToLogBook(record);
 	}
@@ -63,8 +63,8 @@ namespace
 		ss
 			<< "Build order guaranteed by discouraged indirect input declaration." << std::endl
 			<< "Fix: declare input file as direct input of command." << std::endl
-			<< "Input file: " << inputFile->name().string() << std::endl
-			<< "Command   : " << cmd->name().string() << std::endl;
+			<< "Command   : " << cmd->name().string() << std::endl
+			<< "Input file: " << inputFile->name().string() << std::endl;
 		LogRecord record(LogRecord::Warning, ss.str());
 		cmd->context()->addToLogBook(record);
 	}
@@ -78,8 +78,25 @@ namespace
 			<< "Input file not in a known file repository." << std::endl
 			<< "Fix: declare the file repository that contains the input," << std::endl
 			<< "or change command script to not depend on the input file." << std::endl
-			<< "Input file: " << inputFile.string() << std::endl
-			<< std::endl;
+			<< "Command   : " << cmd->name().string() << std::endl
+			<< "Input file: " << inputFile.string() << std::endl;
+		LogRecord record(LogRecord::Error, ss.str());
+		cmd->context()->addToLogBook(record);
+	}
+
+	void logInputNotReadAllowed(
+		CommandNode* cmd,
+		std::string const& repoName,
+		std::filesystem::path const& inputFile
+	) {
+		std::stringstream ss;
+		ss
+			<< "Input file not allowed to be read." << std::endl
+			<< "Fix: adjust exclude patterns of the repository," << std::endl
+			<< "or change command script to not depend on the input file." << std::endl
+			<< "Command: " << cmd->name().string() << std::endl
+			<< "Repository name: " << repoName << std::endl
+			<< "Input file: " << inputFile.string() << std::endl;
 		LogRecord record(LogRecord::Error, ss.str());
 		cmd->context()->addToLogBook(record);
 	}
@@ -92,8 +109,8 @@ namespace
 		ss
 			<< "Source file is updated by build." << std::endl
 			<< "Fix: change command script to not update the source file." << std::endl
-			<< "Source file: " << outputFile->name().string() << std::endl
-			<< "Command    : " << cmd->name().string() << std::endl;
+			<< "Command    : " << cmd->name().string() << std::endl
+			<< "Source file: " << outputFile->name().string() << std::endl;
 		LogRecord record(LogRecord::Error, ss.str());
 		cmd->context()->addToLogBook(record);
 	}
@@ -106,8 +123,8 @@ namespace
 		ss
 			<< "Unknown output file."
 			<< "Fix: declare the file as output of command." << std::endl
-			<< "Output file: " << outputFile.string() << std::endl
-			<< std::endl;
+			<< "Command    : " << cmd->name().string() << std::endl
+			<< "Output file: " << outputFile.string() << std::endl;
 		LogRecord record(LogRecord::Error, ss.str());
 		cmd->context()->addToLogBook(record);
 	}
@@ -140,9 +157,9 @@ namespace
 		ss
 			<< "Output file is produced by 2 commands." << std::endl
 			<< "Fix: adapt command script to ensure that file is produced by one command only." << std::endl
-			<< "Output file: " << outputFile->name().string() << std::endl
 			<< "Command 1  : " << outputFile->producer()->name().string() << std::endl
-		    << "Command 2  : " << cmd->name().string() << std::endl;
+			<< "Command 2  : " << cmd->name().string() << std::endl
+			<< "Output file: " << outputFile->name().string() << std::endl;
 		LogRecord record(LogRecord::Error, ss.str());
 		cmd->context()->addToLogBook(record);
 	}
@@ -185,10 +202,17 @@ namespace
 		cmd->context()->addToLogBook(record);
 	}
 
-	void logDirRemovalError(ILogBook* logBook, std::filesystem::path const& dir, std::error_code ec) {
+	void logDirRemovalError(
+		CommandNode* cmd,
+		ILogBook* logBook, 
+		std::filesystem::path const& dir, 
+		std::error_code ec
+	) {
 		std::stringstream ss;
 		ss
-			<< "Failed to delete temporary script directory " << dir.string() << std::endl
+			<< "Failed to delete temporary script directory." << std::endl
+			<< "Command : " << cmd->name().string() << std::endl
+			<< "Tmp dir : " << dir.string() << std::endl
 			<< "Reason: " << ec.message() << std::endl;
 		LogRecord record(LogRecord::Error, ss.str());
 		logBook->add(record);
@@ -343,10 +367,16 @@ namespace YAM
 		auto node = context()->nodes().find(input);
 		auto fileNode = dynamic_pointer_cast<FileNode>(node);
 		if (fileNode == nullptr) {
-			auto repo = dynamic_pointer_cast<SourceFileRepository>(context()->findRepositoryContaining(input));
-			if (input != exclude && repo == nullptr) {
-				valid = false;
-				logInputNotInARepository(this, input);
+			if (input == exclude) {
+		    } else {
+				auto repo = context()->findRepositoryContaining(input);
+				if (repo == nullptr) {
+					valid = false;
+					logInputNotInARepository(this, input);
+				} else if (!repo->readAllowed(input)) {
+					valid = false;
+					logInputNotReadAllowed(this, repo->name(), input);
+				}
 			}
 		} else {
 			auto genInputFileNode = dynamic_pointer_cast<GeneratedFileNode>(fileNode);
@@ -453,7 +483,7 @@ namespace YAM
 	}
 
 	void CommandNode::cancelSelf() {
-		auto executor = _scriptExecutor;
+		std::shared_ptr<IMonitoredProcess> executor = _scriptExecutor.load();
 		if (executor != nullptr) {
 			executor->terminate();
 		}
@@ -469,18 +499,19 @@ namespace YAM
 		std::map<std::string, std::string> env;
 		env["TMP"] = tmpDir.string();
 
-		_scriptExecutor = std::make_unique<MonitoredProcess>(
+		auto executor = std::make_shared<MonitoredProcess>(
 			cmdExe,
 			std::string("/c ") + scriptFilePath.string(),
 			env);
-		MonitoredProcessResult result = _scriptExecutor->wait();
-		_scriptExecutor = nullptr;
+		_scriptExecutor = executor;
+		MonitoredProcessResult result = executor->wait();
+		_scriptExecutor.store(nullptr);
 
 		if (result.exitCode == 0) {
 			std::error_code ec;
 			bool removed = std::filesystem::remove_all(tmpDir, ec);
 			if (!removed) {
-				logDirRemovalError(context()->logBook().get(), tmpDir, ec);
+				logDirRemovalError(this, context()->logBook().get(), tmpDir, ec);
 			}
 		} else if (!_canceling) {
 			logScriptFailure(this, result, tmpDir);

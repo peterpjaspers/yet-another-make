@@ -2,6 +2,7 @@
 
 #include "ILogBook.h"
 #include <ostream>
+#include <mutex>
 
 namespace YAM
 {
@@ -13,6 +14,7 @@ namespace YAM
 		void add(LogRecord const& record) override;
 
 	private:
+		std::mutex _mutex;
 		std::basic_ostream<char, std::char_traits<char>>* _ostream;
 	};
 }

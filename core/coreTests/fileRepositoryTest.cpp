@@ -16,10 +16,10 @@ namespace
 	}
 
 	TEST(FileRepository, contains) {
-		EXPECT_TRUE(repo.contains(R"(C:\aap\noot\mies\file.cpp)"));
-		EXPECT_FALSE(repo.contains(R"(C:\aap\noot\file.cpp)"));
-		EXPECT_FALSE(repo.contains(R"(\aap\noot\mies\file.cpp)"));
-		EXPECT_FALSE(repo.contains(R"(aap\noot\mies\file.cpp)"));
+		EXPECT_TRUE(repo.lexicallyContains(R"(C:\aap\noot\mies\file.cpp)"));
+		EXPECT_FALSE(repo.lexicallyContains(R"(C:\aap\noot\file.cpp)"));
+		EXPECT_FALSE(repo.lexicallyContains(R"(\aap\noot\mies\file.cpp)"));
+		EXPECT_FALSE(repo.lexicallyContains(R"(aap\noot\mies\file.cpp)"));
 	}
 
 	TEST(FileRepository, relativePath) {
@@ -34,5 +34,19 @@ namespace
 		EXPECT_EQ(std::filesystem::path(), repo.symbolicPathOf(R"(C:\aap\noot\file.cpp)"));
 		EXPECT_EQ(std::filesystem::path(), repo.symbolicPathOf(R"(\aap\noot\file.cpp)"));
 		EXPECT_EQ(std::filesystem::path(), repo.symbolicPathOf(R"(aap\noot\mies\file.cpp)"));
+	}
+
+	TEST(FileRepository, readAllowed) {
+		EXPECT_TRUE(repo.readAllowed(R"(C:\aap\noot\mies\file.cpp)"));
+		EXPECT_FALSE(repo.readAllowed(R"(C:\aap\noot\file.cpp)"));
+		EXPECT_FALSE(repo.readAllowed(R"(\aap\noot\file.cpp)"));
+		EXPECT_FALSE(repo.readAllowed(R"(aap\noot\mies\file.cpp)"));
+	}
+
+	TEST(FileRepository, writeAllowed) {
+		EXPECT_TRUE(repo.readAllowed(R"(C:\aap\noot\mies\file.cpp)"));
+		EXPECT_FALSE(repo.readAllowed(R"(C:\aap\noot\file.cpp)"));
+		EXPECT_FALSE(repo.readAllowed(R"(\aap\noot\file.cpp)"));
+		EXPECT_FALSE(repo.readAllowed(R"(aap\noot\mies\file.cpp)"));
 	}
 }

@@ -1,7 +1,7 @@
 #include "executeNode.h"
 #include "DirectoryTree.h"
 #include "../SourceFileRepository.h"
-#include "../DirectoryNode.h"
+#include "../SourceDirectoryNode.h"
 #include "../SourceFileNode.h"
 #include "../ExecutionContext.h"
 #include "../RegexSet.h"
@@ -24,7 +24,7 @@ namespace
 
     auto isDirtyNode = Delegate<bool, Node*>::CreateLambda([](Node* n) { return n->state() == Node::State::Dirty; });
 
-    std::vector<Node*> getDirtyNodes(DirectoryNode* dirNode) {
+    std::vector<Node*> getDirtyNodes(SourceDirectoryNode* dirNode) {
         GraphWalker walker(dirNode, GraphWalker::Postrequisites, isDirtyNode);
         return walker.included();
     }
@@ -43,7 +43,7 @@ namespace
             excludes,
             &context);
         context.addRepository(repo);
-        DirectoryNode* dirNode = repo->directoryNode().get();
+        SourceDirectoryNode* dirNode = repo->directoryNode().get();
 
         repo->consumeChanges();
         std::vector<Node*> dirtyNodes = getDirtyNodes(dirNode);
@@ -53,11 +53,11 @@ namespace
         EXPECT_TRUE(completed);
         verify(&testTree, dirNode);
 
-        std::vector<std::shared_ptr<DirectoryNode>> subDirNodes;
+        std::vector<std::shared_ptr<SourceDirectoryNode>> subDirNodes;
         dirNode->getSubDirs(subDirNodes);
-        std::shared_ptr<DirectoryNode> dirNode_S1 = subDirNodes[1];
+        std::shared_ptr<SourceDirectoryNode> dirNode_S1 = subDirNodes[1];
         dirNode_S1->getSubDirs(subDirNodes);
-        std::shared_ptr<DirectoryNode> dirNode_S1_S2 = subDirNodes[2];
+        std::shared_ptr<SourceDirectoryNode> dirNode_S1_S2 = subDirNodes[2];
 
         // Update file system
         DirectoryTree* testTree_S1 = testTree.getSubDirs()[1];
@@ -98,13 +98,17 @@ namespace
         completed = YAMTest::executeNodes(dirtyNodes);
         EXPECT_TRUE(completed);
         verify(&testTree, dirNode);
-        
-        EXPECT_EQ(10, context.statistics().nStarted);
-        // 10 because DirectoryNode::pendingStartSelf always returns true.
+
+        // 13 nStarted and nSelfExecuted include the .ignore, .gitignore and
+        // .yamignore of the added dir in testTree_S1_S2 
+        EXPECT_EQ(13, context.statistics().nStarted);
+        // 10 because SourceDirectoryNode::pendingStartSelf always returns true.
         // But only 4 dir nodes will see a modified directory. Only those 4
         // update their content.
-        EXPECT_EQ(10, context.statistics().nSelfExecuted);
-        EXPECT_EQ(6, context.statistics().nRehashedFiles);
+        EXPECT_EQ(13, context.statistics().nSelfExecuted);
+        // 8 nRehashedFiles include .gitignore and .yamignore of the added dir
+        // in testTree_S1_S2 
+        EXPECT_EQ(8, context.statistics().nRehashedFiles);
         EXPECT_EQ(4, context.statistics().nDirectoryUpdates);
         EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode));
         EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode_S1.get()));

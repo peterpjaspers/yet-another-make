@@ -3,6 +3,8 @@
 #include "Delegates.h"
 #include "ExecutionContext.h"
 
+#include <iostream>
+
 namespace YAM
 {
 	Node::Node(ExecutionContext* context, std::filesystem::path const& name)
@@ -275,6 +277,7 @@ namespace YAM
             }
             if (1 == _executingPostrequisites.erase(postrequisite)) {
                 bool stopBuild = (preqState != Node::State::Ok); // todo: && !_node->logBook()->keepWorking();
+
                 if (stopBuild) {
                     // See handlePreRequisiteisCompletion(Node*)
                     cancel();

@@ -10,22 +10,21 @@ namespace YAM
 {
     class ExecutionContext;
     class FileNode;
+    class DotIgnoreNode;
 
-	// A DirectoryNode keeps track of the source files in a directory:
-	//    - creates a SourceFileNode for each file in the directory that
-    //      is not excluded by the FileRepository that contains that
-    //      file.
-	//	  - creates a DirectoryNode for each subdir in the directory that
-    //      is not excluded by the FileRepository that contains that
-    //      subdir.
+	// A SourceDirectoryNode keeps track of the source files in a directory:
+	//    - creates a SourceFileNode for each file in the directory that is
+    //      readAllowed by the FileRepository that contains that file.
+	//	  - creates a SourceDirectoryNode for each subdir in the directory that
+    //      is readAllowed by the FileRepository that contains that subdir.
 	//    - maintains the directory hash. This hash is computed from the
     //      names of the files and subdirs in the directory.
 	// FileRepositories are registered in the execution context of the node.
     //
-	class __declspec(dllexport) DirectoryNode : public Node
+	class __declspec(dllexport) SourceDirectoryNode : public Node
 	{
 	public:
-		DirectoryNode(ExecutionContext* context, std::filesystem::path const& dirName);
+		SourceDirectoryNode(ExecutionContext* context, std::filesystem::path const& dirName);
 
         // Inherited via Node
         virtual bool supportsPrerequisites() const override;
@@ -43,7 +42,7 @@ namespace YAM
 
         // Query the directory content, vector content is sorted by node name.
         void getFiles(std::vector<std::shared_ptr<FileNode>>& filesInDir);
-        void getSubDirs(std::vector<std::shared_ptr<DirectoryNode>>& subDirsInDir);
+        void getSubDirs(std::vector<std::shared_ptr<SourceDirectoryNode>>& subDirsInDir);
 
         std::map<std::filesystem::path, std::shared_ptr<Node>> const& getContent(); // file + dir nodes
 
@@ -76,6 +75,7 @@ namespace YAM
         std::chrono::time_point<std::chrono::utc_clock> _lastWriteTime;
         XXH64_hash_t _hash;
 
+        std::shared_ptr<DotIgnoreNode> _dotIgnoreNode;
         std::map<std::filesystem::path, std::shared_ptr<Node>> _content;
 	};
 }

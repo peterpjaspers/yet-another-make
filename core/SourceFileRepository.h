@@ -9,27 +9,35 @@
 
 namespace YAM
 {
-	class DirectoryNode;
+	class SourceDirectoryNode;
 	class Node;
 	class ExecutionContext;
 
 	// A SourceFileRepository mirrors a file repository in memory as a
-	// DirectoryNode that contains (sub-)DirectoryNodes and SourceFileNodes.
+	// SourceDirectoryNode that contains (sub-)DirectoryNodes and SourceFileNodes.
 	// It stores these nodes in an ExecutionContext. 
-	// 
+	//
 	// A SourceFileRepository cannot and need not mirror generated files.
-	// Cannot because the GeneratedFileNode constructor takes a pointer to
-	// the producer node which is not known by SourceFileRepository. 
+	// Cannot because the GeneratedFileNode constructor takes a pointer to the
+	// producer node which is not known by SourceFileRepository. 
 	// Need not because GenerateFileNodes are created when build files are 
-	// parsed.
-	// It not possible to distinguish between source and generated files
-	// just by looking at file name or extension. SourceFileRepository
-	// therefore relies entirely on the exclude patterns to exclude all
-	// generated files. If this is not done properly, then havoc will occur 
-	// when that file is declared as an output file in a build file. In that
-	// case the build file parser will fail to create a GeneratedFileNode for
-	// that file because SourceFileRepository already created a SourceFileNode
-	// with that name. 
+	// parsed, i.e. before the associated file even exists.
+	// 
+	// Because SourceFileRepository creates SourceFileNodes it must be able to
+	// distinguish between source and generated files to avoid creating a
+	// SourceFileInstance for a generated file. If this is not done properly
+	// havoc will occur when that file is declared as an output file in a 
+	// build file. In that case the build file parser will fail to create a
+	// GeneratedFileNode for that file because SourceFileRepository already 
+	// created a SourceFileNode with that name. 
+	// SourceFileRepository relies entirely on exclude patterns to distinguish
+	// source from generated files. A SourceFileNode will only be created for
+	// a file whose path name does not matches one of the exclude patterns.
+	// 
+	// Note that exclude patterns can also be used to exclude source files
+	// from being mirrored. This is usefull when a repository contains many
+	// files that are not input files for the build. Excluding these files
+	// will limit the size of the build graph.
 	// 
 	// The intended use of SourceFileRepository is to create source file
 	// nodes before executing build file and command nodes.
@@ -73,7 +81,7 @@ namespace YAM
 	{
 	public:
 		// Recursively mirror source directories and source files in given 
-		// 'directory' in a DirectoryNode. Add the mirrored source directories
+		// 'directory' in a SourceDirectoryNode. Add the mirrored source directories
 		// and source file nodes to given 'context->nodes()'.
 		// Exclude from mirroring the directories and files whose paths match 
 		// given '_excludePatterns'. Make sure that these patterns exclude all
@@ -85,12 +93,13 @@ namespace YAM
 			std::string const& repoName,
 			std::filesystem::path const& directory,
 			// TODO: do not pass exclude patterns here.
-			// Instead let each DirectoryNode retrieve exclude patterns from 
+			// Instead let each SourceDirectoryNode retrieve exclude patterns from 
 			// .yamignore, or if absent, from .gitignore.
 			RegexSet const& _excludePatterns,
 			ExecutionContext* context);
 		
-		std::shared_ptr<DirectoryNode> directoryNode() const;
+		std::shared_ptr<SourceDirectoryNode> directoryNode() const;
+		RegexSet const& excludePatterns() const;
 
 		// Recursively remove the directory node from context->nodes().
 		// Intended to be used when the repo is no longer to be mirrored
@@ -98,6 +107,7 @@ namespace YAM
 		void clear();
 
 	private: 
-		std::shared_ptr<DirectoryNode> _directoryNode;
+		RegexSet _excludePatterns;
+		std::shared_ptr<SourceDirectoryNode> _directoryNode;
 	};
 }

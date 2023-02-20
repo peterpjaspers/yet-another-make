@@ -2,7 +2,7 @@
 #include "Node.h"
 #include "SourceFileRepository.h"
 #include "BuildRequest.h"
-#include "ILogBook.h"
+#include "ConsoleLogBook.h"
 
 namespace
 {
@@ -28,6 +28,9 @@ namespace YAM
         , _threadPool(&_threadPoolQueue, "YAM_threadpool", getDefaultPoolSize()) 
         , _logBook(logBook)
     {
+        if (_logBook == nullptr) {
+            _logBook = std::make_shared<ConsoleLogBook>();
+        }
         auto const& entireFileSet = FileAspectSet::entireFileSet();
         _fileAspectSets.insert({ entireFileSet.name(), entireFileSet});
     }
@@ -84,22 +87,13 @@ namespace YAM
     std::shared_ptr<FileRepository> ExecutionContext::findRepositoryContaining(std::filesystem::path const& path) const {
         for (auto pair : _repositories) {
             auto repo = pair.second;
-            if (repo->contains(path)) return repo;
+            if (repo->lexicallyContains(path)) return repo;
         }
         return nullptr;
     }
 
     std::map<std::string, std::shared_ptr<FileRepository>> const& ExecutionContext::repositories() const {
         return _repositories;
-    }
-
-    // TODO: remove this function once DirectoryNode takes excludes patterns from .yamignore
-    // file.
-    RegexSet const& ExecutionContext::findExcludes(std::filesystem::path const& path) const {
-        static RegexSet noExcludes;
-        auto repo = findRepositoryContaining(path);
-        if (repo != nullptr) return repo->excludes();
-        return noExcludes;
     }
 
     // Return the file aspects applicable to the file with the given path name.

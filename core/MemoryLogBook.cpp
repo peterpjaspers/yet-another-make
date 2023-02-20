@@ -5,6 +5,7 @@ namespace YAM
 	MemoryLogBook::MemoryLogBook() {}
 
 	void MemoryLogBook::add(LogRecord const& record) {
+		std::lock_guard<std::mutex> lock(_mutex);
 		_records.push_back(record); 
 	}
 

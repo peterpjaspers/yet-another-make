@@ -61,7 +61,7 @@ namespace
 
 		auto cmd = search_path("cmd");
 		group g;
-		child c(cmd.string() + " /c ping -n 1 localhost", g, std_out > stdoutOfPing);
+		child c(cmd.string() + " /c ping -n 1 127.0.0.1", g, std_out > stdoutOfPing);
 
 		std::vector<std::string> data;
 		std::string line;
@@ -85,7 +85,7 @@ namespace
 
 		group g;
 		child c(
-			cmd.string() + " /c ping -n 1 localhost",
+			cmd.string() + " /c ping -n 1 127.0.0.1",
 			g,
 			std_out > f_stdout,
 			std_err > f_stderr,

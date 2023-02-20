@@ -55,9 +55,9 @@ namespace
 			, stdoutLogBook(std::make_shared<BasicOStreamLogBook>(&std::cout))
 			, logBook(std::make_shared<MultiwayLogBook>())
 			, context(logBook)
-			, pietCmd(std::make_shared<CommandNode>(&context, np(repoDir / "piet\\_cmd")))
-			, janCmd(std::make_shared<CommandNode>(& context, np(repoDir / "jan\\_cmd")))
-			, pietjanCmd(std::make_shared<CommandNode>(& context, np(repoDir / "pietjan\\_cmd")))
+			, pietCmd(std::make_shared<CommandNode>(&context, np("piet\\_cmd")))
+			, janCmd(std::make_shared<CommandNode>(& context, np("jan\\_cmd")))
+			, pietjanCmd(std::make_shared<CommandNode>(& context, np("pietjan\\_cmd")))
 			, pietOut(std::make_shared<GeneratedFileNode>(& context, np(repoDir / "generated\\pietOut.txt"), pietCmd.get()))
 			, janOut(std::make_shared<GeneratedFileNode>(&context, np(repoDir / "generated\\janOut.txt"), janCmd.get()))
 			, pietjanOut(std::make_shared<GeneratedFileNode>(&context, np(repoDir / "generated\\pietjanOut.txt"), pietjanCmd.get()))
@@ -68,7 +68,7 @@ namespace
 			logBook->add(memLogBook);
 			logBook->add(stdoutLogBook);
 			stats.registerNodes = true;
-			// context.threadPool().size(1); // to ease debugging
+			//context.threadPool().size(1); // to ease debugging
 			std::filesystem::create_directories(repoDir);
 			std::filesystem::create_directories(np(repoDir / "generated"));
 
@@ -312,7 +312,7 @@ namespace
 	}
 
 	TEST(CommandNode, fail_script) {
-		auto ping = boost::process::search_path("ping");
+		auto powershell = boost::process::search_path("powershell");
 		Commands cmds;
 
 		// make sure that pietCmd and janCmd are executed in parallel
@@ -321,14 +321,14 @@ namespace
 		}
 		EXPECT_TRUE(cmds.execute());
 
-		// Execution fails because syntax error in script.
-		cmds.pietCmd->setScript("prut piet > ");
-		// ping -n 10 takes 10 seconds, so will be terminated when pietCmd fails.
-		cmds.janCmd->setScript(ping.string() + " -n 10 localhost");
+		cmds.pietCmd->setScript("exit 1"); // execution fails
+		cmds.janCmd->setScript(powershell.string() + R"( -command "Start-Sleep -s 10)");
+
 		EXPECT_TRUE(cmds.execute());
-		EXPECT_EQ(Node::State::Failed, cmds.pietCmd->state());
-		EXPECT_TRUE(Node::State::Canceled == cmds.janCmd->state());
-		EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Command script failed"));
+		ASSERT_EQ(Node::State::Failed, cmds.pietCmd->state());
+		ASSERT_EQ(Node::State::Canceled, cmds.janCmd->state());
+		ASSERT_EQ(Node::State::Canceled, cmds.pietjanCmd->state());
+		ASSERT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Command script failed"));
 	}
 
 	TEST(CommandNode, fail_inputFromMissingInputProducer) {

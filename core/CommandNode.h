@@ -5,6 +5,8 @@
 #include "IMonitoredProcess.h"
 #include "../xxHash/xxhash.h"
 
+#include <atomic>
+
 namespace YAM
 {
 	class GeneratedFileNode;
@@ -127,6 +129,6 @@ namespace YAM
 		// the relevant aspects of the input files.
 		XXH64_hash_t _executionHash;
 
-		std::shared_ptr<IMonitoredProcess> _scriptExecutor;
+		std::atomic<std::shared_ptr<IMonitoredProcess>> _scriptExecutor;
     };
 }

@@ -66,7 +66,7 @@
     <ClInclude Include="GlobNode.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="DirectoryNode.h">
+    <ClInclude Include="SourceDirectoryNode.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="DirectoryWatcher.h">
@@ -150,6 +150,9 @@
     <ClInclude Include="WatchedFileRepository.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="DotIgnoreNode.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -203,7 +206,7 @@
     <ClCompile Include="GlobNode.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="DirectoryNode.cpp">
+    <ClCompile Include="SourceDirectoryNode.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="DirectoryWatcher.cpp">
@@ -270,6 +273,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="WatchedFileRepository.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DotIgnoreNode.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

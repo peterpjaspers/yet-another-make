@@ -107,7 +107,8 @@
     <ClInclude Include="ConsoleWin32.h" />
     <ClInclude Include="dbgMemLeaks.h" />
     <ClInclude Include="Delegates.h" />
-    <ClInclude Include="DirectoryNode.h" />
+    <ClInclude Include="DotIgnoreNode.h" />
+    <ClInclude Include="SourceDirectoryNode.h" />
     <ClInclude Include="DispatcherFrame.h" />
     <ClInclude Include="ExecutionContext.h" />
     <ClInclude Include="ExecutionStatistics.h" />
@@ -158,7 +159,8 @@
     <ClCompile Include="Console.cpp" />
     <ClCompile Include="ConsoleLogBook.cpp" />
     <ClCompile Include="ConsoleWin32.cpp" />
-    <ClCompile Include="DirectoryNode.cpp" />
+    <ClCompile Include="DotIgnoreNode.cpp" />
+    <ClCompile Include="SourceDirectoryNode.cpp" />
     <ClCompile Include="DispatcherFrame.cpp" />
     <ClCompile Include="ExecutionContext.cpp" />
     <ClCompile Include="ExecutionStatistics.cpp" />

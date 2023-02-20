@@ -14,25 +14,29 @@ namespace YAM
 	class ExecutionContext;
 
 	// A WatchedFileRepository continuously watches the file repository for
-	// directory and file changes.  
+	// directory and file changes. 
+	//  
 	// Changes are queued for consumption via the function consumeChanges().
-	// On consumption the directory and file nodes associated with the changes
-	// are marked Dirty. consumeChanges() can be called at any time between 
-	// builds and must be called at the start of a build. The latter to make
-	// sure that the build takes all modified directories and files into account.
-	// Calling consumeChanges() during a build will cause havoc because the 
-	// execution logic in the Node class cannot deal with already executed nodes
-	// to become Dirty again.
-	// Dirty directory and file nodes can be synced with the fileystem state by
-	// executing them. Syncing is not performed by WatchedFileRepository.
+	// On consumption DirectoryNodes and FileNodes associated with the queued 
+	// changes are marked Dirty. These nodes are looked-up from an Execution
+	// Context. Creation of these nodes is outside the scope of this class.
+	// 
+	// consumeChanges() can be called at any time between builds. At latest it
+	// must be called at the start of a build. The build must then sync the 
+	// dirty directory and file nodes witht the latest file system state by 
+	// executing them.
 	//
 	// During a build generated files will be created/modified and the watched
-	// file repository will be notified of these changes. Without further
-	// measure the associated GeneratedFileNodes would be marked Dirty at next
-	// consumeChanges() call, resulting in, often, unnecessary re-executions of
-	// these nodes at the next build. This overhead is reduced by only marking
-	// the generated file node Dirty when its last-write-time differs from the
-	// last-write-time reported in the FileChange event.
+	// file repository will be notified of these changes. The associated nodes
+	// will be marked Dirty at next consumeChanges() call, resulting in 
+	// re-executions of these nodes during the next build. Re-execution will 
+	// retrieve the file's last-write-time and, only when last-write-time 
+	// changed, rehash the file content. Most of these re-executions are not
+	// necessary because the last-write-time will only change when the user 
+	// tampers with the file. This class reduces the number of unnecessary 
+	// re-executions by only marking a generated file node Dirty when its 
+	// last-write-time differs from the last-write-time reported in the 
+	// FileChange event.
 	//
 	class __declspec(dllexport) WatchedFileRepository : public FileRepository
 	{
@@ -45,21 +49,17 @@ namespace YAM
 		WatchedFileRepository(
 			std::string const& repoName,
 			std::filesystem::path const& directory,
-			// TODO: do not pass exclude patterns here.
-			// Instead let each DirectoryNode retrieve exclude patterns from 
-			// .yamignore, or if absent, from .gitignore.
-			RegexSet const& _excludePatterns,
 			ExecutionContext* context);
 
 		// Consume the changes that occurred in the filesystem since the previous
 		// consumption by marking directory and file nodes associated with these 
 		// changes as Dirty.
 		// Only call this function from YAM main thread to ensure that consumption
-		// is an atomic action.
+		// is an atomic operation.
 		void consumeChanges();
 
-		// Return whether dir/file identified by path has changes since previous
-		// consumeChanges().
+		// Return whether dir/file identified by 'path' has changed since 
+		// previous consumeChanges().
 		bool hasChanged(std::filesystem::path const& path) const;
 
 	protected:

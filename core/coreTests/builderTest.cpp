@@ -2,7 +2,7 @@
 #include "../CommandNode.h"
 #include "../SourceFileNode.h"
 #include "../GeneratedFileNode.h"
-#include "../DirectoryNode.h"
+#include "../SourceDirectoryNode.h"
 #include "../SourceFileRepository.h"
 #include "../ThreadPool.h"
 #include "../ExecutionContext.h"
@@ -310,11 +310,13 @@ namespace
 		// 7-8 source file nodes repo.dir/src/janCpp, repo.dir/src/janH
 		// 9-11 generated file nodes pietOut, janOut, pietjanOut
 		// 12-14 commandNodes ccPiet.cpp, ccJan linkPietjan
-		EXPECT_EQ(14, driver.stats.nStarted); // __scope is started twice..
-		EXPECT_EQ(13, driver.stats.started.size()); // ..started contains unique nodes
+		// 15-20 root and src dir each have .ignore, .gitignore and .yamignore
+		EXPECT_EQ(20, driver.stats.nStarted); // __scope is started twice..
+		EXPECT_EQ(19, driver.stats.started.size()); // ..started contains unique nodes
 		EXPECT_EQ(2, driver.stats.nDirectoryUpdates);
 		// 4 source + 3 generated (before cmd exec) + 3 generated (after cmd exec)
-		EXPECT_EQ(10, driver.stats.nRehashedFiles); 
+		// + 2 .gitignore + 2 .yamignore
+		EXPECT_EQ(14, driver.stats.nRehashedFiles); 
 
 		// Note: __scope has been already been destroyed by Builder
 		EXPECT_TRUE(driver.stats.started.contains(driver.findNode(driver.repo.dir)));
@@ -332,8 +334,8 @@ namespace
 
 		// Verify nodes self-executed 
 		// Note: __scope node is executed twice (repo directory and compile and link commands)
-		EXPECT_EQ(14, driver.stats.nSelfExecuted); // __scope self-executed twice..
-		EXPECT_EQ(13, driver.stats.selfExecuted.size()); // ..selfExectued contains unique nodes.
+		EXPECT_EQ(20, driver.stats.nSelfExecuted); // __scope self-executed twice..
+		EXPECT_EQ(19, driver.stats.selfExecuted.size()); // ..selfExectued contains unique nodes.
 		EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(driver.repo.dir)));
 		EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(driver.repo.dir / "src")));
 		EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(driver.repo.pietCpp)));
@@ -456,7 +458,7 @@ namespace
 
 		ASSERT_TRUE(driver.consumeFileChangeEvent({ driver.repo.janCpp }));
 		auto janCppNode = dynamic_pointer_cast<FileNode>(driver.context->nodes().find(driver.repo.janCpp));
-		auto srcDirNode = dynamic_pointer_cast<DirectoryNode>(driver.context->nodes().find(driver.repo.dir / "src"));
+		auto srcDirNode = dynamic_pointer_cast<SourceDirectoryNode>(driver.context->nodes().find(driver.repo.dir / "src"));
 		EXPECT_EQ(Node::State::Ok, driver.ccPiet->state());
 		EXPECT_EQ(Node::State::Dirty, janCppNode->state());
 		EXPECT_EQ(Node::State::Dirty, driver.ccJan->state());

@@ -17,16 +17,13 @@ namespace YAM
 		// Note: the path is not a normalized path.
 		static std::filesystem::path uniquePath();
 
-		// Linux and MacOs: return path unchanged.
+		// Linux and MacOs: 
+		//     return std::filesystem::canonical(path) or, if path does not
+		//     exist return path itself.
 		// Windows: 
-		// if path is in long format: 
-		//     return path in lowercase
-		// if path is in short format and std::filesystem::exists(path):
-		//     return path in long format in lowercase.
-		// if path is in short format and !std::filesystem::exists(path):
-		//     return path in short format in lowercase.
+		//     return lower-cased std::filesystem::canonical(path) or, if path 
+		//     does not  exist return lowercased path.
 		//
-		static std::filesystem::path normalizePath(std::wstring const& path);
 		static std::filesystem::path normalizePath(std::filesystem::path const& path);
 	};
 }

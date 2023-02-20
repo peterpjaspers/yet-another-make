@@ -1,5 +1,5 @@
 #include "SourceFileRepository.h"
-#include "DirectoryNode.h"
+#include "SourceDirectoryNode.h"
 #include "ExecutionContext.h"
 
 namespace YAM
@@ -9,21 +9,24 @@ namespace YAM
 		std::filesystem::path const& directory,
 		RegexSet const& excludes,
 		ExecutionContext* context)
-		: WatchedFileRepository(repoName, directory, excludes, context)
-		, _directoryNode(std::make_shared<DirectoryNode>(context, directory))
+		: WatchedFileRepository(repoName, directory, context)
+		, _excludePatterns(excludes)
+		, _directoryNode(std::make_shared<SourceDirectoryNode>(context, directory))
 	{
 		_context->nodes().add(_directoryNode);
 	}
 
-	std::shared_ptr<DirectoryNode> SourceFileRepository::directoryNode() const {
+	std::shared_ptr<SourceDirectoryNode> SourceFileRepository::directoryNode() const {
 		return _directoryNode; 
+	}
+
+	RegexSet const& SourceFileRepository::excludePatterns() const {
+		return _excludePatterns;
 	}
 
 	void SourceFileRepository::clear() {
 		_context->nodes().remove(_directoryNode);
 		_directoryNode->clear();
-		// Mark Dirty to invalidate all nodes that use the directory node
-		// prerequisite.
 		_directoryNode->setState(Node::State::Dirty);
 	}
 }

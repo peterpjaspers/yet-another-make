@@ -3,6 +3,7 @@
 #include "ILogBook.h"
 #include "BasicOStreamLogBook.h"
 #include <memory>
+#include <mutex>
 
 namespace YAM
 {
@@ -18,6 +19,7 @@ namespace YAM
 	private:
 		void setColors(LogRecord::Aspect aspect);
 
+		std::mutex _mutex;
 		std::shared_ptr<Console> _console;
 	};
 }

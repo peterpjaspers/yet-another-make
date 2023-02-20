@@ -6,7 +6,7 @@
 #include "ThreadPool.h"
 #include "FileAspectSet.h"
 #include "ExecutionStatistics.h"
-#include "ConsoleLogBook.h"
+#include "ILogBook.h"
 
 #include <memory>
 
@@ -14,12 +14,11 @@ namespace YAM
 {
 	class FileRepository;
 	class BuildRequest;
-	class ILogBook;
 
 	class __declspec(dllexport) ExecutionContext
 	{
 	public:
-		ExecutionContext(std::shared_ptr<ILogBook> logBook = std::make_shared<ConsoleLogBook>());
+		ExecutionContext(std::shared_ptr<ILogBook> logBook = nullptr);
 		~ExecutionContext();
 
 		ThreadPool& threadPool();
@@ -45,9 +44,6 @@ namespace YAM
 
 		// Return the file aspects applicable to the file with the given path name.
 		std::vector<FileAspect> findFileAspects(std::filesystem::path const& path) const;
-
-		// Find the exclude patters for the repository that contains path.
-		RegexSet const& findExcludes(std::filesystem::path const& path) const;
 
 		// Return the file aspect set identified by the given name.
 		FileAspectSet const& findFileAspectSet(std::string const& aspectSetName) const;

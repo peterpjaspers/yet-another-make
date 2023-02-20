@@ -106,7 +106,7 @@ namespace YAM
 		//
 		// Prerequisites are nodes that are executed before this node 
 		// starts self-execution.
-		virtual bool supportsPrerequisites() const = 0;
+		virtual bool supportsPrerequisites() const { return false; }
 
 		// Pre: supportsPrerequisites()
 		// Append prerequisite nodes to 'prerequisites'.
@@ -119,7 +119,7 @@ namespace YAM
 		//		- output nodes of this node.
 		// 
 		// Source/output nodes are typically, but not necessarily, file nodes.
-		virtual void getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const = 0;
+		virtual void getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const {};
 
 		// Return whether this node supports postrequisites.
 		// This is a class property.
@@ -154,9 +154,9 @@ namespace YAM
 		// This node does NOT propagate its Dirty state to its postParents.
 		// Why not? Example:
 		// A filesystem directory A contains file A\F and directory A\D.
-		// DirectoryNode A creates file node A\F and directory node A\D.
+		// SourceDirectoryNode A creates file node A\F and directory node A\D.
 		// These sub nodes are postrequisites of A: they are executed after 
-		// self-execution of DirectoryNode A has created these subnodes.
+		// self-execution of SourceDirectoryNode A has created these subnodes.
 		// A is therefore postParent of both A\F and A\D.
 		// 
 		// The postParent node must:
@@ -180,22 +180,22 @@ namespace YAM
 		
 		// Return whether this node supports having output nodes.
 		// This is a class property.
-		virtual bool supportsOutputs() const = 0;
+		virtual bool supportsOutputs() const { return false; }
 
 		// Pre: supportsOutputs()
         // Append the output nodes to 'outputs'.
 		// Note: outputs are typically, but not necessarily, output files nodes.
-		virtual void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const = 0;
+		virtual void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const {};
 
 		// Return whether this node supports input nodes.
 		// This is a class property. 
-		virtual bool supportsInputs() const = 0;
+		virtual bool supportsInputs() const { return false; }
 
 		// Pre: supportsInputs()
 		// Append the inputs nodes to 'inputs'.
 		// Note: inputs are typically, but not necessarily, source files and/or
 		// output files produced by prerequisite command nodes.
-		virtual void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const = 0;
+		virtual void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const {};
 
 		//
 		// End of interfaces that access inputs and outputs of node execution.
@@ -315,7 +315,7 @@ namespace YAM
 		// Pre:pendingStartSelf().
 		// Delegate self-execution of the node to context()->threadPool().
 		// On completion: call notifyCompletion() in context()->mainThread().
-		virtual void startSelf() { throw std::runtime_error("not implemented"); }
+		virtual void startSelf() { postCompletion(Node::State::Failed); }
 
 		// Called when self-execution is busy and cancel() is called.
 		virtual void cancelSelf() { return; }

@@ -1,41 +1,11 @@
 #include "FileSystem.h"
 
 #include <mutex>
-#include <Windows.h>
-#include <stdio.h>
-#include <fileapi.h>
-#include <tchar.h>
 #include <algorithm>
 #include <cwctype>
 
 namespace
-{	
-	bool isShortPath(std::wstring const& path) {
-		auto it = std::find(path.begin(), path.end(), '~');
-	    return it != path.end();
-	}
-
-	std::wstring normalize(std::wstring const& path) {
-		std::wstring nPath;
-		if (!isShortPath(path)) {
-			nPath = path;
-		} else {
-			wchar_t buf[MAX_PATH];
-			DWORD length = GetLongPathNameW(
-				(LPCWSTR)(path.c_str()),
-				(LPWSTR)(&buf),
-				MAX_PATH);
-			if (length > MAX_PATH) throw std::exception("path too long");
-			if (length == 0) {
-				nPath = std::wstring(path);
-			} else {
-				nPath = std::wstring(buf, length);
-			}
-		}
-		std::transform(nPath.begin(), nPath.end(), nPath.begin(), std::towlower);
-		return nPath;
-	}
-	
+{
 	std::mutex mutex; // to guard access to std::tmpnam
 }
 
@@ -46,6 +16,7 @@ namespace YAM
 		while (!std::filesystem::create_directory(d)) {
 			d = uniquePath();
 		}
+		auto c = std::filesystem::canonical(d);
 		return normalizePath(d);
 	}
 
@@ -59,12 +30,17 @@ namespace YAM
 		return up;
 	}
 
-	std::filesystem::path FileSystem::normalizePath(std::wstring const& path) {
-		std::wstring p = normalize(path);
-		return std::filesystem::path(p);
-	}
-
 	std::filesystem::path FileSystem::normalizePath(std::filesystem::path const& path) {
-		return normalizePath(path.wstring());
+		std::error_code ec;
+		std::filesystem::path nPath = std::filesystem::canonical(path, ec);
+		if (ec.value() != 0) {
+			nPath = path;
+		}
+#if defined( _WIN32 )
+		std::wstring str = nPath.wstring();
+		std::transform(str.begin(), str.end(), str.begin(), std::towlower);
+		nPath = str;
+#endif
+		return nPath;
 	}
 }

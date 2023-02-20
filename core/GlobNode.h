@@ -4,10 +4,10 @@
 namespace YAM
 {
 	// TODO: analyze the following proposal 
-	//    - create DirectoryNode and FileNode to cache directory tree
+	//    - create SourceDirectoryNode and FileNode to cache directory tree
 	//      This means that, unlike proposed in design_whenToAddSourceFileNodesToGraph,
 	//      it is not possible to only cache parts of a directory tree.
-	//    - create GlobNode on a DirectoryNode
+	//    - create GlobNode on a SourceDirectoryNode
 	//      E.g. glob  /cygdrive/d/Peter/github/yam/*/*Node.cpp is created
 	//      on /cygdrive/d/Peter/github/yam with glob */*Node.cpp
 	// 

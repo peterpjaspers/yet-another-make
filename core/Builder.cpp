@@ -3,7 +3,7 @@
 #include "BuildResult.h"
 #include "CommandNode.h"
 #include "SourceFileNode.h"
-#include "DirectoryNode.h"
+#include "SourceDirectoryNode.h"
 #include "SourceFileRepository.h"
 #include "GraphWalker.h"
 

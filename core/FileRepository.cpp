@@ -2,13 +2,9 @@
 
 namespace YAM
 {
-	FileRepository::FileRepository(
-		std::string const& repoName,
-		std::filesystem::path const& directory,
-		RegexSet const& excludes)
+	FileRepository::FileRepository(std::string const& repoName, std::filesystem::path const& directory)
 		: _name(repoName)
 		, _directory(directory)
-		, _excludes(excludes)
 	{}
 
 	std::string const& FileRepository::name() const { 
@@ -18,14 +14,18 @@ namespace YAM
 	std::filesystem::path const& FileRepository::directory() const { 
 		return _directory; 
 	}
-	RegexSet const& FileRepository::excludes() const {
-		return _excludes;
+
+	bool FileRepository::lexicallyContains(std::filesystem::path const& absPath) const {
+		const std::size_t result = absPath.string().find(_directory.string());
+		return result == 0;
 	}
 
-	bool FileRepository::contains(std::filesystem::path const& absPath) const {
-		const std::size_t result = absPath.string().find(_directory.string());
-		const bool contains = result == 0;
-		return contains;
+    bool FileRepository::readAllowed(std::filesystem::path const& absPath) const {
+		return lexicallyContains(absPath);
+	}
+
+	bool FileRepository::writeAllowed(std::filesystem::path const& absPath) const {
+		return lexicallyContains(absPath);
 	}
 
 	std::filesystem::path FileRepository::relativePathOf(std::filesystem::path const& absPath) const {
