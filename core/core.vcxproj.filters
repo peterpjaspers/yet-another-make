@@ -147,7 +147,7 @@
     <ClInclude Include="FileRepository.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="WatchedFileRepository.h">
+    <ClInclude Include="FileRepositoryWatcher.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="DotIgnoreNode.h">
@@ -272,7 +272,7 @@
     <ClCompile Include="FileRepository.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="WatchedFileRepository.cpp">
+    <ClCompile Include="FileRepositoryWatcher.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="DotIgnoreNode.cpp">

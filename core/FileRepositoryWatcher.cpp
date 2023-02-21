@@ -1,4 +1,4 @@
-#include "WatchedFileRepository.h"
+#include "FileRepositoryWatcher.h"
 #include "SourceDirectoryNode.h"
 #include "FileNode.h"
 #include "DirectoryWatcher.h"
@@ -33,33 +33,24 @@ namespace
 
 namespace YAM
 {
-	WatchedFileRepository::WatchedFileRepository(
-		std::string const& repoName,
+	FileRepositoryWatcher::FileRepositoryWatcher(
 		std::filesystem::path const& directory,
 		ExecutionContext* context)
-		: FileRepository(repoName, directory)
+		: _directory(directory)
 		, _context(context)
 		, _watcher(std::make_shared<DirectoryWatcher>(
 			directory,
 			true,
-			Delegate<void, FileChange const&>::CreateLambda(
-				[&](FileChange const& change)
-				{
-					FileChange c(change);
-					// Access to nodes is only allowed in main thread context.
-					// Therefore post change handling to main thread.
-					_context->mainThreadQueue().push(
-		            Delegate<void>::CreateLambda([c, this]() { _addChange(c); }));
-				})
-			)
+			Delegate<void, FileChange const&>::CreateRaw(this, &FileRepositoryWatcher::_addChange))
 		) {}
 
-	void WatchedFileRepository::_addChange(FileChange change) {
+	void FileRepositoryWatcher::_addChange(FileChange const& change) {
+		std::lock_guard<std::mutex> lock(_mutex);
 		if (change.action == FileChange::Action::Overflow) {
 			_changes.clear();
 			_changes.insert({ overflowPath, change });
 		} else if (!_changes.contains(overflowPath)) {
-			std::filesystem::path absPath(directory() / change.fileName);
+			std::filesystem::path absPath(_directory / change.fileName);
 			auto it = _changes.find(absPath);
 			if (it == _changes.end()) {
 				_changes.insert({ absPath, change });
@@ -69,19 +60,21 @@ namespace YAM
 		}
 	}
 
-	void WatchedFileRepository::consumeChanges() {
+	void FileRepositoryWatcher::consumeChanges() {
+		std::lock_guard<std::mutex> lock(_mutex);
 		for (auto const& pair : _changes) {
 			_handleChange(pair.second);
 		}
 		_changes.clear();
 	}
 
-	bool WatchedFileRepository::hasChanged(std::filesystem::path const& path) const {
+	bool FileRepositoryWatcher::hasChanged(std::filesystem::path const& path) {
+		std::lock_guard<std::mutex> lock(_mutex);
 		bool contains = _changes.contains(path) || _changes.contains(overflowPath);
 		return contains;
 	}
 
-	void WatchedFileRepository::_handleChange(FileChange const& change) {
+	void FileRepositoryWatcher::_handleChange(FileChange const& change) {
 		if (change.action == FileChange::Action::Added) {
 			_handleAdd(change);
 		} else if (change.action == FileChange::Action::Removed) {
@@ -97,8 +90,8 @@ namespace YAM
 		}
 	}
 
-	void WatchedFileRepository::_handleAdd(FileChange const& change) {
-		std::filesystem::path dirOrFile(directory() / change.fileName);
+	void FileRepositoryWatcher::_handleAdd(FileChange const& change) {
+		std::filesystem::path dirOrFile(_directory / change.fileName);
 		std::filesystem::path parentDir = dirOrFile.parent_path();
 		// take care: cannot use change.lastWriteTime because it applies to
 		// change.fileName, not to parentDir.
@@ -108,8 +101,8 @@ namespace YAM
 		}
 	}
 
-	void WatchedFileRepository::_handleRemove(FileChange const& change) {
-		std::filesystem::path dirOrFile(directory() / change.fileName);
+	void FileRepositoryWatcher::_handleRemove(FileChange const& change) {
+		std::filesystem::path dirOrFile(_directory / change.fileName);
 		std::filesystem::path parentDir = dirOrFile.parent_path();
 		// take care: cannot use change.lastWriteTime because it applies to
 		// change.fileName, not to parentDir.
@@ -120,21 +113,21 @@ namespace YAM
 		_invalidateNodeRecursively(dirOrFile);
 	}
 
-	void WatchedFileRepository::_handleModification(FileChange const& change) {
-		std::filesystem::path dirOrFile(directory() / change.fileName);
+	void FileRepositoryWatcher::_handleModification(FileChange const& change) {
+		std::filesystem::path dirOrFile(_directory / change.fileName);
 		_invalidateNode(dirOrFile, change.lastWriteTime);
 	}
 
-	void WatchedFileRepository::_handleRename(FileChange const& change) {
+	void FileRepositoryWatcher::_handleRename(FileChange const& change) {
 		FileChange remove = change;
 		remove.fileName = change.oldFileName;
 		_handleRemove(remove);
 		_handleAdd(change);
 	}
 
-	void WatchedFileRepository::_handleOverflow() {
+	void FileRepositoryWatcher::_handleOverflow() {
 		std::vector<std::shared_ptr<Node>> nodesInRepo;
-		std::filesystem::path const& repoDir = directory();
+		std::filesystem::path const& repoDir = _directory;
 		auto includeNode = Delegate<bool, std::shared_ptr<Node> const&>::CreateLambda(
 			[&repoDir](std::shared_ptr<Node> const& node) {
 				return isNodeInRepo(node.get(), repoDir);
@@ -145,7 +138,7 @@ namespace YAM
 		}
 	}
 
-	std::shared_ptr<Node> WatchedFileRepository::_invalidateNode(
+	std::shared_ptr<Node> FileRepositoryWatcher::_invalidateNode(
 		std::filesystem::path const& path,
 		std::chrono::time_point<std::chrono::utc_clock> const& lastWriteTime
 	) {
@@ -168,12 +161,12 @@ namespace YAM
 		return node;
 	}
 
-	void WatchedFileRepository::_invalidateNodeRecursively(std::filesystem::path const& path) {
+	void FileRepositoryWatcher::_invalidateNodeRecursively(std::filesystem::path const& path) {
 		std::shared_ptr<Node> node = _context->nodes().find(path);
 		if (node != nullptr) _invalidateNodeRecursively(node);
 	}
 
-	void WatchedFileRepository::_invalidateNodeRecursively(std::shared_ptr<Node> const& node) {
+	void FileRepositoryWatcher::_invalidateNodeRecursively(std::shared_ptr<Node> const& node) {
 		node->setState(Node::State::Dirty);
 		auto dirNode = dynamic_pointer_cast<SourceDirectoryNode>(node);
 		if (dirNode != nullptr) {

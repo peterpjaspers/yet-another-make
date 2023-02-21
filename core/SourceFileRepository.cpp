@@ -1,5 +1,6 @@
 #include "SourceFileRepository.h"
 #include "SourceDirectoryNode.h"
+#include "FileRepositoryWatcher.h"
 #include "ExecutionContext.h"
 
 namespace YAM
@@ -9,8 +10,10 @@ namespace YAM
 		std::filesystem::path const& directory,
 		RegexSet const& excludes,
 		ExecutionContext* context)
-		: WatchedFileRepository(repoName, directory, context)
+		: FileRepository(repoName, directory)
+		, _watcher(std::make_shared<FileRepositoryWatcher>(directory, context))
 		, _excludePatterns(excludes)
+		, _context(context)
 		, _directoryNode(std::make_shared<SourceDirectoryNode>(context, directory))
 	{
 		_context->nodes().add(_directoryNode);
@@ -22,6 +25,14 @@ namespace YAM
 
 	RegexSet const& SourceFileRepository::excludePatterns() const {
 		return _excludePatterns;
+	}
+
+	void SourceFileRepository::consumeChanges() {
+		_watcher->consumeChanges();
+	}
+
+	bool SourceFileRepository::hasChanged(std::filesystem::path const& path) {
+		return _watcher->hasChanged(path);
 	}
 
 	void SourceFileRepository::clear() {

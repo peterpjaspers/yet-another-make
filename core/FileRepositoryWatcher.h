@@ -7,13 +7,14 @@
 #include <memory>
 #include <filesystem>
 #include <map>
+#include <mutex>
 
 namespace YAM
 {
 	class Node;
 	class ExecutionContext;
 
-	// A WatchedFileRepository continuously watches the file repository for
+	// A FileRepositoryWatcher continuously watches a file repository for
 	// directory and file changes. 
 	//  
 	// Changes are queued for consumption via the function consumeChanges().
@@ -38,35 +39,31 @@ namespace YAM
 	// last-write-time differs from the last-write-time reported in the 
 	// FileChange event.
 	//
-	class __declspec(dllexport) WatchedFileRepository : public FileRepository
+	class __declspec(dllexport) FileRepositoryWatcher
 	{
 	public:
 		// Recursively watch given 'directory' for subdirectory and file 
 		// changes. Find directory and file nodes associated with changes in 
 		// given 'context->nodes()'.
-		// Note: exclude patterns are not used. Instead failure to find nodes
-		// in context is ignored.
-		WatchedFileRepository(
-			std::string const& repoName,
+		FileRepositoryWatcher(
 			std::filesystem::path const& directory,
 			ExecutionContext* context);
 
 		// Consume the changes that occurred in the filesystem since the previous
 		// consumption by marking directory and file nodes associated with these 
 		// changes as Dirty.
-		// Only call this function from YAM main thread to ensure that consumption
-		// is an atomic operation.
 		void consumeChanges();
 
 		// Return whether dir/file identified by 'path' has changed since 
 		// previous consumeChanges().
-		bool hasChanged(std::filesystem::path const& path) const;
+		bool hasChanged(std::filesystem::path const& path);
 
 	protected:
+		std::filesystem::path _directory;
 		ExecutionContext* _context;
 
 	private:
-		void _addChange(FileChange change);
+		void _addChange(FileChange const& change);
 		void _handleChange(FileChange const& change);
 		void _handleAdd(FileChange const& change);
 		void _handleRemove(FileChange const& change);
@@ -79,6 +76,7 @@ namespace YAM
 		void _invalidateNodeRecursively(std::filesystem::path const& path);
 		void _invalidateNodeRecursively(std::shared_ptr<Node> const& node);
 
+		std::mutex _mutex;
 		std::map<std::filesystem::path, FileChange> _changes;
 		std::shared_ptr<IDirectoryWatcher> _watcher;
 	};

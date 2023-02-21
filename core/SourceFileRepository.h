@@ -1,7 +1,7 @@
 #pragma once
 
 #include "RegexSet.h"
-#include "WatchedFileRepository.h"
+#include "FileRepository.h"
 
 #include <memory>
 #include <filesystem>
@@ -12,10 +12,12 @@ namespace YAM
 	class SourceDirectoryNode;
 	class Node;
 	class ExecutionContext;
+	class FileRepositoryWatcher;
 
 	// A SourceFileRepository mirrors a file repository in memory as a
 	// SourceDirectoryNode that contains (sub-)DirectoryNodes and SourceFileNodes.
-	// It stores these nodes in an ExecutionContext. 
+	// It stores these nodes in an ExecutionContext. It continuously watches
+	// the repository for changes. See consumeChange()
 	//
 	// A SourceFileRepository cannot and need not mirror generated files.
 	// Cannot because the GeneratedFileNode constructor takes a pointer to the
@@ -77,7 +79,7 @@ namespace YAM
 	// it is hard to distinguish between modifications resulting from command
 	// execution and from the user tampering with the output files.
 	//
-	class __declspec(dllexport) SourceFileRepository : public WatchedFileRepository
+	class __declspec(dllexport) SourceFileRepository : public FileRepository
 	{
 	public:
 		// Recursively mirror source directories and source files in given 
@@ -101,13 +103,26 @@ namespace YAM
 		std::shared_ptr<SourceDirectoryNode> directoryNode() const;
 		RegexSet const& excludePatterns() const;
 
+		// Consume the changes that occurred in the filesystem since the previous
+		// consumption by marking directory and file nodes associated with these 
+		// changes as Dirty. 
+		// The mirror can be synced with the file system by executing the dirty
+		// nodes in the directoryNode() tree.
+		void consumeChanges();
+
+		// Return whether dir/file identified by 'path' has changed since 
+		// previous consumeChanges().
+		bool hasChanged(std::filesystem::path const& path);
+
 		// Recursively remove the directory node from context->nodes().
 		// Intended to be used when the repo is no longer to be mirrored
 		// by YAM.
 		void clear();
 
-	private: 
+	private:
 		RegexSet _excludePatterns;
+		ExecutionContext* _context;
+		std::shared_ptr<FileRepositoryWatcher> _watcher;
 		std::shared_ptr<SourceDirectoryNode> _directoryNode;
 	};
 }
