@@ -13,33 +13,33 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\Node">
+      <UniqueIdentifier>{fb1e924d-5858-4250-a277-fe4478586bb7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\LogBook">
+      <UniqueIdentifier>{57dcfe1e-1f13-419f-92c2-4ce57377e5cf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Thread">
+      <UniqueIdentifier>{dfd60f0b-0a10-49fe-9171-b8aaa6ce74e8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\LogBook">
+      <UniqueIdentifier>{760a99d0-ff49-42e7-9551-452a2a829f7a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Node">
+      <UniqueIdentifier>{c74a1041-24c3-4d8f-9527-da0451d4398f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Thread">
+      <UniqueIdentifier>{763c51ea-9638-47ac-8ad8-4bfdf1c99eb3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Stream">
+      <UniqueIdentifier>{92067dfd-3da0-48bb-80c7-0f14fcaa5d44}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Stream">
+      <UniqueIdentifier>{aa61fa18-f868-40f2-b28a-7f699085cbf4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Delegates.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="NodeSet.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Node.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Dispatcher.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Thread.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThreadPool.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="FileNode.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="CommandNode.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="SourceFileNode.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ExecutionContext.h">
@@ -57,16 +57,7 @@
     <ClInclude Include="RegexSet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="GeneratedFileNode.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="MSBuildTrackerOutputReader.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="GlobNode.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="SourceDirectoryNode.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="DirectoryWatcher.h">
@@ -96,9 +87,6 @@
     <ClInclude Include="BuildService.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="DispatcherFrame.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Builder.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -108,40 +96,7 @@
     <ClInclude Include="BuildResult.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="GraphWalker.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="dbgMemLeaks.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ILogBook.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="TimePoint.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="MemoryLogBook.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="BasicOStreamLogBook.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="LogRecord.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="MultiwayLogBook.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="IConsole.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Console.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ConsoleWin32.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ConsoleLogBook.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="FileRepository.h">
@@ -150,36 +105,111 @@
     <ClInclude Include="FileRepositoryWatcher.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="FileNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="CommandNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="GeneratedFileNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="GlobNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="Node.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="NodeSet.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="SourceDirectoryNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="SourceFileNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="BasicOStreamLogBook.h">
+      <Filter>Header Files\LogBook</Filter>
+    </ClInclude>
+    <ClInclude Include="Console.h">
+      <Filter>Header Files\LogBook</Filter>
+    </ClInclude>
+    <ClInclude Include="ConsoleLogBook.h">
+      <Filter>Header Files\LogBook</Filter>
+    </ClInclude>
+    <ClInclude Include="ConsoleWin32.h">
+      <Filter>Header Files\LogBook</Filter>
+    </ClInclude>
     <ClInclude Include="DotIgnoreNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="GraphWalker.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="ILogBook.h">
+      <Filter>Header Files\LogBook</Filter>
+    </ClInclude>
+    <ClInclude Include="LogRecord.h">
+      <Filter>Header Files\LogBook</Filter>
+    </ClInclude>
+    <ClInclude Include="MemoryLogBook.h">
+      <Filter>Header Files\LogBook</Filter>
+    </ClInclude>
+    <ClInclude Include="MultiwayLogBook.h">
+      <Filter>Header Files\LogBook</Filter>
+    </ClInclude>
+    <ClInclude Include="ThreadPool.h">
+      <Filter>Header Files\Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="Thread.h">
+      <Filter>Header Files\Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="Dispatcher.h">
+      <Filter>Header Files\Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="DispatcherFrame.h">
+      <Filter>Header Files\Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="TimePoint.h">
+      <Filter>Header Files\LogBook</Filter>
+    </ClInclude>
+    <ClInclude Include="IConsole.h">
+      <Filter>Source Files\LogBook</Filter>
+    </ClInclude>
+    <ClInclude Include="EndianShip.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="IStreamable.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="IStreamableTypes.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="IStreamer.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="IIOStream.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="MemoryStream.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="EndOfStreamException.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="STLReader.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BinaryStreamer.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="StreamableTypesBase.h">
+      <Filter>Header Files\Stream</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="NodeSet.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Node.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Dispatcher.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Thread.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ThreadPool.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="FileNode.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="CommandNode.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="SourceFileNode.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ExecutionContext.cpp">
@@ -197,16 +227,7 @@
     <ClCompile Include="RegexSet.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="GeneratedFileNode.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="MSBuildTrackerOutputReader.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="GlobNode.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="SourceDirectoryNode.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="DirectoryWatcher.cpp">
@@ -230,9 +251,6 @@
     <ClCompile Include="BuildService.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="DispatcherFrame.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Builder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -242,40 +260,85 @@
     <ClCompile Include="BuildResult.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="GraphWalker.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="TimePoint.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="MemoryLogBook.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="BasicOStreamLogBook.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="LogRecord.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="MultiwayLogBook.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Console.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ConsoleWin32.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ConsoleLogBook.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="FileRepository.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="FileRepositoryWatcher.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="BasicOStreamLogBook.cpp">
+      <Filter>Source Files\LogBook</Filter>
+    </ClCompile>
+    <ClCompile Include="CommandNode.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="Console.cpp">
+      <Filter>Source Files\LogBook</Filter>
+    </ClCompile>
+    <ClCompile Include="ConsoleLogBook.cpp">
+      <Filter>Source Files\LogBook</Filter>
+    </ClCompile>
+    <ClCompile Include="ConsoleWin32.cpp">
+      <Filter>Source Files\LogBook</Filter>
+    </ClCompile>
+    <ClCompile Include="Dispatcher.cpp">
+      <Filter>Source Files\Thread</Filter>
+    </ClCompile>
+    <ClCompile Include="DispatcherFrame.cpp">
+      <Filter>Source Files\Thread</Filter>
+    </ClCompile>
     <ClCompile Include="DotIgnoreNode.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="FileNode.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFileNode.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="GlobNode.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="GraphWalker.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="LogRecord.cpp">
+      <Filter>Source Files\LogBook</Filter>
+    </ClCompile>
+    <ClCompile Include="MemoryLogBook.cpp">
+      <Filter>Source Files\LogBook</Filter>
+    </ClCompile>
+    <ClCompile Include="MultiwayLogBook.cpp">
+      <Filter>Source Files\LogBook</Filter>
+    </ClCompile>
+    <ClCompile Include="Node.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="NodeSet.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="SourceDirectoryNode.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="SourceFileNode.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="Thread.cpp">
+      <Filter>Source Files\Thread</Filter>
+    </ClCompile>
+    <ClCompile Include="ThreadPool.cpp">
+      <Filter>Source Files\Thread</Filter>
+    </ClCompile>
+    <ClCompile Include="TimePoint.cpp">
+      <Filter>Source Files\LogBook</Filter>
+    </ClCompile>
+    <ClCompile Include="MemoryStream.cpp">
+      <Filter>Source Files\Stream</Filter>
+    </ClCompile>
+    <ClCompile Include="BinaryStreamer.cpp">
+      <Filter>Source Files\Stream</Filter>
+    </ClCompile>
+    <ClCompile Include="StreamableTypesBase.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

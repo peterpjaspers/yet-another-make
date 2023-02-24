@@ -108,6 +108,13 @@
     <ClInclude Include="dbgMemLeaks.h" />
     <ClInclude Include="Delegates.h" />
     <ClInclude Include="DotIgnoreNode.h" />
+    <ClInclude Include="EndianShip.h" />
+    <ClInclude Include="EndOfStreamException.h" />
+    <ClInclude Include="IStreamable.h" />
+    <ClInclude Include="IStreamableTypes.h" />
+    <ClInclude Include="IStreamer.h" />
+    <ClInclude Include="IIOStream.h" />
+    <ClInclude Include="MemoryStream.h" />
     <ClInclude Include="SourceDirectoryNode.h" />
     <ClInclude Include="DispatcherFrame.h" />
     <ClInclude Include="ExecutionContext.h" />
@@ -139,9 +146,12 @@
     <ClInclude Include="Node.h" />
     <ClInclude Include="SourceFileNode.h" />
     <ClInclude Include="SourceFileRepository.h" />
+    <ClInclude Include="STLReader.h" />
+    <ClInclude Include="StreamableTypesBase.h" />
     <ClInclude Include="Thread.h" />
     <ClInclude Include="ThreadPool.h" />
     <ClInclude Include="TimePoint.h" />
+    <ClInclude Include="BinaryStreamer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BasicOStreamLogBook.cpp" />
@@ -160,6 +170,7 @@
     <ClCompile Include="ConsoleLogBook.cpp" />
     <ClCompile Include="ConsoleWin32.cpp" />
     <ClCompile Include="DotIgnoreNode.cpp" />
+    <ClCompile Include="MemoryStream.cpp" />
     <ClCompile Include="SourceDirectoryNode.cpp" />
     <ClCompile Include="DispatcherFrame.cpp" />
     <ClCompile Include="ExecutionContext.cpp" />
@@ -200,9 +211,11 @@
     </ClCompile>
     <ClCompile Include="SourceFileNode.cpp" />
     <ClCompile Include="SourceFileRepository.cpp" />
+    <ClCompile Include="StreamableTypesBase.cpp" />
     <ClCompile Include="Thread.cpp" />
     <ClCompile Include="ThreadPool.cpp" />
     <ClCompile Include="TimePoint.cpp" />
+    <ClCompile Include="BinaryStreamer.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

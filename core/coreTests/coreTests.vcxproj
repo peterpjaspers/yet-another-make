@@ -50,6 +50,7 @@
     <ClCompile Include="fileNodeTest.cpp" />
     <ClCompile Include="directoryWatcherWin32Test.cpp" />
     <ClCompile Include="fileRepositoryTest.cpp" />
+    <ClCompile Include="memoryStreamTest.cpp" />
     <ClCompile Include="monitoredProcessWin32Test.cpp" />
     <ClCompile Include="msBuildTrackerOutputReaderTest.cpp" />
     <ClCompile Include="nodeExecutionTest.cpp" />
@@ -64,6 +65,7 @@
     <ClCompile Include="threadTest.cpp" />
     <ClCompile Include="main_gtest.cpp" />
     <ClCompile Include="timePointTest.cpp" />
+    <ClCompile Include="binaryStreamerTest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\xxHash\xxHash.vcxproj">
