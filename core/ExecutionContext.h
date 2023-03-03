@@ -18,7 +18,8 @@ namespace YAM
 	class __declspec(dllexport) ExecutionContext
 	{
 	public:
-		ExecutionContext(std::shared_ptr<ILogBook> logBook = nullptr);
+		// Construct context, logBook defaults to ConsoleLogBook.
+		ExecutionContext();
 		~ExecutionContext();
 
 		ThreadPool& threadPool();
@@ -52,6 +53,7 @@ namespace YAM
 		// Return the nodes that are in state Node::State::Dirty
 		void getDirtyNodes(std::vector<std::shared_ptr<Node>>& dirtyNodes);
 
+		void logBook(std::shared_ptr<ILogBook> newBook);
 		std::shared_ptr<ILogBook> logBook() const;
 		void addToLogBook(LogRecord const& record);
 

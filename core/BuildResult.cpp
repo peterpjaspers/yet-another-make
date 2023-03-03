@@ -1,4 +1,10 @@
 #include "BuildResult.h"
+#include "IStreamer.h"
+
+namespace
+{
+	uint32_t _streamableType = 0;
+}
 
 namespace YAM
 {
@@ -26,6 +32,20 @@ namespace YAM
 
 	std::chrono::system_clock::duration BuildResult::duration() const {
 		return _endTime - _startTime;
+	}
+
+	void BuildResult::setStreamableType(uint32_t type) {
+		_streamableType = type;
+	}
+
+	uint32_t BuildResult::typeId() const {
+		return _streamableType;
+	}
+
+	void BuildResult::stream(IStreamer* streamer) {
+		streamer->stream(_succeeded);
+		streamer->stream(_startTime);
+		streamer->stream(_endTime);
 	}
 }
 

@@ -54,7 +54,6 @@ namespace
 			, memLogBook(std::make_shared<MemoryLogBook>())
 			, stdoutLogBook(std::make_shared<BasicOStreamLogBook>(&std::cout))
 			, logBook(std::make_shared<MultiwayLogBook>())
-			, context(logBook)
 			, pietCmd(std::make_shared<CommandNode>(&context, np("piet\\_cmd")))
 			, janCmd(std::make_shared<CommandNode>(& context, np("jan\\_cmd")))
 			, pietjanCmd(std::make_shared<CommandNode>(& context, np("pietjan\\_cmd")))
@@ -67,6 +66,7 @@ namespace
 		{
 			logBook->add(memLogBook);
 			logBook->add(stdoutLogBook);
+			context.logBook(logBook);
 			stats.registerNodes = true;
 			//context.threadPool().size(1); // to ease debugging
 			std::filesystem::create_directories(repoDir);

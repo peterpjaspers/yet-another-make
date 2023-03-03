@@ -1,6 +1,9 @@
-#include "../BinaryStreamer.h"
+#include "../BinaryValueStreamer.h"
+#include "../SharedObjectStreamer.h"
+#include "../ObjectStreamer.h"
+#include "../Streamer.h"
+#include "../IStreamable.h"
 #include "../MemoryStream.h"
-#include "../StreamableTypesBase.h"
 
 #include <gtest/gtest.h>
 
@@ -10,12 +13,10 @@ namespace
 
     const unsigned int arrayCapacity = 10;
 
-
     class Streamable : public IStreamable
     {
     public:
-        Streamable()
-        {
+        Streamable() {
             nBytes = arrayCapacity;
             for (unsigned int idx = 0; idx < nBytes; ++idx) {
                 bytes[idx] = static_cast<char>(idx);
@@ -33,10 +34,15 @@ namespace
             ui64 = static_cast<uint64_t>(rand());
             str = std::string("dit is een test");
             wstr = std::wstring(L"dit is een wtest");
+            path = std::filesystem::path(R"(aap/noot/mies)");
         }
 
-        void AssertEqual(Streamable& other)
-        {
+        Streamable(IStreamer* streamer) {
+            stream(streamer);
+        }
+
+        void assertEqual(Streamable& other) {
+            EXPECT_EQ(nBytes, other.nBytes);
             for (unsigned int idx = 0; idx < nBytes; ++idx) {
                 EXPECT_EQ(bytes[idx], other.bytes[idx]);
             }
@@ -53,10 +59,11 @@ namespace
             EXPECT_EQ(ui64, other.ui64);
             EXPECT_EQ(str, other.str);
             EXPECT_EQ(wstr, other.wstr);
+            EXPECT_EQ(path.string(), other.path.string());
         }
 
-        void stream(IStreamer* streamer) override
-        {
+        void stream(IStreamer* streamer) override {
+            streamer->stream(nBytes);
             streamer->stream(static_cast<void*>(&bytes[0]), nBytes);
             streamer->stream(b);
             streamer->stream(f);
@@ -71,7 +78,10 @@ namespace
             streamer->stream(ui64);
             streamer->stream(str);
             streamer->stream(wstr);
+            streamer->stream(path);
         }
+
+        uint32_t typeId() const override { return 2; }
 
     private:
         uint32_t nBytes;
@@ -89,116 +99,144 @@ namespace
         uint64_t ui64;
         std::string str;
         std::wstring wstr;
+        std::filesystem::path path;
     };
 
-    class StreamableTypesById : public StreamableTypesByIdBase
+
+    class Streamable2 : public Streamable
+    {
+    public:
+        Streamable2() : Streamable() {};
+        Streamable2(IStreamer* streamer) : Streamable(streamer) {};
+
+        uint32_t typeId() const override { return 3; }
+    };
+
+    class StreamableReader : public ObjectReader
     {
     protected:
-        uint32_t getType(IStreamable* streamable) const override
-        {
-            if (streamable == nullptr) return INT_MAX;
-            else if (dynamic_cast<Streamable*>(streamable) != nullptr) return 2;
-            throw std::exception("unknown type");
-        }
-
-        IStreamable* createInstance(const unsigned int& typeId) const override
+        IStreamable* readObject(IStreamer* streamer, uint32_t typeId) const override
         {
             if (typeId == INT_MAX) return nullptr;
-            if (typeId == 2) return new Streamable;
+            if (typeId == 2) return new Streamable(streamer);
+            if (typeId == 3) return new Streamable2(streamer);
             throw std::exception("unknown type");
         }
     };
 
-    class StreamableTypesByName : public StreamableTypesByNameBase
+    class StreamableWriter : public ObjectWriter
     {
-    protected:
-        std::string getType(IStreamable* streamable) const override
-        {
-            if (streamable == nullptr) return std::string("");
-            else if (dynamic_cast<Streamable*>(streamable) != nullptr) return std::string("Streamable");
-            throw std::exception("unknown type");
+        uint32_t getTypeId(IStreamable* object) const override {
+            return object->typeId();
         }
+    };
 
-        IStreamable* createInstance(std::string const& typeId) const override
-        {
-            if (typeId == std::string("")) return nullptr;
-            if (typeId == std::string("Streamable")) return new Streamable;
-            throw std::exception("unknown type");
-        }
+    class StreamerSetup
+    {
+    public:
+        StreamerSetup()
+            : _valueWriter(&_stream)
+            , _valueReader(&_stream)
+            , _sharedObjectWriter(&_objectWriter)
+            , _sharedObjectReader(&_objectReader)
+            , _writer(&_valueWriter, &_sharedObjectWriter)
+            , _reader(&_valueReader, &_sharedObjectReader)
+        {}
+
+        Streamer* writer() { return &_writer; }
+        Streamer* reader() { return &_reader; }
+
+    private:
+        MemoryStream _stream;
+        BinaryValueWriter _valueWriter;
+        BinaryValueReader _valueReader;
+        StreamableWriter _objectWriter;
+        StreamableReader _objectReader;
+        SharedObjectWriter _sharedObjectWriter;
+        SharedObjectReader _sharedObjectReader;
+        Streamer _writer;
+        Streamer _reader;
     };
 }
 
 namespace
 {
-    TEST(ValueStream, streamBasicTypes)
-    {
-        MemoryStream stream;
-        Streamable written;
-        BinaryWriter writer(&stream);
-        written.stream(&writer);
+    TEST(Streamer, streamBasicTypes) {
+        StreamerSetup setup;
+        Streamable expected;
+        expected.stream(setup.writer());
 
-        BinaryReader reader(&stream);
-        Streamable read;
-        read.stream(&reader);
-
-        read.AssertEqual(written);
+        Streamable actual;
+        actual.stream(setup.reader());
+        expected.assertEqual(actual);
     }
 
-    TEST(ValueStream, eos)
-    {
-        MemoryStream stream;
-        Streamable written;
-        BinaryWriter writer(&stream);
-        written.stream(&writer);
+    TEST(Streamer, eos) {
+        StreamerSetup setup;
+        Streamable expected;
+        expected.stream(setup.writer());
+        Streamable actual;
+        actual.stream(setup.reader());
 
-        BinaryReader reader(&stream);
-        Streamable read;
-        read.stream(&reader);
+        EXPECT_THROW(actual.stream(setup.reader()), EndOfStreamException);
+    }
+    
+    TEST(Streamer, streamSharedObjects) {
+        StreamerSetup setup;
+        std::shared_ptr<Streamable> expected = std::make_shared<Streamable>();
+        std::shared_ptr<IStreamable> pexpected = expected;
+        setup.writer()->stream(pexpected);
+        setup.writer()->stream(pexpected);
+        std::shared_ptr<IStreamable> actual1;
+        std::shared_ptr<IStreamable> actual2;
+        setup.reader()->stream(actual1);
+        setup.reader()->stream(actual2);
 
-        EXPECT_TRUE(reader.eos());
-        EXPECT_THROW(read.stream(&reader), EndOfStreamException);
+        EXPECT_TRUE(actual1 == actual2);
+        auto sactual1 = dynamic_pointer_cast<Streamable>(actual1);
+        EXPECT_NE(nullptr, sactual1);
+        expected.get()->assertEqual(*(sactual1.get()));
     }
 
-    TEST(ValueStream, streamRawObjects)
-    {
-        StreamableTypesById types;
-        MemoryStream stream;
-        Streamable written;
-        IStreamable* pwritten = &written;
-        BinaryWriter writer(&types, &stream);
-        writer.stream(&pwritten);
-        writer.stream(&pwritten);
-
-        BinaryReader reader(&types, &stream);
-        IStreamable* read1;
-        IStreamable* read2;
-        reader.stream(&read1);
-        reader.stream(&read2);
-
-        EXPECT_TRUE(read1 == read2);
-        Streamable* pread1 = dynamic_cast<Streamable*>(read1);
-        EXPECT_NE(nullptr, pread1);
-        written.AssertEqual(*pread1);
+    TEST(Streamer, streamIntVector) {
+        StreamerSetup setup;
+        std::vector<int> expected = { 1,2,3,4 };
+        setup.writer()->streamVector(expected);
+        std::vector<int> actual;
+        setup.reader()->streamVector(actual);
+        EXPECT_EQ(expected, actual);
     }
 
-    TEST(ValueStream, streamSharedObjects)
-    {
-        StreamableTypesByName types;
-        MemoryStream stream;
-        std::shared_ptr<Streamable> written = std::make_shared<Streamable>();
-        std::shared_ptr<IStreamable> pwritten = written;
-        BinaryWriter writer(&types, &stream);
-        writer.stream(pwritten);
-        writer.stream(pwritten);
-        BinaryReader reader(&types, &stream);
-        std::shared_ptr<IStreamable> read1;
-        std::shared_ptr<IStreamable> read2;
-        reader.stream(read1);
-        reader.stream(read2);
-
-        EXPECT_TRUE(read1 == read2);
-        auto sread1 = dynamic_pointer_cast<Streamable>(read1);
-        EXPECT_NE(nullptr, sread1);
-        written.get()->AssertEqual(*(sread1.get()));
+    TEST(Streamer, streamObjectVector) {
+        StreamerSetup setup;
+        std::shared_ptr<Streamable> expected = std::make_shared<Streamable>();
+        std::shared_ptr<IStreamable> pexpected = expected;
+        std::vector<std::shared_ptr<IStreamable>> expecteds = { pexpected, pexpected };
+        setup.writer()->streamVector(expecteds);
+        std::vector<std::shared_ptr<IStreamable>> actuals;
+        setup.reader()->streamVector(actuals);
+        EXPECT_EQ(expecteds.size(), actuals.size());
+        EXPECT_EQ(actuals[0].get(), actuals[1].get());
+        auto actual = dynamic_pointer_cast<Streamable>(actuals[0]);
+        expected.get()->assertEqual(*actual);
     }
+
+    TEST(Streamer, streamObjectMap) {
+        StreamerSetup setup;
+        const std::string s1("streamable1");
+        const std::string s2("streamable2");
+        std::shared_ptr<Streamable> expected = std::make_shared<Streamable>();
+        std::shared_ptr<IStreamable> pexpected = expected;
+        std::map<std::string, std::shared_ptr<IStreamable>> expecteds = {
+            {s1, pexpected}, { s2, pexpected} };
+        setup.writer()->streamMap(expecteds);
+        std::map<std::string, std::shared_ptr<IStreamable>> actuals;
+        setup.reader()->streamMap(actuals);
+        EXPECT_EQ(expecteds.size(), actuals.size());
+        auto actual1 = dynamic_pointer_cast<Streamable>(actuals[s1]);
+        auto actual2 = dynamic_pointer_cast<Streamable>(actuals[s2]);
+        EXPECT_EQ(actual1.get(), actual2.get());
+        expected.get()->assertEqual(*actual1);
+    }
+
 }

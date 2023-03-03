@@ -37,6 +37,12 @@
     <Filter Include="Source Files\Stream">
       <UniqueIdentifier>{aa61fa18-f868-40f2-b28a-7f699085cbf4}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\BuildService">
+      <UniqueIdentifier>{a674e7e2-0525-4827-ae00-6b38c6875501}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\BuildService">
+      <UniqueIdentifier>{9d6d618b-9987-41d7-b09d-c4c3eaeb0900}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Delegates.h">
@@ -84,16 +90,7 @@
     <ClInclude Include="FileSystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="BuildService.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Builder.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="BuildRequest.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="BuildResult.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="dbgMemLeaks.h">
@@ -183,9 +180,6 @@
     <ClInclude Include="IStreamable.h">
       <Filter>Header Files\Stream</Filter>
     </ClInclude>
-    <ClInclude Include="IStreamableTypes.h">
-      <Filter>Header Files\Stream</Filter>
-    </ClInclude>
     <ClInclude Include="IStreamer.h">
       <Filter>Header Files\Stream</Filter>
     </ClInclude>
@@ -198,14 +192,50 @@
     <ClInclude Include="EndOfStreamException.h">
       <Filter>Header Files\Stream</Filter>
     </ClInclude>
-    <ClInclude Include="STLReader.h">
+    <ClInclude Include="BinaryValueStreamer.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="TcpStream.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildRequest.h">
+      <Filter>Header Files\BuildService</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildResult.h">
+      <Filter>Header Files\BuildService</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildService.h">
+      <Filter>Header Files\BuildService</Filter>
+    </ClInclude>
+    <ClInclude Include="ShutdownRequest.h">
+      <Filter>Header Files\BuildService</Filter>
+    </ClInclude>
+    <ClInclude Include="StopBuildRequest.h">
+      <Filter>Header Files\BuildService</Filter>
+    </ClInclude>
+    <ClInclude Include="SharedObjectStreamer.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="IObjectStreamer.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="IValueStreamer.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="Streamer.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildServiceMessageStreamer.h">
+      <Filter>Header Files\BuildService</Filter>
+    </ClInclude>
+    <ClInclude Include="ObjectStreamer.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="ISharedObjectStreamer.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildServiceMessageTypes.h">
       <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="BinaryStreamer.h">
-      <Filter>Header Files\Stream</Filter>
-    </ClInclude>
-    <ClInclude Include="StreamableTypesBase.h">
-      <Filter>Header Files\Stream</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -248,16 +278,7 @@
     <ClCompile Include="FileSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="BuildService.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Builder.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="BuildRequest.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="BuildResult.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="FileRepository.cpp">
@@ -335,11 +356,43 @@
     <ClCompile Include="MemoryStream.cpp">
       <Filter>Source Files\Stream</Filter>
     </ClCompile>
-    <ClCompile Include="BinaryStreamer.cpp">
+    <ClCompile Include="BinaryValueStreamer.cpp">
       <Filter>Source Files\Stream</Filter>
     </ClCompile>
-    <ClCompile Include="StreamableTypesBase.cpp">
+    <ClCompile Include="TcpStream.cpp">
+      <Filter>Source Files\Stream</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildRequest.cpp">
+      <Filter>Source Files\BuildService</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildResult.cpp">
+      <Filter>Source Files\BuildService</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildService.cpp">
+      <Filter>Source Files\BuildService</Filter>
+    </ClCompile>
+    <ClCompile Include="ShutdownRequest.cpp">
+      <Filter>Source Files\BuildService</Filter>
+    </ClCompile>
+    <ClCompile Include="StopBuildRequest.cpp">
+      <Filter>Source Files\BuildService</Filter>
+    </ClCompile>
+    <ClCompile Include="SharedObjectStreamer.cpp">
+      <Filter>Source Files\Stream</Filter>
+    </ClCompile>
+    <ClCompile Include="Streamer.cpp">
+      <Filter>Source Files\Stream</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildServiceMessageStreamer.cpp">
+      <Filter>Source Files\BuildService</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildServiceMessageTypes.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="IStreamer.inl">
+      <Filter>Header Files\Stream</Filter>
+    </None>
   </ItemGroup>
 </Project>

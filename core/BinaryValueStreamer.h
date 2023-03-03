@@ -1,20 +1,14 @@
 #pragma once
 
-#include "IStreamer.h"
-#include "IIOStream.h"
-#include "IStreamable.h"
-#include "IStreamableTypes.h"
-
-#include <map>
-#include <vector>
+#include "IValueStreamer.h"
 
 namespace YAM
 {
-    class __declspec(dllexport) BinaryWriter : public IStreamer
+    class IOutputStream;
+    class __declspec(dllexport) BinaryValueWriter : public IValueStreamer
     {
     public:
-        BinaryWriter(IOutputStream* oStream);
-        BinaryWriter(IStreamableTypes* types, IOutputStream* oStream);
+        BinaryValueWriter(IOutputStream* oStream);
 
         bool writing() const override { return true; }
         void stream(void* bytes, unsigned int nBytes) override;
@@ -30,30 +24,18 @@ namespace YAM
         void stream(int64_t& value) override;
         void stream(uint64_t& value) override;
 
-        void stream(std::string&) override;
-        void stream(std::wstring&) override;
-
-
-        void stream(IStreamable** streamable) override;
-        void stream(std::shared_ptr<IStreamable>& streamable) override;
-
-        bool eos() override;
-        void flush() override;
-
     private:
-        IStreamableTypes* _types;
         IOutputStream* _stream;
-        std::map<IStreamable*, int> _objects;
     };
 }
 
 namespace YAM
 {
-    class __declspec(dllexport) BinaryReader : public IStreamer
+    class IInputStream;
+    class __declspec(dllexport) BinaryValueReader : public IValueStreamer
     {
     public:
-        BinaryReader(IInputStream* iStream);
-        BinaryReader(IStreamableTypes* types, IInputStream* iStream);
+        BinaryValueReader(IInputStream* ioStream);
 
         bool writing() const override { return false; }
         void stream(void* bytes, unsigned int nBytes) override;
@@ -69,19 +51,7 @@ namespace YAM
         void stream(int64_t& value) override;
         void stream(uint64_t& value) override;
 
-        void stream(std::string&) override;
-        void stream(std::wstring&) override;
-
-        void stream(IStreamable** streamable) override;
-        void stream(std::shared_ptr<IStreamable>& streamable) override;
-
-        bool eos() override;
-        void flush() override;
-
     private:
-        IStreamableTypes* _types;
         IInputStream* _stream;
-        std::vector<IStreamable*> _objects;
-        std::map<IStreamable*, std::shared_ptr<IStreamable> > _sharedObjects;
     };
 }

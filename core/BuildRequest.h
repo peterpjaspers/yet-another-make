@@ -1,12 +1,13 @@
 #pragma 
 
+#include "IStreamable.h"
 #include <filesystem>
 #include <vector>
 #include <string>
 
 namespace YAM
 {
-	class __declspec(dllexport) BuildRequest
+	class __declspec(dllexport) BuildRequest : public IStreamable
 	{
 	public:
 		enum RequestType {
@@ -16,6 +17,7 @@ namespace YAM
 		};
 
 		BuildRequest(RequestType type = Build);
+		BuildRequest(IStreamer* reader) : IStreamable(reader) {}
 
 		void requestType(RequestType type);
 		RequestType requestType() const;
@@ -27,6 +29,11 @@ namespace YAM
 		// Only applicable to Build and Clean requests.
 		void addToScope(std::filesystem::path const& path);
 		std::vector<std::filesystem::path> const& pathsInScope();
+
+		static void setStreamableType(uint32_t type);
+		// Inherited via IStreamable
+		uint32_t typeId() const override;
+		void stream(IStreamer* streamer) override;
 
 	private:
 		RequestType _type;

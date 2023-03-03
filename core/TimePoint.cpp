@@ -1,4 +1,5 @@
 #include "TimePoint.h"
+#include "IStreamer.h"
 
 #include <sstream>
 #include <ctime>
@@ -48,6 +49,31 @@ namespace
 
 namespace YAM
 {
+    WallClockTime::WallClockTime()
+        : year(1900), month(1), day(1)
+        , hour(0), minute(0), second(0), usecond(0)
+    {}
+
+    WallClockTime::WallClockTime(std::vector<uint32_t> args) : WallClockTime() {
+        if (args.size() > 0) year = static_cast<uint16_t>(args[0]);
+        if (args.size() > 1) month = static_cast<uint16_t>(args[1]);
+        if (args.size() > 2) day = static_cast<uint16_t>(args[2]);
+        if (args.size() > 3) hour = static_cast<uint16_t>(args[3]);
+        if (args.size() > 4) minute = static_cast<uint16_t>(args[4]);
+        if (args.size() > 5) second = static_cast<uint16_t>(args[5]);
+        if (args.size() > 6) usecond = args[6];
+    }
+
+    // yyyy-mm-dd hh:mm:ss.uuuuuu
+    WallClockTime::WallClockTime(std::string dateTime) {
+        std::stringstream ss(dateTime);
+        char delim;
+        ss
+            >> year >> delim >> month >> delim >> day
+            >> hour >> delim >> minute >> delim >> second >> delim
+            >> usecond;
+    }
+
     std::string WallClockTime::dateTime() const {
         std::stringstream ss;
         ss << year << '-';
@@ -122,6 +148,13 @@ namespace YAM
         return ss.str();
     }
 
+    void WallClockTime::stream(IStreamer* streamer) {
+        std::string tps;
+        if (streamer->writing()) tps = dateTime();
+        streamer->stream(tps);
+        if (streamer->reading()) *this = WallClockTime(tps);
+    }
+
     TimePoint::TimePoint(std::chrono::system_clock::time_point time)
         : _time(time)
         , _wctime(tp2wc(time))
@@ -138,6 +171,13 @@ namespace YAM
 
     WallClockTime const& TimePoint::wctime() const {
         return _wctime;
+    }
+
+    void TimePoint::stream(IStreamer* streamer) {
+        _wctime.stream(streamer);
+        if (streamer->reading()) {
+            _time = wc2tp(_wctime);
+        }
     }
 }
 

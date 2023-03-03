@@ -23,14 +23,11 @@ namespace
 namespace YAM
 {
 
-    ExecutionContext::ExecutionContext(std::shared_ptr<ILogBook> logBook)
+    ExecutionContext::ExecutionContext()
         : _mainThread(&_mainThreadQueue, "YAM_main")
         , _threadPool(&_threadPoolQueue, "YAM_threadpool", getDefaultPoolSize()) 
-        , _logBook(logBook)
+        , _logBook(std::make_shared<ConsoleLogBook>())
     {
-        if (_logBook == nullptr) {
-            _logBook = std::make_shared<ConsoleLogBook>();
-        }
         auto const& entireFileSet = FileAspectSet::entireFileSet();
         _fileAspectSets.insert({ entireFileSet.name(), entireFileSet});
     }
@@ -123,6 +120,10 @@ namespace YAM
 
     void ExecutionContext::buildRequest(std::shared_ptr<BuildRequest> request) {
         _request = request;
+    }
+
+    void ExecutionContext::logBook(std::shared_ptr<ILogBook> newBook) {
+        _logBook = newBook;
     }
 
     std::shared_ptr<ILogBook> ExecutionContext::logBook() const {

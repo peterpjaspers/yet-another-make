@@ -6,7 +6,7 @@ namespace
 {
 	using namespace YAM;
 
-	WallClockTime wct = {2023, 2, 14, 11, 01, 10, 698765};
+	WallClockTime wct( std::vector<uint32_t>{ 2023, 2, 14, 11, 01, 10, 698765 } );
 
 	TEST(TimePoint, construct) {
 		TimePoint tp(wct);
@@ -20,6 +20,11 @@ namespace
 		EXPECT_EQ(wct.minute, actualWct.minute);
 		EXPECT_EQ(wct.second, actualWct.second);
 		EXPECT_EQ(wct.usecond, actualWct.usecond);
+	}
+
+	TEST(WallClockTime, construct) {
+		WallClockTime t(wct.dateTime());
+		EXPECT_EQ("2023-02-14 11:01:10.698765", t.dateTime());
 	}
 
 	TEST(WallClockTime, dateTime) {

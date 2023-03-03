@@ -1,13 +1,20 @@
 #pragma once
 
-#include "IStreamable.h"
 #include <memory>
+#include <chrono>
 #include <string>
+#include <vector>
+#include <map>
+#include <filesystem>
+#include <cstdint>
 
 namespace YAM
 {
+    class IStreamable;
+
     // IStreamer is an interface that allows applications to write and read
-    // (serialize and deserialize) objects to/from a stream of bytes.
+    // (serialize and deserialize) simple value types and/or STL types and/or
+    // custom types to/from a stream of bytes.
     // The bi-directional interface allows one to use the same code for writing
     // and reading, thus ensuring that data is read in same order as it was 
     // written.
@@ -22,41 +29,36 @@ namespace YAM
     class __declspec(dllexport) IStreamer
     {
     public:
-        IStreamer() {}
-
         virtual ~IStreamer() {}
 
         // Return whether the stream is in write or read mode.
         virtual bool writing() const = 0;
         bool reading() const { return !writing(); }
 
-        // Stream 'nBytes' to/from 'bytes'.
-        // Caller is responsible for allocating 'bytes'.
         virtual void stream(void* bytes, unsigned int nBytes) = 0;
-        virtual void stream(bool& value) = 0;
-        virtual void stream(float& value) = 0;
-        virtual void stream(double& value) = 0;
-        virtual void stream(int8_t& value) = 0;
-        virtual void stream(uint8_t& value) = 0;
-        virtual void stream(int16_t& value) = 0;
-        virtual void stream(uint16_t& value) = 0;
-        virtual void stream(int32_t& value) = 0;
-        virtual void stream(uint32_t& value) = 0;
-        virtual void stream(int64_t& value) = 0;
-        virtual void stream(uint64_t& value) = 0;
+        virtual void stream(bool&) = 0;
+        virtual void stream(float&) = 0;
+        virtual void stream(double&) = 0;
+        virtual void stream(int8_t&) = 0;
+        virtual void stream(uint8_t&) = 0;
+        virtual void stream(int16_t&) = 0;
+        virtual void stream(uint16_t&) = 0;
+        virtual void stream(int32_t&) = 0;
+        virtual void stream(uint32_t&) = 0;
+        virtual void stream(int64_t&) = 0;
+        virtual void stream(uint64_t&) = 0;
 
-        virtual void stream(std::string& value) = 0;
-        virtual void stream(std::wstring& value) = 0;
-
-        virtual void stream(IStreamable** streamable) = 0;
+        // Stream custom type
         virtual void stream(std::shared_ptr<IStreamable>& streamable) = 0;
 
-        // Pre: deserializing
-        // Return whether no more data can be read.
-        virtual bool eos() = 0;
-
-        // Pre: serializing
-        // Flush buffer data, if any, to the bytes stream.
-        virtual void flush() = 0;
+        // Stream standard library types
+        void stream(std::string&);
+        void stream(std::wstring&);
+        void stream(std::chrono::system_clock::time_point&);
+        void stream(std::filesystem::path&);
+        template <typename T> void streamVector(std::vector<T>&);
+        template <typename K, typename V> void streamMap(std::map<K,V>&);
     };
 }
+
+#include "IStreamer.inl"

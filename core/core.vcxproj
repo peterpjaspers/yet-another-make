@@ -101,6 +101,15 @@
     <ClInclude Include="BuildRequest.h" />
     <ClInclude Include="BuildResult.h" />
     <ClInclude Include="BuildService.h" />
+    <ClInclude Include="BuildServiceMessageStreamer.h" />
+    <ClInclude Include="BuildServiceMessageTypes.h" />
+    <ClInclude Include="IObjectStreamer.h" />
+    <ClInclude Include="ISharedObjectStreamer.h" />
+    <ClInclude Include="IValueStreamer.h" />
+    <ClInclude Include="ObjectStreamer.h" />
+    <ClInclude Include="SharedObjectStreamer.h" />
+    <ClInclude Include="Streamer.h" />
+    <ClInclude Include="StopBuildRequest.h" />
     <ClInclude Include="CommandNode.h" />
     <ClInclude Include="Console.h" />
     <ClInclude Include="ConsoleLogBook.h" />
@@ -111,10 +120,10 @@
     <ClInclude Include="EndianShip.h" />
     <ClInclude Include="EndOfStreamException.h" />
     <ClInclude Include="IStreamable.h" />
-    <ClInclude Include="IStreamableTypes.h" />
     <ClInclude Include="IStreamer.h" />
     <ClInclude Include="IIOStream.h" />
     <ClInclude Include="MemoryStream.h" />
+    <ClInclude Include="ShutdownRequest.h" />
     <ClInclude Include="SourceDirectoryNode.h" />
     <ClInclude Include="DispatcherFrame.h" />
     <ClInclude Include="ExecutionContext.h" />
@@ -146,12 +155,11 @@
     <ClInclude Include="Node.h" />
     <ClInclude Include="SourceFileNode.h" />
     <ClInclude Include="SourceFileRepository.h" />
-    <ClInclude Include="STLReader.h" />
-    <ClInclude Include="StreamableTypesBase.h" />
+    <ClInclude Include="TcpStream.h" />
     <ClInclude Include="Thread.h" />
     <ClInclude Include="ThreadPool.h" />
     <ClInclude Include="TimePoint.h" />
-    <ClInclude Include="BinaryStreamer.h" />
+    <ClInclude Include="BinaryValueStreamer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BasicOStreamLogBook.cpp" />
@@ -160,7 +168,14 @@
     </ClCompile>
     <ClCompile Include="BuildRequest.cpp" />
     <ClCompile Include="BuildResult.cpp" />
-    <ClCompile Include="BuildService.cpp" />
+    <ClCompile Include="BuildService.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="BuildServiceMessageStreamer.cpp" />
+    <ClCompile Include="BuildServiceMessageTypes.cpp" />
+    <ClCompile Include="SharedObjectStreamer.cpp" />
+    <ClCompile Include="Streamer.cpp" />
+    <ClCompile Include="StopBuildRequest.cpp" />
     <ClCompile Include="CommandNode.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4251;4996</DisableSpecificWarnings>
@@ -171,6 +186,7 @@
     <ClCompile Include="ConsoleWin32.cpp" />
     <ClCompile Include="DotIgnoreNode.cpp" />
     <ClCompile Include="MemoryStream.cpp" />
+    <ClCompile Include="ShutdownRequest.cpp" />
     <ClCompile Include="SourceDirectoryNode.cpp" />
     <ClCompile Include="DispatcherFrame.cpp" />
     <ClCompile Include="ExecutionContext.cpp" />
@@ -211,11 +227,14 @@
     </ClCompile>
     <ClCompile Include="SourceFileNode.cpp" />
     <ClCompile Include="SourceFileRepository.cpp" />
-    <ClCompile Include="StreamableTypesBase.cpp" />
+    <ClCompile Include="TcpStream.cpp" />
     <ClCompile Include="Thread.cpp" />
     <ClCompile Include="ThreadPool.cpp" />
     <ClCompile Include="TimePoint.cpp" />
-    <ClCompile Include="BinaryStreamer.cpp" />
+    <ClCompile Include="BinaryValueStreamer.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="IStreamer.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -1,4 +1,10 @@
 #include "LogRecord.h"
+#include "IStreamer.h"
+
+namespace
+{
+    uint32_t _streamableType = 0;
+}
 
 namespace YAM
 {
@@ -26,5 +32,22 @@ namespace YAM
             case BuildTimePrediction: return "BuildTimePrediction";
             default: throw std::exception("unknown aspect");
         }
+    }
+
+    void LogRecord::setStreamableType(uint32_t type) {
+        _streamableType = type;
+    }
+
+    uint32_t LogRecord::typeId() const {
+        return _streamableType;
+    }
+
+    void LogRecord::stream(IStreamer* streamer) {
+        uint32_t a;
+        if (streamer->writing()) a = static_cast<uint32_t>(aspect);
+        streamer->stream(a);
+        streamer->stream(message);
+        time.stream(streamer);
+        if (streamer->reading()) aspect = static_cast<Aspect>(a);
     }
 }

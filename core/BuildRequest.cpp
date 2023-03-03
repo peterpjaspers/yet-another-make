@@ -1,4 +1,10 @@
 #include "BuildRequest.h"
+#include "IStreamer.h"
+
+namespace
+{
+	uint32_t _streamableType = 0;
+}
 
 namespace YAM
 {
@@ -30,5 +36,21 @@ namespace YAM
 
 	std::vector<std::filesystem::path> const& BuildRequest::pathsInScope() {
 		return _pathsInScope;
+	}
+
+	void BuildRequest::setStreamableType(uint32_t type) {
+		_streamableType = type;
+	}
+
+	uint32_t BuildRequest::typeId() const {
+		return _streamableType;
+	}
+
+	void BuildRequest::stream(IStreamer* streamer) {
+		int32_t t = static_cast<int32_t>(_type);
+		streamer->stream(t);
+		if (streamer->reading()) _type = static_cast<RequestType>(t);
+		streamer->stream(_directory);
+		streamer->streamVector(_pathsInScope);
 	}
 }
