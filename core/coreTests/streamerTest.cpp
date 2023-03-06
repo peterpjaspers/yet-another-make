@@ -103,11 +103,11 @@ namespace
     };
 
 
-    class Streamable2 : public Streamable
+    class Streamable1 : public Streamable
     {
     public:
-        Streamable2() : Streamable() {};
-        Streamable2(IStreamer* streamer) : Streamable(streamer) {};
+        Streamable1() : Streamable() {};
+        Streamable1(IStreamer* streamer) : Streamable(streamer) {};
 
         uint32_t typeId() const override { return 3; }
     };
@@ -119,7 +119,7 @@ namespace
         {
             if (typeId == INT_MAX) return nullptr;
             if (typeId == 2) return new Streamable(streamer);
-            if (typeId == 3) return new Streamable2(streamer);
+            if (typeId == 3) return new Streamable1(streamer);
             throw std::exception("unknown type");
         }
     };
@@ -183,19 +183,32 @@ namespace
     
     TEST(Streamer, streamSharedObjects) {
         StreamerSetup setup;
-        std::shared_ptr<Streamable> expected = std::make_shared<Streamable>();
-        std::shared_ptr<IStreamable> pexpected = expected;
-        setup.writer()->stream(pexpected);
-        setup.writer()->stream(pexpected);
-        std::shared_ptr<IStreamable> actual1;
-        std::shared_ptr<IStreamable> actual2;
-        setup.reader()->stream(actual1);
-        setup.reader()->stream(actual2);
+        std::shared_ptr<Streamable> expected0 = std::make_shared<Streamable>();
+        std::shared_ptr<IStreamable> pexpected0 = expected0;
+        std::shared_ptr<Streamable> expected1 = std::make_shared<Streamable1>();
+        std::shared_ptr<IStreamable> pexpected1 = expected1;
+        setup.writer()->stream(pexpected0);
+        setup.writer()->stream(pexpected0);
+        setup.writer()->stream(pexpected1);
+        setup.writer()->stream(pexpected1);
+        std::shared_ptr<IStreamable> actual01;
+        std::shared_ptr<IStreamable> actual02;
+        std::shared_ptr<IStreamable> actual11;
+        std::shared_ptr<IStreamable> actual12;
+        setup.reader()->stream(actual01);
+        setup.reader()->stream(actual02);
+        setup.reader()->stream(actual11);
+        setup.reader()->stream(actual12);
 
-        EXPECT_TRUE(actual1 == actual2);
-        auto sactual1 = dynamic_pointer_cast<Streamable>(actual1);
-        EXPECT_NE(nullptr, sactual1);
-        expected.get()->assertEqual(*(sactual1.get()));
+        EXPECT_TRUE(actual01 == actual02);
+        auto sactual01 = dynamic_pointer_cast<Streamable>(actual01);
+        EXPECT_NE(nullptr, sactual01);
+        expected0.get()->assertEqual(*(sactual01.get()));
+
+        EXPECT_TRUE(actual11 == actual12);
+        auto sactual11 = dynamic_pointer_cast<Streamable1>(actual11);
+        EXPECT_NE(nullptr, sactual11);
+        expected1.get()->assertEqual(*(sactual11.get()));
     }
 
     TEST(Streamer, streamIntVector) {
@@ -211,14 +224,19 @@ namespace
         StreamerSetup setup;
         std::shared_ptr<Streamable> expected = std::make_shared<Streamable>();
         std::shared_ptr<IStreamable> pexpected = expected;
-        std::vector<std::shared_ptr<IStreamable>> expecteds = { pexpected, pexpected };
+        std::shared_ptr<Streamable> expected1 = std::make_shared<Streamable1>();
+        std::shared_ptr<IStreamable> pexpected1 = expected1;
+        std::vector<std::shared_ptr<IStreamable>> expecteds = { pexpected, pexpected1, pexpected, pexpected1 };
         setup.writer()->streamVector(expecteds);
         std::vector<std::shared_ptr<IStreamable>> actuals;
         setup.reader()->streamVector(actuals);
         EXPECT_EQ(expecteds.size(), actuals.size());
-        EXPECT_EQ(actuals[0].get(), actuals[1].get());
-        auto actual = dynamic_pointer_cast<Streamable>(actuals[0]);
-        expected.get()->assertEqual(*actual);
+        EXPECT_EQ(actuals[0].get(), actuals[2].get());
+        EXPECT_EQ(actuals[1].get(), actuals[3].get());
+        auto actual0 = dynamic_pointer_cast<Streamable>(actuals[0]);
+        expected.get()->assertEqual(*actual0);
+        auto actual1 = dynamic_pointer_cast<Streamable1>(actuals[1]);
+        expected1.get()->assertEqual(*actual1);
     }
 
     TEST(Streamer, streamObjectMap) {

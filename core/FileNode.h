@@ -39,7 +39,7 @@ namespace YAM
     //         error //see SourceFileRepository
     //     else
     //         add F to C's input files and prerequisites
-    //         use F.hashOf(aspect) to C to compute C's executionHash where
+    //         use F.hashOf(aspect) to compute C's executionHash where
     //         aspect is the one applicable to C (e.g. when C is a C++ 
     //         compilation command then C will use the code aspect hash of F.
     //         The code aspect hash excludes comments from being hashed).
@@ -53,7 +53,7 @@ namespace YAM
     //         error //YAM requires all output nodes to be known a-priori
     //     else
     //         call F.rehashAll() 
-    //         use F.hashOf(entireFile) to C to compute C's executionHash (the
+    //         use F.hashOf(entireFile) to compute C's executionHash (the
     //         entireFile aspect hashes all content of F).
     // 
     // During next build: after C's prerequisites (which includes all of its
@@ -64,23 +64,20 @@ namespace YAM
     // 3) Output file F, produced by P is detected, as input of C
     // C will act as follows:
     //     add F to C's input files and prerequisites
-    //     use F.hashOf(aspect) to C to compute C's executionHash where
-    //     aspect is the one applicable to C (e.g. when C is a link 
-    //     command and F is a dll import library then C will use the exports
-    //     aspect hash of F. The exports hash only hashes the exported symbols
-    //     of F).
+    //     use F.hashOf(aspect) to compute C's executionHash where aspect is
+    //     the one applicable to C (e.g. when C is a link command and F is a 
+    //     dll import library then C will use the exports aspect hash of F. 
+    //     The exports hash only hashes the exported symbols of F).
     //  
     // Race condition: a user may tamper with an output file in the time 
     // interval between its last update by the command script and the time of
     // the retrieval of its last-write-time. In this case the next build will
     // not detect that the file has changed (because last-write-time has not 
     // changed since its last retrieval) and will not re-execute the command, 
-    // resulting in wrong content of the output file.
-    // 
+    // resulting in wrong content of the output file. 
     // This problem can be fixed by detecting, during the build, which output 
     // files are modified by other actors than commands and, at the next build,
     // force the commands that produced these files to re-execute.
-    // This is not easy to implement and has not been implemented in YAM.
     // 
     class __declspec(dllexport) FileNode : public Node
     {

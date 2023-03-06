@@ -168,9 +168,6 @@
     <ClInclude Include="DispatcherFrame.h">
       <Filter>Header Files\Thread</Filter>
     </ClInclude>
-    <ClInclude Include="TimePoint.h">
-      <Filter>Header Files\LogBook</Filter>
-    </ClInclude>
     <ClInclude Include="IConsole.h">
       <Filter>Source Files\LogBook</Filter>
     </ClInclude>
@@ -225,9 +222,6 @@
     <ClInclude Include="Streamer.h">
       <Filter>Header Files\Stream</Filter>
     </ClInclude>
-    <ClInclude Include="BuildServiceMessageStreamer.h">
-      <Filter>Header Files\BuildService</Filter>
-    </ClInclude>
     <ClInclude Include="ObjectStreamer.h">
       <Filter>Header Files\Stream</Filter>
     </ClInclude>
@@ -235,6 +229,9 @@
       <Filter>Header Files\Stream</Filter>
     </ClInclude>
     <ClInclude Include="BuildServiceMessageTypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TimePoint.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -350,9 +347,6 @@
     <ClCompile Include="ThreadPool.cpp">
       <Filter>Source Files\Thread</Filter>
     </ClCompile>
-    <ClCompile Include="TimePoint.cpp">
-      <Filter>Source Files\LogBook</Filter>
-    </ClCompile>
     <ClCompile Include="MemoryStream.cpp">
       <Filter>Source Files\Stream</Filter>
     </ClCompile>
@@ -383,10 +377,10 @@
     <ClCompile Include="Streamer.cpp">
       <Filter>Source Files\Stream</Filter>
     </ClCompile>
-    <ClCompile Include="BuildServiceMessageStreamer.cpp">
-      <Filter>Source Files\BuildService</Filter>
-    </ClCompile>
     <ClCompile Include="BuildServiceMessageTypes.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="TimePoint.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

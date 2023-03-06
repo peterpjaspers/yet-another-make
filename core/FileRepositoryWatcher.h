@@ -24,7 +24,7 @@ namespace YAM
     // 
     // consumeChanges() can be called at any time between builds. At latest it
     // must be called at the start of a build. The build must then sync the 
-    // dirty directory and file nodes witht the latest file system state by 
+    // dirty directory and file nodes with the latest file system state by 
     // executing them.
     //
     // During a build generated files will be created/modified and the watched

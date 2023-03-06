@@ -13,18 +13,28 @@ namespace
         std::chrono::system_clock::time_point const& time = tp.time();
         TimePoint actualTp(time);
         WallClockTime actualWct = actualTp.wctime();
-        EXPECT_EQ(wct.year, actualWct.year);
-        EXPECT_EQ(wct.month, actualWct.month);
-        EXPECT_EQ(wct.day, actualWct.day);
-        EXPECT_EQ(wct.hour, actualWct.hour);
-        EXPECT_EQ(wct.minute, actualWct.minute);
-        EXPECT_EQ(wct.second, actualWct.second);
-        EXPECT_EQ(wct.usecond, actualWct.usecond);
+        EXPECT_EQ(wct.year(), actualWct.year());
+        EXPECT_EQ(wct.month(), actualWct.month());
+        EXPECT_EQ(wct.day(), actualWct.day());
+        EXPECT_EQ(wct.hour(), actualWct.hour());
+        EXPECT_EQ(wct.minute(), actualWct.minute());
+        EXPECT_EQ(wct.second(), actualWct.second());
+        EXPECT_EQ(wct.usecond(), actualWct.usecond());
     }
 
     TEST(WallClockTime, construct) {
         WallClockTime t(wct.dateTime());
         EXPECT_EQ("2023-02-14 11:01:10.698765", t.dateTime());
+    }
+
+    TEST(WallClockTime, constructIllegal) {
+        EXPECT_ANY_THROW(WallClockTime t("0023-02-14 11:01:10.698765"));
+        EXPECT_ANY_THROW(WallClockTime t("2023-55-14 11:01:10.698765"));
+        EXPECT_ANY_THROW(WallClockTime t("2023-02-88 11:01:10.698765"));
+        EXPECT_ANY_THROW(WallClockTime t("2023-02-14 25:01:10.698765"));
+        EXPECT_ANY_THROW(WallClockTime t("2023-02-14 11:77:10.698765"));
+        EXPECT_ANY_THROW(WallClockTime t("2023-02-14 11:01:99.698765"));
+        EXPECT_ANY_THROW(WallClockTime t("2023-02-14 11:01:10.69876599"));
     }
 
     TEST(WallClockTime, dateTime) {

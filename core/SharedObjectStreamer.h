@@ -8,7 +8,6 @@ namespace YAM
 {
     class IObjectStreamer;
 
-    // Base class capable of writing (serializing)  objects into a stream.
     class __declspec(dllexport) SharedObjectWriter : public ISharedObjectStreamer
     {
     public:
@@ -22,8 +21,6 @@ namespace YAM
         std::map<IStreamable*, int> _objects;
     };
 
-    // Base class capable of reading (deserializing)  objects into a stream.
-    // Derived class must implement createInstance().
     class __declspec(dllexport) SharedObjectReader : public ISharedObjectStreamer
     {
     public:

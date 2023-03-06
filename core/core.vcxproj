@@ -101,7 +101,6 @@
     <ClInclude Include="BuildRequest.h" />
     <ClInclude Include="BuildResult.h" />
     <ClInclude Include="BuildService.h" />
-    <ClInclude Include="BuildServiceMessageStreamer.h" />
     <ClInclude Include="BuildServiceMessageTypes.h" />
     <ClInclude Include="IObjectStreamer.h" />
     <ClInclude Include="ISharedObjectStreamer.h" />
@@ -171,7 +170,6 @@
     <ClCompile Include="BuildService.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="BuildServiceMessageStreamer.cpp" />
     <ClCompile Include="BuildServiceMessageTypes.cpp" />
     <ClCompile Include="SharedObjectStreamer.cpp" />
     <ClCompile Include="Streamer.cpp" />

@@ -19,7 +19,7 @@ namespace YAM
     // It stores these nodes in an ExecutionContext. It continuously watches
     // the repository for changes. See consumeChange()
     //
-    // A SourceFileRepository cannot and need not mirror generated files.
+    // A SourceFileRepository cannot, and need not, mirror generated files.
     // Cannot because the GeneratedFileNode constructor takes a pointer to the
     // producer node which is not known by SourceFileRepository. 
     // Need not because GenerateFileNodes are created when build files are 
@@ -57,8 +57,7 @@ namespace YAM
     //    2- Capture last-write-time and hash code of F before using it.
     //       Because input files are detected during command node execution
     //       this can can only be implemented by creating file nodes for all 
-    //       files in the worktree before starting command node execution (as
-    //       intended by SourceFileRepository).
+    //       files in the worktree before starting command node execution.
     //    3- Detect which source files are modified during the build.
     //       At next build force the commands that used these files as input
     //       to re-execute.      

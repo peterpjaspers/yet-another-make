@@ -12,24 +12,33 @@ namespace YAM
 
     struct __declspec(dllexport) WallClockTime
     {
-        uint16_t year;   // 1900...
-        uint16_t month;  // 1..12
-        uint16_t day;    // 1..31
-        uint16_t hour;   // 0..23
-        uint16_t minute; // 0..59
-        uint16_t second; // 0..59
-        uint32_t usecond;  // 0..999999
-
+    public:
         // Construct with all fields set to their minimum value.
         WallClockTime();
 
         // Construct from vector: year = args[0], month = args[1], etc.
-        // When args contains less than 7 elements corresponding fields 
-        // are initialzed to their minimum value.
+        // When args contains less than 7 elements the missing fields 
+        // are initialized to their minimum value.
         WallClockTime(std::vector<uint32_t> args);
 
         // Construct time from dateTime string yyyy-mm-dd hh:mm:ss.uuuuuu
         WallClockTime(std::string dateTime);
+
+        uint16_t year() const { return _year; }
+        uint16_t month() const { return _month; }
+        uint16_t day() const { return _day; }
+        uint16_t hour() const { return _hour; }
+        uint16_t minute() const { return _minute; }
+        uint16_t second() const { return _second; }
+        uint32_t usecond() const { return _usecond; }
+
+        void year(uint16_t);
+        void month(uint16_t);
+        void day(uint16_t);
+        void hour(uint16_t);
+        void minute(uint16_t);
+        void second(uint16_t);
+        void usecond(uint32_t);
 
         // return yyyy-mm-dd hh:mm:ss.uuuuuu
         std::string dateTime() const;
@@ -50,8 +59,20 @@ namespace YAM
         std::string time1() const;
 
         void stream(IStreamer* streamer);
-    };
 
+    private:
+        uint16_t _year;   // 1900...
+        uint16_t _month;  // 1..12
+        uint16_t _day;    // 1..31
+        uint16_t _hour;   // 0..23
+        uint16_t _minute; // 0..59
+        uint16_t _second; // 0..59
+        uint32_t _usecond;  // 0..999999
+    };
+}
+
+namespace YAM
+{
     class __declspec(dllexport) TimePoint
     {
     public:

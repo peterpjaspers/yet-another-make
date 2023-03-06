@@ -19,12 +19,15 @@ namespace YAM
         // Return the number of threads in the pool.
         std::size_t size() const;
 
-        // Adjust the number of threads in the pool.
+        // Adjust the number of threads in the pool. 
         // 
-        // Implementation is therefore kept very simple: 
-        //        - stop dispatcher to request all threads to stop
-        //        - join and destruct all threads
-        //        - start dispatcher and create new threads.
+        // YAM only adjusts size (when the users requests a non-default size) 
+        // at the start of a build, i.e. when the dispatcher queue is empty and
+        // no delegate processing is in progress. Implementation is therefore 
+        // kept simple: 
+        //      - stop dispatcher to request all threads to stop
+        //      - join and destruct all threads
+        //      - start dispatcher and create new threads.
         // 
         // Stopping a thread that is busy executing a delegate will not
         // cancel the delegate. Instead the thread will run the delegate
@@ -35,14 +38,7 @@ namespace YAM
         // In YAM delegates typically dispatch a completion delegate to the
         // main thread. Adjusting size from the main thread will block it, 
         // causing these completion delegates to remain queued on the main 
-        // thread until size adjustment has completed. This makes the 
-        // implementation not very suited for dynamic size adjustment where
-        // size is adjusted to control CPU load.
-        // 
-        // YAM does not provide dynamic size adjustment. YAM only adjusts
-        // size (when the users requests a non-default size) at the start of 
-        // a build, i.e. when the dispatcher queue is empty and no delegate
-        // processing is in progress.
+        // thread until size adjustment has completed.
         //
         void size(std::size_t newSize);
 

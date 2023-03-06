@@ -1,13 +1,10 @@
 #include "BuildService.h"
 #include "TcpStream.h"
-#include "BuildRequest.h"
-#include "StopBuildRequest.h"
-#include "ShutdownRequest.h"
-#include "BuildResult.h"
+#include "BuildServiceMessageTypes.h"
 #include "Streamer.h"
 #include "BinaryValueStreamer.h"
+#include "ObjectStreamer.h"
 #include "SharedObjectStreamer.h"
-#include "BuildServiceMessageStreamer.h"
 
 #include <iostream>
 #include <string>
@@ -16,6 +13,49 @@
 namespace
 {
     using namespace YAM;
+
+    BuildServiceMessageTypes types; // to initialize type ids
+
+    class BuildServiceMessageWriter : public ObjectWriter
+    {
+    protected:
+        uint32_t getTypeId(IStreamable* object) const override {
+            uint32_t tid = object->typeId();
+            auto mtid = static_cast<BuildServiceMessageTypes::MessageType>(tid);
+            bool valid = true;
+            switch (mtid) {
+                case BuildServiceMessageTypes::BuildRequest: break;
+                case BuildServiceMessageTypes::StopBuildRequest: break;
+                case BuildServiceMessageTypes::ShutdownRequest: break;
+                default: valid = false;
+            }
+            if (!valid) throw std::exception("Build service protocol error: illegal object received");
+            return tid;
+        }
+    };
+
+    class BuildServiceMessageReader : public ObjectReader
+    {
+    protected:
+        IStreamable* readObject(IStreamer* streamer, uint32_t typeId) const override {
+            auto mtid = static_cast<BuildServiceMessageTypes::MessageType>(typeId);
+            bool valid = true;
+            IStreamable* object = nullptr;
+            switch (mtid) {
+                case BuildServiceMessageTypes::BuildResult: {
+                    object = new BuildResult(streamer);
+                    break;
+                }
+                case BuildServiceMessageTypes::LogRecord: {
+                    object = new LogRecord(streamer);
+                    break;
+                }
+                default: valid = false;
+            }
+            if (!valid) throw std::exception("Build service protocol error: illegal object sent");
+            return object;
+        }
+    };
 
     std::shared_ptr<IStreamable> receiveRequest(TcpStream* stream) {
         std::shared_ptr<IStreamable> request;

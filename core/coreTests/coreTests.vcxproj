@@ -65,7 +65,7 @@
     <ClCompile Include="threadTest.cpp" />
     <ClCompile Include="main_gtest.cpp" />
     <ClCompile Include="timePointTest.cpp" />
-    <ClCompile Include="binaryStreamerTest.cpp" />
+    <ClCompile Include="streamerTest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\xxHash\xxHash.vcxproj">
