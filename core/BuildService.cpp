@@ -1,103 +1,40 @@
 #include "BuildService.h"
 #include "TcpStream.h"
+#include "BuildServiceProtocol.h"
 #include "BuildServiceMessageTypes.h"
-#include "Streamer.h"
-#include "BinaryValueStreamer.h"
-#include "ObjectStreamer.h"
-#include "SharedObjectStreamer.h"
 
-#include <iostream>
 #include <string>
-#include <boost/asio.hpp>
-
-namespace
-{
-    using namespace YAM;
-
-    BuildServiceMessageTypes types; // to initialize type ids
-
-    class BuildServiceMessageWriter : public ObjectWriter
-    {
-    protected:
-        uint32_t getTypeId(IStreamable* object) const override {
-            uint32_t tid = object->typeId();
-            auto mtid = static_cast<BuildServiceMessageTypes::MessageType>(tid);
-            bool valid = true;
-            switch (mtid) {
-                case BuildServiceMessageTypes::BuildRequest: break;
-                case BuildServiceMessageTypes::StopBuildRequest: break;
-                case BuildServiceMessageTypes::ShutdownRequest: break;
-                default: valid = false;
-            }
-            if (!valid) throw std::exception("Build service protocol error: illegal object received");
-            return tid;
-        }
-    };
-
-    class BuildServiceMessageReader : public ObjectReader
-    {
-    protected:
-        IStreamable* readObject(IStreamer* streamer, uint32_t typeId) const override {
-            auto mtid = static_cast<BuildServiceMessageTypes::MessageType>(typeId);
-            bool valid = true;
-            IStreamable* object = nullptr;
-            switch (mtid) {
-                case BuildServiceMessageTypes::BuildResult: {
-                    object = new BuildResult(streamer);
-                    break;
-                }
-                case BuildServiceMessageTypes::LogRecord: {
-                    object = new LogRecord(streamer);
-                    break;
-                }
-                default: valid = false;
-            }
-            if (!valid) throw std::exception("Build service protocol error: illegal object sent");
-            return object;
-        }
-    };
-
-    std::shared_ptr<IStreamable> receiveRequest(TcpStream* stream) {
-        std::shared_ptr<IStreamable> request;
-        BinaryValueReader valueReader(stream);
-        BuildServiceMessageReader msgReader;
-        SharedObjectReader sharedMsgReader(&msgReader);
-        Streamer reader(&valueReader, &sharedMsgReader);
-        reader.stream(request);
-        return request;
-    }
-
-    template<typename T>
-    void sendReply(TcpStream* stream, std::shared_ptr<T> reply)
-    {
-        auto streamable = dynamic_pointer_cast<IStreamable>(reply);
-        BinaryValueWriter valueWriter(stream);
-        BuildServiceMessageWriter msgWriter;
-        SharedObjectWriter sharedMsgWriter(&msgWriter);
-        Streamer writer(&valueWriter, &sharedMsgWriter);
-        writer.stream(streamable);
-    }
-}
 
 namespace YAM
 {
-    BuildService::BuildService()
-        : _shutdown(false)
+    BuildService::BuildService(bool publishPort)
+        : _service(boost::asio::ip::tcp::v4(), 0)
+        , _acceptor(_context, _service)
+        , _shutdown(false)
         , _thread(&BuildService::run, this)
-    {}
+    {
+        if (publishPort) {
+            auto servicePort = port();
+            //TODO: save port in .yam/.servicePort directory
+        }
+    }
+
+    boost::asio::ip::port_type BuildService::port() const {
+        return _acceptor.local_endpoint().port();
+    }
+
+    void BuildService::join() {
+        _thread.join();
+    }
 
     void BuildService::run() {
         try {
-            boost::asio::io_context context;
-            boost::asio::ip::tcp::socket socket(context);
-            boost::asio::ip::tcp::endpoint service(boost::asio::ip::tcp::v4(), 0);
-            boost::asio::ip::tcp::acceptor acceptor(context, service);
-            unsigned short servicePort = acceptor.local_endpoint().port();
-            // TODO: publish port in .yam directory
+            boost::asio::ip::tcp::socket socket(_context);
             while (!_shutdown) {
-                acceptor.accept(socket);
+                _acceptor.accept(socket);
                 _client = std::make_shared<TcpStream>(socket);
-                std::shared_ptr<IStreamable> request = receiveRequest(_client.get());
+                _protocol = std::make_shared<BuildServiceProtocol>(_client, _client, false);
+                std::shared_ptr<IStreamable> request = _protocol->receive();
                 handleRequest(request);
             }
         } catch (std::exception& e) {
@@ -109,7 +46,7 @@ namespace YAM
 
     void BuildService::add(LogRecord const& record) {
         auto ptr = std::make_shared<LogRecord>(record);
-        sendReply(_client.get(), ptr);
+        _protocol->send(ptr);
     }
 
     void BuildService::handleRequest(std::shared_ptr<IStreamable> request) {
@@ -135,7 +72,7 @@ namespace YAM
     void BuildService::handleBuildCompletion(std::shared_ptr<BuildResult> result) {
         _builder.completor().RemoveObject(this);
         if (_client != nullptr) {
-            sendReply(_client.get(), result);
+            _protocol->send(result);
         }
     }
 }

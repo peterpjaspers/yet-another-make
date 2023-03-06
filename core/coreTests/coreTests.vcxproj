@@ -36,6 +36,7 @@
     <ClCompile Include="AdditionNode.cpp" />
     <ClCompile Include="boostProcessTest.cpp" />
     <ClCompile Include="builderTest.cpp" />
+    <ClCompile Include="buildServiceProtocolTest.cpp" />
     <ClCompile Include="commandNodeTest.cpp">
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </DisableSpecificWarnings>
@@ -44,6 +45,7 @@
     <ClCompile Include="directoryNodeTest.cpp" />
     <ClCompile Include="DirectoryTree.cpp" />
     <ClCompile Include="dispatcherTest.cpp" />
+    <ClCompile Include="dotYamDirectoryTest.cpp" />
     <ClCompile Include="executeNode.cpp" />
     <ClCompile Include="fileAspectSetTest.cpp" />
     <ClCompile Include="fileAspectTest.cpp" />

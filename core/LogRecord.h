@@ -28,7 +28,7 @@ namespace YAM
             std::string const& _message,
             TimePoint const& _time = TimePoint()); // default is current time
 
-        LogRecord(IStreamer* reader) : IStreamable(reader) {}
+        LogRecord(IStreamer* reader);
 
         static std::string aspect2str(LogRecord::Aspect aspect);
 

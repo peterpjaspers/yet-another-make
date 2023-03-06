@@ -6,6 +6,7 @@
 #include "SourceDirectoryNode.h"
 #include "SourceFileRepository.h"
 #include "GraphWalker.h"
+#include "DotYamDirectory.h"
 
 #include <iostream>
 #include <map>
@@ -81,18 +82,13 @@ namespace YAM
         }
     }
     void Builder::_init(std::filesystem::path directory, bool failIfAlreadyInitialized) {
-        const std::string yam(".yam");
-        std::filesystem::path yamDir(directory);
-        while (!yamDir.empty() && !std::filesystem::exists(yamDir / yam)) {
-            auto parent = yamDir.parent_path();
-            yamDir = (parent == yamDir) ? "" : parent;
-        }
-        if (yamDir.empty()) {
-            yamDir = directory / yam;
-            std::filesystem::create_directory(yamDir);
+        std::filesystem::path yamDir = DotYamDirectory::find(directory);
+        if (yamDir.empty()) yamDir = DotYamDirectory::create(directory);
+        std::filesystem::path repoPath = yamDir.parent_path();
+        if (_context.findRepository(repoPath.filename().string()) == nullptr) {
             auto repo = std::make_shared<SourceFileRepository>(
-                directory.filename().string(),
-                directory,
+                repoPath.filename().string(),
+                repoPath,
                 RegexSet({ 
                     RegexSet::matchDirectory("generated"),
                     RegexSet::matchDirectory(".yam")
@@ -103,7 +99,7 @@ namespace YAM
         } else if (failIfAlreadyInitialized) {
             std::cerr
                 << "YAM initialization failed" << std::endl
-                << "Reason:" << ".yam directory already exists in parent directory: " << yamDir.parent_path().string()
+                << "Reason:" << "Already initialized: " << yamDir.parent_path().string()
                 << std::endl;
             _result->succeeded(false);
         } else {

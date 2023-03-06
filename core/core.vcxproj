@@ -97,11 +97,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="BasicOStreamLogBook.h" />
+    <ClInclude Include="BuildClient.h" />
     <ClInclude Include="Builder.h" />
     <ClInclude Include="BuildRequest.h" />
     <ClInclude Include="BuildResult.h" />
     <ClInclude Include="BuildService.h" />
+    <ClInclude Include="BuildServiceProtocol.h" />
     <ClInclude Include="BuildServiceMessageTypes.h" />
+    <ClInclude Include="DotYamDirectory.h" />
     <ClInclude Include="IObjectStreamer.h" />
     <ClInclude Include="ISharedObjectStreamer.h" />
     <ClInclude Include="IValueStreamer.h" />
@@ -162,6 +165,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BasicOStreamLogBook.cpp" />
+    <ClCompile Include="BuildClient.cpp" />
     <ClCompile Include="Builder.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
     </ClCompile>
@@ -170,7 +174,9 @@
     <ClCompile Include="BuildService.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="BuildServiceProtocol.cpp" />
     <ClCompile Include="BuildServiceMessageTypes.cpp" />
+    <ClCompile Include="DotYamDirectory.cpp" />
     <ClCompile Include="SharedObjectStreamer.cpp" />
     <ClCompile Include="Streamer.cpp" />
     <ClCompile Include="StopBuildRequest.cpp" />

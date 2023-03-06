@@ -8,6 +8,10 @@ namespace
 
 namespace YAM
 {
+    BuildResult::BuildResult(IStreamer* reader) {
+        stream(reader);
+    }
+
     BuildResult::BuildResult() 
         : _succeeded(false)
         , _startTime(std::chrono::system_clock::now())

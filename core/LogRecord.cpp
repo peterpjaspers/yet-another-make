@@ -17,6 +17,10 @@ namespace YAM
         , time(_time)
     {}
 
+    LogRecord::LogRecord(IStreamer* reader) {
+        stream(reader);
+    }
+
     std::string LogRecord::aspect2str(LogRecord::Aspect aspect) {
         switch (aspect) {
             case Error: return "Error";

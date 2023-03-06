@@ -6,6 +6,10 @@ namespace
 }
 namespace YAM
 {
+    StopBuildRequest::StopBuildRequest(IStreamer* reader) {
+        stream(reader);
+    }
+
     void StopBuildRequest::setStreamableType(uint32_t type) {
         _streamableType = type;
     }

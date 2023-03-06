@@ -9,7 +9,7 @@ namespace YAM
     {
     public:
         BuildResult();
-        BuildResult(IStreamer* reader) : IStreamable(reader) {}
+        BuildResult(IStreamer* reader);
 
         void succeeded(bool value);
         bool succeeded() const;

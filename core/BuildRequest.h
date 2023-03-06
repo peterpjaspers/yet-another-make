@@ -17,7 +17,7 @@ namespace YAM
         };
 
         BuildRequest(RequestType type = Build);
-        BuildRequest(IStreamer* reader) : IStreamable(reader) {}
+        BuildRequest(IStreamer* reader);
 
         void requestType(RequestType type);
         RequestType requestType() const;

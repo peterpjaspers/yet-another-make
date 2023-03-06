@@ -7,8 +7,8 @@ namespace YAM
     class __declspec(dllexport) StopBuildRequest : public IStreamable
     {
     public:
-        StopBuildRequest();
-        StopBuildRequest(IStreamer* reader) : IStreamable(reader) {}
+        StopBuildRequest() {}
+        StopBuildRequest(IStreamer* reader);
 
         static void setStreamableType(uint32_t type);
         // Inherited via IStreamable

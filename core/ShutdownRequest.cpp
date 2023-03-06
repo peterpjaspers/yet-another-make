@@ -6,6 +6,10 @@ namespace
 }
 namespace YAM
 {
+    ShutdownRequest::ShutdownRequest(IStreamer* reader) {
+        stream(reader);
+    }
+
     void ShutdownRequest::setStreamableType(uint32_t type) {
         _streamableType = type;
     }

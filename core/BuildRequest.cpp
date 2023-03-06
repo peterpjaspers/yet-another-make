@@ -8,6 +8,10 @@ namespace
 
 namespace YAM
 {
+    BuildRequest::BuildRequest(IStreamer* reader) {
+        stream(reader);
+    }
+
     BuildRequest::BuildRequest(RequestType type)
         : _type(type)
     {}

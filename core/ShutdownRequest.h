@@ -6,8 +6,8 @@ namespace YAM
     class __declspec(dllexport) ShutdownRequest : public IStreamable
     {
     public:
-        ShutdownRequest();
-        ShutdownRequest(IStreamer* reader) : IStreamable(reader) {}
+        ShutdownRequest() {}
+        ShutdownRequest(IStreamer* reader);
 
         static void setStreamableType(uint32_t type);
         // Inherited via IStreamable
