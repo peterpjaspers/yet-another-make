@@ -7,20 +7,20 @@
 
 namespace YAM
 {
-	// DirectoryWatcher is a portable (across Windows, Linux, MacOS) implementation
-	// of IDirectoryWatcher.
-	class __declspec(dllexport) DirectoryWatcher : public IDirectoryWatcher
-	{
-	public:
-		DirectoryWatcher(
-			std::filesystem::path const& directory, 
-			bool recursive,
-			Delegate<void, FileChange const&> const& changeHandler);
+    // DirectoryWatcher is a portable (across Windows, Linux, MacOS) implementation
+    // of IDirectoryWatcher.
+    class __declspec(dllexport) DirectoryWatcher : public IDirectoryWatcher
+    {
+    public:
+        DirectoryWatcher(
+            std::filesystem::path const& directory, 
+            bool recursive,
+            Delegate<void, FileChange const&> const& changeHandler);
 
-		void stop() override;
+        void stop() override;
 
-	private:
-		std::shared_ptr<IDirectoryWatcher> _impl;
-	};
+    private:
+        std::shared_ptr<IDirectoryWatcher> _impl;
+    };
 }
 

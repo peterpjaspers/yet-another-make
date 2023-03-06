@@ -7,20 +7,20 @@
 
 namespace YAM
 {
-	class Console;
+    class Console;
 
-	class __declspec(dllexport) ConsoleLogBook : public BasicOStreamLogBook
-	{
-	public:
-		ConsoleLogBook();
+    class __declspec(dllexport) ConsoleLogBook : public BasicOStreamLogBook
+    {
+    public:
+        ConsoleLogBook();
 
-		void add(LogRecord const& record) override;
+        void add(LogRecord const& record) override;
 
-	private:
-		void setColors(LogRecord::Aspect aspect);
+    private:
+        void setColors(LogRecord::Aspect aspect);
 
-		std::mutex _mutex;
-		std::shared_ptr<Console> _console;
-	};
+        std::mutex _mutex;
+        std::shared_ptr<Console> _console;
+    };
 }
 

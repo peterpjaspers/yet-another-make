@@ -7,34 +7,34 @@
 
 namespace YAM
 {
-	Node::Node(ExecutionContext* context, std::filesystem::path const& name)
+    Node::Node(ExecutionContext* context, std::filesystem::path const& name)
         : _context(context)
-		, _name(name)
-		, _state(Node::State::Dirty)
+        , _name(name)
+        , _state(Node::State::Dirty)
         , _executionState(ExecutionState::Idle)
         , _suspended(false)
         , _canceling(false)
-	{} 
+    {} 
 
     Node::~Node() {
     }
 
-	std::filesystem::path const& Node::name() const {
-		return _name; 
-	}
+    std::filesystem::path const& Node::name() const {
+        return _name; 
+    }
 
     ExecutionContext* Node::context() const {
         return _context;
     }
 
-	void Node::setState(State newState) {
-		if (_state != newState) {
-			_state = newState;
-			if (_state == Node::State::Dirty) {
-				for (auto p : _preParents) p->setState(Node::State::Dirty);
+    void Node::setState(State newState) {
+        if (_state != newState) {
+            _state = newState;
+            if (_state == Node::State::Dirty) {
+                for (auto p : _preParents) p->setState(Node::State::Dirty);
             }
-		}
-	}
+        }
+    }
 
     void Node::addPreParent(Node* parent) {
         auto p = _preParents.insert(parent);

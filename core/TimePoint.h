@@ -52,9 +52,9 @@ namespace YAM
         void stream(IStreamer* streamer);
     };
 
-	class __declspec(dllexport) TimePoint
-	{
-	public:
+    class __declspec(dllexport) TimePoint
+    {
+    public:
         TimePoint(std::chrono::system_clock::time_point time = std::chrono::system_clock::now());
         TimePoint(WallClockTime const& wctime);
 
@@ -63,8 +63,8 @@ namespace YAM
 
         void stream(IStreamer* streamer);
 
-	private:
+    private:
         std::chrono::system_clock::time_point _time;
         WallClockTime _wctime;
-	};
+    };
 }

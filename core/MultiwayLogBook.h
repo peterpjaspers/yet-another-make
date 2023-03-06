@@ -6,16 +6,16 @@
 
 namespace YAM
 {
-	class __declspec(dllexport) MultiwayLogBook : public ILogBook
-	{
-	public:
-		MultiwayLogBook();
-		MultiwayLogBook(std::initializer_list<std::shared_ptr<ILogBook>> books);
+    class __declspec(dllexport) MultiwayLogBook : public ILogBook
+    {
+    public:
+        MultiwayLogBook();
+        MultiwayLogBook(std::initializer_list<std::shared_ptr<ILogBook>> books);
 
-		void add(std::shared_ptr<ILogBook> const& book);
-		void add(LogRecord const& record) override;
+        void add(std::shared_ptr<ILogBook> const& book);
+        void add(LogRecord const& record) override;
 
-	private:
-		std::vector<std::shared_ptr<ILogBook>> _books;
-	};
+    private:
+        std::vector<std::shared_ptr<ILogBook>> _books;
+    };
 }

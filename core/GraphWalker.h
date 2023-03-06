@@ -9,8 +9,8 @@ namespace YAM
 {
     class Node;
 
-	class __declspec(dllexport) GraphWalker
-	{
+    class __declspec(dllexport) GraphWalker
+    {
     public:
         enum GraphType
         {
@@ -57,6 +57,6 @@ namespace YAM
         Delegate<bool, Node*> _include;
         std::unordered_set<Node*> _visited;
         std::vector<Node*> _included;
-	};
+    };
 }
 

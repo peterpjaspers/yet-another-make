@@ -48,12 +48,12 @@ namespace YAM
     //        +----TCP Connect------------>
     //        +----ShutDownRequest-------->  Build Service will shutdown    
     //
-	class __declspec(dllexport) BuildService : 
+    class __declspec(dllexport) BuildService : 
         public ILogBook, 
         public std::enable_shared_from_this<BuildService>
-	{
-	public:
-		BuildService();
+    {
+    public:
+        BuildService();
 
         // Inherited via ILogBook
         void add(LogRecord const& record) override;

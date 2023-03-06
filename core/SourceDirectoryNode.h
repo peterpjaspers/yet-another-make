@@ -12,19 +12,19 @@ namespace YAM
     class FileNode;
     class DotIgnoreNode;
 
-	// A SourceDirectoryNode keeps track of the source files in a directory:
-	//    - creates a SourceFileNode for each file in the directory that is
+    // A SourceDirectoryNode keeps track of the source files in a directory:
+    //    - creates a SourceFileNode for each file in the directory that is
     //      readAllowed by the FileRepository that contains that file.
-	//	  - creates a SourceDirectoryNode for each subdir in the directory that
+    //      - creates a SourceDirectoryNode for each subdir in the directory that
     //      is readAllowed by the FileRepository that contains that subdir.
-	//    - maintains the directory hash. This hash is computed from the
+    //    - maintains the directory hash. This hash is computed from the
     //      names of the files and subdirs in the directory.
-	// FileRepositories are registered in the execution context of the node.
+    // FileRepositories are registered in the execution context of the node.
     //
-	class __declspec(dllexport) SourceDirectoryNode : public Node
-	{
-	public:
-		SourceDirectoryNode(ExecutionContext* context, std::filesystem::path const& dirName);
+    class __declspec(dllexport) SourceDirectoryNode : public Node
+    {
+    public:
+        SourceDirectoryNode(ExecutionContext* context, std::filesystem::path const& dirName);
 
         // Inherited via Node
         virtual bool supportsPrerequisites() const override;
@@ -77,7 +77,7 @@ namespace YAM
 
         std::shared_ptr<DotIgnoreNode> _dotIgnoreNode;
         std::map<std::filesystem::path, std::shared_ptr<Node>> _content;
-	};
+    };
 }
 
 

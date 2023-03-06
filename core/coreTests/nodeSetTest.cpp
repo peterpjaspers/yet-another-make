@@ -8,60 +8,60 @@
 
 namespace
 {
-	using namespace YAM;
-	using namespace YAMTest;
+    using namespace YAM;
+    using namespace YAMTest;
 
-	ExecutionContext* context = nullptr;
-	std::shared_ptr<Node> n1 = std::make_shared<NumberNode>(context, "aap/noot");
-	std::shared_ptr<Node> n1dup = std::make_shared<NumberNode>(context, "aap/noot");
-	std::shared_ptr<Node> n2 = std::make_shared<NumberNode>(context, "aap/noot/mies");
+    ExecutionContext* context = nullptr;
+    std::shared_ptr<Node> n1 = std::make_shared<NumberNode>(context, "aap/noot");
+    std::shared_ptr<Node> n1dup = std::make_shared<NumberNode>(context, "aap/noot");
+    std::shared_ptr<Node> n2 = std::make_shared<NumberNode>(context, "aap/noot/mies");
 
-	TEST(NodeSet, Add) {
-		NodeSet set;
-		set.add(n1);
-		EXPECT_EQ(1, set.size());
-		EXPECT_ANY_THROW(set.add(n1dup));
-	}
+    TEST(NodeSet, Add) {
+        NodeSet set;
+        set.add(n1);
+        EXPECT_EQ(1, set.size());
+        EXPECT_ANY_THROW(set.add(n1dup));
+    }
 
-	TEST(NodeSet, AddIfAbsent) {
-		NodeSet set;
-		set.add(n1);
-		set.addIfAbsent(n1);
-		EXPECT_EQ(1, set.size());
-		set.addIfAbsent(n2);
-		EXPECT_EQ(2, set.size());
-	}
+    TEST(NodeSet, AddIfAbsent) {
+        NodeSet set;
+        set.add(n1);
+        set.addIfAbsent(n1);
+        EXPECT_EQ(1, set.size());
+        set.addIfAbsent(n2);
+        EXPECT_EQ(2, set.size());
+    }
 
-	TEST(NodeSet, Find) {
-		NodeSet set;
-		set.add(n1);
-		EXPECT_EQ(n1, set.find(n1->name()));
-		EXPECT_EQ(nullptr, set.find(n2->name()));
-	}
+    TEST(NodeSet, Find) {
+        NodeSet set;
+        set.add(n1);
+        EXPECT_EQ(n1, set.find(n1->name()));
+        EXPECT_EQ(nullptr, set.find(n2->name()));
+    }
 
-	TEST(NodeSet, Contains) {
-		NodeSet set;
-		set.add(n1);
-		EXPECT_TRUE(set.contains(n1->name()));
-		EXPECT_FALSE(set.contains(n2->name()));
-	}
+    TEST(NodeSet, Contains) {
+        NodeSet set;
+        set.add(n1);
+        EXPECT_TRUE(set.contains(n1->name()));
+        EXPECT_FALSE(set.contains(n2->name()));
+    }
 
-	TEST(NodeSet, Remove) {
-		NodeSet set;
-		set.add(n1);
-		set.remove(n1);
-		EXPECT_EQ(0, set.size());
-		EXPECT_EQ(nullptr, set.find(n1->name()));
-		EXPECT_FALSE(set.contains(n1->name()));
-		EXPECT_ANY_THROW(set.remove(n1));
-	}
+    TEST(NodeSet, Remove) {
+        NodeSet set;
+        set.add(n1);
+        set.remove(n1);
+        EXPECT_EQ(0, set.size());
+        EXPECT_EQ(nullptr, set.find(n1->name()));
+        EXPECT_FALSE(set.contains(n1->name()));
+        EXPECT_ANY_THROW(set.remove(n1));
+    }
 
-	TEST(NodeSet, RemoveIfPresent) {
-		NodeSet set;
-		set.add(n1);
-		set.remove(n1);
-		set.removeIfPresent(n1);
-		EXPECT_EQ(0, set.size());
-		EXPECT_EQ(nullptr, set.find(n1->name()));
-	}
+    TEST(NodeSet, RemoveIfPresent) {
+        NodeSet set;
+        set.add(n1);
+        set.remove(n1);
+        set.removeIfPresent(n1);
+        EXPECT_EQ(0, set.size());
+        EXPECT_EQ(nullptr, set.find(n1->name()));
+    }
 }

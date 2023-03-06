@@ -5,20 +5,20 @@
 
 namespace YAM
 {
-	class __declspec(dllexport) MonitoredProcess : public IMonitoredProcess
-	{
-	public:
-		MonitoredProcess(
-			std::string const& program,
-			std::string const& arguments,
-			std::map<std::string, std::string> const& env);
+    class __declspec(dllexport) MonitoredProcess : public IMonitoredProcess
+    {
+    public:
+        MonitoredProcess(
+            std::string const& program,
+            std::string const& arguments,
+            std::map<std::string, std::string> const& env);
 
-	    MonitoredProcessResult const& wait() override;
-		bool wait_for(unsigned int timoutInMilliSeconds) override;
-		void terminate() override;
+        MonitoredProcessResult const& wait() override;
+        bool wait_for(unsigned int timoutInMilliSeconds) override;
+        void terminate() override;
 
-	private:
-		std::shared_ptr<IMonitoredProcess> _impl;
-	};
+    private:
+        std::shared_ptr<IMonitoredProcess> _impl;
+    };
 }
 

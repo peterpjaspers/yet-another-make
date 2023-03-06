@@ -28,5 +28,5 @@ namespace YAM
         virtual void backgroundColor(Color c) = 0;
         virtual void colors(Color text, Color background) = 0;
         virtual void restoreDefaultColors() = 0;
-	};
+    };
 }

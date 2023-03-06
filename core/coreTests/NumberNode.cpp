@@ -3,72 +3,72 @@
 
 namespace YAMTest
 {
-	using namespace YAM;
+    using namespace YAM;
 
-	NumberNode::NumberNode(
-		ExecutionContext* context,
-		std::filesystem::path const& name)
-		: Node(context, name)
-		, _number(rand())
-		, _executionHash(rand()) {
-	}
+    NumberNode::NumberNode(
+        ExecutionContext* context,
+        std::filesystem::path const& name)
+        : Node(context, name)
+        , _number(rand())
+        , _executionHash(rand()) {
+    }
 
-	int NumberNode::number() const { return _number; }
+    int NumberNode::number() const { return _number; }
 
-	void NumberNode::number(int newNumber) {
-		if (_number != newNumber) {
-			_number = newNumber;
-			setState(Node::State::Dirty);
-		}
-	}
+    void NumberNode::number(int newNumber) {
+        if (_number != newNumber) {
+            _number = newNumber;
+            setState(Node::State::Dirty);
+        }
+    }
 
-	void NumberNode::setNumberRehashAndSetOk(int newNumber) {
-		_number = newNumber;
-		rehash();
-		setState(Node::State::Ok);
-	}
+    void NumberNode::setNumberRehashAndSetOk(int newNumber) {
+        _number = newNumber;
+        rehash();
+        setState(Node::State::Ok);
+    }
 
-	// Inherited from Node
-	bool NumberNode::supportsPrerequisites() const { return false; }
+    // Inherited from Node
+    bool NumberNode::supportsPrerequisites() const { return false; }
 
-	void NumberNode::getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const {
-		throw std::runtime_error("precondition violation");
-	}
+    void NumberNode::getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const {
+        throw std::runtime_error("precondition violation");
+    }
 
-	bool NumberNode::supportsOutputs() const { return false; }
+    bool NumberNode::supportsOutputs() const { return false; }
 
-	void NumberNode::getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const {
-		throw std::runtime_error("precondition violation");
-	}
+    void NumberNode::getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const {
+        throw std::runtime_error("precondition violation");
+    }
 
-	bool NumberNode::supportsInputs() const { return false; }
+    bool NumberNode::supportsInputs() const { return false; }
 
-	void NumberNode::getInputs(std::vector<std::shared_ptr<Node>>& inputs) const {
-		throw std::runtime_error("precondition violation");
-	}
+    void NumberNode::getInputs(std::vector<std::shared_ptr<Node>>& inputs) const {
+        throw std::runtime_error("precondition violation");
+    }
 
-	void NumberNode::rehash() {
-		_executionHash = computeExecutionHash();
-	}
+    void NumberNode::rehash() {
+        _executionHash = computeExecutionHash();
+    }
 
-	XXH64_hash_t NumberNode::executionHash() const {
-		return _executionHash;
-	}
+    XXH64_hash_t NumberNode::executionHash() const {
+        return _executionHash;
+    }
 
-	XXH64_hash_t NumberNode::computeExecutionHash() const {
-		return _number;
-	}
+    XXH64_hash_t NumberNode::computeExecutionHash() const {
+        return _number;
+    }
 
-	bool NumberNode::pendingStartSelf() const { return _executionHash != computeExecutionHash(); }
+    bool NumberNode::pendingStartSelf() const { return _executionHash != computeExecutionHash(); }
 
-	void NumberNode::startSelf() {
-		auto d = Delegate<void>::CreateLambda([this]() { execute(); });
-		_context->threadPoolQueue().push(std::move(d));
-	}
+    void NumberNode::startSelf() {
+        auto d = Delegate<void>::CreateLambda([this]() { execute(); });
+        _context->threadPoolQueue().push(std::move(d));
+    }
 
-	void NumberNode::execute() {
-		rehash();
-		postSelfCompletion(Node::State::Ok);
-	}
+    void NumberNode::execute() {
+        rehash();
+        postSelfCompletion(Node::State::Ok);
+    }
 }
 

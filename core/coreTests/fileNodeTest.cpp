@@ -12,7 +12,7 @@ namespace
 {
     using namespace YAM;
 
-	bool createTestFile(std::filesystem::path testPath, std::string const &content) {
+    bool createTestFile(std::filesystem::path testPath, std::string const &content) {
         FILE* fp = std::fopen(testPath.string().c_str(), "w");
         if (!fp) return false;
 
@@ -21,7 +21,7 @@ namespace
 
         std::fclose(fp);
         return true;
-	}
+    }
 
     XXH64_hash_t hashString(std::string const& content) {
         return XXH64(content.c_str(), content.length(), 0);

@@ -2,7 +2,7 @@
 
 namespace YAM
 {
-	SourceFileNode::SourceFileNode(
+    SourceFileNode::SourceFileNode(
         ExecutionContext* context,
         std::filesystem::path const& name)
         : FileNode(context, name)

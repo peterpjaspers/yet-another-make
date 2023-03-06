@@ -3,15 +3,15 @@
 
 namespace YAM
 {
-	BasicOStreamLogBook::BasicOStreamLogBook(std::basic_ostream<char, std::char_traits<char>>* ostream)
-		: _ostream(ostream)
-	{}
+    BasicOStreamLogBook::BasicOStreamLogBook(std::basic_ostream<char, std::char_traits<char>>* ostream)
+        : _ostream(ostream)
+    {}
 
-	void BasicOStreamLogBook::add(LogRecord const& record) {
-		std::lock_guard<std::mutex> lock(_mutex);
-		*_ostream
-			<< record.time.wctime().date() << " " << record.time.wctime().time2() 
-			<< " " << LogRecord::aspect2str(record.aspect)
-			<< ": " << record.message << std::endl;
-	} 
+    void BasicOStreamLogBook::add(LogRecord const& record) {
+        std::lock_guard<std::mutex> lock(_mutex);
+        *_ostream
+            << record.time.wctime().date() << " " << record.time.wctime().time2() 
+            << " " << LogRecord::aspect2str(record.aspect)
+            << ": " << record.message << std::endl;
+    } 
 }

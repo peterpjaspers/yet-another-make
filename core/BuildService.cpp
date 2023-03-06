@@ -46,7 +46,7 @@ namespace YAM
         , _thread(&BuildService::run, this)
     {}
 
-	void BuildService::run() {
+    void BuildService::run() {
         try {
             boost::asio::io_context context;
             boost::asio::ip::tcp::socket socket(context);
@@ -65,7 +65,7 @@ namespace YAM
             _client = nullptr;
             handleRequest(nullptr);
         }
-	}
+    }
 
     void BuildService::add(LogRecord const& record) {
         auto ptr = std::make_shared<LogRecord>(record);

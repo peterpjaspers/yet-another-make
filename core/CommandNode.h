@@ -9,126 +9,126 @@
 
 namespace YAM
 {
-	class GeneratedFileNode;
+    class GeneratedFileNode;
 
-	// CommandNode is capable of:
-	//	  - executing a shell script with a given set of output files.
-	//    - detecting which files are accessed during the execution of the script.
-	//    - checking that the script write-accessed the given set of output files.
-	//    - registering the detected read-accessed files as input files.
-	//    - detecting changes in script, input and/or output files.
-	//      Such changes will out-date the outputs of the command node, causing 
-	//      pendingStartSelf() to return true.
-	// 
-	// CommandNode will lookup the file node associated with a detected input
-	// file in the execution context. If found the node will be registered in
-	// the command node's input set. If not found CommandNode will check
-	// whether the input file is contained in one of the FileRepositories 
-	// registered in the execution context. CommandNode execution will fail when
-	// this is not the case.
-	//      
+    // CommandNode is capable of:
+    //      - executing a shell script with a given set of output files.
+    //    - detecting which files are accessed during the execution of the script.
+    //    - checking that the script write-accessed the given set of output files.
+    //    - registering the detected read-accessed files as input files.
+    //    - detecting changes in script, input and/or output files.
+    //      Such changes will out-date the outputs of the command node, causing 
+    //      pendingStartSelf() to return true.
+    // 
+    // CommandNode will lookup the file node associated with a detected input
+    // file in the execution context. If found the node will be registered in
+    // the command node's input set. If not found CommandNode will check
+    // whether the input file is contained in one of the FileRepositories 
+    // registered in the execution context. CommandNode execution will fail when
+    // this is not the case.
+    //      
     class __declspec(dllexport) CommandNode : public Node
     {
-	public:
-		CommandNode(ExecutionContext* context, std::filesystem::path const& name);
-		~CommandNode();
-		
-		virtual void setState(State newState) override;
-		virtual bool supportsPrerequisites() const override;
+    public:
+        CommandNode(ExecutionContext* context, std::filesystem::path const& name);
+        ~CommandNode();
+        
+        virtual void setState(State newState) override;
+        virtual bool supportsPrerequisites() const override;
 
-		// getPrerequisites appends the input producers (command nodes), the source 
-		// files (SourceFileNode) that were read during the last execution of this 
-		// node and the output files (GeneratedFileNode) to given 'prerequisites'.
-		// Source and output files are prerequisites because their executions 
-		// compute file hashes that are used by pendingStartSelf to check whether 
-		// the outputs of this node are out-dated or have been tampered with.
-		// pendingStartSelf also uses the hashes of input files that were generated
-		// by the input producers. The input producers must therefore be included in
-		// 'prerequisites'to make sure that these generated input files are up-to-date.
-		virtual void getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const override;
+        // getPrerequisites appends the input producers (command nodes), the source 
+        // files (SourceFileNode) that were read during the last execution of this 
+        // node and the output files (GeneratedFileNode) to given 'prerequisites'.
+        // Source and output files are prerequisites because their executions 
+        // compute file hashes that are used by pendingStartSelf to check whether 
+        // the outputs of this node are out-dated or have been tampered with.
+        // pendingStartSelf also uses the hashes of input files that were generated
+        // by the input producers. The input producers must therefore be included in
+        // 'prerequisites'to make sure that these generated input files are up-to-date.
+        virtual void getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const override;
 
-		virtual bool supportsOutputs() const override;
-		virtual void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const override;
+        virtual bool supportsOutputs() const override;
+        virtual void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const override;
 
-		virtual bool supportsInputs() const override;
-		virtual void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const override;
+        virtual bool supportsInputs() const override;
+        virtual void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const override;
 
-		virtual bool pendingStartSelf() const override;
+        virtual bool pendingStartSelf() const override;
 
-		virtual void startSelf() override;
-		virtual void cancelSelf() override;
+        virtual void startSelf() override;
+        virtual void cancelSelf() override;
 
-		XXH64_hash_t computeExecutionHash() const;
+        XXH64_hash_t computeExecutionHash() const;
 
-		// Set the input file aspects that contribute to the output file(s)
-		// of the command node.
-		void setInputAspectsName(std::string const& newName);
+        // Set the input file aspects that contribute to the output file(s)
+        // of the command node.
+        void setInputAspectsName(std::string const& newName);
 
-		// Set the output files generated by this node's execution.
-		void setOutputs(std::vector<std::shared_ptr<GeneratedFileNode>> const & newOutputs);
+        // Set the output files generated by this node's execution.
+        void setOutputs(std::vector<std::shared_ptr<GeneratedFileNode>> const & newOutputs);
 
-		// Set the shell script to be executed when this node executes.
-		// The script must generate all the files specified by setOutputs.
-		// Node execution will fail otherwise.
-		void setScript(std::string const & newScript);
+        // Set the shell script to be executed when this node executes.
+        // The script must generate all the files specified by setOutputs.
+        // Node execution will fail otherwise.
+        void setScript(std::string const & newScript);
 
-		// Set nodes that produce outputs that are (allowed to be) used as
-		// inputs by this node. The producer nodes must be executed before this 
-		// node to make sure that their outputs exist and are up-to-date.
-		// Besides these generated inputs this node is also allowed to use 
-		// source files as inputs. Source files need not be in newInputProducers.
-		// Do not confuse source files with 'source files' generated from e.g.
-		// IDL files, yacc and lex files. The nodes that generate such files must
-		// be in newIputProducers.
-		// This node does not take ownership of the producer nodes.
-		void setInputProducers(std::vector<std::shared_ptr<Node>> const & newInputProducers);
+        // Set nodes that produce outputs that are (allowed to be) used as
+        // inputs by this node. The producer nodes must be executed before this 
+        // node to make sure that their outputs exist and are up-to-date.
+        // Besides these generated inputs this node is also allowed to use 
+        // source files as inputs. Source files need not be in newInputProducers.
+        // Do not confuse source files with 'source files' generated from e.g.
+        // IDL files, yacc and lex files. The nodes that generate such files must
+        // be in newIputProducers.
+        // This node does not take ownership of the producer nodes.
+        void setInputProducers(std::vector<std::shared_ptr<Node>> const & newInputProducers);
 
-	    void getInputProducers(std::vector<std::shared_ptr<Node>>& producers) const;
+        void getInputProducers(std::vector<std::shared_ptr<Node>>& producers) const;
 
-	private:
-		void getSourceInputs(std::vector<std::shared_ptr<Node>> & sourceInputs) const;
-		void setInputs(std::vector<std::shared_ptr<FileNode>> const& newInputs);
-		void rehashOutputs();
+    private:
+        void getSourceInputs(std::vector<std::shared_ptr<Node>> & sourceInputs) const;
+        void setInputs(std::vector<std::shared_ptr<FileNode>> const& newInputs);
+        void rehashOutputs();
 
-		std::shared_ptr<FileNode> findInputNode(
-			std::filesystem::path const& input,
-			std::filesystem::path const& exclude);
-		bool findInputNodes(
-			MonitoredProcessResult const& result,
-			std::filesystem::path const& exclude,
-			std::vector<std::shared_ptr<FileNode>>& inputNodes);
+        std::shared_ptr<FileNode> findInputNode(
+            std::filesystem::path const& input,
+            std::filesystem::path const& exclude);
+        bool findInputNodes(
+            MonitoredProcessResult const& result,
+            std::filesystem::path const& exclude,
+            std::vector<std::shared_ptr<FileNode>>& inputNodes);
 
-		std::shared_ptr<GeneratedFileNode> findOutputNode(
-			std::filesystem::path const& output);
-		bool findOutputNodes(
-			MonitoredProcessResult const& result,
-			std::vector<std::shared_ptr<GeneratedFileNode>>& outputNodes);
-		bool verifyOutputNodes(std::vector<std::shared_ptr<GeneratedFileNode>> const& newOutputNodes);
+        std::shared_ptr<GeneratedFileNode> findOutputNode(
+            std::filesystem::path const& output);
+        bool findOutputNodes(
+            MonitoredProcessResult const& result,
+            std::vector<std::shared_ptr<GeneratedFileNode>>& outputNodes);
+        bool verifyOutputNodes(std::vector<std::shared_ptr<GeneratedFileNode>> const& newOutputNodes);
 
-		MonitoredProcessResult executeScript(std::filesystem::path& scriptFile);
-		void execute();
+        MonitoredProcessResult executeScript(std::filesystem::path& scriptFile);
+        void execute();
 
-		// The name of the FileAspectSet that contains the aspects relevant for this
-		// command, i.e. the aspects of input files that contribute to output file content.
-		std::string _inputAspectsName;
+        // The name of the FileAspectSet that contains the aspects relevant for this
+        // command, i.e. the aspects of input files that contribute to output file content.
+        std::string _inputAspectsName;
 
-		std::vector<std::shared_ptr<Node>> _inputProducers;
-		std::vector<std::shared_ptr<GeneratedFileNode>> _outputs;
+        std::vector<std::shared_ptr<Node>> _inputProducers;
+        std::vector<std::shared_ptr<GeneratedFileNode>> _outputs;
 
-		// TODO: decide whether script will be streamed to build state.
-		// Script can be large, e.g. a link script that links many object
-		// files. Not streaming the script implies that all build files need 
-		// to be reparsed  to re-initialize command scripts. A change in 
-		// script can then be detected by comparing its hash with hash 
-		// of previous script (that was streamed to build state).
-		std::string _script; 
+        // TODO: decide whether script will be streamed to build state.
+        // Script can be large, e.g. a link script that links many object
+        // files. Not streaming the script implies that all build files need 
+        // to be reparsed  to re-initialize command scripts. A change in 
+        // script can then be detected by comparing its hash with hash 
+        // of previous script (that was streamed to build state).
+        std::string _script; 
 
-		std::vector<std::shared_ptr<FileNode>> _inputs; // inputs detected during last script execution
+        std::vector<std::shared_ptr<FileNode>> _inputs; // inputs detected during last script execution
 
-		// The hash of the hashes of the script, of the output files and of the
-		// the relevant aspects of the input files.
-		XXH64_hash_t _executionHash;
+        // The hash of the hashes of the script, of the output files and of the
+        // the relevant aspects of the input files.
+        XXH64_hash_t _executionHash;
 
-		std::atomic<std::shared_ptr<IMonitoredProcess>> _scriptExecutor;
+        std::atomic<std::shared_ptr<IMonitoredProcess>> _scriptExecutor;
     };
 }
