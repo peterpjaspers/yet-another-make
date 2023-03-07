@@ -48,6 +48,9 @@ namespace YAM
             Delegate<bool, std::shared_ptr<Node> const&> includeNode,
             std::vector<std::shared_ptr<Node>>& foundNodes);
 
+        // Execute action on each node in the set.
+        void foreach(Delegate<void, std::shared_ptr<Node> const&> action);
+
         // Return whether the set contains a node with given 'nodeName'
         bool contains(std::filesystem::path const& nodeName);
 

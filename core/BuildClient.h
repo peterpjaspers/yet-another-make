@@ -2,7 +2,6 @@
 
 #include "ILogBook.h"
 #include "Delegates.h"
-#include "Dispatcher.h"
 
 #include <memory>
 #include <thread>
@@ -29,6 +28,8 @@ namespace YAM
         // If servicePort != 0: connect to the service using servicePort.
         BuildClient(ILogBook& logBook, boost::asio::ip::port_type servicePort = 0);
 
+        ~BuildClient();
+
         // Start a build, call completer().Broadcast(buildReply) when the build 
         // has finished.
         void startBuild(std::shared_ptr<BuildRequest> request);
@@ -40,11 +41,10 @@ namespace YAM
         // Shutdown the service, call completer().Execute(nullptr) when service
         // acknowledged shutdown.
         void shutdown();
-        
-        // block caller until build has completed.
-        void waitForCompletion();
 
-        // Return the completor delegate used to notify build completion.
+        // Return the completor delegate used to broadcast build completion.
+        // Take care: broadcast is done in another thread than thread that 
+        // constructed the build client.
         MulticastDelegate<std::shared_ptr<BuildResult>>& completor();
         
     private:
@@ -55,7 +55,6 @@ namespace YAM
         boost::asio::ip::tcp::socket _socket;
         std::shared_ptr<TcpStream> _service;
         std::shared_ptr<BuildServiceProtocol> _protocol;
-        Dispatcher _dispatcher;
         std::shared_ptr<std::thread> _receiver;
         MulticastDelegate<std::shared_ptr<BuildResult>> _completor;
     };

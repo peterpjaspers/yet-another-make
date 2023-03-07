@@ -2,6 +2,7 @@
 #include "BuildServiceProtocol.h"
 #include "BuildServiceMessageTypes.h"
 #include "TcpStream.h"
+#include "EndOfStreamException.h"
 
 #include <string>
 #include <sstream>
@@ -32,6 +33,11 @@ namespace YAM
         }
     }
 
+    BuildClient::~BuildClient() {
+        _receiver->join();
+        _socket.close();
+    }
+
     // Start a build, call completer().Execute(buildReply) when the build 
     // has finished.
     void BuildClient::startBuild(std::shared_ptr<BuildRequest> request) {
@@ -53,10 +59,6 @@ namespace YAM
         _protocol->send(msg);
     }
 
-    void BuildClient::waitForCompletion() {
-        _dispatcher.run();
-    }
-
     // Return the completor delegate used to notify build completion.
     MulticastDelegate<std::shared_ptr<BuildResult>>& BuildClient::completor() {
         return _completor;
@@ -76,10 +78,16 @@ namespace YAM
                     _logBook.add(*logRecord);
                 }
             }
-            _dispatcher.stop();
         } catch (std::exception e) {
-            _logBook.add(LogRecord(LogRecord::Aspect::Progress, std::string("lost connection to service: ") + e.what()));
-            _dispatcher.stop();
+            _logBook.add(LogRecord(
+                LogRecord::Aspect::Progress,
+                std::string("lost connection to service: ") + e.what())
+            );
+        } catch (EndOfStreamException e) {
+            _logBook.add(LogRecord(
+                LogRecord::Aspect::Progress,
+                std::string("lost connection to service: ") + e._message)
+            );
         }
     }
 }

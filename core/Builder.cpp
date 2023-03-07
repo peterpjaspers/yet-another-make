@@ -3,6 +3,7 @@
 #include "BuildResult.h"
 #include "CommandNode.h"
 #include "SourceFileNode.h"
+#include "GeneratedFileNode.h"
 #include "SourceDirectoryNode.h"
 #include "SourceFileRepository.h"
 #include "GraphWalker.h"
@@ -73,6 +74,7 @@ namespace YAM
             _notifyCompletion();
         } else if (request->requestType() == BuildRequest::Clean) {
             _clean(request);
+            _notifyCompletion();
         } else if (request->requestType() == BuildRequest::Build) {
             _init(request->directory(), false);
             _context.buildRequest(request);
@@ -108,7 +110,16 @@ namespace YAM
     }
 
     void Builder::_clean(std::shared_ptr<BuildRequest> request) {
-        throw std::exception("not implemented");
+        uint32_t nFailures = 0;
+        auto cleanNode = Delegate<void, std::shared_ptr<Node> const&>::CreateLambda(
+            [&nFailures](std::shared_ptr<Node> const& node) {
+            auto generatedFileNode = dynamic_pointer_cast<GeneratedFileNode>(node);
+            if (generatedFileNode != nullptr) {
+                if (!generatedFileNode->deleteFile()) nFailures += 1;
+            }
+        });
+        _context.nodes().foreach(cleanNode);
+        _result->succeeded(nFailures==0);
     }
 
     void Builder::_start() {
@@ -155,7 +166,6 @@ namespace YAM
             std::vector<std::shared_ptr<Node>> dirtyCommands;
             appendDirtyCommands(_context.nodes(), dirtyCommands);
             if (dirtyCommands.empty()) {
-                _result->succeeded(_scope->state() == Node::State::Ok);
                 _notifyCompletion();
             } else {
                 _scope->setInputProducers(dirtyCommands); // + dirtyBuildFileParsers

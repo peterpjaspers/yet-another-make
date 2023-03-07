@@ -22,6 +22,15 @@ namespace YAM
     }
 
     Node* GeneratedFileNode::producer() const {
-        return _producer; 
+        return _producer;
+    }
+
+    bool GeneratedFileNode::deleteFile() {
+        std::error_code ec;
+        bool deleted = std::filesystem::remove(name(), ec);
+        if (deleted) {
+            setState(Node::State::Dirty);
+        }
+        return !ec;
     }
 }

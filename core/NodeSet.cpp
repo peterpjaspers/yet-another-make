@@ -55,6 +55,13 @@ namespace YAM
         }
     }
 
+    void NodeSet::foreach(Delegate<void, std::shared_ptr<Node> const&> action) {
+        std::lock_guard<std::mutex> lock(_mutex);
+        for (auto const& pair : _nodes) {
+            action.Execute(pair.second);
+        }
+    }
+
     bool NodeSet::contains(std::filesystem::path const& nodeName)
     {
         std::lock_guard<std::mutex> lock(_mutex);

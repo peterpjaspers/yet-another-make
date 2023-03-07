@@ -16,6 +16,7 @@ namespace YAM
         virtual void setState(State newState) override;
 
         Node* producer() const;
+        bool deleteFile();
 
     private:
         Node* _producer;

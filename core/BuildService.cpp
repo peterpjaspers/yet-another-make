@@ -28,19 +28,26 @@ namespace YAM
     }
 
     void BuildService::run() {
-        try {
+        while (!_shutdown) {
             boost::asio::ip::tcp::socket socket(_context);
-            while (!_shutdown) {
+            try {
                 _acceptor.accept(socket);
                 _client = std::make_shared<TcpStream>(socket);
                 _protocol = std::make_shared<BuildServiceProtocol>(_client, _client, false);
                 std::shared_ptr<IStreamable> request = _protocol->receive();
-                handleRequest(request);
+                while (!_shutdown && request != nullptr) {
+                    handleRequest(request);
+                    if (!_shutdown) request = _protocol->receive();
+                }
+                _protocol.reset();
+                _client.reset();
+            } catch (std::exception& e) {
+                _protocol.reset();
+                _client.reset();
+            } catch (EndOfStreamException e) {
+                _protocol.reset();
+                _client.reset();
             }
-        } catch (std::exception& e) {
-            _client->close();
-            _client = nullptr;
-            handleRequest(nullptr);
         }
     }
 
@@ -53,17 +60,21 @@ namespace YAM
         auto buildRequest = dynamic_pointer_cast<BuildRequest>(request);
         auto stopRequest = dynamic_pointer_cast<StopBuildRequest>(request);
         auto shutdownRequest = dynamic_pointer_cast<ShutdownRequest>(request);
+        _builder.context()->logBook(shared_from_this());
         if (buildRequest != nullptr) {
             if (!_builder.running()) {
-                _builder.context()->logBook(shared_from_this());
                 _builder.completor().AddRaw(this, &BuildService::handleBuildCompletion);
                 _builder.start(buildRequest);
             }
-        } else if (stopRequest != nullptr) {
-            if (_builder.running()) _builder.stop();
-        } else if (shutdownRequest != nullptr) {                
-            if (_builder.running()) _builder.stop(); // protocol error
-            _shutdown = true;
+        } else if (stopRequest != nullptr || shutdownRequest != nullptr) {
+            if (_builder.running()) {
+                _builder.stop();
+            } else {
+                auto result = std::make_shared<BuildResult>();
+                result->succeeded(true);
+                _protocol->send(result);
+            }
+            _shutdown = shutdownRequest != nullptr;
         } else {
             if (_builder.running()) _builder.stop(); // unknown request type
         }

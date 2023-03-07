@@ -35,6 +35,7 @@
   <ItemGroup>
     <ClCompile Include="AdditionNode.cpp" />
     <ClCompile Include="boostProcessTest.cpp" />
+    <ClCompile Include="buildClientServiceTest.cpp" />
     <ClCompile Include="builderTest.cpp" />
     <ClCompile Include="buildServiceProtocolTest.cpp" />
     <ClCompile Include="commandNodeTest.cpp">
