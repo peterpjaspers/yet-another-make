@@ -37,7 +37,7 @@ namespace YAM
         MulticastDelegate<std::shared_ptr<BuildResult>>& completor();
 
     private:
-        void _init(std::filesystem::path directory, bool failIfAlreadyInitialized);
+        void _init(std::filesystem::path directory);
         void _start();
         void _clean(std::shared_ptr<BuildRequest> request);
         void _stop();

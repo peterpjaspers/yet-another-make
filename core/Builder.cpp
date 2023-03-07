@@ -7,6 +7,7 @@
 #include "SourceDirectoryNode.h"
 #include "SourceFileRepository.h"
 #include "GraphWalker.h"
+#include "DotGitDirectory.h"
 #include "DotYamDirectory.h"
 
 #include <iostream>
@@ -70,42 +71,35 @@ namespace YAM
         if (running()) throw std::exception("cannot start a build while one is running");
         _result = std::make_shared<BuildResult>();
         if (request->requestType() == BuildRequest::Init) {
-            _init(request->directory(), true);
+            _init(request->directory());
             _notifyCompletion();
         } else if (request->requestType() == BuildRequest::Clean) {
             _clean(request);
             _notifyCompletion();
         } else if (request->requestType() == BuildRequest::Build) {
-            _init(request->directory(), false);
+            _init(request->directory());
             _context.buildRequest(request);
             _context.mainThreadQueue().push(Delegate<void>::CreateLambda(([this]() { _start(); })));
         } else {
             throw std::exception("unknown build request type");
         }
     }
-    void Builder::_init(std::filesystem::path directory, bool failIfAlreadyInitialized) {
-        std::filesystem::path yamDir = DotYamDirectory::find(directory);
-        if (yamDir.empty()) yamDir = DotYamDirectory::create(directory);
-        std::filesystem::path repoPath = yamDir.parent_path();
-        if (_context.findRepository(repoPath.filename().string()) == nullptr) {
-            auto repo = std::make_shared<SourceFileRepository>(
-                repoPath.filename().string(),
-                repoPath,
-                RegexSet({ 
-                    RegexSet::matchDirectory("generated"),
-                    RegexSet::matchDirectory(".yam")
-                    }),
-                &_context);
-            _context.addRepository(repo);
-            _result->succeeded(true);
-        } else if (failIfAlreadyInitialized) {
-            std::cerr
-                << "YAM initialization failed" << std::endl
-                << "Reason:" << "Already initialized: " << yamDir.parent_path().string()
-                << std::endl;
-            _result->succeeded(false);
-        } else {
-            _result->succeeded(true);
+    void Builder::_init(std::filesystem::path directory) {
+        std::filesystem::path yamDir = DotYamDirectory::initialize(directory, _context.logBook().get());
+        _result->succeeded(!yamDir.empty());
+        if (_result->succeeded()) {
+            std::filesystem::path repoPath = yamDir.parent_path();
+            if (_context.findRepository(repoPath.filename().string()) == nullptr) {
+                auto repo = std::make_shared<SourceFileRepository>(
+                    repoPath.filename().string(),
+                    repoPath,
+                    RegexSet({
+                        RegexSet::matchDirectory("generated"),
+                        RegexSet::matchDirectory(".yam")
+                        }),
+                    &_context);
+                _context.addRepository(repo);
+            }
         }
     }
 

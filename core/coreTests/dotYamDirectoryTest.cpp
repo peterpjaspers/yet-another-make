@@ -1,5 +1,6 @@
 #include "../DotYamDirectory.h"
 #include "../FileSystem.h"
+#include "../MemoryLogBook.h"
 
 #include "gtest/gtest.h"
 
@@ -46,6 +47,40 @@ namespace
         std::filesystem::path expected;
         std::filesystem::path actual = DotYamDirectory::find(deepDir);
         EXPECT_EQ(expected, actual);
+        std::filesystem::remove_all(repoDir);
+    }
+
+    TEST(DotYamDirectory, initializeInGitRepo) {
+        MemoryLogBook logBook;
+        std::filesystem::path repoDir = FileSystem::createUniqueDirectory();
+        std::filesystem::create_directory(repoDir / ".git");
+        std::filesystem::path subDir = repoDir / "sub";
+        std::filesystem::create_directory(subDir);
+
+        std::filesystem::path yamDir = DotYamDirectory::initialize(subDir, &logBook);
+        std::filesystem::path expectedYamDir(repoDir / ".yam");
+        EXPECT_EQ(expectedYamDir, yamDir);
+        EXPECT_TRUE(std::filesystem::exists(yamDir));
+        EXPECT_EQ(1, logBook.records().size());
+        EXPECT_EQ(LogRecord::Aspect::Progress, logBook.records()[0].aspect);
+
+        std::filesystem::remove_all(repoDir);
+    }
+
+    TEST(DotYamDirectory, failInitializeInGitRepo) {
+        MemoryLogBook logBook;
+        std::filesystem::path repoDir = FileSystem::createUniqueDirectory();
+        std::filesystem::create_directory(repoDir / ".git");
+        std::filesystem::path illegalYamDir = repoDir / "sub" / ".yam";
+        std::filesystem::create_directory(illegalYamDir.parent_path());
+        std::filesystem::create_directory(illegalYamDir);
+
+        std::filesystem::path yamDir = DotYamDirectory::initialize(illegalYamDir.parent_path(), &logBook);
+        std::filesystem::path expectedYamDir; // empty because illegal yam dir
+        EXPECT_EQ(expectedYamDir, yamDir);
+        EXPECT_EQ(1, logBook.records().size());
+        EXPECT_EQ(LogRecord::Aspect::Error, logBook.records()[0].aspect);
+
         std::filesystem::remove_all(repoDir);
     }
 }

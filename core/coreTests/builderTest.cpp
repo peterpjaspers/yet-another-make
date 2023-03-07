@@ -257,7 +257,7 @@ namespace
 
         driver.initializeYam();
         std::shared_ptr<BuildResult> result = driver.initializeYam();
-        EXPECT_FALSE(result->succeeded());
+        EXPECT_TRUE(result->succeeded());
     }
 
     TEST(Builder, firstBuild) {

@@ -104,6 +104,7 @@
     <ClInclude Include="BuildService.h" />
     <ClInclude Include="BuildServiceProtocol.h" />
     <ClInclude Include="BuildServiceMessageTypes.h" />
+    <ClInclude Include="DotGitDirectory.h" />
     <ClInclude Include="DotYamDirectory.h" />
     <ClInclude Include="IObjectStreamer.h" />
     <ClInclude Include="ISharedObjectStreamer.h" />
@@ -176,6 +177,7 @@
     </ClCompile>
     <ClCompile Include="BuildServiceProtocol.cpp" />
     <ClCompile Include="BuildServiceMessageTypes.cpp" />
+    <ClCompile Include="DotGitDirectory.cpp" />
     <ClCompile Include="DotYamDirectory.cpp" />
     <ClCompile Include="SharedObjectStreamer.cpp" />
     <ClCompile Include="Streamer.cpp" />

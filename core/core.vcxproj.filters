@@ -243,6 +243,9 @@
     <ClInclude Include="DotYamDirectory.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="DotGitDirectory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -399,6 +402,9 @@
       <Filter>Source Files\BuildService</Filter>
     </ClCompile>
     <ClCompile Include="DotYamDirectory.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DotGitDirectory.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
