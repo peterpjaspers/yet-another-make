@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <atomic>
+#include <mutex>
 #include <thread>
 #include <boost/asio.hpp>
 
@@ -43,6 +44,8 @@ namespace YAM
         void run();
         void handleRequest(std::shared_ptr<IStreamable> request);
         void handleBuildCompletion(std::shared_ptr<BuildResult> result);
+        void send(std::shared_ptr<IStreamable> msg);
+        void closeClient();
 
         boost::asio::io_context _context;
         boost::asio::ip::tcp::endpoint _service;
@@ -50,6 +53,7 @@ namespace YAM
         Builder _builder;
         std::atomic<bool> _shutdown;
         std::thread _thread;
+        std::mutex _mutex;
         std::shared_ptr<TcpStream> _client;
         std::shared_ptr<BuildServiceProtocol> _protocol;
     };

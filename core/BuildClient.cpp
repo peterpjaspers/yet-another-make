@@ -12,6 +12,7 @@ namespace YAM
     BuildClient::BuildClient(ILogBook& logBook, boost::asio::ip::port_type servicePort)
         : _logBook(logBook)
         , _socket(_context)
+        , _state(Idle)
     {
         // Construct a client that connects to the BuildService associated
         // with the .yam directory.
@@ -38,25 +39,34 @@ namespace YAM
         _socket.close();
     }
 
-    // Start a build, call completer().Execute(buildReply) when the build 
-    // has finished.
-    void BuildClient::startBuild(std::shared_ptr<BuildRequest> request) {
+    bool BuildClient::startBuild(std::shared_ptr<BuildRequest> request) {
+        std::lock_guard<std::mutex> lock(_mutex);
+        if (_state != Idle) return false;
+
+        _state = Building;
         auto msg = dynamic_pointer_cast<IStreamable>(request);
         _protocol->send(msg);
+        return true;
     }
 
-    // Stop the build, call completer().Execute(buildReply) when the build 
-    // has stopped.
-    void BuildClient::stopBuild() {
+    bool BuildClient::stopBuild() {
+        std::lock_guard<std::mutex> lock(_mutex);
+        if (_state != Building) return false;
+
+        _state = StoppingBuild;
         auto msg = dynamic_pointer_cast<IStreamable>(std::make_shared<StopBuildRequest>());
         _protocol->send(msg);
+        return true;
     }
 
-    // Shutdown the service, call completer().Execute(nullptr) when service
-    // acknowledged shutdown.
-    void BuildClient::shutdown() {
+    bool BuildClient::startShutdown() {
+        std::lock_guard<std::mutex> lock(_mutex);
+        if (_state != Idle && _state != Done) return false;
+
+        _state = _state == Done ? Done : Shuttingdown;
         auto msg = dynamic_pointer_cast<IStreamable>(std::make_shared<ShutdownRequest>());
         _protocol->send(msg);
+        return _state == Shuttingdown;
     }
 
     // Return the completor delegate used to notify build completion.
@@ -65,17 +75,17 @@ namespace YAM
     }
     
     void BuildClient::run() {
+        std::shared_ptr<BuildResult> result;
         try {
             bool done = false;
             while (!done) {
                 std::shared_ptr<IStreamable> msg = _protocol->receive();
-                auto result = dynamic_pointer_cast<BuildResult>(msg);
+                result = dynamic_pointer_cast<BuildResult>(msg);
                 auto logRecord = dynamic_pointer_cast<LogRecord>(msg);
-                if (result != nullptr) {
-                    _completor.Broadcast(result);
-                    done = true;
-                } else {
+                if (logRecord != nullptr) {
                     _logBook.add(*logRecord);
+                } else {
+                    done = true;
                 }
             }
         } catch (std::exception e) {
@@ -89,5 +99,13 @@ namespace YAM
                 std::string("lost connection to service: ") + e._message)
             );
         }
+        {
+            if (result == nullptr) {
+                result = std::make_shared<BuildResult>(false);
+            }
+            std::lock_guard<std::mutex> lock(_mutex);
+            _state = Done;
+        }
+        _completor.Broadcast(result);
     }
 }

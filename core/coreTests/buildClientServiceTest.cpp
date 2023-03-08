@@ -22,52 +22,51 @@ namespace
 
         Session()
             : service(std::make_shared<BuildService>(false))
-            , client(std::make_shared<BuildClient>(logBook, service->port()))
+            , client(nullptr)
             , repoDir(FileSystem::createUniqueDirectory())
             , _shutdown(false)
         {
-            client->completor().AddLambda([&](std::shared_ptr<BuildResult> r) {
-                std::lock_guard<std::mutex> lock(_mutex);
-                _result = r;
-                _cond.notify_one();
-            });       
+            newClient();
         }
 
         ~Session() {
             if (!_shutdown) {
                 _shutdown = true;
-                client->shutdown();
+                client->startShutdown();
             }
             service->join(); // service can be joined because it was shutdown
-            client.reset(); // close connection to service
+            if (client != nullptr) {
+                client->completor().RemoveObject(this);
+                client.reset(); // close connection to service
+            }
         }
 
         std::shared_ptr<BuildResult> shutdown() {
             _shutdown = true;
-            client->shutdown();
+            if (!client->startShutdown()) return std::make_shared<BuildResult>(false);
             return wait();
         }
 
         std::shared_ptr<BuildResult> init() {
             auto request = std::make_shared<BuildRequest>(BuildRequest::RequestType::Init);
-            startBuild(request);
+            if (!startBuild(request)) return std::make_shared<BuildResult>(false);
             return wait();
         }
 
-        void startBuild(std::shared_ptr<BuildRequest> request) {
+        bool startBuild(std::shared_ptr<BuildRequest> request) {
             request->directory(repoDir);
-            client->startBuild(request);
+            return client->startBuild(request);
         }
 
         std::shared_ptr<BuildResult> build() {
             auto request = std::make_shared<BuildRequest>(BuildRequest::RequestType::Build);
-            startBuild(request);
+            if (!startBuild(request)) return std::make_shared<BuildResult>(false);
             return wait();
         }
 
         std::shared_ptr<BuildResult> clean() {
             auto request = std::make_shared<BuildRequest>(BuildRequest::RequestType::Clean);
-            startBuild(request);
+            if (!startBuild(request)) return std::make_shared<BuildResult>(false);
             return wait();
         }
 
@@ -76,7 +75,22 @@ namespace
             while (_result == nullptr) {
                 _cond.wait(lock);
             }
-            return _result;
+            std::shared_ptr<BuildResult> r = _result;
+            _result = nullptr;
+            return r;
+        }
+
+        void newClient() {
+            if (client != nullptr) {
+                client->completor().RemoveObject(this);
+                client = nullptr;
+            }
+            client = std::make_shared<BuildClient>(logBook, service->port());
+            client->completor().AddLambda([&](std::shared_ptr<BuildResult> r) {
+                std::lock_guard<std::mutex> lock(_mutex);
+                _result = r;
+                _cond.notify_one();
+            });
         }
 
     private:
@@ -84,8 +98,11 @@ namespace
         std::mutex _mutex;
         std::condition_variable _cond;
         std::shared_ptr<BuildResult> _result;
-
     };
+
+    TEST(BuildService, constructSession) {
+        Session session;
+    }
 
     TEST(BuildService, init) {
         Session session;
@@ -99,6 +116,19 @@ namespace
         EXPECT_TRUE(result->succeeded());
     }
 
+    TEST(BuildService, stopBuild) {
+        auto request = std::make_shared<BuildRequest>(BuildRequest::RequestType::Build);
+        Session session;
+
+        EXPECT_TRUE(session.startBuild(request));
+        session.client->stopBuild();
+        auto result = session.wait();
+        // A stopBuild may result in successfull or unsuccessfull completion.
+        // The former when the build already completed when stop was received.
+        // The latter when build in progress was canceled.
+        EXPECT_NE(nullptr, result);
+    }
+
     TEST(BuildService, clean) {
         Session session;
         auto result = session.clean();
@@ -109,5 +139,24 @@ namespace
         Session session;
         auto result = session.shutdown();
         EXPECT_TRUE(result->succeeded());
+    }
+
+    TEST(BuildService, successiveBuilds) {
+        Session session;
+        auto result = session.build();
+        EXPECT_TRUE(result->succeeded());
+
+        session.newClient();
+        result = session.build();
+        EXPECT_TRUE(result->succeeded());
+    }
+
+    TEST(BuildService, illegalClientUse) {
+        Session session;
+        auto result = session.build();
+        EXPECT_TRUE(result->succeeded());
+
+        auto request = std::make_shared<BuildRequest>(BuildRequest::RequestType::Build);
+        EXPECT_FALSE(session.startBuild(request));
     }
 }

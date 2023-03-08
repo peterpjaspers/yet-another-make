@@ -32,28 +32,26 @@ namespace YAM
             boost::asio::ip::tcp::socket socket(_context);
             try {
                 _acceptor.accept(socket);
-                _client = std::make_shared<TcpStream>(socket);
-                _protocol = std::make_shared<BuildServiceProtocol>(_client, _client, false);
+                {
+                    std::lock_guard<std::mutex> lock(_mutex);
+                    _client = std::make_shared<TcpStream>(socket);
+                    _protocol = std::make_shared<BuildServiceProtocol>(_client, _client, false);
+                }
                 std::shared_ptr<IStreamable> request = _protocol->receive();
                 while (!_shutdown && request != nullptr) {
                     handleRequest(request);
                     if (!_shutdown) request = _protocol->receive();
                 }
-                _protocol.reset();
-                _client.reset();
             } catch (std::exception& e) {
-                _protocol.reset();
-                _client.reset();
             } catch (EndOfStreamException e) {
-                _protocol.reset();
-                _client.reset();
             }
+            closeClient();
         }
     }
 
     void BuildService::add(LogRecord const& record) {
         auto ptr = std::make_shared<LogRecord>(record);
-        _protocol->send(ptr);
+        send(ptr);
     }
 
     void BuildService::handleRequest(std::shared_ptr<IStreamable> request) {
@@ -67,14 +65,12 @@ namespace YAM
                 _builder.start(buildRequest);
             }
         } else if (stopRequest != nullptr || shutdownRequest != nullptr) {
+            _shutdown = shutdownRequest != nullptr;
             if (_builder.running()) {
                 _builder.stop();
             } else {
-                auto result = std::make_shared<BuildResult>();
-                result->succeeded(true);
-                _protocol->send(result);
+                send(std::make_shared<BuildResult>(true));
             }
-            _shutdown = shutdownRequest != nullptr;
         } else {
             if (_builder.running()) _builder.stop(); // unknown request type
         }
@@ -82,8 +78,31 @@ namespace YAM
 
     void BuildService::handleBuildCompletion(std::shared_ptr<BuildResult> result) {
         _builder.completor().RemoveObject(this);
-        if (_client != nullptr) {
-            _protocol->send(result);
+        send(result);
+    }
+
+    void BuildService::send(std::shared_ptr<IStreamable> msg) {
+        std::shared_ptr<TcpStream> client;
+        std::shared_ptr<BuildServiceProtocol> protocol;
+        {
+            std::lock_guard<std::mutex> lock(_mutex);
+            client = _client;
+            protocol = _protocol;
         }
+        if (client != nullptr && protocol != nullptr) {
+            try {
+                protocol->send(msg);
+            } catch (std::exception&) {
+            } catch (EndOfStreamException) {
+            }
+        }
+    }
+    void BuildService::closeClient() {
+        std::lock_guard<std::mutex> lock(_mutex);
+        if (_client != nullptr) {
+            _client->closeSocket();
+            _client = nullptr;
+        }
+        _protocol = nullptr;
     }
 }

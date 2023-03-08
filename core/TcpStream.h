@@ -18,7 +18,7 @@ namespace YAM
         void write(const void* bytes, std::size_t nBytes) override;
 
         // close the tcp socket
-        void close();
+        void closeSocket();
 
     private:
         boost::asio::ip::tcp::socket& _socket;

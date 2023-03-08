@@ -9,6 +9,7 @@ namespace YAM
     {
     public:
         BuildResult();
+        BuildResult(bool success);
         BuildResult(IStreamer* reader);
 
         void succeeded(bool value);

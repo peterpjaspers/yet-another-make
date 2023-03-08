@@ -9,6 +9,7 @@ namespace YAM
 
     void TcpStream::read(void* bytes, std::size_t nBytes)
     {
+        if (_eos) throw EndOfStreamException("");
         boost::system::error_code error;
         char* b = static_cast<char*>(bytes);
         std::size_t nRead = 0;
@@ -28,6 +29,7 @@ namespace YAM
 
     void TcpStream::write(const void* bytes, std::size_t nBytes)
     {
+        if (_eos) throw EndOfStreamException("");
         boost::system::error_code error;
         const char* b = static_cast<const char*>(bytes);
         std::size_t nWritten = 0;
@@ -40,7 +42,7 @@ namespace YAM
         if (_eos) throw EndOfStreamException(error.message());
     }
 
-    void TcpStream::close() {
+    void TcpStream::closeSocket() {
         _eos = true;
         _socket.close();
     }

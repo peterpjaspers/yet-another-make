@@ -7,9 +7,10 @@
 namespace
 {
     using namespace YAM;
-    // TODO: retrieve number of cores from operating system
+
     std::size_t getDefaultPoolSize() {
-        return 4;
+        static unsigned int n = std::thread::hardware_concurrency();
+        return n;
     }
 
     Delegate<bool, std::shared_ptr<Node> const&> includeIfDirty = 
