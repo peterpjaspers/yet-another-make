@@ -2,22 +2,18 @@
 #include "TcpStream.h"
 #include "BuildServiceProtocol.h"
 #include "BuildServiceMessageTypes.h"
+#include "BuildServicePortRegistry.h"
 
 #include <string>
 
 namespace YAM
 {
-    BuildService::BuildService(bool publishPort)
+    BuildService::BuildService()
         : _service(boost::asio::ip::tcp::v4(), 0)
         , _acceptor(_context, _service)
         , _shutdown(false)
         , _thread(&BuildService::run, this)
-    {
-        if (publishPort) {
-            auto servicePort = port();
-            //TODO: save port in .yam/.servicePort directory
-        }
-    }
+    {}
 
     boost::asio::ip::port_type BuildService::port() const {
         return _acceptor.local_endpoint().port();

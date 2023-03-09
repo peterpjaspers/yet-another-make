@@ -21,7 +21,7 @@ namespace
         std::filesystem::path repoDir;
 
         Session()
-            : service(std::make_shared<BuildService>(false))
+            : service(std::make_shared<BuildService>())
             , client(nullptr)
             , repoDir(FileSystem::createUniqueDirectory())
             , _shutdown(false)

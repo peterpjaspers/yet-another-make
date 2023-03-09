@@ -33,7 +33,7 @@ namespace YAM
 
         // If no directory/.yam directory is found: create it.
         // Return the absolute path of the .yam directory.
-        static std::filesystem::path create(std::filesystem::path const& directory);
+        static std::filesystem::path create(std::filesystem::path const& directory, ILogBook* logBook = nullptr);
 
         // If directory/.yam directory exists: return that path.
         // Else return find(directory.parent_path());

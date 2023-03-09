@@ -75,6 +75,9 @@ namespace YAM
     }
 
     void FileRepositoryWatcher::_handleChange(FileChange const& change) {
+        if (change.fileName.filename() == "junk.txt") {
+            bool stop = true;
+        }
         if (change.action == FileChange::Action::Added) {
             _handleAdd(change);
         } else if (change.action == FileChange::Action::Removed) {
@@ -115,7 +118,8 @@ namespace YAM
 
     void FileRepositoryWatcher::_handleModification(FileChange const& change) {
         std::filesystem::path dirOrFile(_directory / change.fileName);
-        _invalidateNode(dirOrFile, change.lastWriteTime);
+        _handleAdd(change);
+        auto node = _invalidateNode(dirOrFile, change.lastWriteTime);
     }
 
     void FileRepositoryWatcher::_handleRename(FileChange const& change) {

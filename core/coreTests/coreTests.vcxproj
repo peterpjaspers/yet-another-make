@@ -37,6 +37,7 @@
     <ClCompile Include="boostProcessTest.cpp" />
     <ClCompile Include="buildClientServiceTest.cpp" />
     <ClCompile Include="builderTest.cpp" />
+    <ClCompile Include="buildServicePortRegistryTest.cpp" />
     <ClCompile Include="buildServiceProtocolTest.cpp" />
     <ClCompile Include="commandNodeTest.cpp">
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

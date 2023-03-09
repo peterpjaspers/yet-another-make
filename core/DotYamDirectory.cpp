@@ -19,9 +19,9 @@ namespace YAM
         std::filesystem::path gitDir = DotGitDirectory::find(directory);
         std::filesystem::path yamDir = DotYamDirectory::find(directory);
         if (gitDir.empty() && yamDir.empty()) {
-            yamDir = create(directory);
+            yamDir = create(directory, logBook);
         } else if (!gitDir.empty() && yamDir.empty()) {
-            yamDir = create(gitDir.parent_path());
+            yamDir = create(gitDir.parent_path(), logBook);
         } else if (gitDir.empty() && !yamDir.empty()) {
         } else if (!gitDir.empty() && !yamDir.empty()) {
             if (gitDir.parent_path() != yamDir.parent_path()) {
@@ -36,21 +36,21 @@ namespace YAM
                 logBook->add(LogRecord(LogRecord::Error, ss.str()));
                 yamDir.clear();
             } else {
-                yamDir = create(gitDir.parent_path());
+                yamDir = create(gitDir.parent_path(), logBook);
             }
-        }
-        if (!yamDir.empty()) {
-            std::stringstream ss;
-            ss << "YAM successfully initialized in directory " << yamDir.string() << std::endl;
-            logBook->add(LogRecord(LogRecord::Progress, ss.str()));
         }
         return yamDir;
     }
 
-    std::filesystem::path DotYamDirectory::create(std::filesystem::path const& directory) {
+    std::filesystem::path DotYamDirectory::create(std::filesystem::path const& directory, ILogBook* logBook) {
         std::filesystem::path yamDir(directory / yam);
         if (!std::filesystem::exists(yamDir)) {
             std::filesystem::create_directory(yamDir);
+            if (logBook != nullptr) {
+                std::stringstream ss;
+                ss << "YAM successfully initialized in directory " << yamDir.string() << std::endl;
+                logBook->add(LogRecord(LogRecord::Progress, ss.str()));
+            }
         }
         return yamDir;
     }

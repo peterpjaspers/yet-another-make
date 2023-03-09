@@ -69,6 +69,7 @@ namespace YAM
 
     void Builder::start(std::shared_ptr<BuildRequest> request) {
         if (running()) throw std::exception("cannot start a build while one is running");
+        _context.statistics().reset();
         _result = std::make_shared<BuildResult>();
         if (request->requestType() == BuildRequest::Init) {
             _init(request->directory());
@@ -95,7 +96,10 @@ namespace YAM
                     repoPath,
                     RegexSet({
                         RegexSet::matchDirectory("generated"),
-                        RegexSet::matchDirectory(".yam")
+                        RegexSet::matchDirectory(".yam"),
+                        RegexSet::matchDirectory(".git"),
+                        RegexSet::matchDirectory("x64"),
+                        RegexSet::matchDirectory(".vs")
                         }),
                     &_context);
                 _context.addRepository(repo);
@@ -138,12 +142,12 @@ namespace YAM
 
     void Builder::_handleRepoCompletion(Node* n) {
         if (n != _scope.get()) throw std::exception("unexpected node");
-        _scope->completor().RemoveAll();
-        _result->succeeded(_scope->state() == Node::State::Ok);
-        _scope->setInputProducers(std::vector<std::shared_ptr<Node>>());
-        if (!_result->succeeded()) {
-            _notifyCompletion();
+        if (_scope->state() != Node::State::Ok) {
+            _handleBuildCompletion(_scope.get());
         } else {
+            _scope->completor().RemoveAll();
+            _scope->setInputProducers(std::vector<std::shared_ptr<Node>>());
+            _scope->setState(Node::State::Ok);
             std::vector<std::shared_ptr<SourceFileNode>> buildFiles;
             for (auto const& pair : _context.repositories()) {
                 auto repo = dynamic_pointer_cast<SourceFileRepository>(pair.second);
@@ -160,7 +164,7 @@ namespace YAM
             std::vector<std::shared_ptr<Node>> dirtyCommands;
             appendDirtyCommands(_context.nodes(), dirtyCommands);
             if (dirtyCommands.empty()) {
-                _notifyCompletion();
+                _handleBuildCompletion(_scope.get());
             } else {
                 _scope->setInputProducers(dirtyCommands); // + dirtyBuildFileParsers
                 _scope->completor().AddRaw(this, &Builder::_handleBuildCompletion);
@@ -171,9 +175,16 @@ namespace YAM
 
     void Builder::_handleBuildCompletion(Node* n) {
         if (n != _scope.get()) throw std::exception("unexpected node");
-        _scope->completor().RemoveAll();
+
         _result->succeeded(_scope->state() == Node::State::Ok);
+        _result->nDirectoryUpdates(_context.statistics().nDirectoryUpdates);
+        _result->nNodesExecuted(_context.statistics().nSelfExecuted);
+        _result->nNodesStarted(_context.statistics().nStarted);
+        _result->nRehashedFiles(_context.statistics().nRehashedFiles);
+
+        _scope->completor().RemoveAll();
         _scope->setInputProducers(std::vector<std::shared_ptr<Node>>());
+        _scope->setState(Node::State::Ok);
         _notifyCompletion();
     }
 

@@ -12,12 +12,14 @@ namespace
 namespace YAM
 {
     std::filesystem::path FileSystem::createUniqueDirectory() {
+        const std::filesystem::path tmpDirName("yam_temp_dir");
         std::filesystem::path d = uniquePath();
         while (!std::filesystem::create_directory(d)) {
             d = uniquePath();
         }
-        auto c = std::filesystem::canonical(d);
-        return normalizePath(d);
+        auto tmpDir = d / tmpDirName;
+        std::filesystem::create_directory(tmpDir);
+        return normalizePath(tmpDir);
     }
 
     std::filesystem::path FileSystem::uniquePath() {

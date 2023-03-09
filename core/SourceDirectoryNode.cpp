@@ -1,5 +1,6 @@
 #include "SourceDirectoryNode.h"
 #include "SourceFileNode.h"
+#include "CommandNode.h"
 #include "ExecutionContext.h"
 #include "FileRepository.h"
 #include "DotIgnoreNode.h"
@@ -121,6 +122,9 @@ namespace YAM
 
         for (auto const& dirEntry : std::filesystem::directory_iterator{ name() }) {
             auto const& path = dirEntry.path();
+            if (path.filename() == "junk.txt") {
+                bool stop = true;
+            }
             if (!_dotIgnoreNode->ignore(path)) {
                 std::shared_ptr<Node> child;
                 if (oldContent.contains(path)) {
@@ -137,7 +141,7 @@ namespace YAM
             }
         }
         for (auto const& pair : oldContent) {
-            std::shared_ptr<Node> child;
+            std::shared_ptr<Node> child = pair.second;
             if (child != nullptr) {
                 _removeChildRecursively(child);
             }
@@ -153,7 +157,8 @@ namespace YAM
         //      or directories that are not in the ExecutionContext.
         // Setting child state to Dirty will cause these nodes to re-execute.
         // 
-        child->setState(Node::State::Dirty);
+        //TODO 
+        //child->setState(Node::State::Dirty);
         child->removePostParent(this);
         context()->nodes().remove(child);
         auto dirChild = dynamic_pointer_cast<SourceDirectoryNode>(child);

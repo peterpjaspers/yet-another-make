@@ -2,6 +2,7 @@
 
 #include "IStreamable.h"
 #include <chrono>
+#include <string>
 
 namespace YAM
 {
@@ -21,6 +22,18 @@ namespace YAM
         std::chrono::system_clock::time_point endTime() const;
         // Return endTime() - startTime()
         std::chrono::system_clock::duration duration() const;
+        // Return duration as string: h hours m minute etc.
+        std::string niceDuration() const;
+
+        void nNodesStarted(unsigned int);
+        void nNodesExecuted(unsigned int);
+        void nRehashedFiles(unsigned int);
+        void nDirectoryUpdates(unsigned int);
+
+        unsigned int nNodesStarted() const;
+        unsigned int nNodesExecuted() const;
+        unsigned int nRehashedFiles() const;
+        unsigned int nDirectoryUpdates() const;
 
         static void setStreamableType(uint32_t type);
         // Inherited via IStreamable
@@ -31,6 +44,11 @@ namespace YAM
         bool _succeeded;
         std::chrono::system_clock::time_point _startTime;
         std::chrono::system_clock::time_point _endTime;
+
+        unsigned int _nNodesStarted;
+        unsigned int _nNodesExecuted;
+        unsigned int _nRehashedFiles;
+        unsigned int _nDirectoryUpdates;
     };
 }
 

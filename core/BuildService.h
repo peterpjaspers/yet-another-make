@@ -27,9 +27,8 @@ namespace YAM
     {
     public:
         // Run a build service that accepts client connections at a
-        // dynamically allocated tcp port. If publishPort: store the port
-        // number in file .yam/.servicePort.
-        BuildService(bool publishPort = true);
+        // dynamically allocated tcp port.
+        BuildService();
 
         // Return the port at which the service accepts client connections.
         boost::asio::ip::port_type port() const;
