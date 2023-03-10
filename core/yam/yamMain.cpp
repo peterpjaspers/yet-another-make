@@ -46,10 +46,10 @@ void logResult(ILogBook& logBook, BuildResult& result) {
     if (!duration.empty()) ss << " in " << duration;
     ss
         << std::endl
-        << "Number of dirty nodes = " << result.nNodesStarted() << std::endl
-        << "Number of executed nodes = " << result.nNodesExecuted() << std::endl
-        << "Number of directory hashes = " << result.nDirectoryUpdates() << std::endl
-        << "Number of file hashes = " << result.nRehashedFiles() << std::endl;
+        << "#dirty=" << result.nNodesStarted()
+        << ", #executed=" << result.nNodesExecuted()
+        << ", #dirHashes=" << result.nDirectoryUpdates()
+        << ", #fileHashes=" << result.nRehashedFiles() << std::endl;
 
     LogRecord::Aspect aspect = result.succeeded() ? LogRecord::Aspect::Progress : LogRecord::Aspect::Error;
     LogRecord progress(aspect, ss.str());
