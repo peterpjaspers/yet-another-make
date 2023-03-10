@@ -46,7 +46,7 @@ void logResult(ILogBook& logBook, BuildResult& result) {
     if (!duration.empty()) ss << " in " << duration;
     ss
         << std::endl
-        << "#dirty=" << result.nNodesStarted()
+        << "#started=" << result.nNodesStarted()
         << ", #executed=" << result.nNodesExecuted()
         << ", #dirHashes=" << result.nDirectoryUpdates()
         << ", #fileHashes=" << result.nRehashedFiles() << std::endl;

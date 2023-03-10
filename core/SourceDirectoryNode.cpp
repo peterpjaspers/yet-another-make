@@ -116,30 +116,40 @@ namespace YAM
         return n;
     }
 
+    void SourceDirectoryNode::updateContent(
+        std::filesystem::directory_entry const& dirEntry,
+        std::map<std::filesystem::path, std::shared_ptr<Node>>& oldContent
+    ) {
+        auto const& path = dirEntry.path();
+        if (path.filename() == "junk.txt") {
+            bool stop = true;
+        }
+        if (!_dotIgnoreNode->ignore(path)) {
+            std::shared_ptr<Node> child;
+            if (oldContent.contains(path)) {
+                child = oldContent[path];
+                oldContent[path] = nullptr;
+            } else {
+                child = createNode(dirEntry);
+                if (child != nullptr) {
+                    child->addPostParent(this);
+                    context()->nodes().add(child);
+                }
+            }
+            if (child != nullptr) _content.insert({ child->name(), child });
+        }
+    }
+
     void SourceDirectoryNode::updateContent() {
         auto oldContent = _content;
         _content.clear();
 
-        for (auto const& dirEntry : std::filesystem::directory_iterator{ name() }) {
-            auto const& path = dirEntry.path();
-            if (path.filename() == "junk.txt") {
-                bool stop = true;
-            }
-            if (!_dotIgnoreNode->ignore(path)) {
-                std::shared_ptr<Node> child;
-                if (oldContent.contains(path)) {
-                    child = oldContent[path];
-                    oldContent[path] = nullptr;
-                } else {
-                    child = createNode(dirEntry);
-                    if (child != nullptr) {
-                        child->addPostParent(this);
-                        context()->nodes().add(child);
-                    }
-                }
-                if (child != nullptr) _content.insert({ child->name(), child });
+        if (std::filesystem::exists(name())) {
+            for (auto const& dirEntry : std::filesystem::directory_iterator{ name() }) {
+                updateContent(dirEntry, oldContent);
             }
         }
+
         for (auto const& pair : oldContent) {
             std::shared_ptr<Node> child = pair.second;
             if (child != nullptr) {
@@ -149,18 +159,10 @@ namespace YAM
     } 
 
     void SourceDirectoryNode::_removeChildRecursively(std::shared_ptr<Node> child) {
-        // Nodes (e.g. command nodes) may still reference child as input. These
-        // nodes must re-execute to dereference child to find that 
-        //    - either the node no longer depends on the removed child
-        //    - or the node still depends on child. In that case and re-execution
-        //      fails because yam will fail a build that depends on source files
-        //      or directories that are not in the ExecutionContext.
-        // Setting child state to Dirty will cause these nodes to re-execute.
-        // 
-        //TODO 
-        //child->setState(Node::State::Dirty);
         child->removePostParent(this);
-        context()->nodes().remove(child);
+        // removeIfPresent because a parent directory may already have removed
+        // this directory recursively
+        context()->nodes().removeIfPresent(child);
         auto dirChild = dynamic_pointer_cast<SourceDirectoryNode>(child);
         if (dirChild != nullptr) {
             for (auto const& pair : dirChild->getContent()) {
@@ -189,11 +191,16 @@ namespace YAM
     }
 
     void SourceDirectoryNode::execute() {
-        if (updateLastWriteTime()) {
-            context()->statistics().registerUpdatedDirectory(this);
-            updateContent();
-            updateHash();
+        bool success = true;
+        try {
+            if (updateLastWriteTime()) {
+                context()->statistics().registerUpdatedDirectory(this);
+                updateContent();
+                updateHash();
+            }
+        } catch (std::filesystem::filesystem_error) {
+            success = false;
         }
-        postSelfCompletion(Node::State::Ok);
+        postSelfCompletion(success ? Node::State::Ok : Node::State::Failed);
     }
 }

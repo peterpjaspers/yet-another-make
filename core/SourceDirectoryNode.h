@@ -67,6 +67,9 @@ namespace YAM
     private:
         std::shared_ptr<Node> createNode(std::filesystem::directory_entry const& dirEntry);
         bool updateLastWriteTime();
+        void updateContent(
+            std::filesystem::directory_entry const& dirEntry,
+            std::map<std::filesystem::path, std::shared_ptr<Node>>& oldContent);
         void updateContent();
         void updateHash();
         void _removeChildRecursively(std::shared_ptr<Node> child);
