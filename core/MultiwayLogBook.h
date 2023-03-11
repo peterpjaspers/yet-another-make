@@ -14,6 +14,8 @@ namespace YAM
 
         void add(std::shared_ptr<ILogBook> const& book);
         void add(LogRecord const& record) override;
+        bool error() const override;
+        void resetError() override;
 
     private:
         std::vector<std::shared_ptr<ILogBook>> _books;

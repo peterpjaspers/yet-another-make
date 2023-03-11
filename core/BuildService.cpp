@@ -29,7 +29,7 @@ namespace YAM
             try {
                 _acceptor.accept(socket);
                 {
-                    std::lock_guard<std::mutex> lock(_mutex);
+                    std::lock_guard<std::mutex> lock(_connectMutex);
                     _client = std::make_shared<TcpStream>(socket);
                     _protocol = std::make_shared<BuildServiceProtocol>(_client, _client, false);
                 }
@@ -46,6 +46,8 @@ namespace YAM
     }
 
     void BuildService::add(LogRecord const& record) {
+        std::lock_guard<std::mutex> lock(_logMutex);
+        ILogBook::add(record);
         auto ptr = std::make_shared<LogRecord>(record);
         send(ptr);
     }
@@ -81,7 +83,7 @@ namespace YAM
         std::shared_ptr<TcpStream> client;
         std::shared_ptr<BuildServiceProtocol> protocol;
         {
-            std::lock_guard<std::mutex> lock(_mutex);
+            std::lock_guard<std::mutex> lock(_connectMutex);
             client = _client;
             protocol = _protocol;
         }
@@ -94,7 +96,7 @@ namespace YAM
         }
     }
     void BuildService::closeClient() {
-        std::lock_guard<std::mutex> lock(_mutex);
+        std::lock_guard<std::mutex> lock(_connectMutex);
         if (_client != nullptr) {
             _client->closeSocket();
             _client = nullptr;

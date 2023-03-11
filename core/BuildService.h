@@ -52,7 +52,8 @@ namespace YAM
         Builder _builder;
         std::atomic<bool> _shutdown;
         std::thread _thread;
-        std::mutex _mutex;
+        std::mutex _connectMutex;
+        std::mutex _logMutex;
         std::shared_ptr<TcpStream> _client;
         std::shared_ptr<BuildServiceProtocol> _protocol;
     };

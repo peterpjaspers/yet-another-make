@@ -197,6 +197,8 @@ namespace YAM
                 context()->statistics().registerUpdatedDirectory(this);
                 updateContent();
                 updateHash();
+                LogRecord error(LogRecord::Aspect::Progress, std::string("Rehashed directory ").append(name().string()));
+                context()->addToLogBook(error);
             }
         } catch (std::filesystem::filesystem_error) {
             success = false;

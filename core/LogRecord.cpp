@@ -50,8 +50,8 @@ namespace YAM
         uint32_t a;
         if (streamer->writing()) a = static_cast<uint32_t>(aspect);
         streamer->stream(a);
+        if (streamer->reading()) aspect = static_cast<Aspect>(a);
         streamer->stream(message);
         time.stream(streamer);
-        if (streamer->reading()) aspect = static_cast<Aspect>(a);
     }
 }

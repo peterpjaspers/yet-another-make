@@ -7,8 +7,9 @@ namespace YAM
         : _ostream(ostream)
     {}
 
-    void BasicOStreamLogBook::add(LogRecord const& record) {
+    void BasicOStreamLogBook::add(LogRecord const& record)  {
         std::lock_guard<std::mutex> lock(_mutex);
+        ILogBook::add(record);
         *_ostream
             << record.time.wctime().time3() 
             << " " << LogRecord::aspect2str(record.aspect)

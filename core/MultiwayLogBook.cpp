@@ -17,4 +17,17 @@ namespace YAM
             b->add(record);
         }
     }
+
+    bool MultiwayLogBook::error() const {
+        for (auto const& b : _books) {
+            if (b->error()) return true;
+        }
+        return false;
+    }
+
+    void MultiwayLogBook::resetError() {
+        for (auto const& b : _books) {
+            b->resetError();
+        }
+    } 
 }
