@@ -39,6 +39,7 @@
     <ClCompile Include="builderTest.cpp" />
     <ClCompile Include="buildServicePortRegistryTest.cpp" />
     <ClCompile Include="buildServiceProtocolTest.cpp" />
+    <ClCompile Include="collapsedFileChangesTest.cpp" />
     <ClCompile Include="commandNodeTest.cpp">
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </DisableSpecificWarnings>

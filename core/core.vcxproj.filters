@@ -249,6 +249,9 @@
     <ClInclude Include="BuildServicePortRegistry.h">
       <Filter>Header Files\BuildService</Filter>
     </ClInclude>
+    <ClInclude Include="CollapsedFileChanges.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -409,6 +412,9 @@
     </ClCompile>
     <ClCompile Include="BuildServicePortRegistry.cpp">
       <Filter>Source Files\BuildService</Filter>
+    </ClCompile>
+    <ClCompile Include="CollapsedFileChanges.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

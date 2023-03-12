@@ -105,6 +105,7 @@
     <ClInclude Include="BuildServicePortRegistry.h" />
     <ClInclude Include="BuildServiceProtocol.h" />
     <ClInclude Include="BuildServiceMessageTypes.h" />
+    <ClInclude Include="CollapsedFileChanges.h" />
     <ClInclude Include="DotGitDirectory.h" />
     <ClInclude Include="DotYamDirectory.h" />
     <ClInclude Include="IObjectStreamer.h" />
@@ -178,6 +179,7 @@
     </ClCompile>
     <ClCompile Include="BuildServicePortRegistry.cpp" />
     <ClCompile Include="BuildServiceProtocol.cpp" />
+    <ClCompile Include="CollapsedFileChanges.cpp" />
     <ClCompile Include="DotGitDirectory.cpp" />
     <ClCompile Include="DotYamDirectory.cpp" />
     <ClCompile Include="SharedObjectStreamer.cpp" />

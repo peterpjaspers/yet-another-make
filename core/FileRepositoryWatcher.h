@@ -2,17 +2,17 @@
 
 #include "RegexSet.h"
 #include "FileRepository.h"
-#include "IDirectoryWatcher.h"
+#include "CollapsedFileChanges.h"
 
 #include <memory>
 #include <filesystem>
 #include <map>
-#include <mutex>
 
 namespace YAM
 {
     class Node;
     class ExecutionContext;
+    class IDirectoryWatcher;
 
     // A FileRepositoryWatcher continuously watches a file repository for
     // directory and file changes. 
@@ -58,26 +58,23 @@ namespace YAM
         // previous consumeChanges().
         bool hasChanged(std::filesystem::path const& path);
 
-    protected:
-        std::filesystem::path _directory;
-        ExecutionContext* _context;
-
     private:
         void _addChange(FileChange const& change);
+
         void _handleChange(FileChange const& change);
         void _handleAdd(FileChange const& change);
         void _handleRemove(FileChange const& change);
         void _handleModification(FileChange const& change);
-        void _handleRename(FileChange const& change);
         void _handleOverflow();
+
         std::shared_ptr<Node> _invalidateNode(
             std::filesystem::path const& path,
             std::chrono::time_point<std::chrono::utc_clock> const& lastWriteTime);
         void _invalidateNodeRecursively(std::filesystem::path const& path);
         void _invalidateNodeRecursively(std::shared_ptr<Node> const& node);
 
-        std::mutex _mutex;
-        std::map<std::filesystem::path, FileChange> _changes;
+        ExecutionContext* _context;
+        CollapsedFileChanges _changes;
         std::shared_ptr<IDirectoryWatcher> _watcher;
     };
 }

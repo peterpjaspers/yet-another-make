@@ -29,102 +29,6 @@ namespace
             (isFileNode(node) || isDirNode(node))
             && isSubpath(node->name(), repoDir);
     }
-
-    void insertRenamed(std::map<std::filesystem::path, FileChange>& changes, FileChange const& rename) {
-        FileChange remove;
-        remove.action = FileChange::Action::Removed;
-        remove.fileName = rename.oldFileName;
-        remove.lastWriteTime = rename.lastWriteTime;
-        FileChange add;
-        add.action = FileChange::Action::Added;
-        add.fileName = rename.fileName;
-        add.lastWriteTime = rename.lastWriteTime;
-        changes.insert({ remove.fileName, remove });
-        changes.insert({ add.fileName, add });
-    }
-
-    void insertChange(std::map<std::filesystem::path, FileChange>& changes, FileChange const& change) {
-        if (change.action == FileChange::Action::Renamed) {
-            insertRenamed(changes, change);
-        } else {
-            changes.insert({ change.fileName, change });
-        }
-    }
-
-    // previous->second.action == FileChange::Action::Added
-    void collapseAdded(
-        std::map<std::filesystem::path, FileChange>& changes,
-        std::map<std::filesystem::path, FileChange>::iterator previous,
-        FileChange const& change
-    ) {
-        FileChange::Action action = change.action;
-        if (action == FileChange::Action::Added) {
-            previous->second.lastWriteTime = change.lastWriteTime;
-        } else if (action == FileChange::Action::Removed) {
-            previous->second.action = FileChange::Action::Removed;
-            previous->second.lastWriteTime = change.lastWriteTime;
-        } else if (action == FileChange::Action::Modified) {
-            previous->second.lastWriteTime = change.lastWriteTime;
-        } else if (action == FileChange::Action::Renamed) {
-            changes.erase(previous);
-            insertRenamed(changes, change);
-        }
-    }
-
-    // previous->second.action == FileChange::Action::Removed
-    void collapseRemoved(
-        std::map<std::filesystem::path, FileChange>& changes,
-        std::map<std::filesystem::path, FileChange>::iterator previous,
-        FileChange const& change
-    ) {
-        FileChange::Action action = change.action;
-        if (action == FileChange::Action::Added) {
-            previous->second.action = FileChange::Action::Modified;
-            previous->second.lastWriteTime = change.lastWriteTime;
-        } else if (action == FileChange::Action::Removed) {
-            previous->second.lastWriteTime = change.lastWriteTime;
-        } else if (action == FileChange::Action::Modified) {
-        } else if (action == FileChange::Action::Renamed) {
-            previous->second.lastWriteTime = change.lastWriteTime;
-        }
-    }
-
-    // previous->second.action == FileChange::Action::Modified
-    void collapseModified(
-        std::map<std::filesystem::path, FileChange>& changes,
-        std::map<std::filesystem::path, FileChange>::iterator previous,
-        FileChange const& change
-    ) {
-        FileChange::Action action = change.action;
-        if (action == FileChange::Action::Added) {
-        } else if (action == FileChange::Action::Removed) {
-            previous->second.action = FileChange::Action::Removed;
-            previous->second.lastWriteTime = change.lastWriteTime;
-        } else if (action == FileChange::Action::Modified) {
-            previous->second.lastWriteTime = change.lastWriteTime;
-        } else if (action == FileChange::Action::Renamed) {
-            changes.erase(previous);
-            insertRenamed(changes, change);
-        }
-    }
-
-    void collapseChange(
-        std::map<std::filesystem::path, FileChange>& changes,
-        std::map<std::filesystem::path, FileChange>::iterator previous,
-        FileChange const& change
-    ) {
-        FileChange::Action pa = previous->second.action;
-        if (pa == FileChange::Action::Added) {
-            collapseAdded(changes, previous, change);
-        } else if (pa == FileChange::Action::Removed) {
-            collapseRemoved(changes, previous, change);
-        } else if (pa == FileChange::Action::Modified) {
-            collapseModified(changes, previous, change);
-        } else if (pa == FileChange::Action::Renamed) {
-            // cannot happen because renames are translated to removed and added
-            throw std::exception("illegal change transition");
-        }
-    }
 }
 
 namespace YAM
@@ -132,8 +36,8 @@ namespace YAM
     FileRepositoryWatcher::FileRepositoryWatcher(
         std::filesystem::path const& directory,
         ExecutionContext* context)
-        : _directory(directory)
-        , _context(context)
+        : _context(context)
+        , _changes(directory)
         , _watcher(std::make_shared<DirectoryWatcher>(
             directory,
             true,
@@ -141,38 +45,15 @@ namespace YAM
         ) {}
 
     void FileRepositoryWatcher::_addChange(FileChange const& change) {
-        if (change.fileName.filename() == "junk.txt") {
-            bool stop = true;
-        }
-        std::lock_guard<std::mutex> lock(_mutex);
-        if (change.action == FileChange::Action::Overflow) {
-            _changes.clear();
-            _changes.insert({ overflowPath, change });
-        } else if (!_changes.contains(overflowPath)) {
-            FileChange absChange = change;
-            absChange.fileName = _directory / change.fileName;
-            if (!absChange.oldFileName.empty()) absChange.oldFileName = _directory / absChange.oldFileName;
-            auto it = _changes.find(absChange.fileName);
-            if (it == _changes.end()) {
-                insertChange(_changes, absChange);
-            } else {
-                collapseChange(_changes, it, absChange);
-            }
-        }
+        _changes.add(change);
     }
 
     void FileRepositoryWatcher::consumeChanges() {
-        std::lock_guard<std::mutex> lock(_mutex);
-        for (auto const& pair : _changes) {
-            _handleChange(pair.second);
-        }
-        _changes.clear();
+        _changes.consume(Delegate<void, FileChange const&>::CreateRaw(this, &FileRepositoryWatcher::_handleChange));
     }
 
     bool FileRepositoryWatcher::hasChanged(std::filesystem::path const& path) {
-        std::lock_guard<std::mutex> lock(_mutex);
-        bool contains = _changes.contains(path) || _changes.contains(overflowPath);
-        return contains;
+        return _changes.hasChanged(path);
     }
 
     void FileRepositoryWatcher::_handleChange(FileChange const& change) {
@@ -186,6 +67,7 @@ namespace YAM
         } else if (change.action == FileChange::Action::Modified) {
             _handleModification(change);
         } else if (change.action == FileChange::Action::Renamed) {
+            // CollapsedFileChanges replaces Renameed by Removee and Added
             throw std::exception("illegal change");
         } else if (change.action == FileChange::Action::Overflow) {
             _handleOverflow();
@@ -221,7 +103,7 @@ namespace YAM
 
     void FileRepositoryWatcher::_handleOverflow() {
         std::vector<std::shared_ptr<Node>> nodesInRepo;
-        std::filesystem::path const& repoDir = _directory;
+        std::filesystem::path const& repoDir = _changes.directory();
         auto includeNode = Delegate<bool, std::shared_ptr<Node> const&>::CreateLambda(
             [&repoDir](std::shared_ptr<Node> const& node) {
                 return isNodeInRepo(node.get(), repoDir);
