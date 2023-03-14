@@ -84,6 +84,10 @@ namespace YAM
         if (node != nullptr && dynamic_cast<SourceDirectoryNode*>(node.get()) == nullptr) {
             throw std::exception("unexpected node type");
         }
+        // File nodes may exist that are associated with files that may not yet
+        // exist, e.g. the file nodes for the .gitignore and .yamignore files.
+        // Such nodes must be invalidated, hence call _invalidateNode.
+        _invalidateNode(change.fileName, change.lastWriteTime);
     }
 
     void FileRepositoryWatcher::_handleRemove(FileChange const& change) {

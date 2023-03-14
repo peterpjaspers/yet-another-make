@@ -42,6 +42,10 @@ namespace YAM
         _dotIgnoreFiles.clear();
     }
 
+    void DotIgnoreNode::clear() {
+        setDotIgnoreFiles(std::vector<std::shared_ptr<FileNode>>());
+    }
+
     void DotIgnoreNode::setState(State newState) {
         if (state() != newState) {
             Node::setState(newState);
@@ -85,9 +89,15 @@ namespace YAM
 
     void DotIgnoreNode::setDotIgnoreFiles(std::vector<std::shared_ptr<FileNode>> const& newInputs) {
         if (_dotIgnoreFiles != newInputs) {
-            for (auto i : _dotIgnoreFiles) i->removePreParent(this);
+            for (auto file : _dotIgnoreFiles) {
+                file->removePreParent(this);
+                context()->nodes().remove(file);
+            }
             _dotIgnoreFiles = newInputs;
-            for (auto i : _dotIgnoreFiles) i->addPreParent(this);
+            for (auto file : _dotIgnoreFiles) {
+                file->addPreParent(this);
+                context()->nodes().add(file);
+            }
         }
     }
 

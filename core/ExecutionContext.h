@@ -37,16 +37,27 @@ namespace YAM
         // Find repository by name, return found repo, nullptr when not found.
         std::shared_ptr<FileRepository> findRepository(std::string const& repoName) const;
 
-        // Find repository that contains path, return found repo, nullptr when not found.
+        // Find repository that contains path, return found repo, nullptr when
+        // not found.
         std::shared_ptr<FileRepository> findRepositoryContaining(std::filesystem::path const& path) const;
 
         // Return repositories.
         std::map<std::string, std::shared_ptr<FileRepository>> const& repositories() const;
 
-        // Return the file aspects applicable to the file with the given path name.
+        // Return the file aspects applicable to the file with the given path
+        // name. A FileNode associated with the path will compute the hashes of
+        // the applicable aspects.
         std::vector<FileAspect> findFileAspects(std::filesystem::path const& path) const;
 
         // Return the file aspect set identified by the given name.
+        // A CommandNode uses this set to find for each input file the aspect 
+        // that is relevant to the command. E.g. for a compile command the 
+        // relevant aspect for *.h and *.cpp input files will be the code 
+        // aspect. That aspect excludes comment section from the hash. The 
+        // command uses the hash of the relevant aspect to compute the command 
+        // execution hash. Goal: avoid re-execution of the command when only
+        // non-relevant aspects of the file changes.
+        // 
         FileAspectSet const& findFileAspectSet(std::string const& aspectSetName) const;
 
         NodeSet & nodes();

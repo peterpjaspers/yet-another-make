@@ -16,6 +16,7 @@ namespace YAM
         , _dotIgnoreNode(std::make_shared<DotIgnoreNode>(context, this))
     {
         _dotIgnoreNode->addPreParent(this);
+        context->nodes().add(_dotIgnoreNode);
     }
 
     bool SourceDirectoryNode::supportsPrerequisites() const {
@@ -158,22 +159,26 @@ namespace YAM
         }
     } 
 
-    void SourceDirectoryNode::_removeChildRecursively(std::shared_ptr<Node> child) {
+    void SourceDirectoryNode::_removeChildRecursively(std::shared_ptr<Node> const& child) {
         child->removePostParent(this);
         // removeIfPresent because a parent directory may already have removed
         // this directory recursively
         context()->nodes().removeIfPresent(child);
         auto dirChild = dynamic_pointer_cast<SourceDirectoryNode>(child);
         if (dirChild != nullptr) {
-            for (auto const& pair : dirChild->getContent()) {
-                _removeChildRecursively(pair.second);
-            }
+            dirChild->clear();
         }
     }
 
     void SourceDirectoryNode::clear() {
+        if (_dotIgnoreNode != nullptr) {
+            _dotIgnoreNode->clear();
+            _dotIgnoreNode->removePreParent(this);
+            context()->nodes().remove(_dotIgnoreNode);
+            _dotIgnoreNode = nullptr;
+        }
         for (auto const& pair : _content) {
-            std::shared_ptr<Node> child;
+            std::shared_ptr<Node> const& child = pair.second;
             if (child != nullptr) {
                 _removeChildRecursively(child);
             }
@@ -197,8 +202,10 @@ namespace YAM
                 context()->statistics().registerUpdatedDirectory(this);
                 updateContent();
                 updateHash();
-                LogRecord error(LogRecord::Aspect::Progress, std::string("Rehashed directory ").append(name().string()));
-                context()->addToLogBook(error);
+                if (_context->logBook()->mustLogAspect(LogRecord::Aspect::DirectoryChanges)) {
+                    LogRecord error(LogRecord::Aspect::Progress, std::string("Rehashed directory ").append(name().string()));
+                    context()->addToLogBook(error);
+                }
             }
         } catch (std::filesystem::filesystem_error) {
             success = false;

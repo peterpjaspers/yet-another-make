@@ -47,6 +47,9 @@ namespace YAM
         // not allowed to be accessed by the build.
         bool ignore(std::filesystem::path const& path) const;
 
+        // Remove the .gitignore and .yamignore nodes from context->nodes().
+        void clear();
+
     private:
         void setDotIgnoreFiles(std::vector<std::shared_ptr<FileNode>> const& newFiles);
         XXH64_hash_t computeHash() const;

@@ -10,9 +10,6 @@ namespace YAM
     {
     public:
         IStreamable() = default;
-        // Construct a streamable by streaming its member variables from 
-        // given reader. Pre: reader->reading().
-        IStreamable(IStreamer* reader) {}
 
         virtual ~IStreamable() {}
 

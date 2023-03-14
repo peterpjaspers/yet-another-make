@@ -52,9 +52,7 @@ namespace YAM
         // Return the directory hash.
         XXH64_hash_t getHash() const;
 
-        // Recursively remove the directory node from context->nodes().
-        // Intended to be used when the repo is no longer to be mirrored
-        // by YAM.
+        // Recursively remove the directory content from context->nodes().
         void clear();
 
         void execute();
@@ -72,7 +70,7 @@ namespace YAM
             std::map<std::filesystem::path, std::shared_ptr<Node>>& oldContent);
         void updateContent();
         void updateHash();
-        void _removeChildRecursively(std::shared_ptr<Node> child);
+        void _removeChildRecursively(std::shared_ptr<Node> const& child);
 
         // last seen modification time of the directory
         std::chrono::time_point<std::chrono::utc_clock> _lastWriteTime;
