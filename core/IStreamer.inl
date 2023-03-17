@@ -2,6 +2,7 @@
 #include "TimePoint.h"
 
 #include <sstream>
+#include <chrono>
 #include <ctime>
 #include <iomanip>
 
@@ -54,6 +55,17 @@ namespace
         WallClockTime wct(tps);
         TimePoint tp(wct);
         tpc = tp.time();
+    }
+
+    void writeUtcTimePoint(IStreamer* streamer, std::chrono::utc_clock::time_point& tpc) {
+        unsigned long long cnt = tpc.time_since_epoch().count();
+        streamer->stream(cnt);
+    }
+    void readUtcTimePoint(IStreamer* streamer, std::chrono::utc_clock::time_point& tpc) {
+        unsigned long long cnt;
+        streamer->stream(cnt);
+        std::chrono::utc_clock::duration d(cnt);
+        tpc = std::chrono::utc_clock::time_point(d);
     }
 
     template <typename T>
@@ -145,6 +157,14 @@ namespace YAM
         }
     }
 
+    inline void IStreamer::stream(std::chrono::utc_clock::time_point& tp) {
+        if (writing()) {
+            writeUtcTimePoint(this, tp);
+        } else {
+            readUtcTimePoint(this, tp);
+        }
+    }
+
     template <typename T>
     inline void IStreamer::streamVector(std::vector<T>& items) {
         if (writing()) {
@@ -162,4 +182,17 @@ namespace YAM
             readMap(this, items);
         }
     }
+
+    template <typename T>
+    inline void IStreamer::stream(std::shared_ptr<T>& item) {
+        std::shared_ptr<IStreamable> s;
+        if (writing()) {
+            s = dynamic_pointer_cast<IStreamable>(item);
+        }
+        stream(s);
+        if (reading()) {
+            item = dynamic_pointer_cast<T>(s);
+        }
+    }
+
 }

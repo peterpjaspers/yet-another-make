@@ -4,11 +4,13 @@
 #include "ExecutionContext.h"
 #include "FileRepository.h"
 #include "DotIgnoreNode.h"
+#include "IStreamer.h"
 
 namespace
 {
-    using namespace YAM;
+    uint32_t streamableTypeId = 0;
 }
+
 namespace YAM
 {
     SourceDirectoryNode::SourceDirectoryNode(ExecutionContext* context, std::filesystem::path const& dirName)
@@ -211,5 +213,28 @@ namespace YAM
             success = false;
         }
         postSelfCompletion(success ? Node::State::Ok : Node::State::Failed);
+    }
+
+    void SourceDirectoryNode::setStreamableType(uint32_t type) {
+        streamableTypeId = type;
+    }
+
+    uint32_t SourceDirectoryNode::typeId() const {
+        return streamableTypeId;
+    }
+
+    void SourceDirectoryNode::stream(IStreamer* streamer) {
+        Node::stream(streamer);
+        streamer->stream(_lastWriteTime);
+        streamer->stream(_hash);
+        streamer->stream(_dotIgnoreNode);
+        std::vector<std::shared_ptr<Node>> nodes;
+        if (streamer->writing()) {
+            for (auto const& p : _content) nodes.push_back(p.second);
+        }
+        streamer->streamVector(nodes);
+        if (streamer->reading()) {
+            for (auto n : nodes) _content.insert({ n->name(), n });
+        }
     }
 }

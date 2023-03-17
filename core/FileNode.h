@@ -82,6 +82,8 @@ namespace YAM
     class __declspec(dllexport) FileNode : public Node
     {
     public:
+        FileNode() {} // needed for deserialization
+
         // name is the absolute path name of the file
         FileNode(ExecutionContext* context, std::filesystem::path const& name);
 
@@ -117,6 +119,11 @@ namespace YAM
 
         std::chrono::time_point<std::chrono::utc_clock> const& lastWriteTime();
 
+        static void setStreamableType(uint32_t type);
+        // Inherited from IStreamable
+        uint32_t typeId() const override;
+        void stream(IStreamer* streamer) override;
+
     protected:
         // Inherited via Node
         virtual bool pendingStartSelf() const override;
@@ -128,7 +135,7 @@ namespace YAM
         void execute();
 
         // last seen file modification time
-        std::chrono::time_point<std::chrono::utc_clock> _lastWriteTime;
+        std::chrono::utc_clock::time_point _lastWriteTime;
 
         // aspect name => hash value. All hashes are computed after last
         // update of _lastWriteTime.

@@ -1,6 +1,11 @@
 #include "GeneratedFileNode.h"
 #include "ExecutionContext.h"
 
+namespace
+{
+    uint32_t streamableTypeId = 0;
+}
+
 namespace YAM
 {
     GeneratedFileNode::GeneratedFileNode(
@@ -32,5 +37,13 @@ namespace YAM
             setState(Node::State::Dirty);
         }
         return !ec;
+    }
+
+    void GeneratedFileNode::setStreamableType(uint32_t type) {
+        streamableTypeId = type;
+    }
+
+    uint32_t GeneratedFileNode::typeId() const {
+        return streamableTypeId;
     }
 }

@@ -34,5 +34,7 @@ namespace YAM
         virtual void stream(uint32_t&) = 0;
         virtual void stream(int64_t&) = 0;
         virtual void stream(uint64_t&) = 0;
+
+        virtual void close() {}
     };
 }

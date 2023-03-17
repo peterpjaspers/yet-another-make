@@ -3,6 +3,12 @@
 #include "ExecutionContext.h"
 #include "SourceFileRepository.h"
 #include "ExecutionContext.h"
+#include "IStreamer.h"
+
+namespace
+{
+    uint32_t streamableTypeId = 0;
+}
 
 namespace YAM
 {
@@ -104,5 +110,19 @@ namespace YAM
             }
         }
         postSelfCompletion(Node::State::Ok);
+    }
+
+    void FileNode::setStreamableType(uint32_t type) {
+        streamableTypeId = type;
+    }
+
+    uint32_t FileNode::typeId() const {
+        return streamableTypeId;
+    }
+
+    void FileNode::stream(IStreamer* streamer) {
+        Node::stream(streamer);
+        streamer->stream(_lastWriteTime);
+        streamer->streamMap(_hashes);
     }
 }

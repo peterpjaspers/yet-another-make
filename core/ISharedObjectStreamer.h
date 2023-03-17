@@ -8,7 +8,7 @@ namespace YAM
     class IStreamable;
 
     // Interface for streaming dynamically allocated objects.
-    // Implemenations shall support streaming of multiply reference objects.
+    // Implemenations shall support streaming of multiply referenced objects.
     // Example:
     //     std::shared_ptr<IStreamable> w1 = std::make_shared<SomeClass>();
     //     SharedObjectWriter writer; // implements ISharedObjectStreamer

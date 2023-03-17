@@ -30,6 +30,7 @@ namespace YAM
     class __declspec(dllexport) CommandNode : public Node
     {
     public:
+        CommandNode() {} // needed for deserialization
         CommandNode(ExecutionContext* context, std::filesystem::path const& name);
         ~CommandNode();
         
@@ -84,6 +85,11 @@ namespace YAM
         void setInputProducers(std::vector<std::shared_ptr<Node>> const & newInputProducers);
 
         void getInputProducers(std::vector<std::shared_ptr<Node>>& producers) const;
+
+        static void setStreamableType(uint32_t type);
+        // Inherited from IStreamable
+        uint32_t typeId() const override;
+        void stream(IStreamer* streamer) override;
 
     private:
         void getSourceInputs(std::vector<std::shared_ptr<Node>> & sourceInputs) const;

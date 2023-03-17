@@ -35,6 +35,10 @@ namespace YAMTest
         XXH64_hash_t executionHash() const;
         XXH64_hash_t computeExecutionHash() const;
 
+        // Inherited from IStreamable
+        virtual uint32_t typeId() const { return 0; }
+        virtual void stream(IStreamer* streamer) {}
+
     private:
         void execute();
 

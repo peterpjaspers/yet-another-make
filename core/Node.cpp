@@ -2,6 +2,7 @@
 #include "NodeSet.h"
 #include "Delegates.h"
 #include "ExecutionContext.h"
+#include "IStreamer.h"
 
 #include <iostream>
 
@@ -13,6 +14,7 @@ namespace YAM
         , _state(Node::State::Dirty)
         , _executionState(ExecutionState::Idle)
         , _suspended(false)
+        , _modified(false)
         , _canceling(false)
     {} 
 
@@ -379,5 +381,21 @@ namespace YAM
                 throw std::runtime_error("invalid _executionState");
             }
         }
+    }
+
+    void Node::modified(bool newValue) {
+        if (_modified != newValue) {
+            _modified = newValue;
+            if (_modified) {
+                // TODO: register node as modified at context
+            }
+        }
+    }
+    bool Node::modified() const {
+        return _modified;
+    }
+
+    void Node::stream(IStreamer* streamer) {
+        streamer->stream(_name);
     }
 }

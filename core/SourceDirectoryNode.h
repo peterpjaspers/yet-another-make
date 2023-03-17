@@ -24,6 +24,8 @@ namespace YAM
     class __declspec(dllexport) SourceDirectoryNode : public Node
     {
     public:
+        SourceDirectoryNode() {} // needed for deserialization
+
         SourceDirectoryNode(ExecutionContext* context, std::filesystem::path const& dirName);
 
         // Inherited via Node
@@ -56,6 +58,11 @@ namespace YAM
         void clear();
 
         void execute();
+
+        static void setStreamableType(uint32_t type);
+        // Inherited from IStreamable
+        uint32_t typeId() const override;
+        void stream(IStreamer* streamer) override;
 
     protected:
         // Inherited via Node

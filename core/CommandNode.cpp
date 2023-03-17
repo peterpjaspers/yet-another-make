@@ -6,6 +6,7 @@
 #include "FileAspectSet.h"
 #include "FileSystem.h"
 #include "SourceFileRepository.h"
+#include "IStreamer.h"
 
 #include <iostream>
 #include <fstream>
@@ -19,6 +20,7 @@ namespace
     using namespace YAM;
 
     std::string cmdExe = boost::process::search_path("cmd").string();
+    uint32_t streamableTypeId = 0;
 
     template <typename V>
     bool contains(std::vector<V> const& vec, V el) {
@@ -551,4 +553,22 @@ namespace YAM
         }
         postSelfCompletion(newState);
     }
+
+    void CommandNode::setStreamableType(uint32_t type) {
+        streamableTypeId = type;
+    }
+
+    uint32_t CommandNode::typeId() const {
+        return streamableTypeId;
+    }
+
+    void CommandNode::stream(IStreamer* streamer) {
+        Node::stream(streamer);
+        streamer->streamVector(_inputProducers);
+        streamer->streamVector(_outputs);
+        streamer->streamVector(_inputs);
+        streamer->stream(_script);
+        streamer->stream(_executionHash);
+    }
+
 }

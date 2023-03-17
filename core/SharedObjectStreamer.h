@@ -18,7 +18,7 @@ namespace YAM
 
     private:
         IObjectStreamer* _owriter;
-        std::map<IStreamable*, int> _objects;
+        std::map<IStreamable*, uint32_t> _objects;
     };
 
     class __declspec(dllexport) SharedObjectReader : public ISharedObjectStreamer

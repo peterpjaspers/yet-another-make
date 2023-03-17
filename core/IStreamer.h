@@ -50,11 +50,13 @@ namespace YAM
 
         // Stream custom type
         virtual void stream(std::shared_ptr<IStreamable>& streamable) = 0;
+        template <typename T> void stream(std::shared_ptr<T>& streamable);
 
         // Stream standard library types
         void stream(std::string&);
         void stream(std::wstring&);
         void stream(std::chrono::system_clock::time_point&);
+        void stream(std::chrono::utc_clock::time_point&);
         void stream(std::filesystem::path&);
         template <typename T> void streamVector(std::vector<T>&);
         template <typename K, typename V> void streamMap(std::map<K,V>&);

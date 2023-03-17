@@ -22,6 +22,7 @@ namespace YAM
     class __declspec(dllexport) DotIgnoreNode : public Node
     {
     public:
+        DotIgnoreNode() {} // needed for deserialization
         DotIgnoreNode(
             ExecutionContext* context,
             SourceDirectoryNode *directory);
@@ -49,6 +50,11 @@ namespace YAM
 
         // Remove the .gitignore and .yamignore nodes from context->nodes().
         void clear();
+
+        static void setStreamableType(uint32_t type);
+        // Inherited from IStreamable
+        uint32_t typeId() const override;
+        void stream(IStreamer* streamer) override;
 
     private:
         void setDotIgnoreFiles(std::vector<std::shared_ptr<FileNode>> const& newFiles);

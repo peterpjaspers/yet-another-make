@@ -5,10 +5,13 @@
 #include "FileSystem.h"
 #include "FileAspect.h"
 #include "SourceFileRepository.h"
+#include "IStreamer.h"
 
 namespace
 {
     using namespace YAM;
+
+    uint32_t streamableTypeId = 0;
 
     void setDirtyRecursively(Node* node) {
         node->setState(Node::State::Dirty);
@@ -129,5 +132,19 @@ namespace YAM
             // TODO: parse the dotignore files
         }
         postSelfCompletion(newState);
+    }
+
+    void DotIgnoreNode::setStreamableType(uint32_t type) {
+        streamableTypeId = type;
+    }
+
+    uint32_t DotIgnoreNode::typeId() const {
+        return streamableTypeId;
+    }
+
+    void DotIgnoreNode::stream(IStreamer* streamer) {
+        Node::stream(streamer);
+        streamer->streamVector(_dotIgnoreFiles);
+        streamer->stream(_hash);
     }
 }

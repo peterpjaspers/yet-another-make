@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Delegates.h"
+#include "IStreamable.h"
 
 #include <filesystem>
 #include <functional>
@@ -62,7 +63,7 @@ namespace YAM
     //
     // Name convention: node execution is synonym for 3-stage node execution.
     //
-    class __declspec(dllexport) Node
+    class __declspec(dllexport) Node : public IStreamable
     {
     public:
         enum class State {
@@ -92,6 +93,7 @@ namespace YAM
             // build and must therefore be reset to Dirty at start of build.
         };
 
+        Node() {} // needed for deserialization
         Node(ExecutionContext* context, std::filesystem::path const & name);
         virtual ~Node();
 
@@ -262,6 +264,15 @@ namespace YAM
         // End of Node execution interfaces
         //
 
+        // Set/get modified state. 
+        // A node must be set modified when member variables that are streamed
+        // are modified.
+        void modified(bool newValue);
+        bool modified() const;
+
+        // Inherited from IStreamer
+        void stream(IStreamer* streamer) override;
+
     protected:
         ExecutionContext* _context;
         std::filesystem::path _name;
@@ -360,6 +371,7 @@ namespace YAM
         };
         ExecutionState _executionState;
         bool _suspended;
+        bool _modified;
         // prerequisite nodes, captured at start-resume time.
         std::vector<std::shared_ptr<Node>> _prerequisites;
         // nodes in _prerequisites that are executing  

@@ -112,6 +112,7 @@
     <ClInclude Include="ISharedObjectStreamer.h" />
     <ClInclude Include="IValueStreamer.h" />
     <ClInclude Include="ObjectStreamer.h" />
+    <ClInclude Include="PersistentNodeSet.h" />
     <ClInclude Include="SharedObjectStreamer.h" />
     <ClInclude Include="Streamer.h" />
     <ClInclude Include="StopBuildRequest.h" />
@@ -182,6 +183,9 @@
     <ClCompile Include="CollapsedFileChanges.cpp" />
     <ClCompile Include="DotGitDirectory.cpp" />
     <ClCompile Include="DotYamDirectory.cpp" />
+    <ClCompile Include="PersistentNodeSet.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="SharedObjectStreamer.cpp" />
     <ClCompile Include="Streamer.cpp" />
     <ClCompile Include="StopBuildRequest.cpp" />
