@@ -63,6 +63,8 @@ namespace YAM
         // Inherited from IStreamable
         uint32_t typeId() const override;
         void stream(IStreamer* streamer) override;
+        // Inherited from IPersistable
+        void restore(void* context) override;
 
     protected:
         // Inherited via Node

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Delegates.h"
-#include "IStreamable.h"
+#include "IPersistable.h"
 
 #include <filesystem>
 #include <functional>
@@ -63,7 +63,7 @@ namespace YAM
     //
     // Name convention: node execution is synonym for 3-stage node execution.
     //
-    class __declspec(dllexport) Node : public IStreamable
+    class __declspec(dllexport) Node : public IPersistable
     {
     public:
         enum class State {
@@ -93,7 +93,7 @@ namespace YAM
             // build and must therefore be reset to Dirty at start of build.
         };
 
-        Node() {} // needed for deserialization
+        Node(); // needed for deserialization
         Node(ExecutionContext* context, std::filesystem::path const & name);
         virtual ~Node();
 
@@ -264,14 +264,14 @@ namespace YAM
         // End of Node execution interfaces
         //
 
-        // Set/get modified state. 
-        // A node must be set modified when member variables that are streamed
-        // are modified.
-        void modified(bool newValue);
-        bool modified() const;
+        // Inherited from IPersistable
+        void modified(bool newValue) override;
+        bool modified() const override;
 
-        // Inherited from IStreamer
+        // Inherited from IStreamer (via IPersistable)
         void stream(IStreamer* streamer) override;
+        // Inherited from IPersistable
+        void restore(void* context) override;
 
     protected:
         ExecutionContext* _context;

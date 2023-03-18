@@ -46,4 +46,8 @@ namespace YAM
     uint32_t GeneratedFileNode::typeId() const {
         return streamableTypeId;
     }
+
+    void GeneratedFileNode::producer(Node* producer) {
+        _producer = producer;
+    }
 }

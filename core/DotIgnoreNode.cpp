@@ -28,10 +28,14 @@ namespace
 
 namespace YAM
 {
+
+    DotIgnoreNode::DotIgnoreNode() : Node() {}
+
     DotIgnoreNode::DotIgnoreNode(
         ExecutionContext* context,
+        std::filesystem::path const& name,
         SourceDirectoryNode* directory)
-        : Node(context, directory->name() / ".ignore")
+        : Node(context, name)
         , _directory(directory)
         , _hash(rand())
     {
@@ -90,6 +94,10 @@ namespace YAM
         return ignore;
     }
 
+    void DotIgnoreNode::directory(SourceDirectoryNode* directory) {
+        _directory = directory;
+    }
+
     void DotIgnoreNode::setDotIgnoreFiles(std::vector<std::shared_ptr<SourceFileNode>> const& newInputs) {
         if (_dotIgnoreFiles != newInputs) {
             for (auto file : _dotIgnoreFiles) {
@@ -146,5 +154,12 @@ namespace YAM
         Node::stream(streamer);
         streamer->streamVector(_dotIgnoreFiles);
         streamer->stream(_hash);
+    }
+
+    void DotIgnoreNode::restore(void* context) {
+        Node::restore(context);
+        for (auto file : _dotIgnoreFiles) {
+            file->addPreParent(this);
+        }
     }
 }

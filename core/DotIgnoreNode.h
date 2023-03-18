@@ -22,9 +22,10 @@ namespace YAM
     class __declspec(dllexport) DotIgnoreNode : public Node
     {
     public:
-        DotIgnoreNode() {} // needed for deserialization
+        DotIgnoreNode(); // needed for deserialization
         DotIgnoreNode(
             ExecutionContext* context,
+            std::filesystem::path const& name,
             SourceDirectoryNode *directory);
 
         virtual ~DotIgnoreNode();
@@ -55,8 +56,13 @@ namespace YAM
         // Inherited from IStreamable
         uint32_t typeId() const override;
         void stream(IStreamer* streamer) override;
+        // Inherited from IPersistable
+        void restore(void* context) override;
 
     private:
+        friend class SourceDirectoryNode;
+
+        void directory(SourceDirectoryNode* directory);
         void setDotIgnoreFiles(std::vector<std::shared_ptr<SourceFileNode>> const& newFiles);
         XXH64_hash_t computeHash() const;
         void execute();

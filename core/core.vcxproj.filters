@@ -255,6 +255,9 @@
     <ClInclude Include="PersistentNodeSet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="IPersistable.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">

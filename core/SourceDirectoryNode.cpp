@@ -15,7 +15,7 @@ namespace YAM
 {
     SourceDirectoryNode::SourceDirectoryNode(ExecutionContext* context, std::filesystem::path const& dirName)
         : Node(context, dirName)
-        , _dotIgnoreNode(std::make_shared<DotIgnoreNode>(context, this))
+        , _dotIgnoreNode(std::make_shared<DotIgnoreNode>(context, dirName / ".dotignore", this))
     {
         _dotIgnoreNode->addPreParent(this);
         context->nodes().add(_dotIgnoreNode);
@@ -231,7 +231,23 @@ namespace YAM
         }
         streamer->streamVector(nodes);
         if (streamer->reading()) {
-            for (auto n : nodes) _content.insert({ n->name(), n });
+            // Take care: when streaming nodes from persistent repository the
+            // nodes are constructed but their members may not yet have been 
+            // streamed. Use temporary names to build the map and update the 
+            // map in restore();
+            uint32_t index = 0;
+            for (auto n : nodes) {
+                std::stringstream ss; ss << index; index += 1;
+                _content.insert({ std::filesystem::path(ss.str()), n });
+            }
         }
+    }
+    void SourceDirectoryNode::restore(void* context) {
+        Node::restore(context);
+        _dotIgnoreNode->directory(this);
+        std::vector<std::shared_ptr<Node>> nodes;
+        for (auto const& p : _content) nodes.push_back(p.second);
+        _content.clear();
+        for (auto n : nodes) _content.insert({ n->name(), n });
     }
 }

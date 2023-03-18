@@ -8,6 +8,15 @@
 
 namespace YAM
 {
+    Node::Node()
+        : _context(nullptr)
+        , _state(Node::State::Dirty)
+        , _executionState(ExecutionState::Idle)
+        , _suspended(false)
+        , _modified(false)
+        , _canceling(false)
+    {}
+
     Node::Node(ExecutionContext* context, std::filesystem::path const& name)
         : _context(context)
         , _name(name)
@@ -397,5 +406,10 @@ namespace YAM
 
     void Node::stream(IStreamer* streamer) {
         streamer->stream(_name);
+    }
+
+    void Node::restore(void* context) {
+        _context = reinterpret_cast<ExecutionContext*>(context);
+        _modified = false;
     }
 }

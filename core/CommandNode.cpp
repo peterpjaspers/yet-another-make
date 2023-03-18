@@ -225,6 +225,8 @@ namespace YAM
 {
     using namespace boost::process;
 
+    CommandNode::CommandNode() : Node() {}
+
     CommandNode::CommandNode(
         ExecutionContext* context,
         std::filesystem::path const& name)
@@ -569,6 +571,16 @@ namespace YAM
         streamer->streamVector(_inputs);
         streamer->stream(_script);
         streamer->stream(_executionHash);
+    }
+
+    void CommandNode::restore(void* context) {
+        Node::restore(context);
+        for (auto i : _inputProducers) i->addPreParent(this);
+        for (auto i : _outputs) {
+            i->addPreParent(this);
+            i->producer(this);
+        }
+        for (auto i : _inputs) i->addPreParent(this);
     }
 
 }

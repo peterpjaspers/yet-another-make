@@ -109,6 +109,7 @@
     <ClInclude Include="DotGitDirectory.h" />
     <ClInclude Include="DotYamDirectory.h" />
     <ClInclude Include="IObjectStreamer.h" />
+    <ClInclude Include="IPersistable.h" />
     <ClInclude Include="ISharedObjectStreamer.h" />
     <ClInclude Include="IValueStreamer.h" />
     <ClInclude Include="ObjectStreamer.h" />

@@ -25,6 +25,9 @@ namespace YAM
         uint32_t typeId() const override;
 
     private:
+        friend class CommandNode;
+        void producer(Node* producer);
+
         Node* _producer;
     };
 }

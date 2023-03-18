@@ -8,6 +8,7 @@
 #include "ObjectStreamer.h"
 #include "BinaryValueStreamer.h"
 #include "ISharedObjectStreamer.h"
+#include "ExecutionContext.h"
 
 #include <memory>
 #include <filesystem>
@@ -46,14 +47,14 @@ namespace
             }            
         }
 
-        Node* instantiate(uint32_t typeId) {
+        Node* instantiate(uint32_t typeId, ExecutionContext* context) {
             auto mtid = static_cast<NodeTypeId>(typeId);
             switch (mtid) {
             case NodeTypeId::CommandNode: return new YAM::CommandNode();
-            case NodeTypeId::DotIgnoreNode: return new YAM::DotIgnoreNode;
-            case NodeTypeId::GeneratedFileNode: return new YAM::GeneratedFileNode;
-            case NodeTypeId::SourceDirectoryNode: return new YAM::SourceDirectoryNode;
-            case NodeTypeId::SourceFileNode: return new YAM::SourceFileNode;
+            case NodeTypeId::DotIgnoreNode: return new YAM::DotIgnoreNode();
+            case NodeTypeId::GeneratedFileNode: return new YAM::GeneratedFileNode();
+            case NodeTypeId::SourceDirectoryNode: return new YAM::SourceDirectoryNode();
+            case NodeTypeId::SourceFileNode: return new YAM::SourceFileNode();
             default: throw std::exception("unknown node type");
             }
         }
@@ -135,8 +136,12 @@ namespace
 
 namespace YAM
 {
-    PersistentNodeSet::PersistentNodeSet(std::filesystem::path const& directory)
+    PersistentNodeSet::PersistentNodeSet(
+        std::filesystem::path const& directory,
+        ExecutionContext* context
+    )
         : _directory(directory)
+        , _context(context)
         , _nextId(1)
     {
         auto tree = createTree(_directory, NodeTypes::NodeTypeId::CommandNode);
@@ -156,12 +161,16 @@ namespace YAM
         _typeToTree.insert({ tid, tree });
     }
 
-    void PersistentNodeSet::rollback(NodeSet& nodes) {
+    void PersistentNodeSet::retrieve() {
         abort();
         retrieveNodes();
+        NodeSet& nodes = _context->nodes();
         nodes.clear();
         for (auto pair : _keyToNode) {
             nodes.add(pair.second);
+        }
+        for (auto pair : _keyToNode) {
+            pair.second->restore(_context);
         }
     }
 
@@ -180,9 +189,11 @@ namespace YAM
         for (auto pair : _typeToTree) {
             uint8_t type = pair.first;
             auto tree = pair.second;
-            for (Key id : tree->keys()) {
-                retrieve(id);
-                if (id >= _nextId) _nextId = id + 1;
+            auto keys = tree->keys();
+            for (Key key : keys) {
+                KeyCode code(key);
+                if (code._id >= _nextId) _nextId = code._id + 1;
+                retrieve(key);
             }
         }
     }
@@ -199,7 +210,7 @@ namespace YAM
         auto it = _keyToNode.find(key);
         if (it == _keyToNode.end()) {
             KeyCode code(key);
-            std::shared_ptr<Node> node(nodeTypes.instantiate(code._type));
+            std::shared_ptr<Node> node(nodeTypes.instantiate(code._type, _context));
             _keyToNode.insert({ key, node });
             _nodeToKey.insert({ node.get(), key });
             _retrieveQueue.push(key);
@@ -264,6 +275,14 @@ namespace YAM
             auto tree = _typeToTree[code._type];
             tree->remove(code._id);
         }
+    }
+
+    void PersistentNodeSet::store() {
+        _context->nodes().foreach(Delegate<void, std::shared_ptr<Node> const&>::CreateLambda([this](std::shared_ptr<Node> node) {
+            if (node->modified()) {
+                this->insert(node);
+            }
+        }));
     }
 
     void PersistentNodeSet::commit() {
