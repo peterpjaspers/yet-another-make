@@ -34,6 +34,18 @@ namespace
             YAM::SourceFileNode::setStreamableType(static_cast<uint32_t>(SourceFileNode));
         }
 
+        uint32_t getTypeId(Node* node) {
+            auto tid = static_cast<NodeTypeId>(node->typeId());
+            switch (tid) {
+            case NodeTypeId::CommandNode: return node->typeId();
+            case NodeTypeId::DotIgnoreNode: return node->typeId();
+            case NodeTypeId::GeneratedFileNode: return node->typeId();
+            case NodeTypeId::SourceDirectoryNode: return node->typeId();
+            case NodeTypeId::SourceFileNode: return node->typeId();
+            default: throw std::exception("unknown node type");
+            }            
+        }
+
         Node* instantiate(uint32_t typeId) {
             auto mtid = static_cast<NodeTypeId>(typeId);
             switch (mtid) {
@@ -109,13 +121,40 @@ namespace
     uint8_t getType(Node* node) {
         throw std::exception("TODO");
     }
+
+    std::shared_ptr<Btree::StreamingTree> createTree(
+        std::filesystem::path const& dir, 
+        NodeTypes::NodeTypeId id
+    ) {
+        auto tid = static_cast<int32_t>(id);
+        std::stringstream ss;
+        ss << tid;
+        return std::make_shared< Btree::StreamingTree>(dir / ss.str());
+    }
 }
 
 namespace YAM
 {
-    PersistentNodeSet::PersistentNodeSet(std::filesystem::path const& nodesFile)
-        : _file(nodesFile)
-    {}
+    PersistentNodeSet::PersistentNodeSet(std::filesystem::path const& directory)
+        : _directory(directory)
+        , _nextId(1)
+    {
+        auto tree = createTree(_directory, NodeTypes::NodeTypeId::CommandNode);
+        uint8_t tid = static_cast<char8_t>(NodeTypes::NodeTypeId::CommandNode);
+        _typeToTree.insert({ tid, tree });
+        tree = createTree(_directory, NodeTypes::NodeTypeId::DotIgnoreNode);
+        tid = static_cast<char8_t>(NodeTypes::NodeTypeId::DotIgnoreNode);
+        _typeToTree.insert({ tid, tree });
+        tree = createTree(_directory, NodeTypes::NodeTypeId::GeneratedFileNode);
+        tid = static_cast<char8_t>(NodeTypes::NodeTypeId::GeneratedFileNode);
+        _typeToTree.insert({ tid, tree });
+        tree = createTree(_directory, NodeTypes::NodeTypeId::SourceDirectoryNode);
+        tid = static_cast<char8_t>(NodeTypes::NodeTypeId::SourceDirectoryNode);
+        _typeToTree.insert({ tid, tree });
+        tree = createTree(_directory, NodeTypes::NodeTypeId::SourceFileNode);
+        tid = static_cast<char8_t>(NodeTypes::NodeTypeId::SourceFileNode);
+        _typeToTree.insert({ tid, tree });
+    }
 
     void PersistentNodeSet::rollback(NodeSet& nodes) {
         abort();
@@ -150,7 +189,7 @@ namespace YAM
 
     void PersistentNodeSet::processRetrieveQueue() {
         while (_retrieveNesting == 0 && !_retrieveQueue.empty()) {
-            Key key = _retrieveQueue.back();
+            Key key = _retrieveQueue.front();
             _retrieveQueue.pop();
             retrieveKey(key);
         }
@@ -174,7 +213,7 @@ namespace YAM
         std::shared_ptr<Node> node = _keyToNode[key];
         KeyCode code(key);
         auto tree = _typeToTree[code._type];
-        IValueStreamer* vReader = tree->retrieve(code._id);
+        IValueStreamer* vReader = tree->retrieve(key);
         SharedNodeReader snReader(*this);
         Streamer reader(vReader, &snReader);
         node.get()->stream(&reader);
@@ -182,7 +221,7 @@ namespace YAM
     }
 
     PersistentNodeSet::Key PersistentNodeSet::allocateKey(Node* node) {
-        KeyCode code(_nextId, static_cast<uint8_t>(node->typeId()));
+        KeyCode code(_nextId, static_cast<uint8_t>(nodeTypes.getTypeId(node)));
         _nextId += 1;
         return code._key;
     }
@@ -209,7 +248,7 @@ namespace YAM
 
     void PersistentNodeSet::processInsertQueue() {
         while (_insertNesting == 0 && !_insertQueue.empty()) {
-            Key key = _insertQueue.back();
+            Key key = _insertQueue.front();
             _insertQueue.pop();
             insertKey(key);
         }
@@ -228,7 +267,10 @@ namespace YAM
     }
 
     void PersistentNodeSet::commit() {
-        _btree->commit();
+        //_btree->commit();
+        for (auto const& p : _typeToTree) {
+            p.second->commit();
+        }
     }
 
     void PersistentNodeSet::insertKey(Key key) {
@@ -236,7 +278,7 @@ namespace YAM
         Node* node = _keyToNode[key].get();
         KeyCode code(key);
         auto tree = _typeToTree[code._type];
-        IValueStreamer* vWriter = tree->insert(code._id);
+        IValueStreamer* vWriter = tree->insert(key);
         SharedNodeWriter snWriter(*this);
         Streamer writer(vWriter, &snWriter);
         node->stream(&writer);

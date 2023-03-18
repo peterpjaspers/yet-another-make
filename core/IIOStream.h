@@ -19,6 +19,9 @@ namespace YAM
 
         // Flush buffered data, if any, to the output device.
         virtual void flush() {}
+
+        // Close the output device
+        virtual void close() {}
     };
 
     // Input streams may buffer available data in memory to more optimally

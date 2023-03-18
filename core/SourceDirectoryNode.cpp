@@ -124,9 +124,6 @@ namespace YAM
         std::map<std::filesystem::path, std::shared_ptr<Node>>& oldContent
     ) {
         auto const& path = dirEntry.path();
-        if (path.filename() == "junk.txt") {
-            bool stop = true;
-        }
         if (!_dotIgnoreNode->ignore(path)) {
             std::shared_ptr<Node> child;
             if (oldContent.contains(path)) {

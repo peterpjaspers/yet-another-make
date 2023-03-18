@@ -20,6 +20,8 @@ namespace YAM
     void BinaryValueWriter::stream(uint32_t& value) { _stream->write(static_cast<void*>(&value), sizeof(value)); }
     void BinaryValueWriter::stream(int64_t& value) { _stream->write(static_cast<void*>(&value), sizeof(value)); }
     void BinaryValueWriter::stream(uint64_t& value) { _stream->write(static_cast<void*>(&value), sizeof(value)); }
+
+    void BinaryValueWriter::close() { _stream->close(); }
 }
 
 namespace YAM

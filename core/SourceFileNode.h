@@ -11,5 +11,7 @@ namespace  YAM
         SourceFileNode(ExecutionContext* context, std::filesystem::path const& name);
 
         static void setStreamableType(uint32_t type);
+        // Inherited from IStreamable
+         uint32_t typeId() const override;
     };
 }

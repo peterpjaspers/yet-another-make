@@ -1,6 +1,6 @@
 #include "DotIgnoreNode.h"
 #include "ExecutionContext.h"
-#include "FileNode.h"
+#include "SourceFileNode.h"
 #include "SourceDirectoryNode.h"
 #include "FileSystem.h"
 #include "FileAspect.h"
@@ -36,8 +36,8 @@ namespace YAM
         , _hash(rand())
     {
         setDotIgnoreFiles({
-             std::make_shared<FileNode>(context, _directory->name() / ".gitignore"),
-             std::make_shared<FileNode>(context, _directory->name() / ".yamignore")
+             std::make_shared<SourceFileNode>(context, _directory->name() / ".gitignore"),
+             std::make_shared<SourceFileNode>(context, _directory->name() / ".yamignore")
         });
     }
 
@@ -46,7 +46,7 @@ namespace YAM
     }
 
     void DotIgnoreNode::clear() {
-        setDotIgnoreFiles(std::vector<std::shared_ptr<FileNode>>());
+        setDotIgnoreFiles(std::vector<std::shared_ptr<SourceFileNode>>());
     }
 
     void DotIgnoreNode::setState(State newState) {
@@ -90,7 +90,7 @@ namespace YAM
         return ignore;
     }
 
-    void DotIgnoreNode::setDotIgnoreFiles(std::vector<std::shared_ptr<FileNode>> const& newInputs) {
+    void DotIgnoreNode::setDotIgnoreFiles(std::vector<std::shared_ptr<SourceFileNode>> const& newInputs) {
         if (_dotIgnoreFiles != newInputs) {
             for (auto file : _dotIgnoreFiles) {
                 file->removePreParent(this);

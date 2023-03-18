@@ -7,7 +7,7 @@
 namespace YAM
 {
     class SourceDirectoryNode;
-    class FileNode;
+    class SourceFileNode;
 
     // A DotIgnoreNode parses a .gitignore and/or .yamignore file in a
     // given directory. Both files adhere to the gitignore specification,
@@ -57,14 +57,14 @@ namespace YAM
         void stream(IStreamer* streamer) override;
 
     private:
-        void setDotIgnoreFiles(std::vector<std::shared_ptr<FileNode>> const& newFiles);
+        void setDotIgnoreFiles(std::vector<std::shared_ptr<SourceFileNode>> const& newFiles);
         XXH64_hash_t computeHash() const;
         void execute();
 
         SourceDirectoryNode* _directory;
 
         // The input files, i.e. the .gitignore and/or .yamignore files
-        std::vector<std::shared_ptr<FileNode>> _dotIgnoreFiles;
+        std::vector<std::shared_ptr<SourceFileNode>> _dotIgnoreFiles;
         // TODO: the patterns retrieved from the input files.
          
         // The hash of the hashes of the _dotIgnoreFiles.

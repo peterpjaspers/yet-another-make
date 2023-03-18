@@ -16,4 +16,8 @@ namespace YAM
     void SourceFileNode::setStreamableType(uint32_t type) {
         streamableTypeId = type;
     }
+
+    uint32_t SourceFileNode::typeId() const {
+        return streamableTypeId;
+    }
 }

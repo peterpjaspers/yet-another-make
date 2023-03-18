@@ -24,6 +24,8 @@ namespace YAM
         void stream(int64_t& value) override;
         void stream(uint64_t& value) override;
 
+        void close() override;
+
     private:
         IOutputStream* _stream;
     };
