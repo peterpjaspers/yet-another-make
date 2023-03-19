@@ -183,6 +183,7 @@ namespace YAM
             }
         }
         _content.clear();
+        modified(true);
     }
 
     void SourceDirectoryNode::updateHash() {
@@ -201,6 +202,7 @@ namespace YAM
                 context()->statistics().registerUpdatedDirectory(this);
                 updateContent();
                 updateHash();
+                modified(true);
                 if (_context->logBook()->mustLogAspect(LogRecord::Aspect::DirectoryChanges)) {
                     LogRecord error(LogRecord::Aspect::Progress, std::string("Rehashed directory ").append(name().string()));
                     context()->addToLogBook(error);
@@ -245,8 +247,12 @@ namespace YAM
     void SourceDirectoryNode::restore(void* context) {
         Node::restore(context);
         _dotIgnoreNode->directory(this);
+        _dotIgnoreNode->addPreParent(this);
         std::vector<std::shared_ptr<Node>> nodes;
-        for (auto const& p : _content) nodes.push_back(p.second);
+        for (auto const& p : _content) {
+            nodes.push_back(p.second);            
+            p.second->addPostParent(this);
+        }
         _content.clear();
         for (auto n : nodes) _content.insert({ n->name(), n });
     }

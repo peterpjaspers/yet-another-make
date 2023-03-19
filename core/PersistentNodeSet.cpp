@@ -143,6 +143,8 @@ namespace YAM
         : _directory(directory)
         , _context(context)
         , _nextId(1)
+        , _retrieveNesting(0)
+        , _insertNesting(0)
     {
         auto tree = createTree(_directory, NodeTypes::NodeTypeId::CommandNode);
         uint8_t tid = static_cast<char8_t>(NodeTypes::NodeTypeId::CommandNode);
@@ -241,10 +243,12 @@ namespace YAM
         Key key;
         auto it = _nodeToKey.find(node.get());
         if (it == _nodeToKey.end()) {
+            // new node, insert it irrespective of its modified state.
             key = allocateKey(node.get());
             _nodeToKey.insert({ node.get(), key });
             _keyToNode.insert({ key, node });
             _insertQueue.push(key);
+            node->modified(false);
             processInsertQueue();
         } else {
             key = it->second;
@@ -278,11 +282,10 @@ namespace YAM
     }
 
     void PersistentNodeSet::store() {
-        _context->nodes().foreach(Delegate<void, std::shared_ptr<Node> const&>::CreateLambda([this](std::shared_ptr<Node> node) {
-            if (node->modified()) {
-                this->insert(node);
-            }
-        }));
+        _context->nodes().foreach(
+            Delegate<void, std::shared_ptr<Node> const&>::CreateLambda(
+                [this](std::shared_ptr<Node> node) {this->insert(node);})
+        );
     }
 
     void PersistentNodeSet::commit() {

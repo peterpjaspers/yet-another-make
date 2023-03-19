@@ -254,6 +254,7 @@ namespace YAM
     void CommandNode::setInputAspectsName(std::string const& newName) {
         if (_inputAspectsName != newName) {
             _inputAspectsName = newName;
+            modified(true);
             setState(State::Dirty);
         }
     }
@@ -264,6 +265,7 @@ namespace YAM
             _outputs = newOutputs;
             for (auto i : _outputs) i->addPreParent(this);
             _executionHash = rand();
+            modified(true);
             setState(State::Dirty);
         }
     }
@@ -272,6 +274,7 @@ namespace YAM
         if (newScript != _script) {
             _script = newScript;
             _executionHash = rand();
+            modified(true);
             setState(State::Dirty);
         }
     }
@@ -282,6 +285,7 @@ namespace YAM
             _inputProducers = newInputProducers;
             for (auto i : _inputProducers) i->addPreParent(this);
             _executionHash = rand();
+            modified(true);
             setState(State::Dirty);
         }
     }
@@ -360,6 +364,7 @@ namespace YAM
             for (auto i : _inputs) i->removePreParent(this);
             _inputs = newInputs;
             for (auto i : _inputs) i->addPreParent(this);
+            modified(true);
         }
     }
 
@@ -553,6 +558,7 @@ namespace YAM
                 }
             }
         }
+        modified(true);
         postSelfCompletion(newState);
     }
 

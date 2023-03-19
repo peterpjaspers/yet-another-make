@@ -23,7 +23,7 @@ namespace YAM
         , _state(Node::State::Dirty)
         , _executionState(ExecutionState::Idle)
         , _suspended(false)
-        , _modified(false)
+        , _modified(true)
         , _canceling(false)
     {} 
 

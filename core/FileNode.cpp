@@ -104,6 +104,7 @@ namespace YAM
     void FileNode::execute() {
         if (updateLastWriteTime()) {
             rehashAll(false);
+            modified(true);
             if (_context->logBook()->mustLogAspect(LogRecord::Aspect::FileChanges)) {
                 LogRecord error(LogRecord::Aspect::Progress, std::string("Rehashed file ").append(name().string()));
                 context()->addToLogBook(error);

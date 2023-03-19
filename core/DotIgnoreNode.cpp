@@ -139,6 +139,7 @@ namespace YAM
             newState = Node::State::Ok;
             // TODO: parse the dotignore files
         }
+        modified(true);
         postSelfCompletion(newState);
     }
 
