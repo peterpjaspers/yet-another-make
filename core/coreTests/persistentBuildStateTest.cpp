@@ -6,7 +6,7 @@
 #include "../FileNode.h"
 #include "../ExecutionContext.h"
 #include "../DotYamDirectory.h"
-#include "../PersistentNodeSet.h"
+#include "../PersistentBuildState.h"
 #include "../FileSystem.h"
 #include "../RegexSet.h"
 #include "../FileAspect.h"
@@ -52,7 +52,7 @@ namespace
             EXPECT_TRUE(completed);
             EXPECT_EQ(nNodes, context.nodes().size());
             std::filesystem::create_directory(repoDir / "nodes");
-            PersistentNodeSet psetStore(repoDir / "nodes", &context);
+            PersistentBuildState psetStore(repoDir / "nodes", &context);
             psetStore.store();
         }
     };
@@ -62,7 +62,7 @@ namespace
     public:
         SetupHelper& setup;
         ExecutionContext context;
-        PersistentNodeSet storage;
+        PersistentBuildState storage;
         std::shared_ptr<SourceDirectoryNode> repoDirNode;
 
         StorageHelper(SetupHelper& setupHelper)
@@ -98,7 +98,7 @@ namespace
         }
     };
 
-    TEST(PersistentNodeSetTest, threeDeepDirectoryTree) {
+    TEST(PersistentBuildState, storeAndRetrieve) {
         SetupHelper setup(FileSystem::createUniqueDirectory());
 
         // Retrieve the nodes stored by setup.

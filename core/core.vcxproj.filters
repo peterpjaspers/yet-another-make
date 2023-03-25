@@ -252,7 +252,7 @@
     <ClInclude Include="CollapsedFileChanges.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="PersistentNodeSet.h">
+    <ClInclude Include="PersistentBuildState.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="IPersistable.h">
@@ -422,7 +422,7 @@
     <ClCompile Include="CollapsedFileChanges.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="PersistentNodeSet.cpp">
+    <ClCompile Include="PersistentBuildState.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

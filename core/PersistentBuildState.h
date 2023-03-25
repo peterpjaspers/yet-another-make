@@ -131,14 +131,14 @@ namespace YAM
 {
     class ExecutionContext;
 
-    class __declspec(dllexport) PersistentNodeSet
+    class __declspec(dllexport) PersistentBuildState
     {
     public:
         typedef uint64_t Key;
 
         // Construct a persistent node set that can persist the nodes in
         // context->nodes();
-        PersistentNodeSet(
+        PersistentBuildState(
             std::filesystem::path const& nodesDirectory,
             ExecutionContext* context);
 

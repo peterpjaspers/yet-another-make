@@ -1,4 +1,4 @@
-#include "PersistentNodeSet.h"
+#include "PersistentBuildState.h"
 #include "SourceFileNode.h"
 #include "GeneratedFileNode.h"
 #include "SourceDirectoryNode.h"
@@ -65,41 +65,41 @@ namespace
     class SharedNodeWriter : public YAM::ISharedObjectStreamer
     {
     public:
-        SharedNodeWriter(YAM::PersistentNodeSet& nodeRepo)
+        SharedNodeWriter(YAM::PersistentBuildState& nodeRepo)
             : _nodeRepo(nodeRepo)
         {}
 
         void stream(IStreamer* writer, std::shared_ptr<IStreamable>& object) {
             auto node = dynamic_pointer_cast<YAM::Node>(object);
-            PersistentNodeSet::Key key = _nodeRepo.insert(node);
+            PersistentBuildState::Key key = _nodeRepo.insert(node);
             writer->stream(key);
         }
 
     private:
-        YAM::PersistentNodeSet& _nodeRepo;
+        YAM::PersistentBuildState& _nodeRepo;
     };
 
     class SharedNodeReader : public YAM::ISharedObjectStreamer
     {
     public:
-        SharedNodeReader(YAM::PersistentNodeSet& nodeRepo)
+        SharedNodeReader(YAM::PersistentBuildState& nodeRepo)
             : _nodeRepo(nodeRepo)
         {}
 
         void stream(IStreamer* reader, std::shared_ptr<IStreamable>& object) {
-            PersistentNodeSet::Key key;
+            PersistentBuildState::Key key;
             reader->stream(key);
             std::shared_ptr<YAM::Node> node = _nodeRepo.retrieve(key);
             object = dynamic_pointer_cast<IStreamable>(node);
         }
 
     private:
-        YAM::PersistentNodeSet& _nodeRepo;
+        YAM::PersistentBuildState& _nodeRepo;
     };
 
     class KeyCode {
     public:
-        KeyCode(PersistentNodeSet::Key key) 
+        KeyCode(PersistentBuildState::Key key) 
             : _key(key)
             , _id(key & 0xfffffff)
             , _type(static_cast<uint8_t>(key >> 56))
@@ -114,7 +114,7 @@ namespace
             if (id > maxId) throw std::exception("id out of bounds");
         }
 
-        PersistentNodeSet::Key _key;
+        PersistentBuildState::Key _key;
         uint64_t _id;
         uint8_t _type;
     };
@@ -136,7 +136,7 @@ namespace
 
 namespace YAM
 {
-    PersistentNodeSet::PersistentNodeSet(
+    PersistentBuildState::PersistentBuildState(
         std::filesystem::path const& directory,
         ExecutionContext* context
     )
@@ -163,7 +163,7 @@ namespace YAM
         _typeToTree.insert({ tid, tree });
     }
 
-    void PersistentNodeSet::retrieve() {
+    void PersistentBuildState::retrieve() {
         abort();
         retrieveNodes();
         NodeSet& nodes = _context->nodes();
@@ -176,7 +176,7 @@ namespace YAM
         }
     }
 
-    void PersistentNodeSet::abort() {
+    void PersistentBuildState::abort() {
         _keyToNode.clear();
         _nodeToKey.clear();
         _insertQueue = std::queue<Key>();
@@ -187,7 +187,7 @@ namespace YAM
         //btree.recover();
     }
 
-    void PersistentNodeSet::retrieveNodes() {
+    void PersistentBuildState::retrieveNodes() {
         for (auto pair : _typeToTree) {
             uint8_t type = pair.first;
             auto tree = pair.second;
@@ -200,7 +200,7 @@ namespace YAM
         }
     }
 
-    void PersistentNodeSet::processRetrieveQueue() {
+    void PersistentBuildState::processRetrieveQueue() {
         while (_retrieveNesting == 0 && !_retrieveQueue.empty()) {
             Key key = _retrieveQueue.front();
             _retrieveQueue.pop();
@@ -208,7 +208,7 @@ namespace YAM
         }
     }
 
-    std::shared_ptr<Node> PersistentNodeSet::retrieve(Key key) {
+    std::shared_ptr<Node> PersistentBuildState::retrieve(Key key) {
         auto it = _keyToNode.find(key);
         if (it == _keyToNode.end()) {
             KeyCode code(key);
@@ -221,7 +221,7 @@ namespace YAM
         return _keyToNode[key];
     }
 
-    void PersistentNodeSet::retrieveKey(Key key) {
+    void PersistentBuildState::retrieveKey(Key key) {
         _retrieveNesting++;
         std::shared_ptr<Node> node = _keyToNode[key];
         KeyCode code(key);
@@ -233,13 +233,13 @@ namespace YAM
         _retrieveNesting--;
     }
 
-    PersistentNodeSet::Key PersistentNodeSet::allocateKey(Node* node) {
+    PersistentBuildState::Key PersistentBuildState::allocateKey(Node* node) {
         KeyCode code(_nextId, static_cast<uint8_t>(nodeTypes.getTypeId(node)));
         _nextId += 1;
         return code._key;
     }
 
-    PersistentNodeSet::Key PersistentNodeSet::insert(std::shared_ptr<Node> const& node) {
+    PersistentBuildState::Key PersistentBuildState::insert(std::shared_ptr<Node> const& node) {
         Key key;
         auto it = _nodeToKey.find(node.get());
         if (it == _nodeToKey.end()) {
@@ -261,7 +261,7 @@ namespace YAM
         return key;
     }
 
-    void PersistentNodeSet::processInsertQueue() {
+    void PersistentBuildState::processInsertQueue() {
         while (_insertNesting == 0 && !_insertQueue.empty()) {
             Key key = _insertQueue.front();
             _insertQueue.pop();
@@ -269,7 +269,7 @@ namespace YAM
         }
     }
 
-    void PersistentNodeSet::remove(std::shared_ptr<Node> const& node) {
+    void PersistentBuildState::remove(std::shared_ptr<Node> const& node) {
         auto it = _nodeToKey.find(node.get());
         if (it != _nodeToKey.end()) {
             Key key = it->second;
@@ -281,21 +281,21 @@ namespace YAM
         }
     }
 
-    void PersistentNodeSet::store() {
+    void PersistentBuildState::store() {
         _context->nodes().foreach(
             Delegate<void, std::shared_ptr<Node> const&>::CreateLambda(
                 [this](std::shared_ptr<Node> node) {this->insert(node);})
         );
     }
 
-    void PersistentNodeSet::commit() {
+    void PersistentBuildState::commit() {
         //_btree->commit();
         for (auto const& p : _typeToTree) {
             p.second->commit();
         }
     }
 
-    void PersistentNodeSet::insertKey(Key key) {
+    void PersistentBuildState::insertKey(Key key) {
         _insertNesting++;
         Node* node = _keyToNode[key].get();
         KeyCode code(key);
