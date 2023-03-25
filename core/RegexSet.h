@@ -7,6 +7,8 @@
 
 namespace YAM
 {
+    class IStreamer;
+
     class __declspec(dllexport) RegexSet
     {
     public:
@@ -31,6 +33,8 @@ namespace YAM
 
         // Return whehter s matches one of the regular expressions.
         bool matches(std::string const & s) const;
+
+        void stream(IStreamer* streamer);
 
     private:
         std::vector<std::string> _regexStrings;

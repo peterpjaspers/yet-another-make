@@ -81,6 +81,8 @@ namespace YAM
     class __declspec(dllexport) SourceFileRepository : public FileRepository
     {
     public:
+        SourceFileRepository(); // needed for deserialization
+
         // Recursively mirror source directories and source files in given 
         // 'directory' in a SourceDirectoryNode. Add the mirrored source directories
         // and source file nodes to given 'context->nodes()'.
@@ -118,10 +120,18 @@ namespace YAM
         // by YAM.
         void clear();
 
+        static void setStreamableType(uint32_t type);
+        // Inherited from IStreamer (via IPersistable)
+        uint32_t typeId() const override;
+        void stream(IStreamer* streamer) override;
+        // Inherited from IPersistable
+        void restore(void* context) override;
+
     private:
         RegexSet _excludePatterns;
         ExecutionContext* _context;
         std::shared_ptr<FileRepositoryWatcher> _watcher;
         std::shared_ptr<SourceDirectoryNode> _directoryNode;
+        bool _modified;
     };
 }

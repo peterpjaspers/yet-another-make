@@ -1,4 +1,5 @@
 #include "RegexSet.h"
+#include "IStreamer.h"
 
 namespace YAM
 {
@@ -44,6 +45,15 @@ namespace YAM
             std::size_t index = it - _regexStrings.begin();
             _regexStrings.erase(it);
             _regexes.erase(_regexes.begin() + index);
+        }
+    }
+
+    void RegexSet::stream(IStreamer* streamer) {
+        streamer->streamVector(_regexStrings);
+        if (streamer->reading()) {
+            for (auto str : _regexStrings) {
+                _regexes.push_back(std::regex(str));
+            }
         }
     }
 }

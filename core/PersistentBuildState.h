@@ -1,6 +1,5 @@
 #pragma once
 
-#include "NodeSet.h"
 #include "BinaryValueStreamer.h"
 #include "IIOStream.h"
 
@@ -130,42 +129,51 @@ namespace Btree {
 namespace YAM
 {
     class ExecutionContext;
+    class IPersistable;
 
+    // The YAM build state consists of the nodes and repositories in an
+    // ExecutionContext.
     class __declspec(dllexport) PersistentBuildState
     {
     public:
         typedef uint64_t Key;
 
-        // Construct a persistent node set that can persist the nodes in
-        // context->nodes();
+        // Construct for storage of build state in given directory.
         PersistentBuildState(
-            std::filesystem::path const& nodesDirectory,
+            std::filesystem::path const& directory,
             ExecutionContext* context);
 
-        // Retrieve nodes from storage and replace nodes in execution context by
-        // the retrieved nodes.
+        // Retrieve the build state from storage and replace build state in
+        // the execution context with the retrieved build state.
         void retrieve();
 
-        // Update persistent store to be in sync with nodes in the execution
-        // context:
-        //      - store nodes in that are marked modified
-        //      - remove nodes from storage that are marked removed.
+        // Store the modified parts of the build state.
         void store();
 
-        std::shared_ptr<Node> retrieve(Key key);
+        // Return the number of objects stored since last retrieve().
+        // An object is stored only if it was modified or if it was
+        // not yet persisted.
+        uint64_t nStored() const;
 
-        // If node not yet in storage: add it, else update it.
-        Key insert(std::shared_ptr<Node> const& node);
+        // Retrieve the object identified by key. For use in deserialization 
+        // of persistable object.
+        std::shared_ptr<IPersistable> retrieve(Key key);
 
-        // If node is in storage: remove it.
-        void remove(std::shared_ptr<Node> const& node);
+        // If object not yet in storage: add it to storage
+        // else if object->modified(): update stored object.
+        // Return the key of stored object.
+        // For use in serialization of persistable object.
+        Key insert(std::shared_ptr<IPersistable> const& object);
+
+        // If object is in storage: remove it from storage.
+        void remove(std::shared_ptr<IPersistable> const& object);
 
     private:
         void abort();
-        void retrieveNodes();
+        void retrieveAll();
         void commit();
 
-        Key allocateKey(Node* node);
+        Key allocateKey(IPersistable* object);
 
         void retrieveKey(Key key);
         void processRetrieveQueue();
@@ -178,12 +186,13 @@ namespace YAM
         std::shared_ptr<Btree::StreamingTree> _btree;
         std::map<uint8_t, std::shared_ptr<Btree::StreamingTree>> _typeToTree;
         uint64_t _nextId;
-        std::map<Key, std::shared_ptr<Node>> _keyToNode;
-        std::map<Node*, Key> _nodeToKey;
+        std::map<Key, std::shared_ptr<IPersistable>> _keyToObject;
+        std::map<IPersistable*, Key> _objectToKey;
         uint32_t _retrieveNesting;
         uint32_t _insertNesting;
         std::queue<Key> _retrieveQueue;
         std::queue<Key> _insertQueue;
+        uint64_t _nStored;
     };
 
 }

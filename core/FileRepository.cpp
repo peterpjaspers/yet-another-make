@@ -1,10 +1,21 @@
 #include "FileRepository.h"
+#include "IStreamer.h"
+
+namespace
+{
+    uint32_t streamableTypeId = 0;
+}
 
 namespace YAM
 {
+    FileRepository::FileRepository()
+        : _modified(false)
+    {}
+
     FileRepository::FileRepository(std::string const& repoName, std::filesystem::path const& directory)
         : _name(repoName)
         , _directory(directory)
+        , _modified(true)
     {}
 
     std::string const& FileRepository::name() const { 
@@ -43,5 +54,28 @@ namespace YAM
         auto relPath = relativePathOf(absPath);
         if (relPath.empty()) return relPath;
         return std::filesystem::path(_name) / relPath;
+    }
+
+    void FileRepository::modified(bool newValue) {
+        _modified = newValue;
+    }
+
+    bool FileRepository::modified() const {
+        return _modified;
+    }
+
+    void FileRepository::setStreamableType(uint32_t type) {
+        streamableTypeId = type;
+    }
+
+    uint32_t FileRepository::typeId() const {
+        return streamableTypeId;
+    }
+
+    void FileRepository::stream(IStreamer* streamer) {
+        streamer->stream(_name);
+        streamer->stream(_directory);
+    }
+    void FileRepository::restore(void*) {
     }
 }

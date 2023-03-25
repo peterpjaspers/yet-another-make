@@ -1,5 +1,7 @@
 #pragma once
 
+#include "IPersistable.h"
+
 #include <string>
 #include <filesystem>
 
@@ -7,7 +9,7 @@ namespace YAM
 {
     // A file repository represents a directory tree in the file system. 
     // 
-    // Repository name and build state comparison.
+    // --Repository name and build state comparison.
     // The file nodes in YAM's build graph are identified by absolute path 
     // names. This complicates comparing two build states because clones of
     // repositories can be stored on different paths in different builds. 
@@ -15,9 +17,10 @@ namespace YAM
     // absolute paths to be converted to a 'symbolic' path of form
     // <repoName>/<path relative to repo directory> 
     //
-    class __declspec(dllexport) FileRepository
+    class __declspec(dllexport) FileRepository : public IPersistable
     {
     public:
+        FileRepository(); // needed for deserialization
         FileRepository(std::string const& repoName, std::filesystem::path const& directory);
 
         virtual ~FileRepository() {}
@@ -46,8 +49,20 @@ namespace YAM
         virtual bool readAllowed(std::filesystem::path const& absPath) const;
         virtual bool writeAllowed(std::filesystem::path const& absPath) const;
 
+        // Inherited from IPersistable
+        void modified(bool newValue) override;
+        bool modified() const override;
+
+        static void setStreamableType(uint32_t type);
+        // Inherited from IStreamer (via IPersistable)
+        uint32_t typeId() const override;
+        void stream(IStreamer* streamer) override;
+        // Inherited from IPersistable
+        void restore(void* context) override;
+
     protected:
         std::string _name;
         std::filesystem::path _directory;
+        bool _modified;
     };
 }

@@ -2,9 +2,20 @@
 #include "SourceDirectoryNode.h"
 #include "FileRepositoryWatcher.h"
 #include "ExecutionContext.h"
+#include "IStreamer.h"
+
+namespace
+{
+    uint32_t streamableTypeId = 0;
+}
 
 namespace YAM
 {
+    SourceFileRepository::SourceFileRepository()
+        : FileRepository()
+        , _context(nullptr)
+    {}
+
     SourceFileRepository::SourceFileRepository(
         std::string const& repoName,
         std::filesystem::path const& directory,
@@ -39,5 +50,25 @@ namespace YAM
         _context->nodes().remove(_directoryNode);
         _directoryNode->clear();
         _directoryNode->setState(Node::State::Dirty);
+    }
+
+    void SourceFileRepository::setStreamableType(uint32_t type) {
+        streamableTypeId = type;
+    }
+
+    uint32_t SourceFileRepository::typeId() const {
+        return streamableTypeId;
+    }
+
+    void SourceFileRepository::stream(IStreamer* streamer) {
+        FileRepository::stream(streamer);
+        _excludePatterns.stream(streamer);
+        streamer->stream(_directoryNode);
+    }
+
+    void SourceFileRepository::restore(void* context) {
+        FileRepository::restore(context);
+        _context = reinterpret_cast<ExecutionContext*>(context);
+        _watcher = std::make_shared<FileRepositoryWatcher>(_directory, _context);
     }
 }

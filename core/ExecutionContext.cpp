@@ -137,4 +137,9 @@ namespace YAM
     std::shared_ptr<BuildRequest> ExecutionContext::buildRequest() const {
         return _request;
     }
+
+    void ExecutionContext::clearBuildState() {
+        _nodes.clear();
+        _repositories.clear();
+    }
 }

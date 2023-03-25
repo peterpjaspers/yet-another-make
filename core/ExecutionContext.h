@@ -71,6 +71,9 @@ namespace YAM
         void buildRequest(std::shared_ptr<BuildRequest> request);
         std::shared_ptr<BuildRequest> buildRequest() const;
 
+        // Post: nodes.empty() and repositories().empty()
+        void clearBuildState();
+
     private:
         Dispatcher _mainThreadQueue;
         Dispatcher _threadPoolQueue;
