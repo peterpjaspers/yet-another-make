@@ -7,7 +7,8 @@
 
 namespace
 {
-    std::string trackerExe("""D:\\Programs\\Microsoft Visual Studio\\2022\\community\\MSBuild\\Current\\Bin\\amd64\\Tracker.exe""");
+
+    std::string trackerExe = R"("C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\arm64\Tracker.exe")";
 
     std::filesystem::path trackerLogDir(std::filesystem::path const& tmpDir) {
         return tmpDir / "trackerLogDir";
@@ -20,7 +21,7 @@ namespace
     ) {
         std::stringstream ss;
         ss
-            << trackerExe << " /I " << trackerLogDir(tmpDir).string() << " /c " 
+            << trackerExe << " /I " << trackerLogDir(tmpDir).string() << " /c "
             << program << " " << arguments; 
         return ss.str();
     }
