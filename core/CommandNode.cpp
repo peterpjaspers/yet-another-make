@@ -499,6 +499,8 @@ namespace YAM
     }
 
     MonitoredProcessResult CommandNode::executeScript(std::filesystem::path& scriptFilePath) {
+        if (_script.empty()) return MonitoredProcessResult();
+
         std::filesystem::path tmpDir = FileSystem::createUniqueDirectory();
         scriptFilePath = std::filesystem::path(tmpDir / "cmdscript.cmd");
         std::ofstream scriptFile(scriptFilePath.string());

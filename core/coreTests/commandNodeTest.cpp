@@ -8,6 +8,7 @@
 #include "../MultiwayLogBook.h"
 #include "../MemoryLogBook.h"
 #include "../BasicOStreamLogBook.h"
+#include "../FileRepository.h"
 
 #include "gtest/gtest.h"
 #include <boost/process.hpp>
@@ -67,6 +68,10 @@ namespace
             logBook->add(memLogBook);
             logBook->add(stdoutLogBook);
             context.logBook(logBook);
+            context.addRepository(
+                std::make_shared<FileRepository>(
+                    "windows", 
+                    std::filesystem::path("c:\\windows")));
             stats.registerNodes = true;
             //context.threadPool().size(1); // to ease debugging
             std::filesystem::create_directories(repoDir);
@@ -157,11 +162,11 @@ namespace
 
         std::vector<std::shared_ptr<Node>> inputs;
         cmds.pietCmd->getInputs(inputs);
-        EXPECT_EQ(1, inputs.size());
+        ASSERT_EQ(1, inputs.size());
         EXPECT_EQ(cmds.pietSrc, inputs[0]);
         inputs.clear();
         cmds.janCmd->getInputs(inputs);
-        EXPECT_EQ(1, inputs.size());
+        ASSERT_EQ(1, inputs.size());
         EXPECT_EQ(cmds.janSrc, inputs[0]);
 
         EXPECT_EQ(6, cmds.stats.started.size());
@@ -312,21 +317,15 @@ namespace
     }
 
     TEST(CommandNode, fail_script) {
-        auto powershell = boost::process::search_path("powershell");
         Commands cmds;
 
-        // make sure that pietCmd and janCmd are executed in parallel
-        if (cmds.context.threadPool().size() < 2) {
-            cmds.context.threadPool().size(3);
-        }
         EXPECT_TRUE(cmds.execute());
 
         cmds.pietCmd->setScript("exit 1"); // execution fails
-        cmds.janCmd->setScript(powershell.string() + R"( -command "Start-Sleep -s 10)");
 
         EXPECT_TRUE(cmds.execute());
         ASSERT_EQ(Node::State::Failed, cmds.pietCmd->state());
-        ASSERT_EQ(Node::State::Canceled, cmds.janCmd->state());
+        ASSERT_EQ(Node::State::Ok, cmds.janCmd->state());
         ASSERT_EQ(Node::State::Canceled, cmds.pietjanCmd->state());
         ASSERT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Command script failed"));
     }

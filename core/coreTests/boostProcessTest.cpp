@@ -3,6 +3,7 @@
 #include <boost/asio.hpp>
 #include <chrono>
 #include <string>
+#include <fstream>
 
 namespace
 {
@@ -24,7 +25,6 @@ namespace
         auto path = env["Path"];
         EXPECT_NE("", path.to_string());
     }
-
     TEST(Process, ping) {
         ipstream stdoutOfPing;
 
@@ -113,4 +113,47 @@ namespace
 
     }
 
+    TEST(Process, executeBatchFile) {
+        boost::process::environment thisenv = boost::this_process::environment();
+        boost::process::environment env;
+        env["SystemRoot"] = thisenv.at("SystemRoot").to_string();
+        //std::size_t nVars = thisenv.size();
+        //std::size_t i = 0;
+        //std::size_t start = (4*nVars / 8) + 11;
+        //std::size_t end = (6*nVars / 8) - 1;
+
+        //std::ofstream envStream("env.txt");
+        //for (auto p : thisenv) {
+        //    i++;
+        //    if (i > start && i < end) {
+        //        env.emplace(p.get_name(), p.to_string());
+        //        envStream << p.get_name() << "=" << p.to_string() << std::endl;
+        //    }
+        //}
+        //envStream.close();
+
+        std::ofstream batchStream("batch.cmd");
+        batchStream << "echo Hallo";
+        batchStream.close();
+
+        auto cmdExe = boost::process::search_path("cmd").string();
+        std::string batch = cmdExe + " /c batch.cmd";
+        std::string echo = cmdExe + " /c echo Hallo";
+
+        child batch_no_env_ok(batch);
+        batch_no_env_ok.wait();
+        EXPECT_EQ(0, batch_no_env_ok.exit_code());
+
+        child batch_env_fail(batch, env);
+        batch_env_fail.wait();
+        EXPECT_EQ(0, batch_env_fail.exit_code());
+
+        child echo_no_env_ok(echo);
+        echo_no_env_ok.wait();
+        EXPECT_EQ(0, echo_no_env_ok.exit_code());
+
+        child echo_env_ok(echo, env);
+        echo_env_ok.wait();
+        EXPECT_EQ(0, echo_env_ok.exit_code());
+    }
 }
