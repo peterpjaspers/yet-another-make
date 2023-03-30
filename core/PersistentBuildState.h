@@ -173,6 +173,7 @@ namespace YAM
         void retrieveAll();
         void commit();
 
+        Key bindToKey(std::shared_ptr<IPersistable> const& object);
         Key allocateKey(IPersistable* object);
 
         void retrieveKey(Key key);

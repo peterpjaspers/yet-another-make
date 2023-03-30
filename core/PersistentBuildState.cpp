@@ -14,6 +14,7 @@
 
 #include <memory>
 #include <filesystem>
+#include <set>
 
 namespace
 {
@@ -209,14 +210,29 @@ namespace YAM
     }
 
     void PersistentBuildState::retrieveAll() {
+        // First instantiate all objects...
         for (auto pair : _typeToTree) {
             uint8_t type = pair.first;
             auto tree = pair.second;
             auto keys = tree->keys();
-            for (Key key : keys) {
+            for (auto key : keys) {
                 KeyCode code(key);
                 if (code._id >= _nextId) _nextId = code._id + 1;
-                retrieve(key);
+                std::shared_ptr<IPersistable> object(buildStateTypes.instantiate(code._type, _context));
+                auto pair = _keyToObject.insert({ key, object });
+                _objectToKey.insert({ object.get(), key });
+            }
+        }
+        
+        // ...then retrieve the objects from the btree.
+        // This approach results in retrieval of objects in key order.
+        // This achieves maximum btree retrieve performance.
+        for (auto pair : _typeToTree) {
+            uint8_t type = pair.first;
+            auto tree = pair.second;
+            auto keys = tree->keys();
+            for (auto key : keys) {
+                retrieveKey(key);
             }
         }
         for (auto pair : _keyToObject) {
@@ -264,7 +280,30 @@ namespace YAM
         return code._key;
     }
 
-    PersistentBuildState::Key PersistentBuildState::insert(std::shared_ptr<IPersistable> const& object) {
+    void PersistentBuildState::store() {
+        std::set<Key> keysOfModifiedObjects;
+        // First bind each node to a key...
+        _context->nodes().foreach(
+            Delegate<void, std::shared_ptr<Node> const&>::CreateLambda(
+                [&](std::shared_ptr<Node> node) {
+                    Key key = bindToKey(node);
+                    if (node->modified()) keysOfModifiedObjects.insert(key);
+                })
+        );
+        for (auto const& pair : _context->repositories()) {
+            Key key = bindToKey(pair.second);
+            if (pair.second->modified()) keysOfModifiedObjects.insert(key);
+        }
+        // ...then stream the modified objecs to the btree in key order.
+        // This approach results in inserting of objects in key order.
+        // This achieves maximum btree retrieve performance.
+        for (auto key : keysOfModifiedObjects) {
+            auto object = _keyToObject[key];
+            insert(object);
+        }
+    }
+
+    PersistentBuildState::Key PersistentBuildState::bindToKey(std::shared_ptr<IPersistable> const& object) {
         Key key;
         auto it = _objectToKey.find(object.get());
         if (it == _objectToKey.end()) {
@@ -272,18 +311,20 @@ namespace YAM
             key = allocateKey(object.get());
             _objectToKey.insert({ object.get(), key });
             _keyToObject.insert({ key, object });
+            object->modified(true);
+        } else {
+            key = it->second;
+        }
+        return key;
+    }
+
+    PersistentBuildState::Key PersistentBuildState::insert(std::shared_ptr<IPersistable> const& object) {
+        Key key = bindToKey(object);
+        if (object->modified()) {
             _insertQueue.push(key);
             object->modified(false);
             _nStored += 1;
             processInsertQueue();
-        } else {
-            key = it->second;
-            if (object->modified()) {
-                _insertQueue.push(key);
-                object->modified(false);
-                _nStored += 1;
-                processInsertQueue();
-            }
         }
         return key;
     }
@@ -305,16 +346,6 @@ namespace YAM
             KeyCode code(key);
             auto tree = _typeToTree[code._type];
             tree->remove(code._id);
-        }
-    }
-
-    void PersistentBuildState::store() {
-        _context->nodes().foreach(
-            Delegate<void, std::shared_ptr<Node> const&>::CreateLambda(
-                [this](std::shared_ptr<Node> node) {this->insert(node); })
-        );
-        for (auto const& pair : _context->repositories()) {
-            insert(pair.second);
         }
     }
 
