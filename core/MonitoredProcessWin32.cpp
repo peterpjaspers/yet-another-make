@@ -1,5 +1,6 @@
 #include "MonitoredProcessWin32.h"
 #include "MSBuildTrackerOutputReader.h"
+#include "FileSystem.h"
 
 #include <iostream>
 #include <chrono>
@@ -7,7 +8,7 @@
 
 namespace
 {
-    std::string trackerExe("""D:\\Programs\\Microsoft Visual Studio\\2022\\community\\MSBuild\\Current\\Bin\\amd64\\Tracker.exe""");
+    std::string trackerExe = R"("D:\Programs\Microsoft Visual Studio\2022\community\MSBuild\Current\Bin\amd64\Tracker.exe")";
 
     std::filesystem::path trackerLogDir(std::filesystem::path const& tmpDir) {
         return tmpDir / "trackerLogDir";
@@ -20,15 +21,19 @@ namespace
     ) {
         std::stringstream ss;
         ss
-            << trackerExe << " /I " << trackerLogDir(tmpDir).string() << " /c " 
+            << trackerExe << " /I " << trackerLogDir(tmpDir).string() << " /c "
             << program << " " << arguments; 
-        return ss.str();
+        auto cmd = ss.str();
+        return cmd;
     }
 
     boost::process::environment generateEnv(
         std::filesystem::path const& tmpDir, 
-        std::map<std::string, std::string> const& env) {
+        std::map<std::string, std::string> const& env
+    ) {
+        boost::process::environment thisenv = boost::this_process::environment();
         boost::process::environment bpenv;
+        bpenv["SystemRoot"] = thisenv.at("SystemRoot").to_string();
         bpenv["TMP"] = tmpDir.string();
         for (auto const& pair : env) {
             bpenv[pair.first] = pair.second;
@@ -44,7 +49,7 @@ namespace YAM
         std::string const& arguments,
         std::map<std::string, std::string> const& env)
         : IMonitoredProcess(program, arguments, env)
-        , _tempDir(std::tmpnam(nullptr))
+        , _tempDir(FileSystem::createUniqueDirectory().string())
         , _groupExited(false)
         , _childExited(false)
         , _child(

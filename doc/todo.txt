@@ -1,10 +1,60 @@
 Todo
--ExecutionContext
+- build state storage
+    - implement streaming btree (provides streaming of value types into btree via ValueStreamer i/f)
+    - implement ObjectStreamer (streams C++ objects to/from ValueStreamer)
+    - implement BuildStateStreamer (streams YAM buildstate)
+- winkin (build cache)
+- build file syntax (follow tup, follow mrmake, something completely different?)
+    - decide
+    - implement parsers and DAG updater
+- SourceFileRepository: SourceDirectoryNode takes exclude (ignore) patterns
+  from .gitignore and from .yamignore (having gitignore syntex).
+  In a git repo:
+      .gitignore typically ignores build outputs.
+      .yamignore can additionally ignore source files
+  Not a git repo:
+      .yamignore ignores build outputs and optionally source files
+- Decide how to deal with using generated files from other repos
+    - first build in other repo using that repo's build server, then build this
+       repo versus build both repos in this repo's build server.
+       In first case generated files from other repos must be treated as source files.
+       In second case multi-repo-graph managed by this repo's build server and business
+       as usual. Disadvantage: if other repo was already build then this repo will build
+       it again.
+    - build file must tell YAM which repo's to build
+- Persistentbuildstate
+- File aspects as nodes
+- aspect hashing for Dll import lib and code parts of C++ files 
+- Logging by node in thread pool to memorystream
+  Seperated thread forwards log to tcp/ip socket to client
+- Hide btree behind interface and let current file storage inherit from this interface.
+- Command node script VS command node direct program execution.
+
+
+
+Done
+- ExecutionContext
   To avoid singletons a context object is passed to Node constructor.
-  Add access to:
-	- command line options
-	- logBook
-	- abort build token
+  It provides access to:
+    - NodeSet (renamed from Graph)
+    - main thread and thread pool and their dispatchers
+    - file aspect hasher configuration
+    - file repositories (the directories from which YAM is allowed to take input dependencies)
+    - command line options
+    - logBook
+- filenode, sourcefile, generatedfile (output file of command node)
+- Process class => boost process
+- file aspect hashes
+    - FileNode::_hashes (std::map<aspectName => XXH64_hash_t)
+      _hashes is populated when node is created and updated when context.filehashers changes
+      and file name matches one of filehashes patterns.
+      Note: it is more attractive to only add aspects to filenode that are actually used.
+      With this approach it may happen that hashes are computed that are never used.
+      Unfortunately this is not possible because it cannot be known in advance which commands
+      will use a file as input.
+    - CommandNode::_inputAspects (std::vector<{fileNamePattern, aspectName}>) 
+- client-server interface
+
 - Command node:
     - file dependency detection
         - define dependency detection interface, e.g. dependencies = track(program)
@@ -18,84 +68,17 @@ Todo
       FileNode.h
     - distinguish between modifications caused by user editing source files and tampering
       (e.g. deleting) with generated files.
-      Note: not doing 
-- build state storage
-    - implement streaming btree (provides streaming of value types into btree via ValueStreamer i/f)
-    - implement ObjectStreamer (streams C++ objects to/from ValueStreamer)
-    - implement BuildStateStreamer (streams YAM buildstate)
-- winkin (build cache)
-
-- build file format (follow tup, follow mrmake, something completely different?)
-    - decide
-    - implement parsers and DAG updater
-- SourceFileRepository: also include patterns needed?
+      See TrackedFileRepository 
 
 
-Done
-- ExecutionContext
-  To avoid singletons a context object is passed to Node constructor.
-  It provides access to:
-	- node repository (renamed from Graph)
-	- main thread and thread pool and their dispatchers
-	- file aspect hasher configuration
-- filenode, sourcefile, generatedfile (output file of command node)
-- Process class => boost process
-- file aspect hashes
-    - FileNode::_hashes (std::map<aspectName => XXH64_hash_t)
-      _hashes is populated when node is created and updated when context.filehashers changes
-      and file name matches one of filehashes patterns.
-      Note: it is more attractive to only add aspects to filenode that are actually used.
-      With this approach it may happen that hashes are computed that are never used.
-      Unfortunately this is not possible because it cannot be known in advance which commands
-      will use a file as input.
-    - CommandNode::_inputAspects (std::vector<{fileNamePattern, aspectName}>)
 
-
-  In our latest discussion we stated that all inputs and outputs must be modeled as nodes.
-  This would allow us to compute executionHash in Node class (instead of making it a
-  sub-class responsibility).
-  
-  Analysis:
-  In its simplest form command node class needs a member field: string _script;
-  Command node executionHash = hash(hash(_script), hash(input files), hash(output files))
-
-  Modeling the script as a node (holding the script string) incurs overhead: 
-	- memory: for each command node also a script node
-	- threadpool: script node execution will hash the script text in thread pool.
-          Hashing the script text is very fast. The overhead of posting this operation
-          is probably larger than the hashing itself.
-  
-  To avoid this overhead I propose the following implementation:
-
-  Node class has (a.o.) the following member functions:
-      protected:
-          XXH64_hash_t computeExecutionHashExt(std::initializer_list<XXH64_hash_t> otherHashes) const;
-      public:
-          virtual XXH64_hash_t computeExecutionHash() const { return computeExecutionHash({});}
-
-  Pseudo-code of computeExecutionHash(otherHashes): { return hash(output node hashes, input node hashes, otherHashes)); }
-
-  Command node class has member field: string _script
-  Command node overrides computeExecutionHash: return computeExecutionHash(hash(_script));
-  Note: there are 2 situations in which CommandNode::computeExecutionHash is called:
-	- during self-execution of the command node, in thread pool, immediately after completion of
-          command script. The hash is stored in Node::_executionHash
-        - after completion of command prerequisites execution to figure out whether command self-execution
-          is pending: pending =  _executionHash != computeExecutionHash()
-
-  File node overrides computeExecutionHash(): return hashFileContent(_name);
-  Because computeExecutionHash() is potentially expensive it is intended to be called only 
-  during self-execution of the file node.
-  In that case it obviously makes no sense to implement file node pending as: pending = _executionHash != computeExecutionHash()
-  Instead the implementation is: pending = _state == State::Dirty
-  A file node must be set dirty at start of alpha-build and, during beta-build, when the file is write-accessed.
 
   See https://miro.com/app/board/uXjVO-7wAmU=/ 
   In this board a build file node generates all command nodes, including the command scripts.
   The build file may reference files (e.g. a file that contains a version nr) and globs (e.g. 
   to create a compile command for each cpp file found in the src directory).
   The execution hash of a build file node the becomes:
-	executionHash = hash(hash(input build files), hash(other input files), hash(input globs))
+    executionHash = hash(hash(input build files), hash(other input files), hash(input globs))
   Note: the output command nodes are not part of this hash because there is no way
   that the user can tamper with this output.
   Note: files and globs are nodes.
@@ -110,3 +93,14 @@ Done
   Why? Because node's that execute their prerequisites inspect Node::State to figure out which prerequisites
   need to be started.
   
+
+filenode: empty set of aspects: use write time as hash. 
+executioncontext should return either entirefileaspect or lastwritetimeaspect ico empty set.
+
+binaryvaluestreamer: take endianship into account
+
+builder: suspend threadpool during stopBuild
+
+split BuildRequest in Init, Build and Clean.
+
+Handle Init while in dir tree where a parent already contains .yam dir

@@ -10,7 +10,7 @@ namespace
 
     std::size_t getDefaultPoolSize() {
         static unsigned int n = std::thread::hardware_concurrency();
-        return 1;
+        return n;
     }
 
     Delegate<bool, std::shared_ptr<Node> const&> includeIfDirty = 
