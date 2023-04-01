@@ -104,6 +104,10 @@ namespace Btree {
             return _writer.get();
         }
 
+        YAM::IValueStreamer* replace(uint64_t key) {
+            return insert(key);
+        }
+
         void remove(uint64_t key) {
             std::stringstream ss;
             ss << key;
@@ -145,15 +149,15 @@ namespace YAM
 
         // Retrieve the build state from storage and replace build state in
         // the execution context with the retrieved build state.
+        // Time complexity: O(N) where N is the number of objects in the build
+        // state.
         void retrieve();
 
-        // Store the modified parts of the build state.
-        void store();
-
-        // Return the number of objects stored since last retrieve().
-        // An object is stored only if it was modified or if it was
-        // not yet persisted.
-        uint64_t nStored() const;
+        // Commit the build state to storage.
+        // Time complexity: O(N) where N is the number of new/modified/removed
+        // objects in the build state since previous store().
+        // Return N.
+        std::size_t store();
 
         // Retrieve the object identified by key. For use in deserialization 
         // of persistable object.
@@ -163,13 +167,13 @@ namespace YAM
         // else if object->modified(): update stored object.
         // Return the key of stored object.
         // For use in serialization of persistable object.
-        Key insert(std::shared_ptr<IPersistable> const& object);
+        Key store(std::shared_ptr<IPersistable> const& object);
 
         // If object is in storage: remove it from storage.
         void remove(std::shared_ptr<IPersistable> const& object);
 
     private:
-        void abort();
+        void reset();
         void retrieveAll();
         void commit();
 
@@ -179,8 +183,8 @@ namespace YAM
         void retrieveKey(Key key);
         void processRetrieveQueue();
 
-        void insertKey(Key key);
-        void processInsertQueue();
+        void storeKey(Key key);
+        void processStoreQueue();
 
         std::filesystem::path _directory;
         ExecutionContext* _context;
@@ -190,10 +194,11 @@ namespace YAM
         std::map<Key, std::shared_ptr<IPersistable>> _keyToObject;
         std::map<IPersistable*, Key> _objectToKey;
         uint32_t _retrieveNesting;
-        uint32_t _insertNesting;
+        uint32_t _storeNesting;
         std::queue<Key> _retrieveQueue;
-        std::queue<Key> _insertQueue;
-        uint64_t _nStored;
+        std::queue<Key> _storeQueue;
+        std::unordered_set<Key> _keysToInsert;
+        std::unordered_set<Key> _keysToReplace;
     };
 
 }

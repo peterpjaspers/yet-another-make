@@ -83,8 +83,8 @@ namespace
             return dynamic_pointer_cast<SourceDirectoryNode>(context.nodes().find(setup.repoDir));
         }
 
-        void store() {
-            storage.store();
+        uint32_t store() {
+            return storage.store();
         }
 
         // Wait for file change event to be received for given paths.
@@ -166,12 +166,9 @@ namespace
         EXPECT_TRUE(newFileNode->modified());
 
         // Verify that the modified file node is updated in storage.
-        uint64_t nStoredStart = storage.storage.nStored();
-        storage.store(); // store the modified file node.
-        uint64_t nStored = storage.storage.nStored() - nStoredStart;
+        std::size_t nStored = storage.store(); // store the modified file node.
         EXPECT_EQ(3, nStored); // repo dir, file3, file4
         storage.retrieve(); // replace all nodes in storage.context by ones freshly retrieved from storage
-        EXPECT_EQ(0, storage.storage.nStored());
         fileNode = dynamic_pointer_cast<FileNode>(storage.context.nodes().find(setup.repoDir / "File3"));
         ASSERT_NE(nullptr, fileNode);
 

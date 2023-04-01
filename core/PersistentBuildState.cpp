@@ -95,7 +95,7 @@ namespace
 
         void stream(IStreamer* writer, std::shared_ptr<IStreamable>& object) {
             auto persistable = dynamic_pointer_cast<IPersistable>(object);
-            PersistentBuildState::Key key = _buildState.insert(persistable);
+            PersistentBuildState::Key key = _buildState.store(persistable);
             writer->stream(key);
         }
 
@@ -172,7 +172,7 @@ namespace YAM
         , _context(context)
         , _nextId(1)
         , _retrieveNesting(0)
-        , _insertNesting(0)
+        , _storeNesting(0)
     {
         for (auto tid : buildStateTypes.ids) {
             auto tree = createTree(_directory, tid);
@@ -181,31 +181,32 @@ namespace YAM
     }
 
     void PersistentBuildState::retrieve() {
-        abort();
+        reset();
         retrieveAll();
-        _context->clearBuildState();
         NodeSet& nodes = _context->nodes();
         for (auto pair : _keyToObject) {
             auto object = pair.second;
             if (buildStateTypes.isNode(object.get())) {
                 auto node = dynamic_pointer_cast<Node>(object);
                 nodes.add(node);
-            } else if(buildStateTypes.isFileRepo(object.get())) {
+            } else if (buildStateTypes.isFileRepo(object.get())) {
                 auto repo = dynamic_pointer_cast<FileRepository>(object);
                 _context->addRepository(repo);
             }
         }
     }
 
-    void PersistentBuildState::abort() {
+    void PersistentBuildState::reset() {
         _keyToObject.clear();
         _objectToKey.clear();
-        _insertQueue = std::queue<Key>();
+        _storeQueue = std::queue<Key>();
         _retrieveQueue = std::queue<Key>();
         _retrieveNesting = 0;
-        _insertNesting = 0;
+        _storeNesting = 0;
         _nextId = 1;
-        _nStored = 0;
+        _keysToInsert.clear();
+        _keysToReplace.clear();
+        _context->clearBuildState();
         //btree.recover();
     }
 
@@ -280,27 +281,27 @@ namespace YAM
         return code._key;
     }
 
-    void PersistentBuildState::store() {
-        std::set<Key> keysOfModifiedObjects;
+    std::size_t PersistentBuildState::store() {
         // First bind each node to a key...
         _context->nodes().foreach(
             Delegate<void, std::shared_ptr<Node> const&>::CreateLambda(
-                [&](std::shared_ptr<Node> node) {
-                    Key key = bindToKey(node);
-                    if (node->modified()) keysOfModifiedObjects.insert(key);
-                })
+                [&](std::shared_ptr<Node> node) {bindToKey(node);})
         );
-        for (auto const& pair : _context->repositories()) {
-            Key key = bindToKey(pair.second);
-            if (pair.second->modified()) keysOfModifiedObjects.insert(key);
-        }
+        for (auto const& pair : _context->repositories()) {bindToKey(pair.second);}
         // ...then stream the modified objecs to the btree in key order.
         // This approach results in inserting of objects in key order.
         // This achieves maximum btree retrieve performance.
-        for (auto key : keysOfModifiedObjects) {
+        std::set<Key> keysToStore;
+        for (auto k : _keysToInsert) keysToStore.insert(k);
+        for (auto k : _keysToReplace) keysToStore.insert(k);
+        for (auto key : keysToStore) {
             auto object = _keyToObject[key];
-            insert(object);
+            store(object);
         }
+        _keysToInsert.clear();
+        _keysToReplace.clear();
+        commit();
+        return keysToStore.size();
     }
 
     PersistentBuildState::Key PersistentBuildState::bindToKey(std::shared_ptr<IPersistable> const& object) {
@@ -311,29 +312,30 @@ namespace YAM
             key = allocateKey(object.get());
             _objectToKey.insert({ object.get(), key });
             _keyToObject.insert({ key, object });
+            _keysToInsert.emplace(key);
             object->modified(true);
         } else {
             key = it->second;
+            if (object->modified()) _keysToReplace.emplace(key);
         }
         return key;
     }
 
-    PersistentBuildState::Key PersistentBuildState::insert(std::shared_ptr<IPersistable> const& object) {
+    PersistentBuildState::Key PersistentBuildState::store(std::shared_ptr<IPersistable> const& object) {
         Key key = bindToKey(object);
         if (object->modified()) {
-            _insertQueue.push(key);
+            _storeQueue.push(key);
             object->modified(false);
-            _nStored += 1;
-            processInsertQueue();
+            processStoreQueue();
         }
         return key;
     }
 
-    void PersistentBuildState::processInsertQueue() {
-        while (_insertNesting == 0 && !_insertQueue.empty()) {
-            Key key = _insertQueue.front();
-            _insertQueue.pop();
-            insertKey(key);
+    void PersistentBuildState::processStoreQueue() {
+        while (_storeNesting == 0 && !_storeQueue.empty()) {
+            Key key = _storeQueue.front();
+            _storeQueue.pop();
+            storeKey(key);
         }
     }
 
@@ -349,10 +351,6 @@ namespace YAM
         }
     }
 
-    uint64_t PersistentBuildState::nStored() const {
-        return _nStored;
-    }
-
     void PersistentBuildState::commit() {
         //_btree->commit();
         for (auto const& p : _typeToTree) {
@@ -360,16 +358,19 @@ namespace YAM
         }
     }
 
-    void PersistentBuildState::insertKey(Key key) {
-        _insertNesting++;
+    void PersistentBuildState::storeKey(Key key) {
+        _storeNesting++;
         IPersistable* object = _keyToObject[key].get();
         KeyCode code(key);
         auto tree = _typeToTree[code._type];
-        IValueStreamer* vWriter = tree->insert(key);
+        bool insert = _keysToInsert.contains(key);
+        bool replace = _keysToReplace.contains(key);
+        if (!insert && !replace) throw std::exception("unknown key");
+        IValueStreamer* vWriter = insert ? tree->insert(key) : tree->replace(key);
         SharedPersistableWriter snWriter(*this);
         Streamer writer(vWriter, &snWriter);
         object->stream(&writer);
         vWriter->close();
-        _insertNesting--;
+        _storeNesting--;
     }
 }
