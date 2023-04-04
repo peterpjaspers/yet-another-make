@@ -271,6 +271,7 @@ namespace YAM
         // Inherited from IStreamer (via IPersistable)
         void stream(IStreamer* streamer) override;
         // Inherited from IPersistable
+        void prepareDeserialize() override;
         void restore(void* context) override;
 
     protected:

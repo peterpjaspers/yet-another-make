@@ -9,11 +9,13 @@
 #include "ILogBook.h"
 
 #include <memory>
+#include <unordered_set>
 
 namespace YAM
 {
     class FileRepository;
     class BuildRequest;
+    class IPersistable;
 
     class __declspec(dllexport) ExecutionContext
     {
@@ -71,8 +73,24 @@ namespace YAM
         void buildRequest(std::shared_ptr<BuildRequest> request);
         std::shared_ptr<BuildRequest> buildRequest() const;
 
+        // Fill 'buildState' with nodes and repositories.
+        void getBuildState(std::unordered_set<std::shared_ptr<IPersistable>>& buildState);
+
         // Post: nodes.empty() and repositories().empty()
         void clearBuildState();
+
+        // Determine the differences between buildState and storedState. 
+        // Post:
+        //   toInsert: objects in buildState but not in storedState .
+        //   toReplace: objects in buildState and storedState.
+        //   toRemove: objects in storedState but not in buildState.
+        //   objects in toInsert and toReplace are modified().
+        void computeStorageNeed(
+            std::unordered_set<std::shared_ptr<IPersistable>> const& buildState,
+            std::unordered_set<std::shared_ptr<IPersistable>> const& storedState,
+            std::unordered_set<std::shared_ptr<IPersistable>>& toInsert,
+            std::unordered_set<std::shared_ptr<IPersistable>>& toReplace,
+            std::unordered_set<std::shared_ptr<IPersistable>>& toRemove);
 
     private:
         Dispatcher _mainThreadQueue;

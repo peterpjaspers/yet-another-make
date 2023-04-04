@@ -244,6 +244,17 @@ namespace YAM
             }
         }
     }
+
+    void SourceDirectoryNode::prepareDeserialize() {
+        Node::prepareDeserialize();
+        if (_dotIgnoreNode != nullptr) _dotIgnoreNode->removePreParent(this);
+        for (auto const& p : _content) {
+            p.second->removePostParent(this);
+        }
+        _dotIgnoreNode = nullptr;
+        _content.clear();
+    }
+
     void SourceDirectoryNode::restore(void* context) {
         Node::restore(context);
         _dotIgnoreNode->directory(this);

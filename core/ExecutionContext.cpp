@@ -70,6 +70,8 @@ namespace YAM
         auto it = _repositories.find(repoName);
         bool found = it != _repositories.end();
         if (found) {
+            auto srcRepo = dynamic_pointer_cast<SourceFileRepository>(it->second);
+            if (srcRepo != nullptr) srcRepo->clear();
             _repositories.erase(it);
         }
         return found;
@@ -138,8 +140,41 @@ namespace YAM
         return _request;
     }
 
+    void ExecutionContext::getBuildState(std::unordered_set<std::shared_ptr<IPersistable>>& buildState) {
+        auto addToState = 
+            Delegate<void, std::shared_ptr<Node> const&>::CreateLambda(
+                [&](std::shared_ptr<Node> node) {buildState.insert(node); });
+
+        _nodes.foreach(addToState);
+        for (auto const& pair : _repositories) { buildState.insert(pair.second); }
+    }
+
     void ExecutionContext::clearBuildState() {
         _nodes.clear();
         _repositories.clear();
+    }
+
+    void ExecutionContext::computeStorageNeed(
+        std::unordered_set<std::shared_ptr<IPersistable>> const& buildState,
+        std::unordered_set<std::shared_ptr<IPersistable>> const& storedState,
+        std::unordered_set<std::shared_ptr<IPersistable>>& toInsert,
+        std::unordered_set<std::shared_ptr<IPersistable>>& toReplace,
+        std::unordered_set<std::shared_ptr<IPersistable>>& toRemove
+    ) {
+        for (auto const& p : buildState) {
+            if (storedState.contains(p)) {
+                if (p->modified()) toReplace.insert(p);
+            } else {
+                p->modified(true);
+                toInsert.insert(p);
+            }
+        }
+        for (auto const& p : storedState) {
+            if (!buildState.contains(p)) {
+                toRemove.insert(p);
+                // p may have been modified before it was remooved
+                if (p->modified()) toReplace.insert(p);
+            }
+        }
     }
 }

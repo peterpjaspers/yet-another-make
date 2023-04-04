@@ -29,6 +29,40 @@ namespace
     const std::size_t nNodes = 284;
     const std::size_t nObjects = nNodes+1;
 
+    // Wait for file change event to be received for given paths.
+    // When event is received then consume the changes.
+    // Return whether event was consumed.
+    bool consumeFileChangeEvents(
+        SourceFileRepository* sourceFileRepo,
+        Dispatcher& mainThreadQueue,
+        std::initializer_list<std::filesystem::path> paths)
+    {
+        std::atomic<bool> received = false;
+        Dispatcher dispatcher;
+        auto pollChange = Delegate<void>::CreateLambda(
+            [&]() {
+            for (auto path : paths) {
+                received = sourceFileRepo->hasChanged(path);
+                if (!received) break;
+            }
+        if (received) {
+            sourceFileRepo->consumeChanges();
+        }
+        dispatcher.stop();
+        });
+        const auto retryInterval = std::chrono::milliseconds(100);
+        const unsigned int maxRetries = 10;
+        unsigned int nRetries = 0;
+        do {
+            nRetries++;
+            dispatcher.start();
+            mainThreadQueue.push(pollChange);
+            dispatcher.run();
+            if (!received) std::this_thread::sleep_for(retryInterval);
+        } while (nRetries < maxRetries && !received);
+        return received;
+    }
+
     // Create directory tree, mirror tree in source directory node and
     // store resulting directory node tree to repoDir/ "nodes"
     class SetupHelper
@@ -39,6 +73,7 @@ namespace
         std::filesystem::path yamDir;
         DirectoryTree testTree;
         ExecutionContext context;
+        PersistentBuildState persistentState;
         std::shared_ptr<SourceFileRepository> sourceFileRepo;
         std::shared_ptr<SourceDirectoryNode> repoDirNode;
 
@@ -46,6 +81,7 @@ namespace
             : repoDir(repoDirectory)
             , yamDir(DotYamDirectory::create(repoDir))
             , testTree(repoDir, 3, RegexSet({ ".yam" }))
+            , persistentState(repoDir / "buildState", &context)
             , sourceFileRepo(std::make_shared<SourceFileRepository>(
                 "repo",
                 repoDir,
@@ -53,13 +89,56 @@ namespace
                 &context))
             , repoDirNode(sourceFileRepo->directoryNode())
         {
+            context.threadPool().size(1);
             context.addRepository(sourceFileRepo);
             bool completed = YAMTest::executeNode(repoDirNode.get());
             EXPECT_TRUE(completed);
             EXPECT_EQ(nNodes, context.nodes().size());
             std::filesystem::create_directory(repoDir / "buildState");
-            PersistentBuildState psetStore(repoDir / "buildState", &context);
-            psetStore.store();
+            persistentState.store();
+        }
+
+        bool consumeFileChangeEvent(std::initializer_list<std::filesystem::path> paths) {
+            return consumeFileChangeEvents(sourceFileRepo.get(), context.mainThreadQueue(), paths);
+        }
+
+        void updateFile(std::filesystem::path const& fileToUpdate) {
+            std::ofstream file(fileToUpdate.string());
+            file << "Add some content to the file";
+            file.close();
+        }
+
+        std::filesystem::path addNode() {
+            std::filesystem::path file4(repoDir / "File4");
+            testTree.addFile(); // File4
+            EXPECT_TRUE(consumeFileChangeEvent({ file4 }));
+            std::vector<std::shared_ptr<Node>> dirtyNodes;
+            context.getDirtyNodes(dirtyNodes);
+            EXPECT_TRUE(YAMTest::executeNodes(dirtyNodes));
+            EXPECT_NE(nullptr, context.nodes().find(file4));
+            return file4;
+        }
+
+        std::tuple<std::filesystem::path, XXH64_hash_t> modifyNode() {
+            std::filesystem::path file3(repoDir / "File3");
+            auto node = dynamic_pointer_cast<FileNode>(context.nodes().find(file3));
+            XXH64_hash_t oldHash = node->hashOf(FileAspect::entireFileAspect().name());
+            updateFile(file3);
+            consumeFileChangeEvent({ file3 });
+            YAMTest::executeNode(node.get());
+            XXH64_hash_t newHash = node->hashOf(FileAspect::entireFileAspect().name());
+            EXPECT_NE(oldHash, newHash);
+            return { file3, oldHash };
+        }
+
+        void executeAll() {
+            auto setDirty = Delegate<void, std::shared_ptr<Node> const&>::CreateLambda(
+                [](std::shared_ptr<Node> const& n) { n->setState(Node::State::Dirty); });
+            context.nodes().foreach(setDirty);
+            std::vector<std::shared_ptr<Node>> dirtyNodes;
+            context.getDirtyNodes(dirtyNodes);
+            bool completed = YAMTest::executeNodes(dirtyNodes);
+            EXPECT_TRUE(completed);
         }
     };
 
@@ -83,49 +162,19 @@ namespace
             return dynamic_pointer_cast<SourceDirectoryNode>(context.nodes().find(setup.repoDir));
         }
 
-        uint32_t store() {
+        std::size_t store() {
             return storage.store();
         }
 
-        // Wait for file change event to be received for given paths.
-        // When event is received then consume the changes.
-        // Return whether event was consumed.
-        bool consumeFileChangeEvent(std::initializer_list<std::filesystem::path> paths)
-        {
+        bool consumeFileChangeEvent(std::initializer_list<std::filesystem::path> paths) {
             auto sourceFileRepo = dynamic_pointer_cast<SourceFileRepository>(context.findRepository("repo"));
-            std::atomic<bool> received = false;
-            Dispatcher dispatcher;
-            auto pollChange = Delegate<void>::CreateLambda(
-                [&]() {
-                for (auto path : paths) {
-                    received = sourceFileRepo->hasChanged(path);
-                    if (!received) break;
-                }
-            if (received) {
-                sourceFileRepo->consumeChanges();
-            }
-            dispatcher.stop();
-            });
-            const auto retryInterval = std::chrono::milliseconds(100);
-            const unsigned int maxRetries = 10;
-            unsigned int nRetries = 0;
-            do {
-                nRetries++;
-                dispatcher.start();
-                context.mainThreadQueue().push(pollChange);
-                dispatcher.run();
-                if (!received) std::this_thread::sleep_for(retryInterval);
-            } while (nRetries < maxRetries && !received);
-            return received;
+            return consumeFileChangeEvents(sourceFileRepo.get(), context.mainThreadQueue(), paths);
         }
 
         XXH64_hash_t addFileAndUpdateFileAndExecuteNode(std::shared_ptr<FileNode> fileNode) {
-            setup.testTree.addFile(); // will add File4
             auto hash = fileNode->hashOf(FileAspect::entireFileAspect().name());
-            // update the file associated with fileNode...
-            std::ofstream file3(fileNode->name().string());
-            file3 << "Add some content to the file";
-            file3.close();
+            setup.testTree.addFile(); // add File4
+            setup.updateFile(fileNode->name());
             bool consumed = consumeFileChangeEvent({ fileNode->name(), setup.repoDir / "File4" });
             if (!consumed || Node::State::Dirty != fileNode->state()) throw std::exception("wrong state");
             // ... execute the file to recompute the file hash...
@@ -149,7 +198,7 @@ namespace
         ASSERT_NE(nullptr, repoDirNode);
         EXPECT_EQ(nNodes, storage.context.nodes().size());
 
-        // Verify that the retrieved nodes can be executed
+        // Verify that the rolled-back build state can be executed
         bool completed = YAMTest::executeNode(repoDirNode.get());
         EXPECT_TRUE(completed);
         EXPECT_EQ(nNodes, storage.context.nodes().size());
@@ -179,5 +228,75 @@ namespace
 
         auto actualHash = fileNode->hashOf(FileAspect::entireFileAspect().name());
         EXPECT_EQ(updatedHash, actualHash);
+    }
+
+    TEST(PersistentBuildState, rollbackRemovedRepo) {
+        SetupHelper setup(FileSystem::createUniqueDirectory());
+        EXPECT_EQ(nNodes, setup.context.nodes().size());
+
+        std::string repoName = setup.sourceFileRepo->name();
+        EXPECT_TRUE(setup.context.removeRepository(repoName));
+        EXPECT_EQ(0, setup.context.nodes().size());
+        setup.sourceFileRepo = nullptr;
+        setup.repoDirNode = nullptr;
+
+        setup.persistentState.rollback();
+
+        EXPECT_EQ(nNodes, setup.context.nodes().size());
+        EXPECT_NE(nullptr, setup.context.findRepository(repoName));
+        // Verify that the rolled-back build state can be executed
+        setup.executeAll();
+    }
+
+    TEST(PersistentBuildState, rollbackRemovedNode) {
+        SetupHelper setup(FileSystem::createUniqueDirectory());
+        EXPECT_EQ(nNodes, setup.context.nodes().size());
+
+        std::map<std::filesystem::path, std::shared_ptr<Node>> dirContentBeforeClear =  
+            setup.repoDirNode->getContent();
+        EXPECT_EQ(7, dirContentBeforeClear.size());
+        setup.sourceFileRepo->clear(); // will remove all nodes
+        EXPECT_EQ(0, setup.context.nodes().size());
+        EXPECT_EQ(0, setup.repoDirNode->getContent().size());
+
+        setup.persistentState.rollback();
+
+        EXPECT_EQ(nNodes, setup.context.nodes().size());
+        EXPECT_EQ(dirContentBeforeClear.size(), setup.repoDirNode->getContent().size());
+        // Verify that the rolled-back build state can be executed
+        setup.executeAll();
+    }
+
+    TEST(PersistentBuildState, rollbackAddedNode) {
+        SetupHelper setup(FileSystem::createUniqueDirectory());
+        EXPECT_EQ(nNodes, setup.context.nodes().size());
+
+        std::filesystem::path addedFile = setup.addNode();
+        EXPECT_EQ(nNodes + 1, setup.context.nodes().size());
+
+        setup.persistentState.rollback();
+
+        EXPECT_EQ(nNodes, setup.context.nodes().size());
+        EXPECT_EQ(nullptr, setup.context.nodes().find(addedFile));
+        // Verify that the rolled-back build state can be executed
+        setup.executeAll();
+    }
+
+    TEST(PersistentBuildState, rollbackModifiedNode) {
+        SetupHelper setup(FileSystem::createUniqueDirectory());
+        EXPECT_EQ(nNodes, setup.context.nodes().size());
+
+        auto tuple = setup.modifyNode();
+        std::filesystem::path modifiedFile = std::get<0>(tuple);
+        XXH64_hash_t hashBeforeModify = std::get<1>(tuple);
+
+        setup.persistentState.rollback();
+
+        EXPECT_EQ(nNodes, setup.context.nodes().size());
+        auto node = dynamic_pointer_cast<FileNode>(setup.context.nodes().find(modifiedFile));
+        XXH64_hash_t hash = node->hashOf(FileAspect::entireFileAspect().name());
+        EXPECT_EQ(hashBeforeModify, hash);
+        // Verify that the rolled-back build state can be executed
+        setup.executeAll();
     }
 }

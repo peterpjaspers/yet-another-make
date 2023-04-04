@@ -57,6 +57,7 @@ namespace YAM
         uint32_t typeId() const override;
         void stream(IStreamer* streamer) override;
         // Inherited from IPersistable
+        void prepareDeserialize() override;
         void restore(void* context) override;
 
     private:

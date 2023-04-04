@@ -50,6 +50,7 @@ namespace YAM
         _context->nodes().remove(_directoryNode);
         _directoryNode->clear();
         _directoryNode->setState(Node::State::Dirty);
+        modified(true);
     }
 
     void SourceFileRepository::setStreamableType(uint32_t type) {
@@ -68,7 +69,9 @@ namespace YAM
 
     void SourceFileRepository::restore(void* context) {
         FileRepository::restore(context);
-        _context = reinterpret_cast<ExecutionContext*>(context);
-        _watcher = std::make_shared<FileRepositoryWatcher>(_directory, _context);
+        if (_context == nullptr) {
+            _context = reinterpret_cast<ExecutionContext*>(context);
+            _watcher = std::make_shared<FileRepositoryWatcher>(_directory, _context);
+        }
     }
 }

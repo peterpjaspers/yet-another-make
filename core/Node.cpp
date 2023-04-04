@@ -408,6 +408,9 @@ namespace YAM
         streamer->stream(_name);
     }
 
+    void Node::prepareDeserialize() {
+    }
+
     void Node::restore(void* context) {
         _context = reinterpret_cast<ExecutionContext*>(context);
         _modified = false;

@@ -35,9 +35,17 @@ namespace YAMTest
 
         void execute() {
             for (auto n : _nodes) {
-                _handles[n] = n->completor().Add(
-                    Delegate<void, Node*>::CreateRaw(this, &Executor::_handleNodeCompletion));
-                n->start();
+                bool complete =
+                    n->state() == Node::State::Ok
+                    || n->state() == Node::State::Failed
+                    || n->state() == Node::State::Canceled;
+                if (complete) {
+                    _handleNodeCompletion(n);
+                } else {
+                    _handles[n] = n->completor().Add(
+                        Delegate<void, Node*>::CreateRaw(this, &Executor::_handleNodeCompletion));
+                    if (n->state() == Node::State::Dirty) n->start();
+                }
             }
             _nodes[0]->context()->mainThreadQueue().run(&_frame);
 

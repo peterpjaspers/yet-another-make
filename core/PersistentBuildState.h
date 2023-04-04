@@ -136,7 +136,21 @@ namespace YAM
     class IPersistable;
 
     // The YAM build state consists of the nodes and repositories in an
-    // ExecutionContext.
+    // ExecutionContext. 
+    // Happy flow usage:
+    //      PersistentBuildState pstate(directory, context);
+    //      pstate.retrieve();
+    //      // Add/modify/remove nodes and/or repos in context.
+    //      pstate.store();
+    // 
+    // Non-happy flow usage:
+    //      PersistentBuildState pstate(directory, context);
+    //      pstate.retrieve();
+    //      // Add/modify/remove nodes and/or repos in context.
+    //      // Discover corruption of the build state, e.g. changes in a 
+    //      // build file introduced a cycle in the node graph.      
+    //      pstate.rollback();
+    //
     class __declspec(dllexport) PersistentBuildState
     {
     public:
@@ -147,17 +161,24 @@ namespace YAM
             std::filesystem::path const& directory,
             ExecutionContext* context);
 
-        // Retrieve the build state from storage and replace build state in
-        // the execution context with the retrieved build state.
+        // Retrieve the build state.
         // Time complexity: O(N) where N is the number of objects in the build
         // state.
+        // Post: context contains the retrieved build state.
         void retrieve();
 
-        // Commit the build state to storage.
+        // Store the build state changes applied since last commit().
         // Time complexity: O(N) where N is the number of new/modified/removed
         // objects in the build state since previous store().
         // Return N.
+        // Post:
+        //     store() != -1 : commit succeeded.
+        //     store() == -1 : commit failed. The build state has been rolled 
+        //                     back to the state at last successfull commit.
         std::size_t store();
+
+        // Rollback the build state to its state at last successfull commit.
+        void rollback();
 
         // Retrieve the object identified by key. For use in deserialization 
         // of persistable object.
@@ -175,7 +196,6 @@ namespace YAM
     private:
         void reset();
         void retrieveAll();
-        void commit();
 
         Key bindToKey(std::shared_ptr<IPersistable> const& object);
         Key allocateKey(IPersistable* object);
@@ -185,6 +205,14 @@ namespace YAM
 
         void storeKey(Key key);
         void processStoreQueue();
+        bool commitBtrees();
+
+        // If recoverBtrees: recover btrees to last commit
+        // Restore build state to state at last commit.
+        void rollback(bool recoverBtrees); 
+        
+        // Return in storedState the objects that have a key.
+        void getStoredState(std::unordered_set<std::shared_ptr<IPersistable>>& storedState);
 
         std::filesystem::path _directory;
         ExecutionContext* _context;
@@ -197,8 +225,10 @@ namespace YAM
         uint32_t _storeNesting;
         std::queue<Key> _retrieveQueue;
         std::queue<Key> _storeQueue;
-        std::unordered_set<Key> _keysToInsert;
-        std::unordered_set<Key> _keysToReplace;
+        std::unordered_set<std::shared_ptr<IPersistable>> _toInsert;
+        std::unordered_set<std::shared_ptr<IPersistable>> _toReplace;
+        std::unordered_set<std::shared_ptr<IPersistable>> _toRemove;
+        std::map<IPersistable*, Key> _toRemoveKeys;
     };
 
 }

@@ -581,6 +581,16 @@ namespace YAM
         streamer->stream(_executionHash);
     }
 
+    void CommandNode::prepareDeserialize() {
+        Node::prepareDeserialize();
+        for (auto i : _inputProducers) i->removePreParent(this);
+        for (auto i : _outputs) i->removePreParent(this);
+        for (auto i : _inputs) i->removePreParent(this);
+        _inputProducers.clear();
+        _outputs.clear();
+        _inputs.clear();
+    }
+
     void CommandNode::restore(void* context) {
         Node::restore(context);
         for (auto i : _inputProducers) i->addPreParent(this);
@@ -590,5 +600,4 @@ namespace YAM
         }
         for (auto i : _inputs) i->addPreParent(this);
     }
-
 }

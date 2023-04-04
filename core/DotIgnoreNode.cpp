@@ -109,6 +109,7 @@ namespace YAM
                 file->addPreParent(this);
                 context()->nodes().add(file);
             }
+            modified(true);
         }
     }
 
@@ -155,6 +156,14 @@ namespace YAM
         Node::stream(streamer);
         streamer->streamVector(_dotIgnoreFiles);
         streamer->stream(_hash);
+    }
+
+    void DotIgnoreNode::prepareDeserialize() {
+        Node::prepareDeserialize();
+        for (auto file : _dotIgnoreFiles) {
+            file->removePreParent(this);
+        }
+        _dotIgnoreFiles.clear();
     }
 
     void DotIgnoreNode::restore(void* context) {

@@ -76,6 +76,10 @@ namespace YAM
         streamer->stream(_name);
         streamer->stream(_directory);
     }
+
+    void FileRepository::prepareDeserialize() {
+    }
+
     void FileRepository::restore(void*) {
     }
 }
