@@ -154,6 +154,9 @@ namespace YAM
     class __declspec(dllexport) PersistentBuildState
     {
     public:
+        friend class SharedPersistableReader;
+        friend class SharedPersistableWriter;
+
         typedef uint64_t Key;
 
         // Construct for storage of build state in given directory.
@@ -180,32 +183,22 @@ namespace YAM
         // Rollback the build state to its state at last successfull commit.
         void rollback();
 
-        // Retrieve the object identified by key. For use in deserialization 
-        // of persistable object.
+    private:
+        // retrieve for use by SharedPersistableReader
         std::shared_ptr<IPersistable> retrieve(Key key);
-
-        // If object not yet in storage: add it to storage
-        // else if object->modified(): update stored object.
-        // Return the key of stored object.
-        // For use in serialization of persistable object.
+        // store for use by SharedPersistableWriter
         Key store(std::shared_ptr<IPersistable> const& object);
 
-        // If object is in storage: remove it from storage.
-        void remove(std::shared_ptr<IPersistable> const& object);
-
-    private:
         void reset();
         void retrieveAll();
+        void retrieveKey(Key key);
 
         Key bindToKey(std::shared_ptr<IPersistable> const& object);
         Key allocateKey(IPersistable* object);
-
-        void retrieveKey(Key key);
-        void processRetrieveQueue();
-
-        void storeKey(Key key);
-        void processStoreQueue();
+        void store(std::shared_ptr<IPersistable> const& object, bool replace);
         bool commitBtrees();
+
+        void remove(Key key, std::shared_ptr<IPersistable> const& object);
 
         // If recoverBtrees: recover btrees to last commit
         // Restore build state to state at last commit.
@@ -213,6 +206,8 @@ namespace YAM
         
         // Return in storedState the objects that have a key.
         void getStoredState(std::unordered_set<std::shared_ptr<IPersistable>>& storedState);
+        void addToBuildState(std::shared_ptr<IPersistable> const& object);
+        void removeFromBuildState(std::shared_ptr<IPersistable> const& object);
 
         std::filesystem::path _directory;
         ExecutionContext* _context;
@@ -221,10 +216,6 @@ namespace YAM
         uint64_t _nextId;
         std::map<Key, std::shared_ptr<IPersistable>> _keyToObject;
         std::map<IPersistable*, Key> _objectToKey;
-        uint32_t _retrieveNesting;
-        uint32_t _storeNesting;
-        std::queue<Key> _retrieveQueue;
-        std::queue<Key> _storeQueue;
         std::unordered_set<std::shared_ptr<IPersistable>> _toInsert;
         std::unordered_set<std::shared_ptr<IPersistable>> _toReplace;
         std::unordered_set<std::shared_ptr<IPersistable>> _toRemove;
