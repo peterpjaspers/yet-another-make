@@ -5,7 +5,7 @@
 #include <vector>
 #include <filesystem>
 #include <memory>
-#include <unordered_set>
+#include <unordered_map>
 #include <mutex>
 
 namespace YAM
@@ -57,11 +57,8 @@ namespace YAM
         std::size_t size();
 
     private:
-
         std::mutex _mutex;
-
-        // TODO: used unordered_set. However set cannot use std::filesystem::path as keys.
-        std::map<std::filesystem::path, std::shared_ptr<Node> > _nodes;
+        std::unordered_map<std::filesystem::path, std::shared_ptr<Node> > _nodes;
     };
 }
 

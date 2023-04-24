@@ -1,3 +1,4 @@
+
 #pragma once
 
 #include "Delegates.h"
@@ -22,15 +23,15 @@ namespace YAM
     // Typical node subtypes for a SW build application like YAM are:
     //     - Command node
     //       Execution produces one or more output files. Execution may read
-    //         source files and/or output files produced by other nodes.
-    //         E.g. a C++ compile node produces an object file and reads a cpp and
-    //         header files.
+    //       source files and/or output files produced by other nodes.
+    //       E.g. a C++ compile node produces an object file and reads a cpp and
+    //       header files.
     //     - Generated file node
     //       An output file of a command node. 
-    //         Execution (re-)computes hashes of the file content. 
+    //       Execution (re-)computes hashes of the file content. 
     //     - Source file node
     //       Associated with a source file.
-    //         Execution (re-)computes hashes of the file content.
+    //       Execution (re-)computes hashes of the file content.
     //
     // A node's name takes the form of a file path. For file nodes this path
     // indeed references a file. In general however this need not be the case.
@@ -40,29 +41,52 @@ namespace YAM
     // execution is started by the start() member function. 
     //    stage 1: Execute the prerequisites of the node.
     //             Prerequisite nodes produce results that are needed as input
-    //               by stage 2. E.g. the prerequisites of a link command node are
+    //             by stage 2. E.g. the prerequisites of a link command node are
     //             compilation nodes that produce the object files to be linked.
-    //             The stage 1 execution results in a depth-first traversal of
-    //               the prerequisites node tree.
     //    stage 2: Self-execution of the node.
-    //               In this stage the node can perform node-specific computation.
-    //               E.g. link C++ object files into a library.
-    //               This stage is started by the startSelf() virtual member function.
+    //             In this stage the node can perform node-specific computation.
+    //             E.g. link C++ object files into a library.
+    //             This stage is started by the startSelf() member function. 
     //    stage 3: Execute the postrequisites of the node.
     //             Postrequisite nodes are typically produced by stage 2.
     //             E.g. the execution of a directory node must create a node 
     //             hierachy that reflects the content of a directory tree in the
-    //               filesystem. Further it must compute for each directory and file 
+    //             filesystem. Further it must compute for each directory and file 
     //             node a hash of their content. 
     //             The directory node has no prerequisites.
     //             The directory node's self-execution iterates a directory and
     //             creates for each directory entry a file or directory node.
-    //               The postrequisites are the file and directory nodes created in 
+    //             The postrequisites are the file and directory nodes created in 
     //             stage 2. The stage 3 execution results in a breadth-first 
     //             traversal of the filesystem directory tree.
     //
-    // Name convention: node execution is synonym for 3-stage node execution.
+    // Name convention: node execution is synonym for 3-stage execution.
+    // 
+    // A 3-stage execution of a node must start with executing all dirty nodes
+    // in the postrequisites hierarchy:
+    //      dirtyNodes = getDirtyPostrequisiteNodesRecursively({node})
+    //      execute(dirtyNodes)
     //
+    // The 3-stage execution is functionally equivalent to the following code 
+    // that only uses stage 1 + stage 2 execution:
+    //      dirtyNodes = getDirtyPostRequisiteNodesRecursively({node})
+    //      while (!dirtyNodes.empty()) {
+    //          execute(dirtyNodes) // can produce new dirty postrequisite nodes
+    //          dirtyNodes = getDirtyPostRequisiteNodesRecursively(dirtyNodes)
+    //      }
+    // Stage 3 execution provides better utilization of the threadpool than
+    // above equivalent algorithm because it queues postrequisites of a node 
+    // to the threadpool immediately after completion of stage 2.
+    //
+    // Node class is not MT-safe: all public member functions must be called
+    // from ExecutionContext::mainThread().
+    // Derived classes must access node state and ExecutionContext::nodes() 
+    // in mainThread only. E.g. a directory nodes keeps its child nodes in a
+    // member variable. When a directory node (re-)executes it retrieves
+    // the directory content in threadpool context, posts this content to the
+    // ExecutionContext::mainThreadQueue, the posted delegate assigns retrieved
+    // content to content member variable.
+    //  
     class __declspec(dllexport) Node : public IPersistable
     {
     public:
@@ -207,10 +231,10 @@ namespace YAM
         // Pre: state() == Node::State::Dirty
         // Start asynchronous 3-stage execution:
         //    1: prerequisites.where(Dirty).each(start)
-        //      2: on prerequisites completion: if (pendingStartSelf()) startSelf()
-        //     3a: on startSelf completion: postrequisites.where(Dirty).each(start)
-        //     3b: on postrequisites completion: completor().broadcast(this)
-        // All start() and startSelf() calls are made in current thread. 
+        //    2: on prerequisites completion: if (pendingStartSelf()) startSelf()
+        //   3a: on startSelf completion: postrequisites.where(Dirty).each(start)
+        //   3b: on postrequisites completion: completor().broadcast(this)
+        // start() must be called in context()->mainThread(). 
         // completor().broadcast(this) call is made in context()->mainThread(). 
         void start();
 
