@@ -125,8 +125,8 @@ namespace YAM
     public:
         const uint32_t typeBits = 8;
         const uint32_t idBits = 64 - typeBits;
-        const uint64_t idMask = (1 << idBits) - 1;
-        const uint64_t maxId = (static_cast <uint64_t>(1) << idBits) - 1;
+        const uint64_t idMask = (static_cast <uint64_t>(1) << idBits) - 1;
+        const uint64_t maxId = idMask;
 
         KeyCode(PersistentBuildState::Key key) 
             : _key(key)
@@ -139,7 +139,9 @@ namespace YAM
             , _id(id)
             , _type(type) 
         {
-            if (id > maxId) throw std::exception("id out of bounds");
+            if (id > maxId) {
+                throw std::exception("id out of bounds");
+            }
         }
 
         PersistentBuildState::Key _key;
