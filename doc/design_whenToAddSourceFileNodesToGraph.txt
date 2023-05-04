@@ -2,8 +2,8 @@ Output file nodes are specified in the build files and hence are added to the
 graph before command node execution.
 
 But when to add a source file node to the graph?
-	1) when it is detected as input file of a command node
-	2) adding (and hashing) all source files in the repository before start
+    1) when it is detected as input file of a command node
+    2) adding (and hashing) all source files in the repository before start
     of command node execution.
 
   Option 1) has the disadvantage that source file hash is computed after it has
@@ -97,7 +97,7 @@ to:
             std::shared_ptr<FileNode> _file;
     }
 A disadvantage of this approach is that it may cause frequent re-execution of the
-DirectoryNode that contains the generated files because typically output files
+SourceDirectoryNode that contains the generated files because typically output files
 are deleted before being re-generated, resulting in directory updates.
 
 Note: the above approach to file node creation and execution also simplifies 

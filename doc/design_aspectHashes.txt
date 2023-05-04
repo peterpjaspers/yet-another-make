@@ -90,19 +90,19 @@ FileAspects in its executionHash.
 
 FileAspects and FileAspectSets are stored in the ExecutionContext.
 This context is used by CommandNode and FileNode as follows:
-	- command node:
+    - command node:
         - executes script and detects input files
-		- queries ExecutionContext for its input FileAspectSet 
+        - queries ExecutionContext for its input FileAspectSet 
         - executionHash = hash(
                 hash of command script,
                 hashes of relevant aspects of input files, 
                 hashes of (entire content) of output files, 
                 hash of used FileAspectSet)
         - pendingStartSelf compares stored executionHash with current one
-	- input file node:
-		- has member field: std::map<aspectName,hashValue> _hashes;
+    - input file node:
+        - has member field: std::map<aspectName,hashValue> _hashes;
         - computes the applicable aspect hashes:
-		    - query ExecutionContext for all FileAspects that match the file
+            - query ExecutionContext for all FileAspects that match the file
             - use the aspect hashers to compute aspect hashes
             - clear _hashes;
             - store new hashes in _hashes;

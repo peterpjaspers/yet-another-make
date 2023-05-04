@@ -1,19 +1,37 @@
-Todo
-- build state storage
-    - implement streaming btree (provides streaming of value types into btree via ValueStreamer i/f)
-    - implement ObjectStreamer (streams C++ objects to/from ValueStreamer)
-    - implement BuildStateStreamer (streams YAM buildstate)
+Todo: core
+- DirectoryNode execution should finish after self-execution, not after
+  postrequisites execution.
+- decide on postrequisites
+  Non-consistent interface: executing directory node builds entire tree when
+  node is executed first time. Subsequent execution of the directory node
+  only update its children and executes its direct dirty children. Dirty children 
+  further down the tree will not be executed. To achieve full tree update the 
+  application must find all dirty nodes and then execute these. Both behaviors
+  are captured in this code:
+      vector dirtyNodes;
+      while (tree->findDirtyNodesRecursively(dirtyNodes)) {
+          execute(dirtyNodes)
+      }
+  Finding dirty nodes by iterating over all nodes is O(n). 
+  Another approach that is O(log(n) and that keeps the recursive implementation:
+  A node that is set dirty propagates dirty state to its postrequisiteParents.
+  Disadvantage: directory nodes in path from root to dirty node will self-execute even when
+  this is not necessary. Possible refinement: add hasDirtyPostRequisites flag. Nodes in state Ok
+  and hasDirtyPostRequisites only execute postRequisites that are dirty or hasDirtyPostRequisites.
+- decide on how to make finding dirty nodes O(1)
+- decide on MT-safe buildstate access: lock buildstate or post all updates to main thread
+- transaction across multiple btrees (tree of trees)
+- investigate scalability by measuring execution overhead, hashing overhead and 
+  handling found file dependencies.
+- implement DotIgnoreNode
+- File aspects as nodes
+- aspect hashing for Dll import lib and code parts of C++ files 
+- Logging by node in thread pool to memorystream
+  Seperated thread forwards log to tcp/ip socket to client
+- Hide btree behind interface and let current file storage inherit from this interface.
+- Command node script executes in shell: user must specify which shell.
+  It must also be possible to execute 'script' directly (e.g. cc -o a.obj a.cpp)
 - winkin (build cache)
-- build file syntax (follow tup, follow mrmake, something completely different?)
-    - decide
-    - implement parsers and DAG updater
-- SourceFileRepository: SourceDirectoryNode takes exclude (ignore) patterns
-  from .gitignore and from .yamignore (having gitignore syntex).
-  In a git repo:
-      .gitignore typically ignores build outputs.
-      .yamignore can additionally ignore source files
-  Not a git repo:
-      .yamignore ignores build outputs and optionally source files
 - Decide how to deal with using generated files from other repos
     - first build in other repo using that repo's build server, then build this
        repo versus build both repos in this repo's build server.
@@ -22,17 +40,23 @@ Todo
        as usual. Disadvantage: if other repo was already build then this repo will build
        it again.
     - build file must tell YAM which repo's to build
-- Persistentbuildstate
-- File aspects as nodes
-- aspect hashing for Dll import lib and code parts of C++ files 
-- Logging by node in thread pool to memorystream
-  Seperated thread forwards log to tcp/ip socket to client
-- Hide btree behind interface and let current file storage inherit from this interface.
-- Command node script VS command node direct program execution.
 
+Todo: non-core
+- build file syntax (follow tup, follow mrmake, something completely different?)
+    - decide
+    - implement parsers and DAG updater
 
 
 Done
+- build state storage (PersistentBuildState)
+- streaming btree (provides streaming of value types into btree via ValueStreamer i/f)
+- SourceFileRepository: SourceDirectoryNode takes exclude (ignore) patterns
+  from .gitignore and from .yamignore (having gitignore syntex).
+  In a git repo:
+      .gitignore typically ignores build outputs.
+      .yamignore can additionally ignore source files
+  Not a git repo:
+      .yamignore ignores build outputs and optionally source files
 - ExecutionContext
   To avoid singletons a context object is passed to Node constructor.
   It provides access to:
