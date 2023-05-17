@@ -1,8 +1,6 @@
 #ifndef VALUE_STREAMER_H
 #define VALUE_STREAMER_H
 
-#include "BTree.h"
-
 namespace BTree {
 
     class ValueStreamer {
@@ -19,26 +17,28 @@ namespace BTree {
         virtual void stream( int64_t& value ) = 0;
         virtual void stream( uint64_t& value ) = 0;
         virtual bool eos() = 0;
+        virtual ValueStreamer& open( StreamIndex index ) = 0;
+        virtual bool isOpen() = 0;
         virtual void close() = 0;
     };
 
     class ValueReader : public ValueStreamer {
     private:
-        const Tree<StreamKey,uint8_t,false,true>& tree;
+        const Tree<StreamKey,uint8_t[]>& tree;
         StreamKey key;
         std::pair<const uint8_t*, PageIndex> buffer;
         uint16_t position;
         void readBlock() {
-            if ( position == buffer.second ) {
+            if ( buffer.second <= position ) {
                 buffer = tree.retrieve( key );
                 key.sequence += 1;
                 position = 0;
             }
         }
         uint8_t getByte() {
-            static const std::string signature( "uint8_t ValueReader::getByte()" );
+            static const char* signature( "uint8_t ValueReader::getByte()" );
             readBlock();
-            if ( buffer.first == nullptr ) throw signature + " - Streaming beyond end of stream";
+            if ( buffer.first == nullptr ) throw std::string( signature ) + " - Streaming beyond end of stream";
             return buffer.first[ position++ ];
         }
         template <class T>
@@ -47,8 +47,8 @@ namespace BTree {
            for (size_t i = 0; i < sizeof( T ); i++) streamed[ i ] = getByte();
         }
     public:
-        ValueReader( const Tree<StreamKey,uint8_t,false,true>& values, StreamIndex index ) :
-            tree( values ), key( index, 0 ), buffer( nullptr, INT16_MAX ), position( INT16_MAX )
+        ValueReader( const Tree<StreamKey,uint8_t[]>& values ) :
+            tree( values ), buffer( nullptr, UINT16_MAX ), position( UINT16_MAX )
         {}
         void stream( bool& value ) { return( getValue<bool>( value ) ); }
         void stream( float& value ) { return( getValue<float>( value ) ); }
@@ -62,19 +62,31 @@ namespace BTree {
         void stream( int64_t& value ) { return( getValue<int64_t>( value ) ); }
         void stream( uint64_t& value ) { return( getValue<uint64_t>( value ) ); }
         bool eos() { readBlock(); return( buffer.first == nullptr ); }
-        void close() {}
+        ValueReader& open( StreamIndex index ) {
+            static const char* signature = "ValueReader& ValueReader::open( StreamIndex index )";
+            if (isOpen()) throw std::string( signature ) + " - Opening while reader open";
+            key = StreamKey( index, 0 );
+            return *this;
+        }
+        bool isOpen() { return( position != UINT16_MAX ); }
+        void close() {
+            static const char* signature = "void ValueReader::close()";
+            if (!isOpen()) throw std::string( signature ) + " - Closing closed reader";
+            position = UINT16_MAX;
+            
+        }
     }; // class ValueReader
 
     class ValueWriter : public ValueStreamer {
     private:
-        Tree<StreamKey,uint8_t,false,true>& tree;
+        Tree<StreamKey,uint8_t[]>& tree;
         StreamKey key;
         std::vector<uint8_t> buffer;
         uint16_t position;
         void writeBlock() {
-            static const std::string signature( "void ValueWriter::writeBlock()" );
+            static const char* signature( "void ValueWriter::writeBlock()" );
             if (0 < position) {
-                if (key.sequence == UINT16_MAX) throw signature + " - Exceding maximum block count";
+                if (key.sequence == UINT16_MAX) throw std::string( signature ) + " - Exceding maximum block count";
                 tree.insert( key, &buffer[ 0 ], position );
                 key.sequence += 1;
                 position = 0;
@@ -90,8 +102,8 @@ namespace BTree {
            for (size_t i = 0; i < sizeof( T ); i++) putByte( streamed[ i ] );
         }
     public:
-        ValueWriter( Tree<StreamKey,uint8_t,false,true>& values, StreamIndex index, StreamBlockSize block ) :
-            tree( values ), key( index, 0 ), buffer( block ), position( 0 )
+        ValueWriter( Tree<StreamKey,uint8_t[]>& values, StreamBlockSize block ) :
+            tree( values ), buffer( block ), position( UINT16_MAX )
         {}
         void stream( bool& value ) { return( putValue<bool>( value ) ); }
         void stream( float& value ) { return( putValue<float>( value ) ); }
@@ -105,7 +117,20 @@ namespace BTree {
         void stream( int64_t& value ) { return( putValue<int64_t>( value ) ); }
         void stream( uint64_t& value ) { return( putValue<uint64_t>( value ) ); }
         bool eos() { return( false ); }
-        void close() { writeBlock(); }
+        ValueWriter& open( StreamIndex index ) {
+            static const char* signature = "ValueWriter& ValueWriter::open( StreamIndex index )";
+            if (isOpen()) throw std::string( signature ) + " - Opening while writer open";
+            key = StreamKey( index, 0 );
+            position = 0;
+            return *this;
+        }
+        bool isOpen() { return( position != UINT16_MAX ); }
+        void close() {
+            static const char* signature = "void ValueWriter::close()";
+            if (!isOpen()) throw std::string( signature ) + " - Closing closed writer";
+            writeBlock();
+            position = UINT16_MAX;
+        }
     }; // class ValueWriter
 
 }; // namespace BTree

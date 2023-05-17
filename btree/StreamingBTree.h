@@ -5,7 +5,9 @@
 #include "ValueStreamer.h"
 
 // ToDo: Reuse indeces by maintaining a collection of deleted indeces...
-// ToDo: Add constructor argument to enable user defined key comparison
+// ToDo: Add constructor argument to enable user defined key comparison...
+// ToDo: Implement B-Tree of B-Trees to enable two B-Trees to reside in a single page pool.
+// ToDo: Iterator over streaming B-Tree to return streamers.
 
 namespace BTree {
 
@@ -17,28 +19,31 @@ namespace BTree {
         return( 0 );
     };
 
-    template< class K, bool KA >
+    template< class K >
     class StreamingTree {
     private:
-        Tree<K,StreamIndex,KA,false> indeces;
-        Tree<StreamKey,uint8_t,false,true> values;
+        Tree<K,StreamIndex> indeces;
+        Tree<StreamKey,uint8_t[]> values;
+        ValueReader reader;
+        ValueWriter writer;
         StreamBlockSize blockSize;
         StreamIndex index;
-        template< class SK, bool SKA >
-        friend std::ostream & operator<<( std::ostream & o, const StreamingTree<SK, SKA>& tree );
+        template< class KT >
+        friend std::ostream & operator<<( std::ostream & o, const StreamingTree<KT>& tree );
     public:
-        StreamingTree( PagePool& pool, StreamBlockSize block, UpdateMode mode = Auto ) :
-            indeces( Tree<K,StreamIndex,KA,false>( pool, mode, 0  ) ),
-            values( Tree<StreamKey,uint8_t,false,true>( pool, mode, nullptr, UINT16_MAX, compareIndexRange ) ),
-            blockSize( block ),
+        StreamingTree( PagePool& indexPool, PagePool& valuePool, StreamBlockSize block, UpdateMode mode = Auto ) :
+            indeces( indexPool, mode, 0 ),
+            values( valuePool, mode, nullptr, UINT16_MAX, compareIndexRange ),
+            reader( values ),
+            writer( values, block ),
             index( 1 )
         {
-            static const std::string signature( "StreamingTree( PagePool& pool, StreamBlockSize block, UpdateMode mode )" );
-            if ( (pool.pageCapacity() / 8) < block ) throw signature + " - Invalid block size";
+            static const char* signature( "StreamingTree( PagePool& indexPool, PagePool& valuePool, StreamBlockSize block, UpdateMode mode )" );
+            if ( (valuePool.pageCapacity() / 8) < block ) throw std::string( signature ) + " - Invalid block size";
         };
 
-        template<bool AK = KA>
-        typename std::enable_if<(!AK),ValueWriter>::type& insert( const K& key ) {
+        template< class KT = K, std::enable_if_t<(S<KT>),bool> = true >
+        ValueWriter& insert( const KT& key ) {
             StreamIndex index = indeces.retrieve( key );
             if ( index != 0 ) {
                 removeBlocks( index );
@@ -46,18 +51,19 @@ namespace BTree {
                 index = StreamingTree::index++;
                 indeces.insert( key, index );
             }
-            return *( new ValueWriter( values, index, blockSize ) );
+            return writer.open( index );
         }
-        template<bool AK = KA>
-        typename std::enable_if<(!AK),ValueReader>::type& retrieve( const K& key ) {
-            return *( new ValueReader( values, indeces.retrieve( key ) ) );
+        template< class KT = K, std::enable_if_t<(S<KT>),bool> = true >
+        ValueReader& retrieve( const KT& key ) const {
+            return reader.open( indeces.retrieve( key ) );
         }
-        template<bool AK = KA>
-        typename std::enable_if<(!AK),void>::type remove( const K& key ) {
+        template< class KT = K, std::enable_if_t<(S<KT>),bool> = true >
+        void remove( const KT& key ) {
             removeBlocks( indeces.retrieve( key ) );
+            indeces.remove( key );
         }
-        template<bool AK = KA>
-        typename std::enable_if<(AK),ValueWriter>::type& insert( const K* key, PageSize keySize ) {
+        template< class KT = K, std::enable_if_t<(A<KT>),bool> = true >
+        ValueWriter& insert( const B<KT>* key, PageSize keySize ) {
             StreamIndex index = indeces.retrieve( key, keySize );
             if ( index != 0 ) {
                 removeBlocks( index );
@@ -65,15 +71,16 @@ namespace BTree {
                 index = StreamingTree::index++;
                 indeces.insert( key, keySize, index );
             }
-            return *( new ValueWriter( values, index, blockSize ) );
+            return writer.open( index );
         }
-        template<bool AK = KA>
-        typename std::enable_if<(AK),ValueReader>::type& retrieve( const K* key, PageSize keySize ) {
-            return *( new ValueReader( values, indeces.retrieve( key, keySize ) ) );
+        template< class KT = K, std::enable_if_t<(A<KT>),bool> = true >
+        ValueReader& retrieve( const B<KT>* key, PageSize keySize ) {
+            return reader.open( indeces.retrieve( key, keySize ) );
         }
-        template<bool AK = KA>
-        typename std::enable_if<(AK),void>::type remove( const K*key, PageSize keySize ) {
+        template< class KT = K, std::enable_if_t<(A<KT>),bool> = true >
+        void remove( const B<KT>*key, PageSize keySize ) {
             removeBlocks( indeces.retrieve( key, keySize ) );
+            indeces.remove( key, keySize );
         }
         void commit() { indeces.commit(); values.commit(); };
         void recover(){ indeces.recover(); values.recover(); };
@@ -91,8 +98,8 @@ namespace BTree {
         }
     }; // class StreamingTree
 
-    template< class K, bool KA >
-    inline std::ostream & operator<<( std::ostream & o, const StreamingTree<K,KA>& tree ) { tree.stream( o ); return o; }
+    template< class K >
+    inline std::ostream & operator<<( std::ostream & o, const StreamingTree<K>& tree ) { tree.stream( o ); return o; }
 
 }; // namespace BTree
 

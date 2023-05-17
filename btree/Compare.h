@@ -11,7 +11,7 @@ namespace BTree {
 
     // Compare functor operating on Page indeces.
     // Compares functor key with the key at argument index.
-    // Derived classes operate on Leaf and Node pages.
+    // Derived classes operate on Leaf and Node pages with fixed and variable size keys.
     class Compare {
     public:
         virtual KeyCompare operator()( PageIndex index ) const { return 0; };
@@ -20,10 +20,10 @@ namespace BTree {
         // Returns true if key was found, false otherwise.
         // If key was not found, returns index of smallest key larger than requested key
         // unless such a key does not exist in which case returns size of page.
-        bool index( Trail& trail ) const {
+        bool position( Trail& trail ) const {
             PageSize n = size();
             if (n == 0) {
-                trail.index( 0, +1 );
+                trail.position( Trail::AfterSplit );
                 return false;
             }
             PageIndex high = n;
@@ -38,29 +38,25 @@ namespace BTree {
                 } else if (0 < cmp) {
                     low = (mid + 1);
                 } else {
-                    trail.index( mid, cmp );
+                    trail.position( Trail::OnIndex, mid );
                     return true;
                 }
             } while (low < high);
-            if (low == n) {
-                cmp = operator()( n - 1 );
-                trail.index( (n - 1), cmp );
+            PageIndex idx = mid;
+            if (low == n) idx = (n - 1);
+            else if (mid < low) idx = low;
+            else if (0 < low) idx = (low - 1);
+            cmp = operator()( idx );
+            if (0 < cmp) {
+                trail.position( Trail::AfterIndex, idx );
                 return false;
-            } else if (mid != low) {
-                KeyCompare cmpLow = operator()( low );
-                if (0 <= cmpLow) {
-                    trail.index( low, cmpLow );
-                    return false;
-                }
-            } else if (0 < low) {
-                KeyCompare cmpLow = operator()( low - 1 );
-                if (0 <= cmpLow) {
-                    trail.index( (low - 1), cmpLow );
-                    return false;
-                }
+            } else if (cmp < 0) {
+                if (0 < idx) trail.position( Trail::AfterIndex, (idx - 1) );
+                else trail.position( Trail::AfterSplit );
+                return false;
             }
-            trail.index( mid, cmp );
-            return false;
+            trail.position( Trail::OnIndex, idx );
+            return true;
         };
     };
     template< class K, class V, bool KA, bool VA > 

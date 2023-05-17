@@ -3,212 +3,333 @@
 
 #include "Page.h"
 #include "PagePool.h"
+#include "TreeBase.h"
 
 namespace BTree {
 
-    // Maximum height of a B-tree.
-    // Enforcing a maximum height enables various optimizations.
-    const PageDepth MaxHeight = 8;
-
     // A Trail maintains a path through a B-tree.
     class Trail {
-        // An TrailEntry points to a particular key-value pair in a BTree Page.
-        struct TrailEntry {
-            // The PageLink associated with the Page in which the key-value pair resides
-            // This is either a Leaf Page or a Node Page.
-            const PageHeader* header;
-            // The index in the page at which the key-value pair is located
-            // In range [ 0, size ). 0 for split value and first indexed key-value.
-            PageIndex index;
-            // Comparison result with key at index in node.
-            // 0 if key compares equal to key at index in this Leaf or Node Page.
-            // Negative is key compares less than key at index 0, only for split values.
-            // Positive if key compares greater than key at index in Node Page.
-            KeyCompare compare;
-        };
-        PagePool& pool;
-        std::array< TrailEntry, MaxHeight > stack;
-        PageDepth height;
     public:
-    Trail() = delete;
-        inline Trail( PagePool& p ) : pool( p ), height( 0 ) {}
-        inline Trail( PagePool& pool, const PageHeader* header ) : Trail( pool ) {
-            stack[ height++ ] = { header, 0, -1 };
+        // Maximum height of a B-tree.
+        // Enforcing a maximum height enables static allocation of Trail objects.
+        static const PageDepth MaxHeight = 16;
+        // The position in a Page of a Trail entry.
+        enum Position {
+            Undefined   = 0, // Position undefined
+            OnIndex     = 1, // On page index
+            AfterIndex  = 2, // After page index; i.e., between two indeces or after last index
+            OnSplit     = 3, // On page split
+            AfterSplit  = 4  // After page split; i.e., before first index (if any)
+        };
+        // The position is OnIndex or OnSplit if the Trail is positioned at an existing key.
+        // The position is AfterSplit or AfterIndex if the Trail is positioned at a non-existing key.
+    private:
+        // An TrailEntry points to a particular key-value position in a BTree Page.
+        // A position in the B-tree is either a located key-value for an existing key or a location at which
+        // the key-value pair would be inserted if it does not exist.
+        struct TrailEntry
+        {
+            // The PageLink associated with the Page in a Trail, either a Leaf Page or a Node Page.
+            const PageHeader* header;
+            // Position of Trail in this Page.
+            Position position;
+            // The index in the Page for the associated with the Page position.
+            // In range [ 0, count ). 0 for split positions.
+            PageIndex index;
+        };
+        const TreeBase& tree;
+        std::array<TrailEntry,MaxHeight> stack;
+        PageDepth height;
+        inline bool isSplit(Position position) const {
+            return ((position == OnSplit) || (position == AfterSplit));
         }
-        Trail( const Trail& trail ) : Trail( trail.pool ) {
+        inline bool isIndex(Position position) const {
+            return ((position == OnIndex) || (position == AfterIndex));
+        }
+    public:
+        Trail() = delete;
+        inline Trail( const TreeBase& base ) : tree( base ), height( 0 ) {
+            stack[height++] = { tree.root, Undefined, 0 };
+        }
+        Trail( const Trail& trail ) : tree( trail.tree ) {
             height = trail.height;
-            for (PageDepth i = 0; i < height; i++) stack[ i ] = trail.stack[ i ];
+            for (PageDepth i = 0; i < height; i++) stack[i] = trail.stack[i];
         }
-        friend bool operator== (const Trail& a, const Trail& b) {
-            if (a.height != b.height) return false;
-            for (PageDepth i = 0; i < a.height; i++) {
-                if (
-                    (*(a.stack[ i ].header) != *(b.stack[ i ].header)) ||
-                    (a.stack[ i ].index != b.stack[ i ].index) ||
-                    (a.stack[ i ].compare != b.stack[ i ].compare)
-                ) return false;
-        	}
-            return true;
-        };
-        friend bool operator!= (const Trail& a, const Trail& b) {
-            if (a.height != b.height) return true;
-            for (PageDepth i = 0; i < a.height; i++) {
-                if (
-                    (*(a.stack[ i ].header) != *(b.stack[ i ].header)) ||
-                    (a.stack[ i ].index != b.stack[ i ].index) ||
-                    (a.stack[ i ].compare != b.stack[ i ].compare)
-                ) return true;
-        	}
-            return false;
-        };
-        
-        inline Trail& push( const PageHeader* header, PageIndex index, KeyCompare compare  ) {
-            static const std::string signature( "Trail& Trail::push( const PageHeader* header, PageIndex index, KeyCompare compare  )" );
-            if (height == MaxHeight) throw signature + " - trail overflow.";
-            stack[ height++ ] = { header, index, compare };
+        Trail& operator=( const Trail& trail ) {
+            static const char* signature("Trail& Trail::operator=( const Trail& trail ");
+            if (&tree.pool != &trail.tree.pool) throw std::string( signature ) + " - Only valid on same page pool";
+            height = trail.height;
+            for (PageDepth i = 0; i < height; i++) stack[i] = trail.stack[i];
             return *this;
         }
-        inline Trail& push( const PageHeader* header ) {
-            static const std::string signature( "Trail& Trail::push( const PageHeader* header )" );
-            if (height == MaxHeight) throw signature + " - trail overflow.";
-            stack[ height++ ].header = header;
+        friend bool operator==(const Trail& a, const Trail& b);
+        friend bool operator!=(const Trail& a, const Trail& b);
+        inline Trail& push(const PageHeader *header) {
+            static const char* signature("Trail& Trail::push( const PageHeader* header )");
+            if (height == MaxHeight) throw std::string( signature ) + " - trail overflow.";
+            stack[height++] = {header, Undefined, 0};
             return *this;
         }
-        inline Trail&  pop() {
-            static const std::string signature( "Trail& Trail::pop()" );
-            if (height == 0) throw signature + " - trail underflow.";
+        inline Trail& push(const PageHeader *header, Position position, PageIndex index = 0) {
+            static const char* signature("Trail& Trail::push( const PageHeader* header, Position position, PageIndex index )");
+            if (height == MaxHeight) throw std::string( signature ) + " - trail overflow.";
+            stack[height++] = {header, position, index};
+            return *this;
+        }
+        inline Trail& pushSplit(const PageHeader *header) {
+            return push( header, ( (header->depth == 0) ? Trail::OnSplit : Trail::AfterSplit ) );
+        }
+        inline Trail& pushIndex(const PageHeader *header, PageIndex index, bool on = true ) {
+            return push( header, (on ? OnIndex : AfterIndex) , index );
+        }
+        inline Trail& pop() {
+            static const char* signature("Trail& Trail::pop()");
+            if (height == 0) throw std::string( signature ) + " - trail underflow.";
             height--;
             return *this;
         }
         inline PageDepth depth() const { return height; }
         // Return header of current Page on Trail
-        inline const PageHeader* header( PageDepth offset = 0 ) const {
-            static const std::string signature( "const PageHeader* Trail::header( PageDepth offset = 0 ) const" );
-            if (height < (offset + 1)) throw signature + " - Invalid offset.";
-            return stack[ height - offset - 1 ].header;
+        inline const PageHeader *header(PageDepth offset = 0) const {
+            static const char* signature("const PageHeader* Trail::header( PageDepth offset ) const");
+            if (height < (offset + 1)) throw std::string( signature ) + " - Invalid offset.";
+            return stack[height - offset - 1].header;
+        }
+        // Return current Page position on Trail
+        inline Position position(PageDepth offset = 0) const {
+            static const char* signature("Position Trail::position( PageDepth offset ) const");
+            if (height < (offset + 1)) throw std::string( signature ) + " - Invalid offset.";
+            return stack[height - offset - 1].position;
         }
         // Return current Page index on Trail
         inline PageIndex index( PageDepth offset = 0 ) const {
-            static const std::string signature( "PageIndex Trail::index( PageDepth offset = 0 ) const" );
-            if (height < (offset + 1)) throw signature + " - Invalid offset.";
-            return stack[ height - offset - 1 ].index;
+            static const char* signature("PageIndex Trail::index( PageDepth offset ) const");
+            if (height < (offset + 1)) throw std::string( signature ) + " - Invalid offset.";
+            return stack[height - offset - 1].index;
         }
-        // Return current comparison result on Trail
-        inline KeyCompare compare( PageDepth offset = 0 ) const {
-            static const std::string signature( "KeyCompare Trail::compare( PageDepth offset = 0 ) const" );
-            if (height < (offset + 1)) throw signature + " - Invalid offset.";
-            return stack[ height - offset - 1 ].compare;
+        // Set Page position on Trail
+        inline void position( Position position, PageIndex index = 0, PageDepth offset = 0 ) {
+            static const char* signature("void Trail::position( Position position, PageIndex index, PageDepth offset )");
+            if (height < (offset + 1)) throw std::string( signature ) + " - Invalid offset.";
+            if (position == Undefined) throw std::string( signature ) + " - Invalid Undefined position.";
+            if (isSplit(position) && (index != 0)) throw std::string( signature ) + " - Split index must be zero.";
+            const PageHeader *header = this->header(offset);
+            if (isIndex(position) && (header->count <= index)) throw std::string( signature ) + " - Invalid Page index.";
+            stack[height - offset - 1].position = position;
+            stack[height - offset - 1].index = index;
         }
-        inline void index( PageIndex i, KeyCompare c ) {
-            stack[ height - 1 ].index = i; stack[ height - 1 ].compare = c;
+        // Determine if trail is positioned at a split.
+        // Returns true if positioned on or after a spilt, false otherwise.
+        inline bool atSplit(PageDepth offset = 0) const {
+            static const char* signature("bool Trail::atSplit( PageDepth offset ) const");
+            if (height < (offset + 1)) throw std::string( signature ) + " - Invalid offset.";
+            return isSplit(stack[height - offset - 1].position);
         }
-        inline void compare( KeyCompare c ) { stack[ height - 1 ].compare = c; }
-        inline void compare( PageDepth offset, KeyCompare c ) {
-            static const std::string signature( "void Trail::compare( PageDepth offset, KeyCompare c )" );
-            if (height < (offset + 1)) throw signature + " - Invalid offset.";
-            stack[ height - offset - 1 ].compare = c;
+        // Determine if trail is positioned on a split.
+        // Returns true if positioned on a spilt, false otherwise.
+        inline bool onSplit(PageDepth offset = 0) const {
+            static const char* signature("bool Trail::onSplit( PageDepth offset ) const");
+            if (height < (offset + 1)) throw std::string( signature ) + " - Invalid offset.";
+            return (stack[height - offset - 1].position == OnSplit);
         }
-        inline bool split( PageDepth offset = 0 ) const {
-            static const std::string signature( "bool Trail::split( PageDepth offset = 0 ) const" );
-            if (height < (offset + 1)) throw signature + " - Invalid offset.";
-            return( (stack[ height - offset - 1 ].compare < 0) && (stack[ height - offset - 1 ].index == 0) );
+        // Determine if trail is positioned at a key-value index.
+        // Returns true if positioned on or after an index, false otherwise.
+        inline bool atIndex(PageDepth offset = 0) const {
+            static const char* signature("bool Trail::atIndex( PageDepth offset ) const");
+            if (height < (offset + 1)) throw std::string( signature ) + " - Invalid offset.";
+            return isIndex(stack[height - offset - 1].position);
         }
-        // Determine level in tree at which a match was found.
+        // Determine if trail is positioned on a key-value index.
+        // Returns true if positioned on an index, false otherwise.
+        inline bool onIndex(PageDepth offset = 0) const {
+            static const char* signature("bool Trail::onIndex( PageDepth offset ) const");
+            if (height < (offset + 1)) throw std::string( signature ) + " - Invalid offset.";
+            return (stack[height - offset - 1].position == OnIndex);
+        }
+        // Determine offset in Trail to a key match; offset to a search key.
         // Returns zero if no match was found.
         inline PageDepth match() const {
             for (PageDepth offset = 0; offset < height; offset++) {
-                if (0 <= stack[ height - offset - 1 ].compare) return( offset );
+                Position position = stack[height - offset - 1].position;
+                if ((position == OnIndex) || (position == AfterIndex)) return (offset);
             }
-            return( 0 );
+            return (0);
         }
-        // Pop the trail to the level of a match
-        inline void popToMatch() {
-            static const std::string signature( "void Trail::popToMatch()" );
-            if (height == 0) throw signature + " - trail underflow.";
+        // Determine offset in Trail to an exact key match; i.e., non-zero offset to a split key.
+        // Returns zero if no match was found.
+        inline PageDepth exactMatch() const {
             for (PageDepth offset = 0; offset < height; offset++) {
-                if (0 <= stack[ height - offset - 1 ].compare) {
-                    height -= offset;
-                    break;
-                }
+                Position position = stack[height - offset - 1].position;
+                if (position == OnIndex) return (offset);
             }
+            return (0);
         }
-
-        inline void clear( const PageHeader* header ) {
+        // Pop the Trail to a key match; i.e., go up all split key levels.
+        // Does nothing if no match was found.
+        inline Trail& popToMatch() { height -= match(); return *this; }
+        // Empty the trail to the root page header
+        inline Trail& clear() {
             height = 0;
-            stack[ height++ ] = { header, 0, -1 };
+            stack[height++] = {tree.root, Undefined, 0};
+            return *this;
         }
-        // Return pointer to PageHeader indexed by trail.
-        // Trail is assumed to access a Node page.
-        template< class K, bool KA >
-        const PageHeader* indexedHeader( PageDepth offset = 0 ) const {
-            static const std::string signature( "const PageHeader* Trail::indexedHeader( PageDepth offset = 0 ) const" );
-            if (height < (offset + 1)) throw signature + " - Invalid offset.";
-            const PageHeader* header = this->header( offset );
-            if (header->depth == 0) throw signature + " - Trail does not reference a Node Page";
-            const Page<K,PageLink,KA,false>* nodePage = pool.page<K,PageLink,KA,false>( header );
-            if (split( offset )) {
-                return pool.reference( nodePage->split() );
+        // Update trail to reflect deleted index.
+        Trail& deletedIndex( PageDepth offset = 0 ) {
+            static const char* signature("void Trail::deletedIndex( PageDepth offset )");
+            if (height < (offset + 1)) throw std::string( signature ) + " - Invalid offset.";
+            PageIndex index = this->index( offset );
+            if (0 < index) {
+                position( AfterIndex, (index - 1), offset );
+            } else if (0 < header()->split) {
+                position( AfterSplit, 0, offset );
             } else {
-                return pool.reference( nodePage->value( index( offset ) ) );
+                // Only Page that does not have a split value is very first Leaf Page.
+                stack[height - offset - 1].position = Undefined;
+                stack[height - offset - 1].index = 0;
+            }
+            return *this;
+        }
+        // Return pointer to PageHeader of Page referred by the current Trail position.
+        // Trail must be positioned in a Node page.
+        template <class K, bool KA>
+        const PageHeader *pageHeader(PageDepth offset = 0) const {
+            static const char* signature("const PageHeader* Trail::pageHeader( PageDepth offset ) const");
+            if (height < (offset + 1)) throw std::string( signature ) + " - Invalid offset.";
+            const PageHeader *header = this->header(offset);
+            if (header->depth == 0) throw std::string( signature ) + " - Trail does not reference a Node Page";
+            const Page<K,PageLink,KA,false> *nodePage = tree.pool.page<K,PageLink,KA,false>(header);
+            if (atSplit(offset)) {
+                return tree.pool.reference(nodePage->split());
+            } else {
+                return tree.pool.reference(nodePage->value(index(offset)));
             }
         };
-
-        // Navigate to next key-value index in trail
-        template< class K, bool KA >
+        // Navigate to next position in Trail
+        // Returns true if a next position exists, false otherwise.
+        template <class K, bool KA>
         bool next() {
-            if (split()) {
-                compare( match(), +1 );
-                index( 0, 0 );
+            static const char* signature("bool Trail::next()");
+            if (atSplit() && (0 < header()->count)) {
+                position( OnIndex, 0 );
                 return true;
             } else if ((index() + 1) < header()->count) {
-                index( (index() + 1), 0 );
+                position( OnIndex, (index() + 1) );
                 return true;
-            } else if (1 < depth()) {
+            }
+            if (1 < height) {
                 pop();
                 if (next<K,KA>()) {
-                    const PageHeader* header = indexedHeader<K,KA>();
-                    push( header, 0, -1 );
+                    const PageHeader *header = pageHeader<K, KA>();
+                    if (0 < header->split) {
+                        push(header, OnSplit);
+                    } else {
+                        if (header->count == 0) throw std::string( signature ) + " - Navigating to empty page.";
+                        push(header, OnIndex, 0);
+                    }
                     return true;
                 }
+            } else {
+                // No next entry, set to end
+                end<K,KA>();
             }
             return false;
         }
-        // Navigate to next leaf Page in trail
-        template< class K, bool KA >
-        bool nextPage() {
-            if ((1 < depth()) && (header()->depth == 0)) pop();
-            return next<K,KA>();
-        }
-
-        // Navigate to previous key-value index in trail
-        template< class K, bool KA >
+        // Navigate to previous position in trail.
+        // Returns true if a previous position exists, false otherwise.
+        template <class K, bool KA>
         bool previous() {
-            if (split()) {
-                if (1 < depth()) {
-                    pop();
-                    if (previous<K,KA>()) {
-                        const PageHeader* header = indexedHeader<K,KA>();
-                        push( header, (header->count - 1), +1 );
+            static const char* signature("bool Trail::previous()");
+            if (atSplit()) {
+                if (height <= 1) return false;
+                pop();
+                if (previous<K,KA>()) {
+                    const PageHeader *header = pageHeader<K, KA>();
+                    if (0 < header->count) {
+                        push( header, OnIndex, (header->count - 1) );
+                        return true;
+                    } else {
+                        if (header->split == 0) throw std::string( signature ) + " - Navigating to empty page.";
+                        push( header, OnSplit );
                         return true;
                     }
                 }
             } else if (0 < index()) {
-                index( (index() - 1), 0 );
+                position( OnIndex, (index() - 1) );
                 return true;
-            } else {
-                index( 0, -1  );
+            } else if (0 < header()->split) {
+                // Only Page that does not have a split value is very first Leaf Page.
+                position( OnSplit );
                 return true;
             }
             return false;
         }
-        // Navigate to previous leaf Page in trail
+        // Set trail to begin
         template< class K, bool KA >
-        bool previousPage() {
-            if ((1 < depth()) && (header()->depth == 0)) pop();
-            return previous<K,KA>();
+        Trail& begin() {
+            static const char* signature( "Trail& Trail::begin()" );
+            const PageHeader* header = tree.root;
+            if (header->free == 1)  throw std::string(signature) + " - Accessing freed page.";
+            height = 0;
+            while (0 < header->depth) {
+                const Page<K,PageLink,KA,false>* node = tree.pool.page<K,PageLink,KA,false>( header );
+                push( header, AfterSplit );
+                header = &tree.pool.access( node->split() );
+                if (header->free == 1)  throw std::string(signature) + " - Accessing freed page.";
+            }
+            push( header, OnIndex, 0 );
+            return *this;
+        }
+        // Set trail to end
+        template< class K, bool KA >
+        Trail& end() {
+            static const char* signature( "Trail& Trail::end()" );
+            const PageHeader* header = tree.root;
+            if (header->free == 1)  throw std::string(signature) + " - Accessing freed page.";
+            height = 0;
+            while (0 < header->depth) {
+                const Page<K,PageLink,KA,false>* node = tree.pool.page<K,PageLink,KA,false>( header );
+                if (0 < header->count) {
+                    push( header, OnIndex, (header->count - 1) );
+                    header = &tree.pool.access( node->value( header->count - 1 ) );
+                } else {
+                    push( header, OnSplit );
+                    header = &tree.pool.access( node->split() );
+                }
+                if (header->free == 1)  throw std::string(signature) + " - Accessing freed page.";
+            }
+            push( header, OnIndex, header->count );
+            return *this;
         }
 
+        template< class K, class V, bool KA, bool VA >
+        Page<K,V,KA,VA>* page( PageDepth offset = 0 ) const { return tree.pool.page<K,V,KA,VA>( header( offset ) ); }
+
     }; // class Trail
+
+    bool operator==(const Trail& a, const Trail& b) {
+        if (&a.tree != &b.tree) return false;
+        if (a.height != b.height) return false;
+        for (PageDepth i = 0; i < a.height; i++) {
+            if (
+                (a.stack[i].header != b.stack[i].header) ||
+                (a.stack[i].position != b.stack[i].position) ||
+                (a.stack[i].index != b.stack[i].index)
+            ) return false;
+        }
+        return true;
+    };
+    bool operator!=(const Trail& a, const Trail& b) {
+        if (&a.tree != &b.tree) return true;
+        if (a.height != b.height) return true;
+        for (PageDepth i = 0; i < a.height; i++) {
+            if (
+                (a.stack[i].header != b.stack[i].header) ||
+                (a.stack[i].position != b.stack[i].position) ||
+                (a.stack[i].index != b.stack[i].index)
+            ) return true;
+        }
+        return false;
+    };
 
 } // namespace BTree
 

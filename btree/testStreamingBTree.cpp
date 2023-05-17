@@ -10,6 +10,8 @@ const int BTreePageSize = 4096;
 const int ValueBlockSize = 128;
 const int ObjectCount = 10;
 
+// ToDo: Generate multiple keys with multiple objects per key...
+
 class Object {
     bool b;
     float f;
@@ -80,11 +82,14 @@ PagePool* createPagePool( bool persistent, string path, PageSize pageSize ) {
 }
 
 int main(int argc, char* argv[]) {
+    system( "RMDIR /S /Q testStreamingBTree" );
+    system( "MKDIR testStreamingBTree" );
     ofstream stream;
-    stream.open( "testStreamingBTree.txt" );
+    stream.open( "testStreamingBTree\\testStreamingBTree.txt" );
     try {
         BTree::String2StreamTree tree(
-            *createPagePool( true, "String2StreamBTree.bin", BTreePageSize ),
+            *createPagePool( true, "testStreamingBTree\\String2IndexBTree.bt", BTreePageSize ),
+            *createPagePool( true, "testStreamingBTree\\Index2StreamBTree.bt", BTreePageSize ),
             ValueBlockSize
         );
         stream << "Writing " << ObjectCount << " objects...\n";
@@ -95,6 +100,8 @@ int main(int argc, char* argv[]) {
             o.stream( writer );
         }
         writer.close();
+        tree.commit();
+        if (ObjectCount <= 10) stream << tree;
         stream << "Reading " << ObjectCount << " objects...\n";
         ValueReader& reader = tree.retrieve( key );
         for ( uint16_t i = 0; i < ObjectCount; i++ ) {
@@ -103,8 +110,6 @@ int main(int argc, char* argv[]) {
             if ( o != r ) stream << "Value mismatch at " << i << ".\n";
         }
         reader.close();
-        tree.commit();
-        if (ObjectCount <= 10) stream << tree;
     }
     catch ( string message ) {
         stream << message << "\n";

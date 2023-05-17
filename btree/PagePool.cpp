@@ -18,20 +18,23 @@ namespace BTree {
     // For example, the capacity is ~17.6 TB with 4K pages.
 
     // Create a PagePool with the given page size.
-    PagePool::PagePool( PageSize pageSize ) : capacity( pageSize ) { linkRoot.nullify(); }
+    PagePool::PagePool( PageSize pageSize ) : capacity( pageSize ), currentRoot( nullptr ) { commitLink.nullify(); }
     PagePool::~PagePool() {
-        for ( int p = (pages.size() - 1); 0 <= p; p-- ) std::free( reinterpret_cast<void*>( pages[ p ] ) );
+        for ( auto header : pages ) std::free( reinterpret_cast<void*>( header ) );
+        pages.clear();
+        freePages.clear();
+        modifiedPages.clear();
     };
     // Allocate a page in the memory pool.
     // Returns a PageLink that indexes the allocated page.
     // Allocates and additional page of memory as required.
     PageHeader* PagePool::allocate() {
-        static const std::string signature( "PageHeader* PagePool::allocate()" );
+        static const char* signature( "PageHeader* PagePool::allocate()" );
         if (freePages.empty()) {
             // No recycled pages available, allocate additional page and add it in the pool...
             PageLink link = PageLink( pages.size() );
             PageHeader* header = reinterpret_cast<PageHeader*>( malloc( capacity ) );
-            if (header == nullptr) throw signature + " - Page allocation failed";
+            if (header == nullptr) throw string( signature ) + " - Page allocation failed";
             pages.push_back( header );
             header->page = link;
             header->capacity = this->capacity;
@@ -56,22 +59,21 @@ namespace BTree {
     };
     // Free the page indexed by a PageLink.
     void PagePool::free( const PageLink& link ) {
-        static const std::string signature( "void PagePool::free( const PageLink& link )" );
+        static const char* signature( "void PagePool::free( const PageLink& link )" );
         // Recycle page by adding it to the free list
-        if (link.null()) throw signature + " - Freeing null page";
-        PageLink freedLink = PageLink( link );
-        const PageHeader* freedPage = pages[ link.index ];
-        if (freedPage->free == 1) throw signature + " - Freeing free page";
+        if (link.null()) throw string( signature ) + " - Freeing null page";
+        PageHeader* freedPage = pages[ link.index ];
+        if (freedPage->free == 1) throw string( signature ) + " - Freeing free page";
         freedPage->free = 1;
         freePages.push_back( link );
     };
-    // Return the address of the page indexed by a PageLink.
+    // Return the address of the page indexed by the a PageLink.
     PageHeader* PagePool::reference( const PageLink& link ) const {
-        static const std::string signature( "PageHeader* PagePool::reference( const PageLink& link ) const" );
+        static const char* signature( "PageHeader* PagePool::reference( const PageLink& link ) const" );
         if (link.null()) { return nullptr; }
-        if ( pages.size() <= link.index ) throw signature + " - Invalid pool index";
+        if ( pages.size() <= link.index ) throw string( signature ) + " - Invalid pool index";
         PageHeader* page = pages[ link.index ];
-        if (page->free == 1) throw signature + " - Referencing free page";
+        if (page->free == 1) throw string( signature ) + " - Referencing free page";
         return( page );
     };
 
@@ -92,7 +94,8 @@ namespace BTree {
             modifiedPage->modified = 0;
         }
         modifiedPages.clear();
-        linkRoot = link;
+        commitLink = link;
+        currentRoot = reference( commitLink );
     }
 
     // Discard all outstanding modify requests by recovering old root.
@@ -104,7 +107,7 @@ namespace BTree {
             if ((modifiedPage->free == 0) && freeModifiedPages) free( modifiedPage );
         }
         modifiedPages.clear();
-        return( linkRoot );
+        return( commitLink );
     }
 
 } // namespace BTree

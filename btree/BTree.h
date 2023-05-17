@@ -1,405 +1,440 @@
-#ifndef BTREE_BTREE_H
-#define BTREE_BTREE_H
+#ifndef BTREE_TREE_H
+#define BTREE_TREE_H
 
 #include <stdlib.h>
 #include <cstdint>
 #include <string.h>
+#include <sstream>
 #include <iostream>
 #include <iomanip>
 
-#include "Page.h"
+#include "TreeBase.h"
 #include "Compare.h"
-#include "Trail.h"
-
-// ToDo: B-Tree bi-directional Iterator. Make use of Trail.
-// ToDo: Implement various update/access strategies:
-//          1: in-place update, primarily for in-memory B-tree, no multithreaded access
-//          2: copy page on update, enables concurrent update and read access
-//          3: transaction controlled access, transaction completion consolidates updated pages
-//          4: versioned B-tree with transaction controlled access, consolidating update generates new version
-//             Read access never blocks but continues on existing version
-//             Requires garbage collection of stale versions; i.e., versions no longer being accessed
-//          5: Local update transaction access (questionable!).
-//             To enable concurrent update access on disjunct parts of the B-tree
 
 namespace BTree {
 
-    // Default scalar key comparison function making use of less<T> on type of key.
-    template< class K >
-    inline int defaultCompareScalar( const K& a, const K& b ) {
-        return( std::less<K>()( a, b ) ? -1 : ( std::less<K>()( b, a ) ? +1 : 0 ) );
-    };
-    // Default array key comparison function making use of less<T> on type of key array elements.
-    template< class K >
-    inline int defaultCompareArray( const K* a, PageIndex na, const K* b, PageIndex nb ) {
-        PageIndex n = (( na < nb ) ? na : nb );
-        for (PageIndex i = 0; i < n; i++) {
-            if (std::less<K>()( a[ i ], b[ i ] )) {
-                return -1;
-            } else if (std::less<K>()( b[ i ], a[ i ] )) {
-                return +1;
-            }
-        }
-        return( ( na < nb ) ? -1 : ( (nb < na) ? +1 : 0 ) );
-    };
+    template< class KT, class VT, class RT > class BTreeIterator;
 
-    static const float LowPageThreshold = 0.3;
+    static const float LowPageThreshold = 0.4;
     static const float HighPageThreshold = 0.9;
 
-    // Updates on a B-tree can be either in-place or with copy-on-update behavior.
-    // Modifications to a B-tree may exhibit in-place or transcation behavior.
-    // Transactions require copy-on-update for all page modifications.
-    // For transaction behaviour:
-    //   Modifications are consolidated with a call to commit(), transaction succeeds.
-    //   Modifications are discarded with a call to recover(), transaction fails.
-    // During a transaction modified pages are registered with a call to modify() and
-    // pages to be recoverd (i.e., copied-on-updat) are registered with a call to recover().
-    // Pages copied-on-update with a persistent pool may be reused reducing memory footprint
-    // (particularly for large transactions).
-
-    enum UpdateMode {
-        Auto = 0,                  // Infered from pool.persistent() (false -> InPlace, true -> PersistentTransaction)
-        InPlace = 1,               // No copy-on-update behaviour (default for non-persistent pool)
-        MemoryTransaction = 2,     // copy-on-update behaviour without memory reuse
-        PersistentTransaction = 3  // copy-on-update behaviour with memory reuse (default for persistent pool)
-    };
-
-    template< class K, class V, bool KA = false, bool VA = false > class Tree {
+    // BTree with template arguments for key (K) and value (V).
+    // For example:
+    //   Tree< int, float > - maps integer keys to float values.
+    // Either or both arguments may be arrays.
+    //   Tree< char[], float > - maps C-string keys to float values.
+    //   Tree< int, char[] > - maps integer keys to C-string values.
+    //   Tree< char[], uint16_t[] > - maps C-string keys to arrays of 16-bit unsigned integers.
+    template< class K, class V > class Tree : public TreeBase {
     private:
-        // The PagePool from which to allocate Pages for this Tree.
-        PagePool& pool;
-        // The update mnode to be enforced
-        UpdateMode mode;
         // The (user defined) comparison function on keys.
         // Defaults to use of operator<() on key values.
         union {
             int (*scalar)( const K&, const K& );
-            int (*array)( const K*, PageSize, const K*, PageSize );
+            int (*array)( const B<K>*, PageSize, const B<K>*, PageSize );
         } compare;
-        // Default scalar value to be returned if scalar value key not found.
-        V scalarDefault;
-        // Default array value to be returned if array value key not found.
-        std::pair<const V*,PageIndex> arrayDefault;
-        // The root page (header) of the B-tree
-        PageHeader* root; // Root page is always referenced
-        template< class SK, class SV, bool SKA, bool SVA >
-        friend std::ostream & operator<<( std::ostream & o, const Tree<SK,SV,SKA,SVA>& tree );
+        template< class KT, class VT, class RT >
+        friend class BTreeIterator;
+        template< class KT, class VT >
+        friend std::ostream & operator<<( std::ostream & o, const Tree<KT,VT>& tree );
     public:
         Tree() = delete;
-        template< bool AK = KA, bool AV = VA >
+        template< class KT = K, class VT = V >
         Tree(
-            typename std::enable_if<(!AK&&!AV),PagePool>::type& pagePool,
-            UpdateMode updateMode = UpdateMode::Auto,
-            const V& defaultValue = V(),
-            int (*compareKey)( const K&, const K& ) = defaultCompareScalar<K>
-        ) : pool( pagePool ), mode( deriveMode( updateMode, pagePool ) ) {
-            root = pool.root();
-            if (root == nullptr) root = &allocateLeaf()->header;
-            compare.scalar = compareKey;
-            scalarDefault = defaultValue;
-        }
-        template< bool AK = KA, bool AV = VA >
+            std::enable_if_t<(S<KT>),PagePool>& pagePool,
+            int(*compareKey)( const B<KT>&, const B<KT>& ) = defaultCompareScalar<KT>,
+            UpdateMode updateMode = UpdateMode::Auto
+        ) : Tree<KT,VT>( pagePool, compareKey, updateMode, pagePool.clean() ) {}
+        template< class KT = K, class VT = V >
         Tree(
-            typename std::enable_if<(!AK&&AV),PagePool>::type& pagePool,
-            UpdateMode updateMode = UpdateMode::Auto,
-            const V* defaultValue = nullptr,
-            PageIndex defaultValueSize = 0,
-            int (*compareKey)( const K&, const K& ) = defaultCompareScalar<K>
-        ) : pool( pagePool ), mode( deriveMode( updateMode, pagePool ) ) {
-            root = pool.root();
-            if (root == nullptr) root = &allocateLeaf()->header;
-            compare.scalar = compareKey;
-            arrayDefault = std::make_pair( defaultValue, defaultValueSize );
-        }
-        template< bool AK = KA, bool AV = VA >
-        Tree(
-            typename std::enable_if<(AK&&!AV),PagePool>::type& pagePool,
-            UpdateMode updateMode = UpdateMode::Auto,
-            const V& defaultValue = V(),
-            int (*compareKey)( const K*, PageIndex, const K*, PageIndex ) = defaultCompareArray<K>
-        ) : pool( pagePool ), mode( deriveMode( updateMode, pagePool ) ) {
-            root = pool.root();
-            if (root == nullptr) root = &allocateLeaf()->header;
-            compare.array = compareKey;
-            scalarDefault = defaultValue;
-        }
-        template< bool AK = KA, bool AV = VA >
-        Tree(
-            typename std::enable_if<(AK&&AV),PagePool>::type& pagePool,
-            UpdateMode updateMode = UpdateMode::Auto,
-            const V* defaultValue = nullptr,
-            PageIndex defaultValueSize = 0,
-            int (*compareKey)( const K*, PageIndex, const K*, PageIndex ) = defaultCompareArray<K>
-        ) : pool( pagePool ), mode( deriveMode( updateMode, pagePool ) ) {
-            root = pool.root();
-            if (root == nullptr) root = &allocateLeaf()->header;
-            compare.array = compareKey;
-            arrayDefault = std::make_pair( defaultValue, defaultValueSize );
-        }
-
-        // Set value for a particular key
-        // Set scalar value for scalar key
-        template< bool AK = KA, bool AV = VA > typename std::enable_if<(!AK&&!AV),void>::type
-        insert( const K& key, const V& value ) {
-            Trail trail( pool, root );
-            bool found = find( key, trail );
-            Page<K,V,false,false>* page = leaf( trail );
-            if (!page->entryFit()) {
-                grow<V,false>( trail );
-                found = find( key, trail );
-                page = leaf( trail );
-            }
-            Page<K,V,false,false>* copyPage = updatePage<V,false>( trail );
-            if (found) {
-                if (trail.split()) {
-                    page->split( value, copyPage );
-                } else {
-                    page->replace( trail.index(), value, copyPage );
+            std::enable_if_t<(A<KT>),PagePool>& pagePool,
+           int(*compareKey)( const B<KT>*, PageIndex, const B<KT>*, PageIndex ) = defaultCompareArray<B<KT>>,
+            UpdateMode updateMode = UpdateMode::Auto
+        ) : Tree<KT,VT>( pagePool, compareKey, updateMode, pagePool.clean() ) {}
+        // Destruct B-Tree making sure to leave PagePool behind in a consistent state.
+        ~Tree() { pool.recover(); freeAll( *root ); }
+        // Insert a key-value entry in the B-Tree.
+        // Returns true if the value was inserted, false if the key was already present.
+        template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&S<VT>),bool> = true >
+        bool insert( const K& key, const V& value ) {
+            Trail trail( *this );
+            if (!find<KT>( key, trail )) {
+                auto page = leaf( trail );
+                if (!page->entryFit()) {
+                    grow<VT>( trail );
+                    find<KT>( key, trail.clear() );
+                    page = leaf( trail );
                 }
-            } else {
-                if ((page->header.count == 0) or (trail.compare() < 0)) {
+                auto copyPage = updatePage<VT>( trail );
+                if (trail.atSplit()) {
                     page->insert( 0, key, value, copyPage );
                 } else {
                     page->insert( (trail.index() + 1), key, value, copyPage );
                 }
+                recoverPage( page->header, copyPage->header );
+                return( true );
             }
-            recoverPage( page->header, copyPage->header );
+            return( false );
         }
         // Set scalar value for array key
-        template< bool AK = KA, bool AV = VA > typename std::enable_if<(AK&&!AV),void>::type
-        insert( const K* key, PageSize keySize, const V& value ) {
-            Trail trail( pool, root );
-            bool found = find( key, keySize, trail );
-            Page<K,V,true,false>* page = leaf( trail );
-            if (!page->entryFit( keySize )) {
-                grow<V,false>( trail );
-                found = find( key, keySize, trail );
-                page = leaf( trail );
-            }
-            Page<K,V,true,false>* copyPage = updatePage<V,false>( trail );
-            if (found) {
-                if (trail.split()) {
-                    page->split( value, copyPage );
-                } else {
-                    page->replace( trail.index(), value, copyPage );
+        template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&S<VT>),bool> = true >
+        bool insert( const B<KT>* key, PageSize keySize, const V& value ) {
+            Trail trail( *this );
+            bool found = find<KT>( key, keySize, trail );
+            if (!find<KT>( key, keySize, trail )) {
+                auto page = leaf( trail );
+                if (!page->entryFit( keySize )) {
+                    grow<VT>( trail );
+                    find<KT>( key, keySize, trail.clear() );
+                    page = leaf( trail );
                 }
-            } else {
-                if ((page->header.count == 0) or (trail.compare() < 0)) {
+                auto copyPage = updatePage<VT>( trail );
+                if (trail.atSplit()) {
                     page->insert( 0, key, keySize, value, copyPage );
                 } else {
                     page->insert( (trail.index() + 1), key, keySize, value, copyPage );
                 }
+                recoverPage( page->header, copyPage->header );
+                return( true );
             }
-            recoverPage( page->header, copyPage->header );
+            return( false );
         }
         // Set array value for scalar key
-        template< bool AK = KA, bool AV = VA > typename std::enable_if<(!AK&&AV),void>::type
-        insert( const K& key, const V* value, PageSize valueSize ) {
-            Trail trail( pool, root );
-            bool found = find( key, trail );
-            Page<K,V,false,true>* page = leaf( trail );
-            if (!page->entryFit( valueSize )) {
-                grow<V,true>( trail );
-                found = find( key, trail );
-                page = leaf( trail );
-            }
-            Page<K,V,false,true>* copyPage = updatePage<V,true>( trail );
-            if (found) {
-                if (trail.split()) {
-                    page->split( value, valueSize, copyPage );
-                } else {
-                    page->replace( trail.index(), value, valueSize, copyPage );
+        template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&A<VT>),bool> = true >
+        bool insert( const K& key, const B<VT>* value, PageSize valueSize ) {
+            Trail trail( *this );
+            if (!find<KT>( key, trail )) {
+                auto page = leaf( trail );
+                if (!page->entryFit( valueSize )) {
+                    grow<VT>( trail );
+                    find<KT>( key, trail.clear() );
+                    page = leaf( trail );
                 }
-            } else {
-                if ((page->header.count == 0) or (trail.compare() < 0)) {
+                auto copyPage = updatePage<VT>( trail );
+                if (trail.atSplit()) {
                     page->insert( 0, key, value, valueSize, copyPage );
                 } else {
                     page->insert( (trail.index() + 1), key, value, valueSize, copyPage );
                 }
+                recoverPage( page->header, copyPage->header );
+                return( true );
             }
-            recoverPage( page->header, copyPage->header );
+            return( false );
         }
         // Set array value for array key
-        template< bool AK = KA, bool AV = VA > typename std::enable_if<(AK&&AV),void>::type
-        insert( const K* key, PageSize keySize, const V* value, PageSize valueSize ) {
-            Trail trail( pool, root );
-            bool found = find( key, keySize, trail );
-            Page<K,V,true,true>* page = leaf( trail );
-            if (!page->entryFit( keySize, valueSize )) {
-                grow<V,true>( trail );
-                found = find( key, keySize, trail );
-                page = leaf( trail );
-            }
-            Page<K,V,true,true>* copyPage = updatePage<V,true>( trail );
-            if (found) {
-                if (trail.split()) {
-                    page->split( value, valueSize, copyPage );
-                } else {
-                    page->replace( trail.index(), value, valueSize, copyPage );
+        template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&A<VT>),bool> = true >
+        bool insert( const B<KT>* key, PageSize keySize, const B<VT>* value, PageSize valueSize ) {
+            Trail trail( *this );
+            if (!find<KT>( key, keySize, trail )) {
+                auto page = leaf( trail );
+                if (!page->entryFit( keySize, valueSize )) {
+                    grow<VT>( trail );
+                    find<KT>( key, keySize, trail.clear() );
+                    page = leaf( trail );
                 }
-            } else {
-                if ((page->header.count == 0) or (trail.compare() < 0)) {
+                auto copyPage = updatePage<VT>( trail );
+                if (trail.atSplit()) {
                     page->insert( 0, key, keySize, value, valueSize, copyPage );
                 } else {
                     page->insert( (trail.index() + 1), key, keySize, value, valueSize, copyPage );
                 }
+                recoverPage( page->header, copyPage->header );
+                return( true );
             }
-            recoverPage( page->header, copyPage->header );
+            return( false );
+        }
+
+        // Replace a value for a key in the B-Tree.
+        // Returns true if the value was replaced, false if the key was not present.
+        template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&S<VT>),bool> = true >
+        bool replace( const K& key, const V& value ) {
+            Trail trail( *this );
+            if (find<KT>( key, trail )) {
+                auto page = leaf( trail );
+                auto copyPage = updatePage<VT>( trail );
+                if (trail.atSplit()) {
+                    page->split( value, copyPage );
+                } else {
+                    page->replace( trail.index(), value, copyPage );
+                }
+                recoverPage( page->header, copyPage->header );
+                return( true );
+            }
+            return( false );
+        }
+        template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&S<VT>),bool> = true >
+        bool replace( const B<KT>* key, PageSize keySize, const V& value ) {
+            Trail trail( *this );
+            if (find<KT>( key, keySize, trail )) {
+                auto page = leaf( trail );
+                auto copyPage = updatePage<VT>( trail );
+                if (trail.atSplit()) {
+                    page->split( value, copyPage );
+                } else {
+                    page->replace( trail.index(), value, copyPage );
+                }
+                recoverPage( page->header, copyPage->header );
+                return( true );
+            }
+            return( false );
+        }
+        template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&A<VT>),bool> = true >
+        bool replace( const K& key, const B<VT>* value, PageSize valueSize ) {
+            Trail trail( *this );
+            if (find<KT>( key, trail )) {
+                auto page = leaf( trail );
+                // Only grow if value size actually increases...
+                PageSize oldSize = ((trail.atSplit()) ? page->splitValueSize() : page->valueSize( trail.index() ));
+                if ((oldSize < (valueSize * sizeof(B<VT>))) && (page->header.capacity < (page->filling() + ((valueSize * sizeof(B<VT>)) - oldSize)))) {
+                    grow<VT>( trail );
+                    find<KT>( key, trail.clear() );
+                    page = leaf( trail );
+                }
+                auto copyPage = updatePage<VT>( trail );
+                if (trail.atSplit()) {
+                    page->split( value, valueSize, copyPage );
+                } else {
+                    page->replace( trail.index(), value, valueSize, copyPage );
+                }
+                recoverPage( page->header, copyPage->header );
+                return( true );
+            }
+            return( false );
+        }
+        template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&A<VT>),bool> = true >
+        bool replace( const B<KT>* key, PageSize keySize, const B<VT>* value, PageSize valueSize ) {
+            Trail trail( *this );
+            if (find<KT>( key, keySize, trail )) {
+                auto page = leaf( trail );
+                // Only grow if value size actually increases...
+                PageSize oldSize = ((trail.atSplit()) ? page->splitValueSize() : page->valueSize( trail.index() ));
+                if ((oldSize < (valueSize * sizeof(B<VT>))) && (page->header.capacity < (page->filling() + ((valueSize * sizeof(B<VT>)) - oldSize)))) {
+                    grow<VT>( trail );
+                    find<KT>( key, keySize, trail.clear() );
+                    page = leaf( trail );
+                }
+                auto copyPage = updatePage<VT>( trail );
+                if (trail.atSplit()) {
+                    page->split( value, valueSize, copyPage );
+                } else {
+                    page->replace( trail.index(), value, valueSize, copyPage );
+                }
+                recoverPage( page->header, copyPage->header );
+                return( true );
+            }
+            return( false );
         }
 
         // Return value a particular key.
-        // Returns default value is key was not found.
-        // Return scalar value for scalar key
-        template< bool AK = KA, bool AV = VA > const typename std::enable_if<(!AK&&!AV),V>::type&
-        retrieve( const K& key) const {
-            Trail trail( pool, root );
-            if (find( key, trail )) return value<false>( trail );
-            return( scalarDefault );
+        // Throws an exception if key was not found.
+        template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&S<VT>),bool> = true >
+        const VT& retrieve( const KT& key) const {
+            static const char* signature = "const V& Tree<K,V>::retrieve( const K& key) const";
+            Trail trail( *this );
+            if (!find<KT>( key, trail )) throw std::string( signature ) + " - Key not found";
+            return value<VT>( trail );
         }
-        // Return scalar value for array key
-        template< bool AK = KA, bool AV = VA > const typename std::enable_if<(AK&&!AV),V>::type&
-        retrieve( const K* key, const PageIndex keySize ) const {
-            Trail trail( pool, root );
-            if (find( key, keySize, trail )) return value<false>( trail );
-            return( scalarDefault );
+        template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&S<VT>),bool> = true >
+        const VT& retrieve( const B<KT>* key, const PageIndex keySize ) const {
+            static const char* signature = "const V& Tree<K,V>::retrieve( const K* key, const PageIndex keySize ) const";
+            Trail trail( *this );
+            if (!find<KT>( key, keySize, trail )) throw std::string( signature ) + " - Key not found";
+            return value<VT>( trail );
         }
-        // Return array value for scalar key
-        template< bool AK = KA, bool AV = VA > typename std::enable_if<(!AK&&AV),std::pair<const V*, PageIndex>>::type
-        retrieve( const K& key ) const {
-            Trail trail( pool, root );
-            if (find( key, trail )) return value<true>( trail );
-            return( arrayDefault );
+        template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&A<VT>),bool> = true >
+        std::pair<const B<VT>*, PageIndex> retrieve( const KT& key) const {
+            static const char* signature = "std::pair<const V*, PageIndex> Tree<K,V>::retrieve( const K& key) const";
+            Trail trail( *this );
+            if (!find<KT>( key, trail )) throw std::string( signature ) + " - Key not found";
+            return value<VT>( trail );
         }
-        // Return array value for array key
-        template< bool AK = KA, bool AV = VA > typename std::enable_if<(AK&&AV),std::pair<const V*, PageIndex>>::type
-        retrieve( const K* key, const PageIndex keySize ) const {
-            Trail trail( pool, root );
-            if (find( key, keySize, trail )) return value<true>( trail );
-            return( arrayDefault );
+        template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&A<VT>),bool> = true >
+        std::pair<const B<VT>*, PageIndex> retrieve( const B<KT>* key, const PageIndex keySize ) const {
+            static const char* signature = "std::pair<const V*, PageIndex> Tree<K,V>::retrieve( const K* key, const PageIndex keySize ) const";
+            Trail trail( *this );
+            if (!find<KT>( key, keySize, trail )) throw std::string( signature ) + " - Key not found";
+            return value<VT>( trail );
+        }
+        // Test if particular key exists.
+        template< class KT = K, class VT = V, std::enable_if_t<(S<KT>),bool> = true >
+        bool exists( const KT& key) const {
+            Trail trail( *this );
+            return( find<KT>( key, trail ) );
+        }
+        template< class KT = K, class VT = V, std::enable_if_t<(A<KT>),bool> = true >
+        bool exists( const B<KT>* key, const PageIndex keySize ) const {
+            Trail trail( *this );
+            return( find<KT>( key, keySize, trail ) );
         }
 
         // Remove a key-value pair.
         // Returns true if key-value pair was removed, false if key-value pair was not found.
         // Remove value for scalar key
-        template< bool AK = KA >
-        typename std::enable_if<(!AK),bool>::type remove( const K& key ) {
-            Trail trail( pool, root );
-            if (!find( key, trail )) return false;
-            Page<K,V,AK,VA>* page = this->page<V,VA>( trail );
-            if (trail.compare() == 0) {
-                // Removing a key-value pair in this page.
-                Page<K,V,false,VA>* copyPage = updatePage<V,VA>( trail );
-                page->remove( trail.index(), copyPage );
-                recoverPage( page->header, copyPage->header );
-            } else {
-                // Removing key to split value in this page.
-                nextSplit<false>( trail, key );
-                page = this->page<V,VA>( trail );
-            }
-            if (page->filling() < (LowPageThreshold * page->header.capacity) ) merge<V,AK,VA>( trail );
+        template< class KT = K, std::enable_if_t<(S<KT>),bool> = true >
+        bool remove( const KT& key ) {
+            Trail trail( *this );
+            if (!find<KT>( key, trail )) return false;
+            removeAt<KT,V>( trail, key );
             return true;
         }
         // Remove value for array key
-        template< bool AK = KA >
-        typename std::enable_if<(AK),bool>::type remove( const K* key, PageIndex keySize ) {
-            Trail trail( pool, root );
-            if (!find( key, keySize, trail )) return false;
-            Page<K,V,AK,VA>* page = this->page<V,VA>( trail );
-            if (trail.compare() == 0) {
-                // Removing a key-value pair in this page.
-                Page<K,V,true,VA>* copyPage = updatePage<V,VA>( trail );
-                page->remove( trail.index(), copyPage );
-                recoverPage( page->header, copyPage->header );
-            } else {
-                // Removing key to split value in this page.
-                nextSplit<true>( trail, key, keySize );
-                page = this->page<V,VA>( trail );
-            }
-            if (page->filling() < (LowPageThreshold * page->header.capacity) ) merge<V,AK,VA>( trail );
+        template< class KT = K, std::enable_if_t<(A<KT>),bool> = true >
+        bool remove( const B<KT>* key, PageIndex keySize ) {
+            Trail trail( *this );
+            if (!find<KT>( key, keySize, trail )) return false;
+            removeAt<KT,V>( trail, key, keySize );
             return true;
         }
 
-        // Consolidate all B-tree modifications to a defined state.
-        void commit() { pool.commit( root->page ); }
-        // Restore B-tree to previously consolidated state.
-        void recover() {
-            PageLink link( pool.recover() );
-            if (link.null()) {
-                // No previous B-tree state, recover to empty B-tree
-                freeAll( root );
-                root = &allocateLeaf()->header;
-            } else {
-                root = pool.reference( link );
-            }
+        // Return depth of B-tree.
+        // Provides an indication of magnitude of the log(N) cost of operations on the B-tree.
+        PageDepth depth() const { return( root->depth ); }
+
+        // Return the number of key-value entries in the B-tree.
+        size_t size() const { return( pageCount( root ) ); }
+
+        // Return iterator to begin of B-Tree
+        template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&S<VT>),bool> = true >
+        BTreeIterator<KT,VT, std::pair<const KT&, const VT&> > begin() {
+            auto iterator = new BTreeIterator<KT,VT, std::pair<const KT&, const VT&> >( *this );
+            return iterator->begin();
+        }
+        template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&S<VT>),bool> = true >
+        BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, const VT&> > begin() {
+            auto iterator = new BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, const VT&> >( *this );
+            return iterator->begin();
+        }
+        template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&A<VT>),bool> = true >
+        BTreeIterator<KT,VT, std::pair<const KT&, std::pair<const B<VT>*,PageSize>> > begin() {
+            auto iterator = new BTreeIterator<KT,VT, std::pair<const KT&, std::pair<const B<VT>*,PageSize>> >( *this );
+            return iterator->begin();
+        }
+        template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&A<VT>),bool> = true >
+        BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, std::pair<const B<VT>*,PageSize>> > begin() {
+            auto iterator = new BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, std::pair<const B<VT>*,PageSize>> >( *this );
+            return iterator->begin();
+        }
+        // Return iterator to end of B-Tree
+        template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&S<VT>),bool> = true >
+        BTreeIterator<KT,VT, std::pair<const KT&, const VT&> > end() {
+            auto iterator = new BTreeIterator<KT,VT, std::pair<const KT&, const VT&> >( *this );
+            return iterator->end();
+        }
+        template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&S<VT>),bool> = true >
+        BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, const VT&> > end() {
+            auto iterator = new BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, const VT&> >( *this );
+            return iterator->end();
+        }
+        template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&A<VT>),bool> = true >
+        BTreeIterator<KT,VT, std::pair<const KT&, std::pair<const B<VT>*,PageSize>> > end() {
+            auto iterator = new BTreeIterator<KT,VT, std::pair<const KT&, std::pair<const B<VT>*,PageSize>> >( *this );
+            return iterator->end();
+        }
+        template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&A<VT>),bool> = true >
+        BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, std::pair<const B<VT>*,PageSize>> > end() {
+            auto iterator = new BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, std::pair<const B<VT>*,PageSize>> >( *this );
+            return iterator->end();
+        }
+        // Return iterator to location of key in B-Tree.
+        // If key cannot be found, returns end.
+        template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&S<VT>),bool> = true >
+        BTreeIterator<KT,VT, std::pair<const KT&, const VT&> > at( const KT& key ) {
+            Trail trail( *this );
+            bool found = find<KT>( key, trail );
+            auto iterator = new BTreeIterator<KT,VT, std::pair<const KT&, const VT&> >( *this );
+            if (found) return iterator->at( trail );
+            return iterator->end();
+        }
+        template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&S<VT>),bool> = true >
+        BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, const VT&> > at( const B<KT>* key, PageSize keySize ) {
+            Trail trail( *this );
+            bool found = find<KT>( key, keySize, trail );
+            auto iterator = new BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, const VT&> >( *this );
+            if (found) return iterator->at( trail );
+            return iterator->end();
+        }
+        template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&A<VT>),bool> = true >
+        BTreeIterator<KT,VT, std::pair<const KT&, std::pair<const B<VT>*,PageSize>> > at( const KT& key ) {
+            Trail trail( *this );
+            bool found = find<KT>( key, trail );
+            auto iterator = new BTreeIterator<KT,VT, std::pair<const KT&, std::pair<const B<VT>*,PageSize>> >( *this );
+            if (found) return iterator->at( trail );
+            return iterator->end();
+        }
+        template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&A<VT>),bool> = true >
+        BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, std::pair<const B<VT>*,PageSize>> > at( const B<KT>* key, PageSize keySize ) {
+            Trail trail( *this );
+            bool found = find<KT>( key, keySize, trail );
+            auto iterator = new BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, std::pair<const B<VT>*,PageSize>> >( *this );
+            if (found) return iterator->at( trail );
+            return iterator->end();
         }
 
     private:
 
         // Allocate a new Page
-        template<class VT = V, bool AV = VA>
-        inline Page<K,VT,KA,AV>* allocatePage( PageDepth depth ) {
-            Page<K,VT,KA,AV>* page = pool.page<K,VT,KA,AV>( depth );
+        template< class VT >
+        inline Page<B<K>,B<VT>,A<K>,A<VT>>* allocatePage( const PageDepth depth ) const {
+            Page<B<K>,B<VT>,A<K>,A<VT>>* page = pool.page<B<K>,B<VT>,A<K>,A<VT>>( depth );
             pool.modify( page->header );
             return( page );
         }
-        inline Page<K,V,KA,VA>* allocateLeaf() {
-            return allocatePage<V,VA>( 0 );
+        template< class VT >
+        inline Page<B<K>,B<VT>,A<K>,A<VT>>* allocatePage( const PageHeader& header ) const {
+            return( allocatePage<VT>( header.depth ) );
         }
-        inline Page<K,PageLink,KA,false>* allocateNode( PageDepth depth ) {
-            return( allocatePage<PageLink,false>( depth ) );
+    
+        inline Page<B<K>,B<V>,A<K>,A<V>>* allocateLeaf() const {
+            return allocatePage<V>( 0 );
+        }
+        inline Page<B<K>,PageLink,A<K>,false>* allocateNode( const PageDepth depth ) const {
+            return( allocatePage<PageLink>( depth ) );
         }
 
         // Convert a PageHeader pointer to a Page instance.
-        template<class VT = V, bool AV = VA>
-        inline Page<K,VT,KA,AV>* page( const PageHeader* header ) const {
-            return( pool.page<K,VT,KA,AV>( header ) );
+        template< class VT >
+        inline Page<B<K>,B<VT>,A<K>,A<VT>>* page( const PageHeader* header ) const {
+            return( pool.page<B<K>,B<VT>,A<K>,A<VT>>( header ) );
         }
         // Convert a Trail to a Page instance.
-        template<class VT = V, bool AV = VA>
-        inline Page<K,VT,KA,AV>* page( const Trail& trail, PageDepth offset = 0 ) const {
-            return( pool.page<K,VT,KA,AV>( trail.header( offset ) ) );
+        template< class VT >
+        inline Page<B<K>,B<VT>,A<K>,A<VT>>* page( const Trail& trail, PageDepth offset = 0 ) const {
+            return( pool.page<B<K>,B<VT>,A<K>,A<VT>>( trail.header( offset ) ) );
         }
         // Access Leaf Page addressed by Trail.
         // Returns null pointer if Trail does not address a Leaf Page.
-        inline Page<K,V,KA,VA>* leaf( const Trail& trail ) const {
+        inline Page<B<K>,B<V>,A<K>,A<V>>* leaf( const Trail& trail ) const {
             const PageHeader* header = trail.header();
             if (header->depth != 0) return( nullptr );
-            return( pool.page<K,V,KA,VA>( header ) );
+            return( pool.page<B<K>,B<V>,A<K>,A<V>>( header ) );
         }
-        // Access Node Page addressed by Trail at (optional) offset.
+        // Access Node Page addressed by Trail (at optional depth offset).
         // Returns null pointer if Trail does not address a Node Page.
-        inline Page<K,PageLink,KA,false>* node( const Trail& trail, PageDepth offset = 0 ) const {
+        inline Page<B<K>,PageLink,A<K>,false>* node( const Trail& trail, PageDepth offset = 0 ) const {
             const PageHeader* header = trail.header( offset );
             if (header->depth == 0) return( nullptr );
-            return( pool.page<K,PageLink,KA,false>( header ) );
-        }
-
-        // Derive B-tree update mode as function of requested mode and page pool persistence.
-        UpdateMode deriveMode( UpdateMode mode, PagePool& pool ) {
-            if (mode != Auto) return mode;
-            if (pool.persistent()) return PersistentTransaction;
-            return InPlace;
+            return( pool.page<B<K>,PageLink,A<K>,false>( header ) );
         }
 
         // Recursively copy-on-update nodes in trail up to root.
         // Stop when a modified node or root is encountered.
-        void updateNodeTrail( Trail& trail, PageHeader& header ) {
+        void updateNodeTrail( Trail& trail, const PageHeader& header ) {
+            Trail::Position position = trail.position();
             PageIndex index = trail.index();
-            KeyCompare compare = trail.compare();
             trail.pop();
             if (trail.depth() == 0) {
-                root = &header;
+                root = &( const_cast<PageHeader&>(header) );
             } else {
-                Page<K,PageLink,KA,false>* node = page<PageLink,false>( trail.header() );
+                auto node = page<PageLink>( trail.header() );
                 if (node->header.modified) {
-                    if (trail.split()) {
+                    if (trail.atSplit()) {
                         node->split( header.page );
                     } else {
                         node->replace( trail.index(), header.page );
                     }
                 } else {
-                    Page<K,PageLink,KA,false>* copy = allocatePage<PageLink,false>( node->header.depth );
-                    if (trail.split()) {
+                    auto copy = allocatePage<PageLink>( node->header );
+                    if (trail.atSplit()) {
                         node->split( header.page, copy );
                     } else {
                         node->replace( trail.index(), header.page, copy );
@@ -408,10 +443,10 @@ namespace BTree {
                     updateNodeTrail( trail, copy->header );
                 }
             }
-            trail.push( &header, index, compare );
+            trail.push( &header, position, index );
         }
 
-        // An update to the B-tree at trail is to be performed.
+        // An update to the BTree at trail is to be performed.
         // This can be an insertion, replacement or removal of a key-value.
         // Enforce update semantics being one of:
         //   InPlace -> no copy-on-update
@@ -421,28 +456,32 @@ namespace BTree {
         // Does nothing if page is already modified; i.e., accessing copy of an earlier update.
         // The functions updatePage and recoverPage are used to enclose code that updates
         // the content of a page as follows:
-        //   Page<K,VT,KA,AV>* page = ...
-        //   Page<K,VT,KA,AV>* copy = updatePage<VT,AV>( trail );
+        //   Page<K,V,KA,VT>* page = ...
+        //   Page<K,V,KA,VT>* copy = updatePage<V>( trail );
         //      ... code that updatedates page such as
         //      page->insert( index, key, value, copy );
         //      ...
         //   recoverPage( page->header, copy->header );
         // The insert function is supplied with an additional argument for copy-on-update behavior.
-        template< class VT, bool AV >
-        Page<K,VT,KA,AV>* updatePage( Trail& trail ) {
-            Page<K,VT,KA,AV>* page = this->page<VT,AV>( trail.header() );
+        template< class VT >
+        Page<B<K>,B<VT>,A<K>,A<VT>>* updatePage( Trail& trail ) {
+            auto page = this->page<VT>( trail.header() );
             if (mode == InPlace) pool.modify( page->header );
             if (page->header.modified) return page;
-            Page<K,VT,KA,AV>* copy = allocatePage<VT,AV>( page->header.depth );
-            updateNodeTrail( trail, copy->header );
-            return copy;
+            auto copyPage = allocatePage<VT>( page->header );
+            updateNodeTrail( trail, copyPage->header );
+            return copyPage;
         }
-        // Condition indicating that copy-on-update pages are to be reused (recycled as free page).
-        inline bool reusePages() { return ((mode == PersistentTransaction) ? true : false ); }
         // Recover (persistent) src page if it differs from dst page;
         // i.e., dst is the copy-on-update version of src.
         inline void recoverPage( const PageHeader& src, const PageHeader& dst ) {
             if (src.page != dst.page) pool.recover( src, true );
+        }
+        // Free page and recover (persistent) page if not mofified;
+        // i.e., (persistent) page is being freed but is not yet copied on update.
+        inline void recoverUnmodifiedPage( const PageHeader& page ) {
+            if (page.modified == 0) pool.recover( page, false );
+            pool.free( page );
         }
 
         // Find a particular key.
@@ -451,325 +490,378 @@ namespace BTree {
         // If key is associated with a split value, trail index will be 0 and compare negative.
         // For split values, a found key will reside in a node page eariler in trail.
         // If key is not found the indexed key is the largest key less than the requested key.
-        // The optional depth indicates to which B-tree depth to find. Defaults to 0, finding to leaf.
+        // The optional depth indicates to which BTree depth to find. Defaults to 0, finding to leaf.
         // Find a scalar key.
-        template< bool AK = KA > typename std::enable_if<(!AK),bool>::type
-        find( const K& key, Trail& trail, PageDepth to = 0 ) const {
+        template< class KT, std::enable_if_t<(S<KT>),bool> = true >
+        bool find( const KT& key, Trail& trail, PageDepth to = 0 ) const {
             bool found = false;
             bool keyFound;
-            Page<K,V,false,VA>* leafPage = leaf( trail );
+            auto leafPage = leaf( trail );
             if (leafPage) {
-                keyFound = LeafCompareScalar<K,V,VA>( leafPage, key, compare.scalar ).index( trail );
+                keyFound = LeafCompareScalar<KT,B<V>,A<V>>( leafPage, key, compare.scalar ).position( trail );
                 found |= keyFound;
             } else {
-                Page<K,PageLink,false,false>* nodePage = node( trail );
-                keyFound = NodeCompareScalar<K>( nodePage, key, compare.scalar ).index( trail );
+                auto nodePage = node( trail );
+                keyFound = NodeCompareScalar<KT>( nodePage, key, compare.scalar ).position( trail );
                 if (nodePage->header.depth == to) return found;
-                if (trail.compare() == 0) {
+                if (trail.onIndex()) {
                     PageLink link = nodePage->value( trail.index() );
-                    find( key, trail.push( pool.reference( link ) ), to );
+                    find<KT>( key, trail.push( pool.reference( link ) ), to );
                     found = true;
-                } else if (trail.split() || ((nodePage->header.count == 0) && nodePage->splitDefined())) {
+                } else if (trail.atSplit() || ((nodePage->header.count == 0) && nodePage->splitDefined())) {
                     PageLink link = nodePage->split();
-                    keyFound = find( key, trail.push( pool.reference( link ) ), to );
+                    keyFound = find<KT>( key, trail.push( pool.reference( link ) ), to );
                     found |= keyFound;
                 } else if (0 <= trail.index()) {
                     PageLink link = nodePage->value( trail.index() );
-                    keyFound = find( key, trail.push( pool.reference( link ) ), to );
+                    keyFound = find<KT>( key, trail.push( pool.reference( link ) ), to );
                     found |= keyFound;
                 }
             }
             return found;
         }
         // Find an array key.
-        template< bool AK = KA > typename std::enable_if<(AK),bool>::type
-        find( const K* key, const PageIndex keySize, Trail& trail, PageDepth to = 0 ) const {
+        template< class KT, std::enable_if_t<(A<KT>),bool> = true >
+        bool find( const B<KT>* key, const PageIndex keySize, Trail& trail, PageDepth to = 0 ) const {
             bool found = false;
             bool keyFound;
-            Page<K,V,true,VA>* leafPage = leaf( trail );
+            auto leafPage = leaf( trail );
             if (leafPage) {
-                keyFound = LeafCompareArray<K,V,VA>( leafPage, key, keySize, compare.array ).index( trail );
+                keyFound = LeafCompareArray<B<KT>,B<V>,A<V>>( leafPage, key, keySize, compare.array ).position( trail );
                 found |= keyFound;
             } else {
-                Page<K,PageLink,true,false>* nodePage = node( trail );
-                keyFound = NodeCompareArray<K>( nodePage, key, keySize, compare.array ).index( trail );
+                auto nodePage = node( trail );
+                keyFound = NodeCompareArray<B<KT>>( nodePage, key, keySize, compare.array ).position( trail );
                 if (nodePage->header.depth == to) return found;
-                if (trail.compare() == 0) {
+                if (trail.onIndex()) {
                     PageLink link = nodePage->value( trail.index() );
-                    find( key, keySize, trail.push( pool.reference( link ) ), to );
+                    find<KT>( key, keySize, trail.push( pool.reference( link ) ), to );
                     found = true;
-                } else if (trail.split() || ((nodePage->header.count == 0) && nodePage->splitDefined())) {
+                } else if (trail.atSplit() || ((nodePage->header.count == 0) && nodePage->splitDefined())) {
                     PageLink link = nodePage->split();
-                    keyFound = find( key, keySize, trail.push( pool.reference( link ) ), to );
+                    keyFound = find<KT>( key, keySize, trail.push( pool.reference( link ) ), to );
                     found |= keyFound;
                 } else if (0 <= trail.index()) {
                     PageLink link = nodePage->value( trail.index() );
-                    keyFound = find( key, keySize, trail.push( pool.reference( link ) ), to );
+                    keyFound = find<KT>( key, keySize, trail.push( pool.reference( link ) ), to );
                     found |= keyFound;
                 }
             }
             return found;
         }
+        template< class KT, class VT, std::enable_if_t<(S<KT>),bool> = true >
+        bool find( const Page<B<KT>,B<VT>,false,A<VT>>* page, Trail& trail ) const {
+            return find<KT>( page->key( 0 ), trail, page->header.depth );
+        }
+        template< class KT, class VT, std::enable_if_t<(A<KT>),bool> = true >
+        bool find( const Page<B<KT>,B<VT>,true,A<VT>>* page, Trail& trail ) const {
+            return find<KT>( page->key( 0 ), page->keySize( 0 ), trail, page->header.depth );
+        }
         // Insert a key-link in a Node Page.
         // Insert scalar key-link
-        template< bool AK = KA > typename std::enable_if<(!AK),void>::type
-        nodeInsert( Trail& trail, const K& key, PageLink link ) {
-            static const std::string signature( "void BTree<K,V,KA,VA>::nodeInsert( Trail& trail, const K& key, PageLink link )" );
+        template< class KT, std::enable_if_t<(S<KT>),bool> = true >
+        void nodeInsert( Trail& trail, const K& key, PageLink link ) {
+            static const char* signature( "void Tree<K,V>::nodeInsert( Trail& trail, const K& key, PageLink link )" );
             if (trail.depth() == 0) {
-                if (MaxHeight < (root->depth + 1)) throw signature + " - Max B-tree heigth exceeded";
-                PageLink linkRoot = root->page;
-                Page<K,PageLink,false,false>* node = allocateNode( root->depth + 1 );
+                if (Trail::MaxHeight < (root->depth + 1)) throw std::string( signature ) + " - Max BTree heigth exceeded";
+                PageHeader* oldRoot = root;
+                auto node = allocateNode( root->depth + 1 );
                 root = &node->header;
+                node->split( oldRoot->page );
                 node->insert( 0, key, link );
-                node->split( linkRoot );
-                trail.clear( root );
+                trail.clear();
             } else {
-                Page<K,PageLink,false,false>* node = this->node( trail );
-                if (!node->entryFit()) {
-                    grow<PageLink,false>( trail );
-                    find( key, trail, node->header.depth );
-                    node = this->node( trail );
+                auto parent = node( trail );
+                if (!parent->entryFit()) {
+                    grow<PageLink>( trail );
+                    find<KT>( key, trail.clear(), parent->header.depth );
+                    parent = node( trail );
                 }
-                Page<K,PageLink,false,false>* copy = updatePage<PageLink,false>( trail );
-                if ((node->header.count == 0) or (trail.compare() < 0)) {
-                    node->insert( 0, key, link, copy );
+                auto copy = updatePage<PageLink>( trail );
+                if ((parent->header.count == 0) or (trail.atSplit())) {
+                    parent->insert( 0, key, link, copy );
                 } else {
-                    node->insert( (trail.index() + 1), key, link, copy );
+                    parent->insert( (trail.index() + 1), key, link, copy );
                 }
-                recoverPage( node->header, copy->header );
+                recoverPage( parent->header, copy->header );
             }
         }
         // Insert array key-link
-        template< bool AK = KA > typename std::enable_if<(AK),void>::type
-        nodeInsert( Trail& trail, const K* key, PageIndex keySize, PageLink link ) {
-            static const std::string signature( "void BTree<K,V,KA,VA>::nodeInsert( Trail& trail, const K* key, PageIndex keySize, PageLink link )" );
+        template< class KT, std::enable_if_t<(A<KT>),bool> = true >
+        void nodeInsert( Trail& trail, const B<KT>* key, PageIndex keySize, PageLink link ) {
+            static const char* signature( "void Tree<K,V>::nodeInsert( Trail& trail, const K* key, PageIndex keySize, PageLink link )" );
             if (trail.depth() == 0) {
-                if (MaxHeight < (root->depth + 1)) throw signature + " - Max B-tree heigth exceeded";
-                PageLink linkRoot = root->page;
-                Page<K,PageLink,true,false>* node = allocateNode( root->depth + 1 );
-                root = &node->header;
-                node->insert( 0, key, keySize, link );
-                node->split( linkRoot );
-                trail.clear( root );
+                if (Trail::MaxHeight < (root->depth + 1)) throw std::string( signature ) + " - Max BTree heigth exceeded";
+                PageHeader* oldRoot = root;
+                auto parent = allocateNode( root->depth + 1 );
+                root = &parent->header;
+                parent->split( oldRoot->page );
+                parent->insert( 0, key, keySize, link );
+                trail.clear();
             } else {
-                Page<K,PageLink,true,false>* node = this->node( trail );
-                if (!node->entryFit( keySize )) {
-                    grow<PageLink,false>( trail );
-                    find( key, keySize, trail, node->header.depth );
-                    node = this->node( trail );
+                auto parent = node( trail );
+                if (!parent->entryFit( keySize )) {
+                    grow<PageLink>( trail );
+                    find<KT>( key, keySize, trail.clear(), parent->header.depth );
+                    parent = node( trail );
                 }
-                Page<K,PageLink,true,false>* copy = updatePage<PageLink,false>( trail );
-                if ((node->header.count == 0) or (trail.compare() < 0)) {
-                    node->insert( 0, key, keySize, link, copy );
+                auto copy = updatePage<PageLink>( trail );
+                if ((parent->header.count == 0) or (trail.atSplit())) {
+                    parent->insert( 0, key, keySize, link, copy );
                 } else {
-                    node->insert( (trail.index() + 1), key, keySize, link, copy );
+                    parent->insert( (trail.index() + 1), key, keySize, link, copy );
                 }
-                recoverPage( node->header, copy->header );
+                recoverPage( parent->header, copy->header );
             }
         }
-        template< class VT = V, bool AV = VA >
-        inline typename std::enable_if<(!AV),void>::type
-        setSplit( Page<K,VT,KA,false>& dst, const Page<K,VT,KA,false>& src, PageIndex index ) const {
+        template< class VT, std::enable_if_t<(S<VT>),bool> = true >
+        inline void setSplit( Page<B<K>,VT,A<K>,false>& dst, const Page<B<K>,VT,A<K>,false>& src, PageIndex index ) const {
             dst.split( src.value( index ) );
         }
-        template< class VT = V, bool AV = VA >
-        inline typename std::enable_if<(AV),void>::type
-        setSplit( Page<K,VT,KA,true>& dst, const Page<K,VT,KA,true>& src, PageIndex index ) const {
+        template< class VT, std::enable_if_t<(A<VT>),bool> = true >
+        inline void setSplit( Page<B<K>,B<VT>,A<K>,true>& dst, const Page<B<K>,B<VT>,A<K>,true>& src, PageIndex index ) const {
             dst.split( src.value( index ), src.valueSize( index ) );
         }
-        template< class VT = V, bool AK = KA, bool AV = VA >
-        inline typename std::enable_if<(!AK),void>::type
-        insertSplitKey( Trail& trail, const Page<K,VT,false,AV>& src, PageIndex index, PageLink link ) {
-            nodeInsert( trail, src.key( index ), link );
+        template< class KT, class VT, std::enable_if_t<S<KT>,bool> = true >
+        inline void insertSplitKey( Trail& trail, const Page<KT,B<VT>,false,A<VT>>& src, PageIndex index, PageLink link ) {
+            nodeInsert<KT>( trail, src.key( index ), link );
         }
-        template< class VT = V, bool AK = KA, bool AV = VA >
-        inline typename std::enable_if<(AK),void>::type
-        insertSplitKey( Trail& trail, const Page<K,VT,true,AV>& src, PageIndex index, PageLink link ) {
-            nodeInsert( trail, src.key( index ), src.keySize( index ), link );
+        template< class KT, class VT, std::enable_if_t<A<KT>,bool> = true >
+        inline void insertSplitKey( Trail& trail, const Page<B<KT>,B<VT>,true,A<VT>>& src, PageIndex index, PageLink link ) {
+            nodeInsert<KT>( trail, src.key( index ), src.keySize( index ), link );
         }
-        // Create room in Page by adding a Page to the right
+        // Find index that splits page into *this of (nearly) equal filling.
+        // This is not necessarily half-way in entries for *this with variable size keys and/or values.
+        template< class KT, class VT >
+        PageIndex optimalCut( Page<B<KT>,B<VT>,A<KT>,A<VT>>* node ) {
+            PageIndex cut = (node->header.count / 2);
+            PageSize fill = node->filling();
+            PageSize leftFill = node->filling( cut );
+            PageSize rightFill = (fill - leftFill);
+            PageSize balance = ((leftFill < rightFill) ? (rightFill - leftFill) : (leftFill - rightFill));
+            if (leftFill < rightFill) {
+                while ((leftFill < rightFill) && ((cut + 1) < node->header.count)) {
+                    PageIndex probe = (cut + 1);
+                    leftFill = node->filling( probe );
+                    rightFill = (fill - leftFill);
+                    PageSize newBalance = ((leftFill < rightFill) ? (rightFill - leftFill) : (leftFill - rightFill));
+                    if (balance < newBalance) return( cut );
+                    balance = newBalance;
+                    cut = probe;
+                }
+            } else {
+                while ((rightFill < leftFill) && (0 < (cut - 1))) {
+                    PageIndex probe = (cut - 1);
+                    leftFill = node->filling( probe );
+                    rightFill = (fill - leftFill);
+                    PageSize newBalance = ((leftFill < rightFill) ? (rightFill - leftFill) : (leftFill - rightFill));
+                    if (balance < newBalance) return( cut );
+                    balance = newBalance;
+                    cut = probe;
+                }
+            }
+            return( cut );
+        }
+        // Create room in Page for insertion by adding a Page to the right
         // This will result in adding a key to the parent page.
         // Content is is shifted to the newly created Page, making room in both Pages.
         // This can fail if maximum tree depth is exceeded.
-        template< class VT = V, bool AV = VA > void
-        grow( Trail& trail ) {
-            Page<K,VT,KA,AV>* node = page<VT,AV>( trail );
-            Page<K,VT,KA,AV>* copy = updatePage<VT,AV>( trail );
-            PageIndex index = (node->header.count / 2);
-            Page<K,VT,KA,AV>* right = allocatePage<VT,AV>( node->header.depth );
-            node->shiftRight( *right, index, copy );
-            PageIndex splitIndex = (copy->header.count - 1);
-            setSplit<VT,AV>( *right, *copy, splitIndex );
-            insertSplitKey<VT,KA,AV>( trail.pop(), *copy, splitIndex, right->header.page );
-            copy->remove( splitIndex );
-            recoverPage( node->header, copy->header );
+        template< class VT >
+        void grow( Trail& trail ) {
+            auto node = page<VT>( trail );
+            auto copyNode = updatePage<VT>( trail );
+            auto right = allocatePage<VT>( node->header );
+            node->shiftRight( *right, optimalCut<K,VT>( node ), copyNode );
+            PageIndex splitKeyIndex = (copyNode->header.count - 1);
+            setSplit<VT>( *right, *copyNode, splitKeyIndex );
+            insertSplitKey<K,VT>( trail.pop(), *copyNode, splitKeyIndex, right->header.page );
+            copyNode->remove( splitKeyIndex );
+            recoverPage( node->header, copyNode->header );
         }
 
-        // Allocate room in ancestor node for (possibly) larger array key
-        void allocateSplit( Trail& trail, const K* key, const PageSize keySize ) {
-            Page<K,V,true,VA>* page = this->page<V,VA>( trail );
-            PageDepth offset = trail.match();
-            Page<K,PageLink,true,false>* ancestor = this->node( trail, offset );
-            while (!ancestor->entryFit( page->keySize(0) )) {
-                trail.popToMatch();
-                grow<PageLink,false>( trail );
-                find( key, keySize, trail, page->header.depth );
-                offset = trail.match();
-                ancestor = this->node( trail, offset );
-            }
-        }        
-        
-        // Set split value in Page with next largest key (if any)
+        // Remove current split and set split in Page to next key-value (if any)
         // Add new split key to appropriate node
-        // Set next scalar key split
-        template<bool AK = KA>
-        typename std::enable_if<(!AK),void>::type nextSplit( Trail& trail, const K& key ) {
-            Page<K,V,false,VA>* page = this->page<V,VA>( trail );
+        template< class KT = K, class VT = V, std::enable_if_t<(S<KT>),bool> = true >
+        void nextSplit( Trail& trail, const K& key ) {
+            // Set split for fixed size keys
+            auto page = this->page<VT>( trail );
             if (0 < page->header.count) {
-                // Shift Page key 0 into split and update corresponding Node key to match
+                // Shift Page value 0 into split and update corresponding Node key to Page key 0
                 // Shift into new page for convenience (minimize memory rearrangement)
-                Page<K,V,false,VA>* newPage = allocatePage<V,VA>( page->header.depth );
-                setSplit<V,VA>( *newPage, *page, 0 );
+                auto newPage = allocatePage<VT>( page->header );
+                setSplit<VT>( *newPage, *page, 0 );
                 if (1 < page->header.count) page->shiftRight( *newPage, 1 );
-                trail.pop();
-                Page<K,PageLink,false,false>* node = this->node( trail );
-                Page<K,PageLink,false,false>* copy = updatePage<PageLink,false>( trail );
-                if (trail.split()) {
-                    node->split( newPage->header.page, copy );
+                auto parent = node( trail.pop() );
+                auto copyParent = updatePage<PageLink>( trail );
+                if (trail.atSplit()) {
+                    parent->split( newPage->header.page, copyParent );
                     PageDepth offset = trail.match();
                     // Ancestor page is already copied due to earlier updatePage...
-                    Page<K,PageLink,false,false>* ancestor = this->node( trail, offset );
+                    auto ancestor = node( trail, offset );
                     PageIndex index = trail.index( offset );
-                    ancestor->exchange( index, page->key(0), ancestor->value(index) );
+                    ancestor->replace( index, page->key(0), ancestor->value(index) );
                 } else {
-                    node->exchange( trail.index(), page->key(0), newPage->header.page, copy );
+                    parent->replace( trail.index(), page->key(0), newPage->header.page, copyParent );
                 }
-                recoverPage( node->header, copy->header );
-                trail.push( &newPage->header, 0, -1 );
-                pool.recover( page->header, false );
-                pool.free( page->header );
+                recoverPage( parent->header, copyParent->header );
+                trail.pushSplit( &newPage->header );
+                conditionalMerge( trail );
             } else {
-                Page<K,V,false,VA>* copyPage = updatePage<V,VA>( trail );
-                page->removeSplit( copyPage );
-                recoverPage( page->header, copyPage->header );
+                // Page is empty after removing split...
+                removeAt<KT,PageLink>( trail.pop(), key );
             }
+            pool.recover( page->header, true );
         }
-        // Set next array key split
-        template<bool AK = KA>
-        typename std::enable_if<(AK),void>::type nextSplit( Trail& trail, const K* key, const PageSize keySize ) {
-            Page<K,V,true,VA>* page = this->page<V,VA>( trail );
+        // Remove current split and set split in Page to next key-value (if any)
+        // Add new split key to appropriate node
+        template< class KT = K, class VT = V, std::enable_if_t<(A<KT>),bool> = true >
+        void nextSplit( Trail& trail, const B<KT>* key, const PageSize keySize ) {
+            // Set split for variable size keys
+            auto page = this->page<VT>( trail );
             if (0 < page->header.count) {
                 // Shift Page key 0 into split and update corresponding Node key to match
                 // Shift into new page for convenience (minimize memory rearrangement)
-                Page<K,V,true,VA>* newPage = allocatePage<V,VA>( page->header.depth );
-                setSplit<V,VA>( *newPage, *page, 0 );
+                auto newPage = allocatePage<VT>( page->header );
+                setSplit<VT>( *newPage, *page, 0 );
                 if (1 < page->header.count) page->shiftRight( *newPage, 1 );
-                allocateSplit( trail, key, keySize );
-                trail.pop();
-                Page<K,PageLink,true,false>* node = this->node( trail );
-                Page<K,PageLink,true,false>* copy = updatePage<PageLink,false>( trail );
-                if (trail.split()) {
-                    node->split( newPage->header.page, copy );
-                    PageDepth offset = trail.match();
-                    // Ancestor page is already copied due to earlier updatePage...
-                    Page<K,PageLink,true,false>* ancestor = this->node( trail, offset );
-                    PageIndex index = trail.index( offset );
-                    ancestor->exchange( index, page->key(0), page->keySize(0), ancestor->value(index) );
-                } else {
-                    node->exchange( trail.index(), page->key(0), page->keySize(0), newPage->header.page, copy );
+                auto ancestor = node( trail, trail.match() );
+                while (!ancestor->entryFit( page->keySize(0) )) {
+                    grow<PageLink>( trail.popToMatch() );
+                    find<KT>( key, keySize, trail.clear(), page->header.depth );
+                    ancestor = node( trail, trail.match() );
                 }
-                recoverPage( node->header, copy->header );
-                trail.push( &newPage->header, 0, -1 );
-                pool.recover( page->header, false );
-                pool.free( page->header );
+                auto parent = node( trail.pop() );
+                auto copyParent = updatePage<PageLink>( trail );
+                if (trail.atSplit()) {
+                    parent->split( newPage->header.page, copyParent );
+                    PageDepth offset = trail.match();
+                    auto ancestor = node( trail, offset );
+                    PageIndex index = trail.index( offset );
+                    ancestor->replace( index, page->key(0), page->keySize(0), ancestor->value(index) );
+                } else {
+                    parent->replace( trail.index(), page->key(0), page->keySize(0), newPage->header.page, copyParent );
+                }
+                recoverPage( parent->header, copyParent->header );
+                trail.pushSplit( &newPage->header );
+                conditionalMerge( trail );
             } else {
-                Page<K,V,true,VA>* copyPage = updatePage<V,VA>( trail );
-                page->removeSplit( copyPage );
-                recoverPage( page->header, copyPage->header );
+                removeAt<KT,PageLink>( trail.pop(), key, keySize );
             }
+            pool.recover( page->header, true );
         }
 
+        // Remove entry at trail.
+        // Remove scalar key entry at trail.
+        template< class KT = K, class VT = V, std::enable_if_t<(S<KT>),bool> = true >
+        void removeAt( Trail& trail, const KT& key ) {
+            auto page = this->page<VT>( trail );
+            if (trail.atIndex()) {
+                // Removing a key-value pair in this page.
+                PageIndex index = trail.index();
+                auto copyPage = updatePage<VT>( trail );
+                page->remove( index, copyPage );
+                trail.deletedIndex();
+                recoverPage( page->header, copyPage->header );
+                conditionalMerge( trail );
+            } else {
+                // Removing key to split value in this page.
+                nextSplit<KT,VT>( trail, key );
+                pruneRoot();
+            }
+        }
+        // Remove array key entry at trail.
+        template< class KT = K, class VT = V, std::enable_if_t<(A<KT>),bool> = true >
+        void removeAt( Trail& trail, const B<KT>* key, PageIndex keySize ) {
+            auto page = this->page<VT>( trail );
+            if (trail.atIndex()) {
+                // Removing a key-value pair in this page.
+                PageIndex index = trail.index();
+                auto copyPage = updatePage<VT>( trail );
+                page->remove( index, copyPage );
+                trail.deletedIndex();
+                recoverPage( page->header, copyPage->header );
+                conditionalMerge( trail );
+            } else {
+                // Removing key to split value in this page.
+                nextSplit<KT,VT>( trail, key, keySize );
+                pruneRoot();
+            }
+        }
         // Return scalar value at trail to leaf
-        template< bool AV = VA > const typename std::enable_if<(!AV),V>::type&
-        value( const Trail& trail ) const {
-            Page<K,V,KA,false>* page = leaf( trail );
-            if (trail.compare() == 0) return page->value( trail.index() );
+        template< class VT, std::enable_if_t<(S<VT>),bool> = true >
+        const V& value( const Trail& trail ) const {
+            const auto page = leaf( trail );
+            if (trail.onIndex()) return page->value( trail.index() );
             return page->split();
         }
         // Return array value at trail to leaf
-        template< bool AV = VA > typename std::enable_if<(AV),std::pair<const V*, PageIndex>>::type
-        value( const Trail& trail ) const {
-            Page<K,V,KA,true>* page = leaf( trail );
-            if (trail.compare() == 0) return{ page->value( trail.index() ), page->valueSize( trail.index() ) };
+        template< class VT, std::enable_if_t<(A<VT>),bool> = true >
+        std::pair<const B<VT>*, PageIndex> value( const Trail& trail ) const {
+            const auto page = leaf( trail );
+            if (trail.onIndex()) return{ page->value( trail.index() ), page->valueSize( trail.index() ) };
             return{ page->split(), page->splitSize() };
         }
         // Append split with value in src and key in ancestor at index to src.
         // Append scalar value with scalar key
-        template< class VT, bool AK, bool AV > inline typename std::enable_if<(!AK&&!AV),void>::type
-        appendSplit( Page<K,VT,AK,AV>& dst, const Page<K,PageLink,AK,false>& ancestor, PageIndex index, const Page<K,VT,AK,AV>& src, Page<K,VT,AK,AV>* copy = nullptr ) {
+        template< class VT, std::enable_if_t<(S<K>&&S<VT>),bool> = true >
+        inline void appendSplit( Page<K,VT,false,false>& dst, const Page<K,PageLink,false,false>& ancestor, PageIndex index, const Page<K,VT,false,false>& src, Page<K,VT,false,false>* copy = nullptr ) {
             dst.insert( dst.header.count, ancestor.key( index ), src.split(), copy );
         }
         // Append array value with scalar key
-        template< class VT, bool AK, bool AV > inline typename std::enable_if<(!AK&&AV),void>::type
-        appendSplit( Page<K,VT,AK,AV>& dst, const Page<K,PageLink,AK,false>& ancestor, PageIndex index, const Page<K,VT,AK,AV>& src, Page<K,VT,AK,AV>* copy = nullptr ) {
+        template< class VT, std::enable_if_t<(S<K>&&A<VT>),bool> = true >
+        inline void appendSplit( Page<K,B<VT>,false,true>& dst, const Page<K,PageLink,false,false>& ancestor, PageIndex index, const Page<K,B<VT>,false,true>& src, Page<K,B<VT>,false,true>* copy = nullptr ) {
             dst.insert( dst.header.count, ancestor.key( index ), src.split(), src.splitSize(), copy );
         }
         // Append scalar value with array key
-        template< class VT, bool AK, bool AV > inline typename std::enable_if<(AK&&!AV),void>::type
-        appendSplit( Page<K,VT,AK,AV>& dst, const Page<K,PageLink,AK,false>& ancestor, PageIndex index, const Page<K,VT,AK,AV>& src, Page<K,VT,AK,AV>* copy = nullptr ) {
+        template< class VT, std::enable_if_t<(A<K>&&S<VT>),bool> = true >
+        inline void appendSplit( Page<B<K>,VT,true,false>& dst, const Page<B<K>,PageLink,true,false>& ancestor, PageIndex index, const Page<B<K>,VT,true,false>& src, Page<B<K>,VT,true,false>* copy = nullptr ) {
             dst.insert( dst.header.count, ancestor.key( index ), ancestor.keySize( index ), src.split(), copy );
         }
         // Append array value with array key
-        template< class VT, bool AK, bool AV > inline typename std::enable_if<(AK&&AV),void>::type
-        appendSplit( Page<K,VT,AK,AV>& dst, const Page<K,PageLink,AK,false>& ancestor, PageIndex index, const Page<K,VT,AK,AV>& src, Page<K,VT,AK,AV>* copy = nullptr ) {
+        template< class VT, std::enable_if_t<(A<K>&&A<VT>),bool> = true >
+        inline void appendSplit( Page<B<K>,B<VT>,true,true>& dst, const Page<B<K>,PageLink,true,false>& ancestor, PageIndex index, const Page<B<K>,B<VT>,true,true>& src, Page<B<K>,B<VT>,true,true>* copy = nullptr ) {
             dst.insert( dst.header.count, ancestor.key( index ), ancestor.keySize( index ), src.split(), src.splitSize(), copy );
         }
 
-        template< bool AK = KA > inline typename std::enable_if<(!AK),void>::type
-        locateSplit( Trail& trail, const Page<K,PageLink,false,false>& node ) const {
-            find( node.key( 0 ), trail );
+        template< class KT, std::enable_if_t<(S<KT>),bool> = true >
+        inline void locateSplit( Trail& trail, const Page<KT,PageLink,false,false>& node ) const {
+            find<KT>( node.key( 0 ), trail );
         }
-        template< bool AK = KA > inline typename std::enable_if<(AK),void>::type
-        locateSplit( Trail& trail, const Page<K,PageLink,true,false>& node ) const {
-            find( node.key( 0 ), node.keySize( 0 ), trail );
+        template< class KT, std::enable_if_t<(A<KT>),bool> = true >
+        inline void locateSplit( Trail& trail, const Page<B<KT>,PageLink,true,false>& node ) const {
+            find<KT>( node.key( 0 ), node.keySize( 0 ), trail );
         }
-        void removeSplitKey( const Trail& trail ) {
-            PageDepth offset = trail.match();
-            Page<K,PageLink,KA,false>* node = page<PageLink,false>( trail.header( offset ) );
-            node->remove( trail.index( offset ) );
-        }
-
         // Access previous page at trail (referencing node page)
         // Returns null if there is no previous page
-        template< class VT = V, bool AV = VA>
-        Page<K,VT,KA,AV>* previousPage( Trail& trail ) {
-            static const std::string signature( "Page<K,VT,KA,AV>* BTree<K,V,KA,VA>::previousPage( Trail& trail )" );
-            if ( trail.previousPage<K,KA>() ) {
-                const PageHeader* header = trail.indexedHeader<K,KA>();
+        // Trail must be positioned on a node Page.
+        template< class VT >
+        Page<B<K>,B<VT>,A<K>,A<VT>>* previousPage( Trail& trail ) {
+            if ( trail.previous<B<K>,A<K>>() ) {
+                const PageHeader* header = trail.pageHeader<K,A<K>>();
                 if (0 < header->count) {
-                    trail.push( header, (header->count - 1), 0 );
+                    trail.pushIndex( header, (header->count - 1) );
                 } else {
-                    if (header->split == 0) throw signature + " - Navigating to empty page";
-                    trail.push( header, 0, -1 );
+                    trail.pushSplit( header );
                 }
-                return page<VT,AV>( header );
+                return page<VT>( header );
             }
             return nullptr;
         }
-        // Access next page at trail (referencing node page)
+        // Access next page at trail (referencing node page).
         // Returns null if there is no next page
-        template< class VT = V, bool AV = VA>
-        Page<K,VT,KA,AV>* nextPage( Trail& trail ) {
-            static const std::string signature( "Page<K,VT,KA,AV>* BTree<K,V,KA,VA>::nextPage( Trail& trail )" );
-            if ( trail.nextPage<K,KA>() ) {
-                const PageHeader* header = trail.indexedHeader<K,KA>();
+        // Trail must be positioned on a node Page.
+        template< class VT >
+        Page<B<K>,B<VT>,A<K>,A<VT>>* nextPage( Trail& trail ) {
+            static const char* signature( "Page<K,V,KA,VA>* Tree<K,V>::nextPage( Trail& trail )" );
+            if ( trail.next<B<K>,A<K>>() ) {
+                const PageHeader* header = trail.pageHeader<K,A<K>>();
                 if (0 < header->split) {
-                    trail.push( header, 0 , -1 );
+                    trail.pushSplit( header );
                 } else {
-                    if (header->count == 0) throw signature + " - Navigating to empty page";
-                    trail.push( header, 0 , 0 );
+                    if (header->count == 0) throw std::string( signature ) + " - Navigating to empty page";
+                    trail.pushIndex( header , 0 );
                 }
-                return page<VT,AV>( header );
+                return page<VT>( header );
             }
             return nullptr;
         }
@@ -777,105 +869,165 @@ namespace BTree {
         // removing node key to (appended) src page.
         // Trail points to parent of src.
         // Frees src Page
-        template< class VT = V, bool AK = KA, bool AV = VA>
-        void mergePage( Trail& srcTrail, Trail& dstTrail ) {
-            Page<K,VT,AK,AV>* src = page<VT,AV>( srcTrail );
-            Page<K,VT,AK,AV>* dst = page<VT,AV>( dstTrail );
-            Page<K,VT,AK,AV>* srcCopy = updatePage<VT,AV>( srcTrail );
-            Page<K,VT,AK,AV>* dstCopy = updatePage<VT,AV>( dstTrail );
+        template< class KT, class VT>
+        void mergePage( Trail& dstTrail, Trail& srcTrail ) {
+            const auto src = page<VT>( srcTrail );
+            auto dst = page<VT>( dstTrail );
+            auto srcCopy = updatePage<VT>( srcTrail );
+            auto dstCopy = updatePage<VT>( dstTrail );
             srcTrail.pop();
             dstTrail.pop();
             PageDepth offset = srcTrail.match();
             PageIndex index = srcTrail.index( offset );
-            Page<K,PageLink,AK,false>* ancestor = page<PageLink,false>( srcTrail.header( offset ) );
-            appendSplit<VT,AK,AV>( *dst, *ancestor, index, *src, dstCopy );
+            Page<B<KT>,PageLink,A<KT>,false>* ancestor = page<PageLink>( srcTrail.header( offset ) );
+            PageLink ancestorLink = ancestor->value( index );
+            // Page being merged must have a split value as it cannot be leftmost leaf.
+            appendSplit<VT>( *dst, *ancestor, index, *src, dstCopy );
             src->shiftLeft( *dstCopy, src->header.count, srcCopy );
-            if (srcTrail.split()) {
-                // Replace split key with next largest key if any
-                Page<K,PageLink,AK,false>* parent = node( srcTrail );
-                if (0 < parent->header.count) {
-                    Page<K,PageLink,AK,false>* park = allocateNode( ancestor->header.depth );
-                    appendSplit<PageLink,AK,false>( *park, *ancestor, index, *parent );
-                    parent->split( parent->value( 0 ) );
-                    srcTrail.popToMatch();
-                    insertSplitKey( srcTrail, *parent, 0, ancestor->value( index ) );
-                    parent->remove( 0 );
-                    srcTrail.clear( root );
-                    locateSplit( srcTrail, *park );
-                    removeSplitKey( srcTrail );
-                    pool.free( park->header.page );
-                }   
-            } else {
-                ancestor->remove( index );
-            }
             recoverPage( dst->header, dstCopy->header );
-            pool.recover( src->header, false );
-            pool.free( src->header.page );
-            if (srcTrail.depth() == 1) {
-                if (ancestor->header.count == 0) {
-                    // Merged tree to single leaf page
-                    root = pool.reference( ancestor->split() );
-                    pool.free( ancestor->header.page );
-                }
+            recoverPage( src->header, srcCopy->header );
+            // Recursively merge ancestor nodes where possible
+            // A non-empty node must exist as we just merged two *this
+            pruneBranch<PageLink>( srcTrail );
+            // Remove link to recently merged page
+            auto parent = node( srcTrail );
+            if (parent == ancestor) {
+                ancestor->remove( index );
+                srcTrail.deletedIndex();
             } else {
-                srcTrail.popToMatch();
-                ancestor = node( srcTrail );
-                if (ancestor->filling() < (LowPageThreshold * ancestor->header.capacity) ) merge<PageLink,AK,false>( srcTrail );
+                // Replace split key in ancestor with next largest key in parent
+                auto keyPark = allocateNode( parent->header.depth );
+                appendSplit<PageLink>( *keyPark, *parent, 0, *parent );
+                parent->split( parent->value( 0 ) );
+                parent->remove( 0 );
+                ancestor->remove( index );
+                srcTrail.popToMatch().deletedIndex();
+                insertSplitKey<KT,PageLink>( srcTrail, *keyPark, 0, ancestorLink );
+                pool.free( keyPark->header );
+            }
+            pruneRoot();
+            // Merged page (dstCopy) has at least one key-value entry, find it using key( 0 )
+            find<KT,VT>( dstCopy, srcTrail.clear() );
+            if (1 < srcTrail.depth()) {
+                parent = node( srcTrail.pop() );
+                if (parent->filling() < (LowPageThreshold * parent->header.capacity) ) merge<KT,PageLink>( srcTrail );
             }
         }
-        template< bool AK = KA > typename std::enable_if<(!AK),PageSize>::type
-        splitKeySize( const Trail& trail ) { return sizeof(K); }
-        template< bool AK = KA > typename std::enable_if<(AK),PageSize>::type
-        splitKeySize( const Trail& trail ) {
+        // Pune tree of degenerate nodes up to non-empty node
+        // A degenerate node being a node containing only a split link
+        template< class VT >
+        void pruneBranch( Trail& trail ) {
+            auto node = page<VT>( trail );
+            while (node->size() == 0) {
+                pool.free( node->header );
+                node = page<VT>( trail.pop() );
+            }
+        }
+        // Set new root if current root is degenerate.
+        void pruneRoot() {
+            if ((root->count == 0) && (0 < root->depth)) {
+                // Pruned root to single branch, replace trunk with branch (either a node or leaf Page)
+                auto rootPage = page<PageLink>( this->root );
+                root = pool.reference( rootPage->split() );
+                pool.free( rootPage->header );
+            }
+        }
+        template< class KT, std::enable_if_t<(S<KT>),bool> = true >
+        PageSize splitKeySize( const Trail& trail ) const {
             PageDepth offset = trail.match();
-            Page<K,PageLink,AK,false>* ancestor = node( trail, offset );
-            return( sizeof(K) * ancestor->keySize( trail.index( offset ) ) );
+            PageIndex index = trail.index( offset );
+            const auto ancestor = node( trail, offset );
+            if (index < ancestor->header.count) return( sizeof(KT) );
+            return( 0 );
+        }
+        template< class KT, std::enable_if_t<(A<KT>),bool> = true >
+        PageSize splitKeySize( const Trail& trail ) const {
+            PageDepth offset = trail.match();
+            PageIndex index = trail.index( offset );
+            const auto ancestor = node( trail, offset );
+            if (index < ancestor->header.count) return( sizeof(B<KT>) * ancestor->keySize( index ) );
+            return( 0 );
         }
         // Merge neighbouring Pages, if any
-        // This may result recursively merging Pages higher up in B-tree, eventually reducing B-tree height.
-        template< class VT = V, bool AK = KA, bool AV = VA>
+        // This may result recursively merging Pages higher up in BTree, eventually reducing BTree height.
+        template< class KT, class VT >
         void merge( Trail& trail ) {
             const PageHeader* header = trail.header();
             if (header != root) {
                 Trail pageTrail( trail );
                 trail.pop();
-                const Page<K,VT,KA,AV>* page = this->page<VT,AV>( header );
-                PageIndex pageFill = page->filling();
+                const auto page = this->page<VT>( header );
                 Trail leftTrail( trail );
-                PageSize leftSplitKeySize = splitKeySize( leftTrail );
-                const Page<K,VT,KA,AV>* leftPage = previousPage<VT,AV>( leftTrail );
-                PageIndex leftFill = ( leftPage ? (leftPage->filling() + leftSplitKeySize) : (2 * page->header.capacity) );
+                const auto leftPage = previousPage<VT>( leftTrail );
+                PageIndex leftFill = (2 * page->header.capacity);
+                if (leftPage) {
+                    leftFill = leftPage->filling();
+                    leftFill += page->indexedFilling( page->size() );
+                    PageSize leftSplitKeySize = splitKeySize<KT>( trail );
+                    if (0 < leftSplitKeySize) leftFill += (leftSplitKeySize + page->splitValueSize());
+                }
                 Trail rightTrail( trail );
-                PageSize rightSplitKeySize = splitKeySize( rightTrail );
-                const Page<K,VT,KA,AV>* rightPage = nextPage<VT,AV>( rightTrail );
-                PageIndex rightFill = ( rightPage ? (rightPage->filling() + rightSplitKeySize) : (2 * page->header.capacity) );
+                const auto rightPage = nextPage<VT>( rightTrail );
+                PageIndex rightFill = (2 * page->header.capacity);
+                if (rightPage) {
+                    rightFill = rightPage->indexedFilling( rightPage->size() );
+                    PageSize rightSplitKeySize = splitKeySize<KT>( rightTrail );
+                    if (0 < rightSplitKeySize) rightFill += (rightSplitKeySize + rightPage->splitValueSize());
+                    rightFill += page->filling();
+                }
                 PageIndex threshold = (HighPageThreshold * page->header.capacity);
-                if ((leftFill < rightFill) && ((leftFill + pageFill) < threshold)) {
-                    mergePage<VT,AK,AV>( pageTrail, leftTrail ); // Shift content of this page to left
-                } else if ((rightFill + pageFill) < threshold) {
-                    mergePage<VT,AK,AV>( rightTrail, pageTrail ); // Shift content of right page to this page
+                if ((leftFill < rightFill) && (leftFill < threshold)) {
+                    mergePage<KT,VT>( leftTrail, pageTrail ); // Shift content of this page to left page
+                } else if (rightFill < threshold) {
+                    mergePage<KT,VT>( pageTrail, rightTrail ); // Shift content of right page to this page
                 }
             }
         }
-
-        // Free a page and all pages that is references; i.e., free an entire (sub-) tree.
-        void freeAll( const PageHeader* page ) {
-            if (0 < page->depth) {
-                Page<K,PageLink,KA,false>* node = this->page<PageLink,false>( page );
-                if (node->splitDefined()) freeAll( pool.reference( node->split() ) );
-                for (PageIndex i = 0; i < node->size(); i++) freeAll( pool.reference( node->value( i ) ) );
+        // Merge either Leaf or Node *this depending on page level at top of trail.
+        void conditionalMerge( Trail& trail ) {
+            const PageHeader* header = trail.header();
+            if (header->depth == 0) {
+                auto page = leaf( trail );
+                if (page->filling() < (LowPageThreshold * page->header.capacity) ) merge<K,V>( trail );
+            } else {
+                auto page = node( trail );
+                if (page->filling() < (LowPageThreshold * page->header.capacity) ) merge<K,PageLink>( trail );
             }
-            pool.free( page );
+        }
+
+        // Free a page and all pages that it references; i.e., free an entire (sub-) tree.
+        void freeAll( const PageHeader& page ) {
+            if (page.free != 1) {
+                if (0 < page.depth) {
+                    Page<B<K>,PageLink,A<K>,false>* node = this->page<PageLink>( &page );
+                    if (node->splitDefined()) freeAll( pool.access( node->split() ) );
+                    for (PageIndex i = 0; i < node->size(); i++) freeAll( pool.access( node->value( i ) ) );
+                }
+                pool.free( page );
+            }
+        }
+
+        // Recursively count the number of key-value entries in a page.
+        size_t pageCount( const PageHeader* header ) const {
+            static const char* signature( "size_t Tree<K,V>::pageCount( PageHeader* header ) const" );
+            if (header->free == 1)  throw std::string(signature) + " - Accessing freed page.";
+            size_t count = header->count;
+            if (0 < header->depth) {
+                const auto node = page<PageLink>( header );
+                if (node->splitDefined()) count += pageCount( pool.reference( node->split() ) );
+                for (PageIndex i = 0; i < node->size(); i++) count += pageCount( pool.reference( node->value( i )) );
+            }
+            return( count );
         }
 
         void streamPage( std::ostream & o, PageLink link, PageDepth depth ) const {
             if (pool.valid( link )) {
                 const PageHeader& header = pool.access( link );
                 if (header.depth == 0) {
-                    Page<K,V,KA,VA>* leaf = pool.page<K,V,KA,VA>( &header );
+                    auto leaf = pool.page<B<K>,B<V>,A<K>,A<V>>( &header );
                     if (header.depth == depth) o << *leaf;
                 } else {
-                    Page<K,PageLink,KA,false>* node = pool.page<K,PageLink,KA,false>( &header );
+                    auto node = pool.page<B<K>,PageLink,A<K>,false>( &header );
                     if (header.depth == depth) o << *node;
                     if (node->splitDefined()) {
                         PageLink link = node->split();
@@ -898,55 +1050,54 @@ namespace BTree {
             } else o << "Invalid page link " << link << "\n";
         }
 
+    public:
+
+        template< class KT = K, class VT = V >
+        Tree(
+            std::enable_if_t<(S<KT>),PagePool>& pagePool,
+            int(*compareKey)( const B<KT>&, const B<KT>& ),
+            UpdateMode updateMode,
+            PageHeader* pageRoot
+        ) : TreeBase( pagePool, pageRoot, updateMode ) {
+            if (root == nullptr) root = &allocateLeaf()->header;
+            compare.scalar = compareKey;
+        }
+        template< class KT = K, class VT = V >
+        Tree(
+            std::enable_if_t<(A<KT>),PagePool>& pagePool,
+            int(*compareKey)( const B<KT>*, PageIndex, const B<KT>*, PageIndex ),
+            UpdateMode updateMode,
+            PageHeader* pageRoot
+        ) : TreeBase( pagePool, pageRoot, updateMode ) {
+            if (root == nullptr) root = &allocateLeaf()->header;
+            compare.array = compareKey;
+        }
+
     protected:
 
+        // Recover B-Tree to a root defined by a PageLink. 
+        void recoverTree( PageLink link ) {
+            if (link.null()) {
+                // No previous B-Tree state, recover to empty BTree
+                freeAll( *root );
+                root = &allocateLeaf()->header;
+            } else {
+                root = pool.reference( link );
+            }
+        }
+        
         void stream( std::ostream & o ) const {
             o << "Root\n";
             for (int d = root->depth; 0 <= d; d--) streamPage( o, root->page, d );
         }
 
-    private:
-    
-        struct Iterator 
-        {
-            using iterator_category = std::forward_iterator_tag;
-            using difference_type   = void;
-            using value_type        = void;
-            using pointer           = void;
-            using reference         = void;
-
-            Iterator( Trail location ) : trail( location ) {}
-
-            Iterator& operator++() { trail.next<K,KA>(); return *this; }  
-            Iterator operator++(int) { Iterator tmp = *this; ++(*this); return tmp; }
-            Iterator& operator--() { trail.previous<K,KA>(); return *this; }  
-            Iterator operator--(int) { Iterator tmp = *this; ++(*this); return tmp; }
-            inline bool operator==( const Iterator& i ) { return( trail == i.trail ); }
-            inline bool operator!= (const Iterator& i ) { return( trail != i.trail ); }
-
-        private:
-            Trail trail;
-        };
-
-        Iterator begin() {
-            Trail trail;
-            // Navigate trail to begin...
-            return Iterator( trail );
-        }
-        Iterator end() {
-            Trail trail;
-            // Navigate trail to end...
-            return Iterator( trail );            
-        }
-
     }; // class Tree
 
-    template< class K, class V, bool KA, bool VA >
-    inline std::ostream & operator<<( std::ostream & o, const Tree<K,V,KA,VA>& tree ) { tree.stream( o ); return o; }
-
-
-
+    template< class K, class V >
+    inline std::ostream & operator<<( std::ostream & o, const Tree<K,V>& tree ) { tree.stream( o ); return o; }
 
 }; // namespace BTree
 
-#endif // BTREE_BTREE_H
+#include "BTreeIterator.h"
+
+#endif // BTREE_TREE_H

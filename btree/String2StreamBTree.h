@@ -1,34 +1,34 @@
 #ifndef STRING_2_STREAM_BTREE_H
 #define STRING_2_STREAM_BTREE_H
 
-// ToDo: (default) constructor arguments, specifically user defined key comparison
-
 #include "StreamingBTree.h"
+#include <string.h>
 
 namespace BTree {
 
-    class String2StreamTree : private StreamingTree< char, true > {
+    // B-Tree mapping std::string keys to stream values.
+    // See StreamingTree for streaming details.
+    class String2StreamTree : private StreamingTree< char[] > {
     public :
-        inline String2StreamTree( PagePool& pool, StreamBlockSize block, UpdateMode mode = Auto ) :
-            StreamingTree<char,true>( pool, block, mode )
-        {}
-        inline ValueWriter& insert( std::string key ) {
-            return StreamingTree<char,true>::insert( key.c_str(), key.size() );
-        }
-        inline ValueReader& retrieve( std::string key ) {
-            return StreamingTree<char,true>::retrieve( key.c_str(), key.size() );
-        }
-        inline void remove( std::string key ) {
-            StreamingTree<char,true>::remove( key.c_str(), key.size() );
-        }
-        inline void commit() { StreamingTree<char,true>::commit(); }
-        inline void recover() { StreamingTree<char,true>::recover(); }
+        // Construct a string to stream B-Tree on the given page pool with the given stream block size.
+        String2StreamTree( PagePool& indexPool, PagePool& valuePool, StreamBlockSize block, UpdateMode mode = Auto );
+        // Insert a value in the B-Tree.
+        ValueWriter& insert( std::string key );
+        // Retrieve a value from the B-Tree.
+        ValueReader& retrieve( std::string key );
+        // Remove a value from the B-Tree.
+        void remove( std::string key );
+        // Commit updates to the B-Tree.
+        void commit();
+        // Recover B-Tree to previous commit state.
+        void recover();
     private:
+        // Stream B-Tree content in human readable format.
         friend std::ostream & operator<<( std::ostream & o, const String2StreamTree& tree );
     };
 
-    inline std::ostream & operator<<( std::ostream & o, const String2StreamTree& tree ) { tree.stream( o ); return o; }
-
 }; // namespace BTree
+
+#include "String2StreamBTree_Imp.h"
 
 #endif // STRING_2_STREAM_BTREE_H

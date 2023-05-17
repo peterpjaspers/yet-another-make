@@ -1,7 +1,3 @@
-#include <windows.h>
-#include "psapi.h"
-#include "processthreadsapi.h"
-
 #include <cstring>
 #include <cstdlib>
 #include <chrono>
@@ -42,30 +38,11 @@ char* generateName( int n ) {
 #define MAX_N 1000000
 #define NODE_POOL_CAPACITY 1000
 
-int currentMemoryUsage() {
-    PROCESS_MEMORY_COUNTERS counters;
-    GetProcessMemoryInfo( GetCurrentProcess(), &counters, sizeof( counters ) );
-    return counters.WorkingSetSize;
-}
-
-void outputMemoryUsage( int baseUsage, ostream stream ) {
-    int usage = (currentMemoryUsage() - baseUsage);
-    if ((1024 * 1024 * 1024) <= usage) {
-        stream << "Required " << (static_cast<float>( usage ) / (1024 * 1024 * 1024)) << " giga-bytes.\n";
-    } else if ((1024 * 1024) <= usage) {
-        stream << "Required " << (static_cast<float>( usage ) / (1024 * 1024)) << " mega-bytes.\n";
-    } else if (1024 <= usage) {
-        stream << "Required " << (static_cast<float>( usage ) / 1024) << " kilo-bytes.\n";
-    } else {
-        stream << "Required " << usage << " bytes.\n";        
-    }
-}
-
 int compare( const int& a, const int& b ) { return(a - b); };
 
 int main(int argc, char* argv[]) {
     int n = MAX_N;
-    if (1 < argc) { n = min( stoi( argv[1] ), MAX_N ); }
+    if (1 < argc) { n = min( stoi( argv[ 1] ), MAX_N ); }
     string fileName( "testPage.txt" );
     if (2 < argc) { fileName = argv[2]; }
     ofstream stream;

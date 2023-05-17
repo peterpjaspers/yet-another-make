@@ -127,7 +127,7 @@ public:
         size_t keyCount = keys.size();
         if (0 < keyCount) {
             int index = generateKeyIndex( keyCount );
-            uint32_t key( keys[ index ] );
+            int32_t key( keys[ index ] );
             int32_t value = generateIntValue();
             tree.insert( key, value );
             lastKey = key;
@@ -162,7 +162,7 @@ public:
 };
 
 class IntCStringTreeTester : virtual public TreeTester {
-    Tree< int32_t, char, false, true > tree;
+    Tree< int32_t, char[] > tree;
     map<int32_t,string> values;
     vector<int32_t> keys;
 public:
@@ -186,7 +186,7 @@ public:
         tree.insert( key, valueString.c_str(), valueString.size() );
     };
     bool retrieve( int iteration ) {
-        uint32_t key( keys[ iteration ] );
+        int32_t key( keys[ iteration ] );
         pair<const char*,int32_t> result = tree.retrieve( key );
         string valueString( result.first, result.second );
         bool retrieved = ( (valueString == values[ key ]) ? true : false );
@@ -197,7 +197,7 @@ public:
         size_t keyCount = keys.size();
         if (0 < keyCount) {
             int index = generateKeyIndex( keyCount );
-            uint32_t key( keys[ index ] );
+            int32_t key( keys[ index ] );
             char value[ MaxValueString + 1 ];
             generateStringValue( value );
             tree.insert( key, value, strlen( value ) );
@@ -207,7 +207,7 @@ public:
         size_t keyCount = keys.size();
         if (0 < keyCount) {
             int index = generateKeyIndex( keyCount );
-            uint32_t key( keys[ index ] );
+            int32_t key( keys[ index ] );
             bool removed = ( (tree.remove( key )) ? true : false );
             keys.erase( keys.begin() + index );
             if (!removed) outputStream << "Failed to remove key " << key << " [ " << iteration << " ]\n" << flush;
@@ -232,7 +232,7 @@ public:
 };
 
 class CStringIntTreeTester : virtual public TreeTester {
-    Tree< char, int32_t, true, false > tree;
+    Tree< char[], int32_t > tree;
     map<string,int32_t> values;
     vector<string> keyStrings;
     vector<int32_t> keys;
@@ -304,7 +304,7 @@ public:
 };
 
 class CStringCStringTreeTester : virtual public TreeTester {
-    Tree< char, char, true, true > tree;
+    Tree< char[], char[] > tree;
     map<string,string> values;
     vector<string> keyStrings;
     vector<uint32_t> keys;
@@ -400,7 +400,9 @@ int main(int argc, char* argv[]) {
     UpdateMode mode = InPlace;
     auto start = chrono::steady_clock::now();;
     ofstream stream;
-    stream.open( "testBTree.txt" );
+    system( "RMDIR /S /Q testBTree" );
+    system( "MKDIR testBTree" );
+    stream.open( "testBTRee\\testBTree.txt" );
     try {
         TreeTester* tester = nullptr;
         for (int i = 1; i < argc; i++) {
@@ -409,7 +411,7 @@ int main(int argc, char* argv[]) {
                 string fileName( argv[ ++i ] );
                 stream << "Streaming to " << fileName << flush;
                 stream.close();
-                stream.open( fileName );
+                stream.open( "testBTRee\\" + fileName );
             } else if (command ==  "array") {
                 string argument( argv[ ++i ] );
                 if (argument == "keys") arrayKeys = true; else arrayValues = true;
@@ -425,7 +427,7 @@ int main(int argc, char* argv[]) {
             } else if (command ==  "create") {
                 pageSize = PageSize( min( max( stoi( argv[ ++i ] ), int( MinPageSize)  ), int( MaxPageSize ) ) );
                 string persistentFile;
-                if (persistentStore) persistentFile = argv[ ++i ];
+                if (persistentStore) persistentFile = string( "testBTRee\\" ) + argv[ ++i ];
                 if (!arrayKeys && !arrayValues) {
                     stream << "--- int -> int ---\n";
                     PagePool* pagePool = createPagePool( persistentStore, persistentFile, pageSize );

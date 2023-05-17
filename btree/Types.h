@@ -13,66 +13,51 @@ namespace BTree {
 
     const PageSize MinPageSize = 128;
     const PageSize MaxPageSize = 32768;
-    const unsigned int MaxPagePoolIndex = 0xFFFFFFFF;
-    const unsigned int MaxPageDepth = 0x0FFF;
+    const std::uint32_t MaxPagePoolIndex = UINT32_MAX;
+    const PageDepth MaxPageDepth = 0x0FFF;
 
     // Reference to a page in a paged memory pool.
     // PageLinks are 32-bit values that index a page in the ppol.
     // Access to memory in a PagePool is exclusively via PageLinks as opposed to direct
     // memory access via 64-bit pointers significanlty reducing memory usage in paged data structures
-    // suzh as B-trees.
+    // such as B-trees. 
     class PageLink {
     public:
         uint32_t index; // Index of a page in the pool
-        // inline PageLink() : index( MaxPagePoolIndex ) {}
         inline PageLink() {}
         inline PageLink( const PageLink& link ) { index = link.index; }
         inline PageLink( unsigned int index ) { this->index = index; }
         inline PageLink& operator= ( const PageLink& link ) { index = link.index; return( *this ); }
-        inline void nullify() { index = MaxPagePoolIndex; }
+        inline PageLink& nullify() { index = MaxPagePoolIndex; return( *this ); }
         inline bool null() const { return( index == MaxPagePoolIndex ); }
         friend bool operator== ( const PageLink& a, const PageLink& b );
         friend bool operator!= ( const PageLink& a, const PageLink& b );
         friend bool operator<  ( const PageLink& a, const PageLink& b );
         friend std::ostream & operator<<( std::ostream & stream, PageLink const & link );
     };
+    
+    static const PageLink nullPage( MaxPagePoolIndex );
 
     inline bool operator== ( const PageLink& a, const PageLink& b ) { return( a.index == b.index ); }
     inline bool operator!= ( const PageLink& a, const PageLink& b ) { return( a.index != b.index ); }
-    inline bool operator<  ( const PageLink& a,const PageLink& b )  { return( a.index <  b.index ); };
+    inline bool operator<  ( const PageLink& a, const PageLink& b ) { return( a.index <  b.index ); };
 
     struct PageHeader {
-        PageLink page;                       // Link to this page (self reference)
-        mutable unsigned int free : 1;       // Page is free (not in use)
-        mutable unsigned int modified : 1;   // Page is modified (changed after last commit or allocate)
-        mutable unsigned int persistent : 1; // Page is present in persistent store (previously consolidated)
-        mutable unsigned int recover : 1;    // Page may need to be recovered (modified after last commit)
-        unsigned int depth : 12;             // The depth in the BTree of this Page, 0 for leaf pages.
-        PageSize capacity;                   // Page capacity in bytes
-        PageSize count;                      // Number of key-value pairs in Page
-        PageSize split;                      // Size of split value (0 for no split, 1 for scalar split, array size otherwise)
+        PageLink page;                   // Link to this page (self reference)
+        mutable uint16_t free : 1;       // Page is free (not in use)
+        mutable uint16_t modified : 1;   // Page is modified (changed after last commit or allocate)
+        mutable uint16_t persistent : 1; // Page is present in persistent store (previously commited)
+        mutable uint16_t recover : 1;    // Page may need to be recovered (modified after last commit)
+        uint16_t depth : 12;             // The depth in the BTree of this Page, 0 for leaf pages.
+        PageSize capacity;               // Page capacity in bytes
+        PageSize count;                  // Number of key-value pairs in Page
+        PageSize split;                  // Size of split value
+        // 0 for no split, 1 for fixed size split, variable size value element count (not sizeof) otherwise
     };
 
-    inline bool operator== ( const PageHeader& a, const PageHeader& b ) {
-        return(
-            (a.page == b.page ) &&
-            (a.free == b.free ) &&
-            (a.depth == b.depth ) &&
-            (a.capacity == b.capacity ) &&
-            (a.count == b.count )
-        );
-    }
-    inline bool operator!= ( const PageHeader& a, const PageHeader& b ) {
-        return(
-            (a.page != b.page ) ||
-            (a.free != b.free ) ||
-            (a.depth != b.depth ) ||
-            (a.capacity != b.capacity ) ||
-            (a.count != b.count )
-        );
-    }
-
-    template <class K, class V, bool KA, bool VA> class Page;
+    class PagePool;
+    template< class K, class V, bool AK, bool AV > class Page;
+    template< class K, class V > class Tree;
 
     typedef std::uint16_t StreamBlockSize;
     typedef std::uint64_t StreamIndex;
@@ -80,11 +65,28 @@ namespace BTree {
     struct StreamKey {
         uint64_t index : 48;
         uint64_t sequence : 16;
-        StreamKey() = delete;
+        StreamKey() : index( UINT64_MAX >> 16 ), sequence( UINT16_MAX ) {};
         StreamKey( StreamIndex i, StreamSequence s ) : index( i ), sequence( s ) {};
         StreamKey( const StreamKey& range ) : index( range.index ), sequence( range.sequence ) {};
     };
     std::ostream & operator<<( std::ostream & stream, StreamKey const & range );
+
+    // Fixed size element type of (variable length, unbounded) array template argument.
+    // Evaluates to type of first dimension element if template argument is an array.
+    // Evaluates to type of template argument otherwise.
+    // Evaluates to bound (fixed size) array for multi-dimensional arrays.
+    template< class T >
+    using B = typename std::remove_extent<T>::type;
+
+    // Determine array length variablilty through template instantiation.
+    // For multi-dimentsional arrays, succeeds or fails if single first dimension is unbound.
+    // Note that only first dimension (of a C++ array) may be unbound.
+    // Template A instantiation succeeds for variable length arrays.
+    // Template S instantiation succeeds for fixed length arrays or non-array types.
+    template< class T >
+    constexpr bool A = bool((0 < std::rank_v<T>) && (std::extent_v<T,0> == 0));
+    template< class T >
+    constexpr bool S = bool((std::rank_v<T> == 0) || (0 < std::extent_v<T,0>));
 
 } // namespace BTree
 

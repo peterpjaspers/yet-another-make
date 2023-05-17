@@ -6,7 +6,7 @@
 namespace BTree {
 
     std::ostream & operator<<( std::ostream & stream, PageLink const & link ) {
-        const int StreamSize = 10;
+        const int StreamSize = 20;
         char string[ StreamSize + 1 ];
         if (link.null()) {
             snprintf( string, StreamSize, "%s", "< null >" );
