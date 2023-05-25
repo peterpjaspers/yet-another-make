@@ -24,6 +24,7 @@ namespace YAM
     //     - Command node
     //       Execution produces one or more output files. Execution may read
     //       source files and/or output files produced by other nodes.
+    //       source files and/or output files produced by other nodes.
     //       E.g. a C++ compile node produces an object file and reads a cpp and
     //       header files.
     //     - Generated file node
@@ -78,14 +79,16 @@ namespace YAM
     // above equivalent algorithm because it queues postrequisites of a node 
     // to the threadpool immediately after completion of stage 2.
     //
-    // Node class is not MT-safe: all public member functions must be called
-    // from ExecutionContext::mainThread().
-    // Derived classes must access node state and ExecutionContext::nodes() 
-    // in mainThread only. E.g. a directory nodes keeps its child nodes in a
-    // member variable. When a directory node (re-)executes it retrieves
-    // the directory content in threadpool context, posts this content to the
-    // ExecutionContext::mainThreadQueue, the posted delegate assigns retrieved
-    // content to content member variable.
+    // Node class is not MT-safe: unless specified otherwise member functions
+    // must be called from ExecutionContext::mainThread(). Derived classes must
+    // access node state and ExecutionContext::nodes() in mainThread only. 
+    // This implies that a node that (re-)executes in thread pool cannot
+    // store its execution results in its member variables. Instead it must 
+    // store these results in a temporary instance of (a derived class) of 
+    // SelfExecutionResult, post this result to the main thread via 
+    // Node::postSelfCompletion and store the result in its member variables in
+    // its override of commitSelfCompletion. The latter is posted to main thread
+    // by postSelfCompletion.
     //  
     class __declspec(dllexport) Node : public IPersistable
     {
@@ -115,6 +118,10 @@ namespace YAM
             //
             // Failed and Canceled states become meaningless when starting a new
             // build and must therefore be reset to Dirty at start of build.
+        };
+
+        struct SelfExecutionResult {
+            Node::State _newState;
         };
 
         Node(); // needed for deserialization
@@ -349,17 +356,20 @@ namespace YAM
         virtual bool pendingStartSelf() const { return false; }
 
         // Pre:pendingStartSelf().
-        // Delegate self-execution of the node to context()->threadPool().
-        // On completion: call notifyCompletion() in context()->mainThread().
-        virtual void startSelf() { postCompletion(Node::State::Failed); }
+        // Perform self-execution of the node.
+        // Function is called in context()->threadPool() context.
+        // On completion: call postSelfCompletion(..).
+        virtual void selfExecute() { throw "not implemented"; }
 
         // Called when self-execution is busy and cancel() is called.
         virtual void cancelSelf() { return; }
 
-        // Push handleSelfCompletion(newState) to mainThreadQueue()
-        void postSelfCompletion(Node::State newState);
+        // Push commitSelfCompletion(result); handleSelfCompletion(result); 
+        // to mainThreadQueue()
+        void postSelfCompletion(std::shared_ptr<SelfExecutionResult> result);
 
-        virtual void handleSelfCompletion(Node::State newState);
+        // Store the result of self-execution in the node's member variables.
+        virtual void commitSelfCompletion(SelfExecutionResult const* result) { throw "not implemented"; }
 
         // Push notifyCompletion(newState) to mainThreadQueue()
         void postCompletion(Node::State newState);
@@ -376,6 +386,9 @@ namespace YAM
         void continueStart();
         void startPrerequisites();
         void startPrerequisite(Node* prerequisite);
+        void startSelf(); // push selfExecute() to _context->threadPoolQueue().
+
+        void handleSelfCompletion(SelfExecutionResult const* result);
         void handlePrerequisiteCompletion(Node* prerequisite);
         void handlePrerequisitesCompletion();
         bool allPrerequisitesAreOk() const;

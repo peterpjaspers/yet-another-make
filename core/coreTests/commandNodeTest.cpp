@@ -351,7 +351,7 @@ namespace
 
         // pietjanCmd reads output files of pietCmd and janCmd.
         // Execution warns for indirect prerequisites because pietCmd is 
-        // not an indirect prerequisite of pietjanCmd.
+        // an indirect prerequisite(via janCmd) of pietjanCmd.
         cmds.janCmd->setInputProducers({ cmds.pietCmd });
         cmds.pietjanCmd->setInputProducers({ cmds.janCmd });
         EXPECT_TRUE(cmds.execute());

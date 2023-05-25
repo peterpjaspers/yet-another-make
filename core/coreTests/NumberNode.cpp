@@ -22,12 +22,6 @@ namespace YAMTest
         }
     }
 
-    void NumberNode::setNumberRehashAndSetOk(int newNumber) {
-        _number = newNumber;
-        rehash();
-        setState(Node::State::Ok);
-    }
-
     // Inherited from Node
     bool NumberNode::supportsPrerequisites() const { return false; }
 
@@ -47,28 +41,38 @@ namespace YAMTest
         throw std::runtime_error("precondition violation");
     }
 
-    void NumberNode::rehash() {
-        _executionHash = computeExecutionHash();
-    }
-
     XXH64_hash_t NumberNode::executionHash() const {
         return _executionHash;
     }
 
+    XXH64_hash_t NumberNode::computeExecutionHash(int number) const {
+        return number;
+    }
+
     XXH64_hash_t NumberNode::computeExecutionHash() const {
-        return _number;
+        return computeExecutionHash(_number);
     }
 
     bool NumberNode::pendingStartSelf() const { return _executionHash != computeExecutionHash(); }
 
-    void NumberNode::startSelf() {
-        auto d = Delegate<void>::CreateLambda([this]() { execute(); });
-        _context->threadPoolQueue().push(std::move(d));
+    void NumberNode::selfExecute(int newNumber, ExecutionResult* result) {
+        result->_newState = Node::State::Ok;
+        result->_number = newNumber;
+        result->_executionHash = computeExecutionHash(newNumber);
     }
 
-    void NumberNode::execute() {
-        rehash();
-        postSelfCompletion(Node::State::Ok);
+    void NumberNode::selfExecute() {
+        auto result = std::make_shared<ExecutionResult>();
+        selfExecute(_number, result.get());
+        postSelfCompletion(result);
+    }
+
+    void NumberNode::commitSelfCompletion(SelfExecutionResult const* result) {
+        if (result->_newState == Node::State::Ok) {
+            auto r = reinterpret_cast<ExecutionResult const*>(result);
+            _number = r->_number;
+            _executionHash = r->_executionHash;
+        }
     }
 }
 

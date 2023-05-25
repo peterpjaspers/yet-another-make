@@ -30,7 +30,7 @@ namespace
     // Return whether 'node' is a prerequisite (recursive) of 'command'.
     // If node is a prerequisite then return the distance the between command
     // and node in 'distance'.
-    bool isPrerequisite(Node* command, Node* node, std::unordered_set<Node*>& visited, int& distance)    {
+    bool isPrerequisite(CommandNode* command, Node* node, std::unordered_set<Node*>& visited, int& distance)    {
         if (!visited.insert(node).second) return false; // node was already checked
 
         std::unordered_set<Node*> parents = node->preParents();
@@ -264,7 +264,6 @@ namespace YAM
             for (auto i : _outputs) i->removePreParent(this);
             _outputs = newOutputs;
             for (auto i : _outputs) i->addPreParent(this);
-            _executionHash = rand();
             modified(true);
             setState(State::Dirty);
         }
@@ -273,7 +272,6 @@ namespace YAM
     void CommandNode::setScript(std::string const& newScript) {
         if (newScript != _script) {
             _script = newScript;
-            _executionHash = rand();
             modified(true);
             setState(State::Dirty);
         }
@@ -319,21 +317,29 @@ namespace YAM
     XXH64_hash_t CommandNode::computeExecutionHash() const {
         std::vector<XXH64_hash_t> hashes;
         hashes.push_back(XXH64_string(_script));
-        for (auto node : _outputs) hashes.push_back(node->hashOf(FileAspect::entireFileAspect().name()));
+        auto entireFile = FileAspect::entireFileAspect().name();
+        for (auto node : _outputs) hashes.push_back(node->hashOf(entireFile));
         FileAspectSet inputAspects = context()->findFileAspectSet(_inputAspectsName);
         for (auto node : _inputs) {
-            auto & inputAspect = inputAspects.findApplicableAspect(node->name());
+            auto& inputAspect = inputAspects.findApplicableAspect(node->name());
             hashes.push_back(node->hashOf(inputAspect.name()));
         }
-        // TODO: add hash of inputAspects because changes in input aspects definition
-        // must result in re-execution of the command.
         XXH64_hash_t hash = XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
-        return hash;    
+        return hash;
     }
 
-    void CommandNode::startSelf() {
-        auto d = Delegate<void>::CreateLambda([this]() { execute(); });
-        _context->threadPoolQueue().push(std::move(d));
+    XXH64_hash_t CommandNode::computeExecutionHash(ExecutionResult const* result) const {
+        std::vector<XXH64_hash_t> hashes;
+        hashes.push_back(XXH64_string(_script));
+        auto entireFile = FileAspect::entireFileAspect().name();
+        for (auto r : result->_outputNodeResults) hashes.push_back(r->hashOf(entireFile));
+        FileAspectSet inputAspects = context()->findFileAspectSet(_inputAspectsName);
+        for (auto node : result->_inputs) {
+            auto& inputAspect = inputAspects.findApplicableAspect(node->name());
+            hashes.push_back(node->hashOf(inputAspect.name()));
+        }
+        XXH64_hash_t hash = XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
+        return hash;
     }
 
     void CommandNode::getSourceInputs(std::vector<std::shared_ptr<Node>> & sourceInputs) const {
@@ -343,20 +349,15 @@ namespace YAM
         }
     }
 
-    // Update hashes of output files
-    // Note that it is safe to do this in threadpool context during
-    // this node's self-execution because the main thread will not 
-    // access these outputs while this node is executing.
-    void CommandNode::rehashOutputs() {
+    bool CommandNode::executeOutputFiles(
+        std::vector<std::shared_ptr<FileNode::ExecutionResult>> & outputHashes) {
         for (auto ofile : _outputs) {
-            // output files are part of this node's prerequisites and were
-            // hence executed, and moved to state Ok, before the start of 
-            // this node's self-execution. 
-            if (ofile->state() != State::Ok) {
-                throw std::runtime_error("state error");
-            }
-            ofile->rehashAll();
+            auto result = std::make_shared< FileNode::ExecutionResult>();
+            ofile->selfExecute(result.get());
+            if (result->_newState != Node::State::Ok) return(false);
+            outputHashes.push_back(result);
         }
+        return true;
     }
 
     void CommandNode::setInputs(std::vector<std::shared_ptr<FileNode>> const& newInputs) {
@@ -390,14 +391,22 @@ namespace YAM
         } else {
             auto genInputFileNode = dynamic_pointer_cast<GeneratedFileNode>(fileNode);
             if (genInputFileNode != nullptr) {
-                int distance = 0;
-                std::unordered_set<Node*> visitedNodes;
-                valid = isPrerequisite(this, genInputFileNode->producer(), visitedNodes, distance);
+                valid = false;
+                for (auto const& ip : _inputProducers) {
+                    if (ip.get() == genInputFileNode->producer()) {
+                        valid = true;
+                        break;
+                    }
+                }
+                //int distance = 0;
+                //std::unordered_set<Node*> visitedNodes;
+                //valid = isPrerequisite(this, genInputFileNode->producer(), visitedNodes, distance);
                 if (!valid) {
                     logBuildOrderNotGuaranteed(this, genInputFileNode.get());
-                } else if (distance > 0) {
-                    logDiscouragedBuildOrderGuarantee(this, genInputFileNode.get());
-                }
+                } 
+                //else if (distance > 0) {
+                //    logDiscouragedBuildOrderGuarantee(this, genInputFileNode.get());
+                //}
             } else if (dynamic_pointer_cast<SourceFileNode>(fileNode) == nullptr) {
                 throw std::exception("Unexpected input file node type");
             }
@@ -530,38 +539,52 @@ namespace YAM
         return result;
     }
 
-    void CommandNode::execute() {
-        Node::State newState;
+    void CommandNode::selfExecute() {
+        auto result = std::make_shared<ExecutionResult>();
         if (_canceling) {
-            newState = Node::State::Canceled;
+            result->_newState = Node::State::Canceled;
         } else {
             std::filesystem::path scriptFilePath;
-            MonitoredProcessResult result = executeScript(scriptFilePath);
-            if (result.exitCode != 0) {
+            MonitoredProcessResult scriptResult = executeScript(scriptFilePath);
+            if (scriptResult.exitCode != 0) {
                 if (_canceling) {
-                    newState = Node::State::Canceled;
+                    result->_newState = Node::State::Canceled;
                 } else {
-                    newState = Node::State::Failed;
-                    _executionHash = rand();
+                    result->_newState = Node::State::Failed;
                 }
             } else {
-                std::vector<std::shared_ptr<FileNode>> newInputs;
-                bool validInputs = findInputNodes(result, scriptFilePath, newInputs);
+                bool validInputs = findInputNodes(scriptResult, scriptFilePath, result->_inputs);
 
                 std::vector<std::shared_ptr<GeneratedFileNode>> newOutputs;
-                bool validOutputs = findOutputNodes(result, newOutputs);
+                bool validOutputs = findOutputNodes(scriptResult, newOutputs);
                 validOutputs = validOutputs && verifyOutputNodes(newOutputs);
 
-                newState = (validInputs && validOutputs) ? Node::State::Ok : Node::State::Failed;
-                if (newState == Node::State::Ok) {
-                    setInputs(newInputs);
-                    rehashOutputs();
-                    _executionHash = computeExecutionHash();
+                result->_newState = (validInputs && validOutputs) ? Node::State::Ok : Node::State::Failed;
+                if (result->_newState == Node::State::Ok) {
+                    if (!executeOutputFiles(result->_outputNodeResults)) {
+                        result->_newState = Node::State::Failed;
+                    } else {
+                        result->_executionHash = computeExecutionHash(result.get());
+                    }
                 }
             }
         }
-        modified(true);
-        postSelfCompletion(newState);
+        postSelfCompletion(result);
+    }
+
+    void CommandNode::commitSelfCompletion(SelfExecutionResult const* result) {
+        if (result->_newState == Node::State::Ok) {
+            auto cmdResult = reinterpret_cast<ExecutionResult const*>(result);
+            if (_outputs.size() != cmdResult->_outputNodeResults.size()) {
+                throw std::exception("size mismatch");
+            }
+            for (std::size_t i = 0; i < _outputs.size(); ++i) {
+                _outputs[i]->commitSelfCompletion(cmdResult->_outputNodeResults[i].get());
+            }
+            setInputs(cmdResult->_inputs);
+            _executionHash = cmdResult->_executionHash;
+            modified(true);
+        }
     }
 
     void CommandNode::setStreamableType(uint32_t type) {

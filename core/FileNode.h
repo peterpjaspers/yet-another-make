@@ -2,6 +2,7 @@
 
 #include "Node.h"
 #include "FileAspect.h"
+#include "MemoryLogBook.h"
 #include "../xxHash/xxhash.h"
 
 #include <map>
@@ -10,15 +11,20 @@ namespace YAM
 {
     class FileRepository;
 
-    // A file node computes hashes of aspects of its associated file. The list
-    // of aspects applicable to the file is retrieved from the node's execution 
+    // A file node computes hashes of aspects of its associated file. The lis
+    // of aspects applicable to the file is retrieved from the node's execution
     // context.
     // 
-    // FileNode::rehashAll() retrieves and caches the file's last-write-time
-    // and then computes the aspect hashes of the file. rehashAll() is called
-    // by the file node itself during its execution. If the file node is an
-    // output node of some command node C then rehashAll() is also called
-    // by C on completion of C's execution. 
+    // execute(ExecutionResult& result) retrieves the file's last-write-time,
+    // computes the hashes of the file aspects applicable to the file and
+    // stores time and hashes in the given result. 
+    // Intended use: if the file node is an output node of some command node C 
+    // then C.execute() C will call this function to re-compute time and hashes.
+    // C will post result to main thread where it calls FileNode::commit(result)
+    // to cache the reslt in member filed _result.
+    // 
+    // FileNode::execute() calls FileNode::execute(ExecutionResult& result) and
+    // posts  result to the main thread where it calls FileNode::commit(result).
     // 
     // Hashing a non-existing file results in a random hash value. An empty set
     // of aspects will only update the cached file's last-write-time.
@@ -79,45 +85,69 @@ namespace YAM
     // files are modified by other actors than commands and, at the next build,
     // force the commands that produced these files to re-execute.
     // 
+    // Unless stated otherwise all public functions must be called from main
+    // thread.
+    //
     class __declspec(dllexport) FileNode : public Node
     {
     public:
+        struct ExecutionResult : public Node::SelfExecutionResult {
+            // File last-write-time
+            std::chrono::utc_clock::time_point _lastWriteTime;
+            // file aspect name => file aspect hash
+            std::map<std::string, XXH64_hash_t> _hashes;
+
+            // Pre: _success
+            // Return the hash of given file aspectName.
+            // Throw exception when aspectName is unknown.
+            XXH64_hash_t hashOf(std::string const& aspectName) {
+                auto it = _hashes.find(aspectName);
+                if (it == _hashes.end()) throw std::runtime_error("no such aspect");
+                return it->second;
+            }
+        };
+
         FileNode() {} // needed for deserialization
 
         // name is the absolute path name of the file
+        // Construction allowed in any thread
         FileNode(ExecutionContext* context, std::filesystem::path const& name);
 
         // Inherited via Node
-        virtual bool supportsPrerequisites() const override;
-        virtual void getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const override;
+        bool supportsPrerequisites() const override;
+        void getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const override;
 
-        virtual bool supportsOutputs() const override;
-        virtual void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const override;
+        bool supportsOutputs() const override;
+        void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const override;
 
-        virtual bool supportsInputs() const override;
-        virtual void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const override;
+        bool supportsInputs() const override;
+        void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const override;
+
+        // Pre: state() == State::Ok
+        ExecutionResult const& result() const;
+
+        // Pre: state() == State::Ok
+        // Return the cached last-write-time of the file.
+        std::chrono::time_point<std::chrono::utc_clock> const& lastWriteTime();
 
         // Pre: state() == State::Ok
         // Return the cached hash of given aspect.
         // Throw exception when aspect is unknown.
         XXH64_hash_t hashOf(std::string const& aspectName);
 
-        // Pre: state() == State::Ok
-        // Retrieve and cache file's last-write-time, then compute and cache 
-        // hashes of all applicable file aspects.
-        void rehashAll();
+        // Retrieve last-write-time and compute hashes of all file aspects
+        // applicable for this file. Store time and hashes in given 'result'.
+        // Can be called from any thread.
+        void selfExecute(ExecutionResult* result) const;
 
         // Return the file repository that contains this file.
         std::shared_ptr<FileRepository> fileRepository() const;
 
-        // Return the file path (this->name()) relative to the root directory
-        // of the file repository that contains this file.
+        // Return fileRepository()->relativePathOf(name()).
         std::filesystem::path relativePath() const;
 
-        // Return fileRepository->symbolicPathOf(name()).
+        // Return fileRepository()->symbolicPathOf(name()).
         std::filesystem::path symbolicPath() const;
-
-        std::chrono::time_point<std::chrono::utc_clock> const& lastWriteTime();
 
         static void setStreamableType(uint32_t type);
         // Inherited from IStreamable
@@ -126,20 +156,14 @@ namespace YAM
 
     protected:
         // Inherited via Node
-        virtual bool pendingStartSelf() const override;
-        virtual void startSelf() override;
+        bool pendingStartSelf() const override;
+        void selfExecute() override;
+        void commitSelfCompletion(SelfExecutionResult const* result) override;
 
     private:
-        bool updateLastWriteTime();
-        void rehashAll(bool doUpdateLastWriteTime);
-        void execute();
-
-        // last seen file modification time
-        std::chrono::utc_clock::time_point _lastWriteTime;
-
-        // aspect name => hash value. All hashes are computed after last
-        // update of _lastWriteTime.
-        std::map<std::string, XXH64_hash_t> _hashes;
+        std::chrono::time_point<std::chrono::utc_clock> retrieveLastWriteTime() const;
+                
+        ExecutionResult _result; 
     };
 }
 

@@ -134,7 +134,7 @@ namespace YAMTest
     void verify(DirectoryTree* expected, YAM::SourceDirectoryNode* actual) {
 
         EXPECT_EQ(YAM::Node::State::Ok, actual->state());
-        EXPECT_EQ(expected->getHash(), actual->getHash());
+        EXPECT_EQ(expected->getHash(), actual->executionHash());
 
         std::vector<std::shared_ptr<YAM::FileNode>> fileNodes;
         actual->getFiles(fileNodes);

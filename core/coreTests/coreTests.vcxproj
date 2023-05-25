@@ -32,6 +32,12 @@
     <Import Project="..\boost_$(Platform).props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IntDir>$(ProjectDir)$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IntDir>$(ProjectDir)$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
   <ItemGroup>
     <ClCompile Include="AdditionNode.cpp" />
     <ClCompile Include="boostProcessTest.cpp" />

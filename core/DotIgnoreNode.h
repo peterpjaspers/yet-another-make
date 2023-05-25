@@ -30,17 +30,15 @@ namespace YAM
 
         virtual ~DotIgnoreNode();
 
-        virtual void setState(State newState) override;
+        void setState(State newState) override;
 
-        virtual bool supportsPrerequisites() const override;
-        virtual void getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const override;
+        bool supportsPrerequisites() const override;
+        void getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const override;
 
-        virtual bool supportsInputs() const override;
-        virtual void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const override;
+        bool supportsInputs() const override;
+        void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const override;
 
-        virtual bool pendingStartSelf() const override;
-
-        virtual void startSelf() override;
+        bool pendingStartSelf() const override;
 
         // return the hash of the ignore patterns. 
         XXH64_hash_t hash() const;
@@ -59,6 +57,10 @@ namespace YAM
         // Inherited from IPersistable
         void prepareDeserialize() override;
         void restore(void* context) override;
+
+    protected:
+        void selfExecute() override;
+        void commitSelfCompletion(SelfExecutionResult const* result) override;
 
     private:
         friend class SourceDirectoryNode;

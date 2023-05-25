@@ -5,6 +5,7 @@
 #include <chrono>
 #include <vector>
 #include <map>
+#include <unordered_set>
 
 namespace YAM
 {
@@ -29,17 +30,17 @@ namespace YAM
         SourceDirectoryNode(ExecutionContext* context, std::filesystem::path const& dirName);
 
         // Inherited via Node
-        virtual bool supportsPrerequisites() const override;
-        virtual void getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const override;
+        bool supportsPrerequisites() const override;
+        void getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const override;
 
-        virtual bool supportsPostrequisites() const override;
-        virtual void getPostrequisites(std::vector<std::shared_ptr<Node>>& postrequisites) const override;
+        bool supportsPostrequisites() const override;
+        void getPostrequisites(std::vector<std::shared_ptr<Node>>& postrequisites) const override;
 
-        virtual bool supportsOutputs() const override;
-        virtual void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const override;
+        bool supportsOutputs() const override;
+        void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const override;
 
-        virtual bool supportsInputs() const override;
-        virtual void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const override;
+        bool supportsInputs() const override;
+        void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const override;
         // End of Inherited via Node
 
         // Query the directory content, vector content is sorted by node name.
@@ -51,13 +52,11 @@ namespace YAM
         std::chrono::time_point<std::chrono::utc_clock> const& lastWriteTime();
 
         // Pre: state() == State::Ok
-        // Return the directory hash.
-        XXH64_hash_t getHash() const;
+        // Return the execution hash (hash of hash of all dir entry names)
+        XXH64_hash_t executionHash() const;
 
         // Recursively remove the directory content from context->nodes().
         void clear();
-
-        void execute();
 
         static void setStreamableType(uint32_t type);
         // Inherited from IStreamable
@@ -69,25 +68,40 @@ namespace YAM
 
     protected:
         // Inherited via Node
-        virtual bool pendingStartSelf() const override;
-        virtual void startSelf() override;
+        bool pendingStartSelf() const override;
+        void selfExecute() override;
+        void commitSelfCompletion(SelfExecutionResult const* result) override;
 
     private:
-        std::shared_ptr<Node> createNode(std::filesystem::directory_entry const& dirEntry);
-        bool updateLastWriteTime();
-        void updateContent(
-            std::filesystem::directory_entry const& dirEntry,
-            std::map<std::filesystem::path, std::shared_ptr<Node>>& oldContent);
-        void updateContent();
-        void updateHash();
-        void _removeChildRecursively(std::shared_ptr<Node> const& child);
+        struct ExecutionResult : public Node::SelfExecutionResult {
+            std::chrono::time_point<std::chrono::utc_clock> _lastWriteTime;
+            std::map<std::filesystem::path, std::shared_ptr<Node>> _content;
+            // the difference with _content and this->_content
+            std::unordered_set<std::shared_ptr<Node>> _added;
+            std::unordered_set<std::shared_ptr<Node>> _kept;
+            std::unordered_set<std::shared_ptr<Node>> _removed;
+            XXH64_hash_t _executionHash;
+        };
 
-        // last seen modification time of the directory
-        std::chrono::time_point<std::chrono::utc_clock> _lastWriteTime;
-        XXH64_hash_t _hash;
+        std::shared_ptr<Node> createNode(std::filesystem::directory_entry const& dirEntry) const;
+        std::chrono::time_point<std::chrono::utc_clock> retrieveLastWriteTime() const;
+        std::shared_ptr<Node> getNode(
+            std::filesystem::directory_entry const& dirEntry,
+            std::unordered_set<std::shared_ptr<Node>>& added,
+            std::unordered_set<std::shared_ptr<Node>>& kept) const;
+        void computeContent(
+            std::map<std::filesystem::path, std::shared_ptr<Node>>& content,
+            std::unordered_set<std::shared_ptr<Node>>& added,
+            std::unordered_set<std::shared_ptr<Node>>& kept,
+            std::unordered_set<std::shared_ptr<Node>>& removed) const;
+        XXH64_hash_t computeExecutionHash(std::map<std::filesystem::path, std::shared_ptr<Node>> const& content) const;
+        void _removeChildRecursively(std::shared_ptr<Node> const& child);
+        void selfExecute(ExecutionResult* result) const;
 
         std::shared_ptr<DotIgnoreNode> _dotIgnoreNode;
+        std::chrono::time_point<std::chrono::utc_clock> _lastWriteTime;
         std::map<std::filesystem::path, std::shared_ptr<Node>> _content;
+        XXH64_hash_t _executionHash;
     };
 }
 

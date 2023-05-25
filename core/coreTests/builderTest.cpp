@@ -318,7 +318,6 @@ namespace
         // + 2 .gitignore + 2 .yamignore
         EXPECT_EQ(14, driver.stats.nRehashedFiles); 
 
-        // Note: __scope has been already been destroyed by Builder
         EXPECT_TRUE(driver.stats.started.contains(driver.findNode(driver.repo.dir)));
         EXPECT_TRUE(driver.stats.started.contains(driver.findNode(driver.repo.dir / "src")));
         EXPECT_TRUE(driver.stats.started.contains(driver.findNode(driver.repo.pietCpp)));

@@ -11,6 +11,11 @@ namespace YAMTest
     class AdditionNode : public Node
     {
     public:
+        struct ExecutionResult : public Node::SelfExecutionResult {
+            std::shared_ptr<NumberNode::ExecutionResult> _sumResult;
+            XXH64_hash_t _executionHash;
+        };
+
         AdditionNode(ExecutionContext* context, std::filesystem::path const& name);
         ~AdditionNode();
 
@@ -30,7 +35,7 @@ namespace YAMTest
 
         virtual bool pendingStartSelf() const override;
 
-        virtual void startSelf() override;
+        void selfExecute(ExecutionResult* result);
 
         XXH64_hash_t executionHash() const;
         XXH64_hash_t computeExecutionHash() const;
@@ -39,8 +44,12 @@ namespace YAMTest
         virtual uint32_t typeId() const { return 0; }
         virtual void stream(IStreamer* streamer) {}
 
+    protected:
+        void selfExecute() override;
+        void commitSelfCompletion(SelfExecutionResult const* result) override;
+
     private:
-        void execute();
+        XXH64_hash_t computeExecutionHash(XXH64_hash_t sumHash) const;
 
         std::vector<std::shared_ptr<NumberNode>> _operands;
         std::shared_ptr<NumberNode> _sum;

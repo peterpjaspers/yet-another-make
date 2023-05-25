@@ -55,32 +55,47 @@ namespace YAMTest
 
     bool AdditionNode::pendingStartSelf() const { return _executionHash != computeExecutionHash(); }
 
-    void AdditionNode::startSelf() {
-        auto d = Delegate<void>::CreateLambda([this]() { execute(); });
-        _context->threadPoolQueue().push(std::move(d));
-    }
-
     XXH64_hash_t AdditionNode::executionHash() const {
         return _executionHash;
     }
 
-    XXH64_hash_t AdditionNode::computeExecutionHash() const {
-        std::vector< XXH64_hash_t> hashes;
+    XXH64_hash_t AdditionNode::computeExecutionHash(XXH64_hash_t sumHash) const {
+        std::vector<XXH64_hash_t> hashes;
         for (auto node : _operands) {
             hashes.push_back(node->executionHash());
         }
-        hashes.push_back(_sum->executionHash());
+        hashes.push_back(sumHash);
         return XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
     }
 
-    void AdditionNode::execute() {
+    XXH64_hash_t AdditionNode::computeExecutionHash() const {
+        return computeExecutionHash(_sum->executionHash());
+    }
+
+    void AdditionNode::selfExecute(ExecutionResult* result) {
+        result->_sumResult = std::make_shared<NumberNode::ExecutionResult>();
         int sum = 0;
         for (auto op : _operands) {
             auto nr = dynamic_cast<NumberNode*>(op.get())->number();
             sum += nr;
         }
-        _sum->setNumberRehashAndSetOk(sum);
-        _executionHash = computeExecutionHash();
-        postSelfCompletion(Node::State::Ok);
+        _sum->selfExecute(sum, result->_sumResult.get());
+        result->_executionHash = computeExecutionHash(result->_sumResult->_executionHash);
+        result->_newState = Node::State::Ok;
+    }
+
+    void AdditionNode::selfExecute() {
+        auto result = std::make_shared<ExecutionResult>();
+        selfExecute(result.get());
+        postSelfCompletion(result);
+    }
+
+    void AdditionNode::commitSelfCompletion(SelfExecutionResult const* result) {
+        if (result->_newState == Node::State::Ok) {
+            auto r = reinterpret_cast<ExecutionResult const*>(result);
+            _sum->commitSelfCompletion(r->_sumResult.get());
+            _executionHash = r->_executionHash;
+        }
+
     }
 }

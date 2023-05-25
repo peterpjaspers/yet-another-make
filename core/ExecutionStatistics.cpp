@@ -22,7 +22,7 @@ namespace YAM
         updatedDirectories.clear();
     }
 
-    void ExecutionStatistics::registerStarted(Node* node) {
+    void ExecutionStatistics::registerStarted(Node const* node) {
         nStarted++;
         if (registerNodes) {
             started.insert(node);
@@ -30,7 +30,7 @@ namespace YAM
     }
 
 
-    void ExecutionStatistics::registerSelfExecuted(Node* node) {
+    void ExecutionStatistics::registerSelfExecuted(Node const* node) {
         nSelfExecuted++;
         if (registerNodes) {
             selfExecuted.insert(node);
@@ -38,7 +38,7 @@ namespace YAM
     }
 
 
-    void ExecutionStatistics::registerRehashedFile(FileNode* node) {
+    void ExecutionStatistics::registerRehashedFile(FileNode const* node) {
         nRehashedFiles++;
         if (registerNodes) {
             std::lock_guard<std::mutex> lock(mutex);
@@ -46,7 +46,7 @@ namespace YAM
         }
     }
 
-    void ExecutionStatistics::registerUpdatedDirectory(SourceDirectoryNode* node) {
+    void ExecutionStatistics::registerUpdatedDirectory(SourceDirectoryNode const* node) {
         nDirectoryUpdates++;
         if (registerNodes) {
             std::lock_guard<std::mutex> lock(mutex);

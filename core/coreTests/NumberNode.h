@@ -10,12 +10,17 @@ namespace YAMTest
     class NumberNode : public Node
     {
     public:
+        struct ExecutionResult : Node::SelfExecutionResult {
+            int _number;
+            XXH64_hash_t _executionHash;
+        };
+
         NumberNode(ExecutionContext* context, std::filesystem::path const& name);
 
         int number() const;
         void number(int newNumber);
 
-        void setNumberRehashAndSetOk(int newNumber);
+        void selfExecute(int newNumber, ExecutionResult* result);
 
         // Inherited from Node
         virtual bool supportsPrerequisites() const override;
@@ -26,11 +31,12 @@ namespace YAMTest
 
         virtual bool supportsInputs() const override;
         virtual void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const override;
-
-        void rehash();
         
         XXH64_hash_t executionHash() const;
         XXH64_hash_t computeExecutionHash() const;
+        XXH64_hash_t computeExecutionHash(int number) const;
+
+        void commitSelfCompletion(SelfExecutionResult const* result) override;
 
         // Inherited from IStreamable
         virtual uint32_t typeId() const { return 0; }
@@ -39,10 +45,9 @@ namespace YAMTest
     protected:
         virtual bool pendingStartSelf() const override;
 
-        virtual void startSelf() override;
+        void selfExecute() override;
 
     private:
-        void execute();
 
         int _number;
         XXH64_hash_t _executionHash;

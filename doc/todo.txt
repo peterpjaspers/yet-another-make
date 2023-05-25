@@ -1,6 +1,9 @@
 Todo: core
-- DirectoryNode execution should finish after self-execution, not after
-  postrequisites execution.
+- ensure MT-safe access of preParents and postParents
+  E.g. CommandNode::isPrerequisite()
+- NodeSet either MT-safe for add/remove nodes or post all NodeSet add/remove
+  to main thread. E.g. SourceDirectoryNode::updateContent()
+- DirectoryNode execution must (also) notify completion of self-execution.
 - decide on postrequisites
   Non-consistent interface: executing directory node builds entire tree when
   node is executed first time. Subsequent execution of the directory node

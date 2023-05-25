@@ -9,6 +9,8 @@
 namespace
 {
     uint32_t streamableTypeId = 0;
+
+    auto minLwt = std::chrono::time_point<std::chrono::utc_clock>::min();
 }
 
 namespace YAM
@@ -51,8 +53,8 @@ namespace YAM
     void SourceDirectoryNode::getInputs(std::vector<std::shared_ptr<Node>>& inputs) const {
     }
 
-    XXH64_hash_t SourceDirectoryNode::getHash() const {
-        return _hash;
+    XXH64_hash_t SourceDirectoryNode::executionHash() const {
+        return _executionHash;
     }
 
     void SourceDirectoryNode::getFiles(std::vector<std::shared_ptr<FileNode>>& filesInDir) {
@@ -91,69 +93,61 @@ namespace YAM
         return true;
     }
 
-    void SourceDirectoryNode::startSelf() {
-        auto d = Delegate<void>::CreateLambda([this]() { execute(); });
-        _context->threadPoolQueue().push(std::move(d));
-    }
-
-    // Sync _lastWriteTime with current directory state. 
-    // Return whether it was changed since previous update.
-    bool SourceDirectoryNode::updateLastWriteTime() {
+    std::chrono::time_point<std::chrono::utc_clock> SourceDirectoryNode::retrieveLastWriteTime() const {
         std::error_code ec;
         auto lwt = std::filesystem::last_write_time(name(), ec);
-        auto lwutc = decltype(lwt)::clock::to_utc(lwt);
-        if (lwutc != _lastWriteTime) {
-            _lastWriteTime = lwutc;
-            return true;
-        }
-        return false;
+        if (ec) return minLwt;
+        return decltype(lwt)::clock::to_utc(lwt);
     }
 
-    std::shared_ptr<Node> SourceDirectoryNode::createNode(std::filesystem::directory_entry const& dirEntry) {
+    std::shared_ptr<Node> SourceDirectoryNode::createNode(std::filesystem::directory_entry const& dirEntry) const {
         std::shared_ptr<Node> n = nullptr;
         if (dirEntry.is_directory()) {
             n = std::make_shared<SourceDirectoryNode>(context(), dirEntry.path());
         } else if (dirEntry.is_regular_file()) {
             n = std::make_shared<SourceFileNode>(context(), dirEntry.path());
+        } else {
+            bool notHandled = true;
         }
         return n;
     }
 
-    void SourceDirectoryNode::updateContent(
+    std::shared_ptr<Node> SourceDirectoryNode::getNode(
         std::filesystem::directory_entry const& dirEntry,
-        std::map<std::filesystem::path, std::shared_ptr<Node>>& oldContent
-    ) {
+        std::unordered_set<std::shared_ptr<Node>>& added,
+        std::unordered_set<std::shared_ptr<Node>>& kept
+    ) const {
+        std::shared_ptr<Node> child = nullptr;
         auto const& path = dirEntry.path();
         if (!_dotIgnoreNode->ignore(path)) {
-            std::shared_ptr<Node> child;
-            if (oldContent.contains(path)) {
-                child = oldContent[path];
-                oldContent[path] = nullptr;
+            auto it = _content.find(path);
+            if (it != _content.end()) {
+                child = it->second;
+                kept.insert(it->second);
             } else {
                 child = createNode(dirEntry);
-                if (child != nullptr) {
-                    child->addPostParent(this);
-                    context()->nodes().add(child);
-                }
+                added.insert(child);
             }
-            if (child != nullptr) _content.insert({ child->name(), child });
         }
+        return child;
     }
 
-    void SourceDirectoryNode::updateContent() {
-        auto oldContent = _content;
-        _content.clear();
-
+    void SourceDirectoryNode::computeContent(
+        std::map<std::filesystem::path, std::shared_ptr<Node>>& content,
+        std::unordered_set<std::shared_ptr<Node>>& added,
+        std::unordered_set<std::shared_ptr<Node>>& removed,
+        std::unordered_set<std::shared_ptr<Node>>& kept
+    ) const {
         if (std::filesystem::exists(name())) {
+            std::shared_ptr<Node> child = nullptr;
             for (auto const& dirEntry : std::filesystem::directory_iterator{ name() }) {
-                updateContent(dirEntry, oldContent);
+                child = getNode(dirEntry, added, kept);
+                if (child != nullptr) content.insert({ child->name(), child });
             }
         }
-
-        for (auto const& pair : oldContent) {
-            std::shared_ptr<Node> child = pair.second;
-            if (child != nullptr) {
-                _removeChildRecursively(child);
+        for (auto const& pair : _content) {
+            if (!kept.contains(pair.second)) {
+                removed.insert(pair.second);
             }
         }
     } 
@@ -186,32 +180,60 @@ namespace YAM
         modified(true);
     }
 
-    void SourceDirectoryNode::updateHash() {
+    XXH64_hash_t SourceDirectoryNode::computeExecutionHash(std::map<std::filesystem::path, std::shared_ptr<Node>> const& content) const {
         std::vector<XXH64_hash_t> hashes;
-        for (auto const& pair : _content) {
+        for (auto const& pair : content) {
             std::shared_ptr<Node> n = pair.second;
             hashes.push_back(XXH64_string(n->name().string()));
         }
-        _hash = XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
+        return XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
     }
 
-    void SourceDirectoryNode::execute() {
+    void SourceDirectoryNode::selfExecute(ExecutionResult* result) const {
         bool success = true;
         try {
-            if (updateLastWriteTime()) {
-                context()->statistics().registerUpdatedDirectory(this);
-                updateContent();
-                updateHash();
+            result->_content.clear();
+            result->_added.clear();
+            result->_removed.clear();
+            result->_kept.clear();
+            result->_lastWriteTime = retrieveLastWriteTime();
+            if (result->_lastWriteTime != _lastWriteTime) {
+                computeContent(result->_content, result->_added, result->_removed, result->_kept);
+                result->_executionHash = computeExecutionHash(result->_content);
+            }
+        } catch (std::filesystem::filesystem_error) {
+            success = false;
+        }
+        result->_newState = success ? Node::State::Ok : Node::State::Failed;
+    }
+    void SourceDirectoryNode::selfExecute() {
+        auto result = std::make_shared<ExecutionResult>();
+        selfExecute(result.get());
+        postSelfCompletion(result);
+    }
+
+    void SourceDirectoryNode::commitSelfCompletion(SelfExecutionResult const* result) {
+        if (result->_newState == Node::State::Ok) {
+            auto r = reinterpret_cast<ExecutionResult const*>(result);
+            if (r->_lastWriteTime != _lastWriteTime) {
+                _lastWriteTime = r->_lastWriteTime;
+                _content = r->_content;
+                _executionHash = r->_executionHash;
+                for (auto const& n : r->_added) {
+                    n->addPostParent(this);
+                    _context->nodes().add(n);
+                }
+                for (auto const& n : r->_removed) {
+                    _removeChildRecursively(n);
+                }
                 modified(true);
+                context()->statistics().registerUpdatedDirectory(this);
                 if (_context->logBook()->mustLogAspect(LogRecord::Aspect::DirectoryChanges)) {
                     LogRecord error(LogRecord::Aspect::Progress, std::string("Rehashed directory ").append(name().string()));
                     context()->addToLogBook(error);
                 }
             }
-        } catch (std::filesystem::filesystem_error) {
-            success = false;
         }
-        postSelfCompletion(success ? Node::State::Ok : Node::State::Failed);
     }
 
     void SourceDirectoryNode::setStreamableType(uint32_t type) {
@@ -225,7 +247,7 @@ namespace YAM
     void SourceDirectoryNode::stream(IStreamer* streamer) {
         Node::stream(streamer);
         streamer->stream(_lastWriteTime);
-        streamer->stream(_hash);
+        streamer->stream(_executionHash);
         streamer->stream(_dotIgnoreNode);
         std::vector<std::shared_ptr<Node>> nodes;
         if (streamer->writing()) {

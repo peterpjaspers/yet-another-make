@@ -37,11 +37,6 @@ namespace YAM
     void FileNode::getInputs(std::vector<std::shared_ptr<Node>>& inputs) const {
     }
 
-    XXH64_hash_t FileNode::hashOf(std::string const& aspectName) {
-        if (!_hashes.contains(aspectName)) throw std::runtime_error("no such aspect");
-        return _hashes[aspectName];
-    }
-
     std::shared_ptr<FileRepository> FileNode::fileRepository() const {
         return context()->findRepositoryContaining(name());
     }
@@ -51,14 +46,11 @@ namespace YAM
         if (repo == nullptr) return name();
         return repo->relativePathOf(name());
     }
+
     std::filesystem::path FileNode::symbolicPath() const {
         std::shared_ptr<FileRepository> repo = fileRepository();
         if (repo == nullptr) return name();
         return repo->symbolicPathOf(name());
-    }
-
-    std::chrono::time_point<std::chrono::utc_clock> const& FileNode::lastWriteTime() {
-        return _lastWriteTime;
     }
 
     // Note that pendingStartSelf is only called during node execution, i.e. when
@@ -68,49 +60,75 @@ namespace YAM
     bool FileNode::pendingStartSelf() const {
         return true;
     }
-
-    void FileNode::startSelf() {
-        auto d = Delegate<void>::CreateLambda([this]() { execute(); });
-        _context->threadPoolQueue().push(std::move(d));
-    }
-
-    // Sync _lastWriteTime with current file state. 
-    // Return whether it was changed since previous update.
-    bool FileNode::updateLastWriteTime() {
+     
+    std::chrono::time_point<std::chrono::utc_clock> FileNode::retrieveLastWriteTime() const {
         std::error_code ec;
         auto lwt = std::filesystem::last_write_time(name(), ec);
+
         auto lwutc = decltype(lwt)::clock::to_utc(lwt);
-        if (lwutc != _lastWriteTime) {
-            _lastWriteTime = lwutc;
-            return true;
-        }
-        return false;
+        return lwutc;
     }
 
-    void FileNode::rehashAll(bool doUpdateLastWriteTime) {
-        if (doUpdateLastWriteTime) updateLastWriteTime();
-        _hashes.clear();
-        std::vector<FileAspect> aspects = context()->findFileAspects(name());
-        for (auto const& aspect : aspects) {
-            _hashes[aspect.name()] = aspect.hash(name());
-        }
-        context()->statistics().registerRehashedFile(this);
-    }
-
-    void FileNode::rehashAll() {
-        rehashAll(true);
-    }
-
-    void FileNode::execute() {
-        if (updateLastWriteTime()) {
-            rehashAll(false);
-            modified(true);
-            if (_context->logBook()->mustLogAspect(LogRecord::Aspect::FileChanges)) {
-                LogRecord error(LogRecord::Aspect::Progress, std::string("Rehashed file ").append(name().string()));
-                context()->addToLogBook(error);
+    void FileNode::selfExecute(ExecutionResult* result) const{
+        result->_newState = Node::State::Failed;
+        result->_hashes.clear();
+        result->_lastWriteTime = retrieveLastWriteTime();
+        bool success = result->_lastWriteTime != std::chrono::utc_clock::time_point::min();
+        if (success) {
+            result->_newState = Node::State::Ok;
+            bool changed = result->_lastWriteTime != _result._lastWriteTime;
+            if (changed) {
+                std::vector<FileAspect> aspects = context()->findFileAspects(name());
+                for (auto const& aspect : aspects) {
+                    result->_hashes[aspect.name()] = aspect.hash(name());
+                }
+            } else {
+                result->_hashes = _result._hashes;
             }
         }
-        postSelfCompletion(Node::State::Ok);
+    }
+       
+    void FileNode::commitSelfCompletion(SelfExecutionResult const* result) {
+        if (result->_newState != Node::State::Ok) {
+            _result._lastWriteTime = std::chrono::utc_clock::time_point::min();
+            _result._hashes.clear();
+            LogRecord error(
+                LogRecord::Aspect::Error,
+                std::string("Failed to rehash file ").append(name().string()));
+            context()->addToLogBook(error);
+            return;
+        }
+        auto fileResult = reinterpret_cast<ExecutionResult const*>(result);
+        bool changed = fileResult->_lastWriteTime != _result._lastWriteTime;
+        if (changed) {
+            _result = *fileResult;
+            modified(true);
+            context()->statistics().registerRehashedFile(this);
+            if (_context->logBook()->mustLogAspect(LogRecord::Aspect::FileChanges)) {
+                LogRecord progress(
+                    LogRecord::Aspect::Progress,
+                    std::string("Rehashed file ").append(name().string()));
+                context()->addToLogBook(progress);
+            }
+        }
+    }
+
+    void FileNode::selfExecute() {
+        auto result = std::make_shared<ExecutionResult>();
+        selfExecute(result.get());
+        postSelfCompletion(result);
+    }
+
+    FileNode::ExecutionResult const& FileNode::result() const {
+        return _result;
+    }
+
+    std::chrono::time_point<std::chrono::utc_clock> const& FileNode::lastWriteTime() {
+        return _result._lastWriteTime;
+    }
+
+    XXH64_hash_t FileNode::hashOf(std::string const& aspectName) {
+        return _result.hashOf(aspectName);
     }
 
     void FileNode::setStreamableType(uint32_t type) {
@@ -123,7 +141,7 @@ namespace YAM
 
     void FileNode::stream(IStreamer* streamer) {
         Node::stream(streamer);
-        streamer->stream(_lastWriteTime);
-        streamer->streamMap(_hashes);
+        streamer->stream(_result._lastWriteTime);
+        streamer->streamMap(_result._hashes);
     }
 }

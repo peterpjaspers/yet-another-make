@@ -34,8 +34,8 @@ namespace YAM
         CommandNode(ExecutionContext* context, std::filesystem::path const& name);
         ~CommandNode();
         
-        virtual void setState(State newState) override;
-        virtual bool supportsPrerequisites() const override;
+        void setState(State newState) override;
+        bool supportsPrerequisites() const override;
 
         // getPrerequisites appends the input producers (command nodes), the source 
         // files (SourceFileNode) that were read during the last execution of this 
@@ -46,20 +46,17 @@ namespace YAM
         // pendingStartSelf also uses the hashes of input files that were generated
         // by the input producers. The input producers must therefore be included in
         // 'prerequisites'to make sure that these generated input files are up-to-date.
-        virtual void getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const override;
+        void getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const override;
 
-        virtual bool supportsOutputs() const override;
-        virtual void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const override;
+        bool supportsOutputs() const override;
+        void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const override;
 
-        virtual bool supportsInputs() const override;
-        virtual void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const override;
+        bool supportsInputs() const override;
+        void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const override;
 
-        virtual bool pendingStartSelf() const override;
+        bool pendingStartSelf() const override;
 
-        virtual void startSelf() override;
-        virtual void cancelSelf() override;
-
-        XXH64_hash_t computeExecutionHash() const;
+        void cancelSelf() override;
 
         // Set the input file aspects that contribute to the output file(s)
         // of the command node.
@@ -94,10 +91,23 @@ namespace YAM
         void prepareDeserialize() override;
         void restore(void* context) override;
 
+    protected:
+        void selfExecute() override;
+
     private:
+        struct ExecutionResult : public Node::SelfExecutionResult {
+            // inputs detected during last script execution
+            std::vector<std::shared_ptr<FileNode>> _inputs;
+            // results of the re-executed (re-hashed) output nodes
+            std::vector<std::shared_ptr<FileNode::ExecutionResult>> _outputNodeResults;
+            XXH64_hash_t _executionHash;
+        };
+
         void getSourceInputs(std::vector<std::shared_ptr<Node>> & sourceInputs) const;
         void setInputs(std::vector<std::shared_ptr<FileNode>> const& newInputs);
-        void rehashOutputs();
+        bool executeOutputFiles(std::vector<std::shared_ptr<FileNode::ExecutionResult>>& outputHashes);
+        XXH64_hash_t computeExecutionHash() const;
+        XXH64_hash_t computeExecutionHash(ExecutionResult const* result) const;
 
         std::shared_ptr<FileNode> findInputNode(
             std::filesystem::path const& input,
@@ -115,7 +125,7 @@ namespace YAM
         bool verifyOutputNodes(std::vector<std::shared_ptr<GeneratedFileNode>> const& newOutputNodes);
 
         MonitoredProcessResult executeScript(std::filesystem::path& scriptFile);
-        void execute();
+        void commitSelfCompletion(SelfExecutionResult const* result) override;
 
         // The name of the FileAspectSet that contains the aspects relevant for this
         // command, i.e. the aspects of input files that contribute to output file content.
@@ -127,17 +137,19 @@ namespace YAM
         // TODO: decide whether script will be streamed to build state.
         // Script can be large, e.g. a link script that links many object
         // files. Not streaming the script implies that all build files need 
-        // to be reparsed  to re-initialize command scripts. A change in 
+        // to be reparsed to re-initialize command scripts. A change in 
         // script can then be detected by comparing its hash with hash 
         // of previous script (that was streamed to build state).
         std::string _script; 
 
-        std::vector<std::shared_ptr<FileNode>> _inputs; // inputs detected during last script execution
+        std::atomic<std::shared_ptr<IMonitoredProcess>> _scriptExecutor;
+        
+        // inputs detected during last script execution
+        std::vector<std::shared_ptr<FileNode>> _inputs;
 
-        // The hash of the hashes of the script, of the output files and of the
+        // The hash of the hashes of all items that, when changed, invalidate
+        // the output files. Items include the script, the output files and 
         // the relevant aspects of the input files.
         XXH64_hash_t _executionHash;
-
-        std::atomic<std::shared_ptr<IMonitoredProcess>> _scriptExecutor;
     };
 }

@@ -127,21 +127,21 @@ namespace YAM
         return hash;
     }
 
-    void DotIgnoreNode::startSelf() {
-        auto d = Delegate<void>::CreateLambda([this]() { execute(); });
-        context()->threadPoolQueue().push(std::move(d));
-    }
-
-    void DotIgnoreNode::execute() {
-        Node::State newState;
+    void DotIgnoreNode::selfExecute() {
+        auto result = std::make_shared<SelfExecutionResult>();
         if (_canceling) {
-            newState = Node::State::Canceled;
+            result->_newState = Node::State::Canceled;
         } else {
-            newState = Node::State::Ok;
+            result->_newState = Node::State::Ok;
             // TODO: parse the dotignore files
         }
         modified(true);
-        postSelfCompletion(newState);
+        //postSelfCompletion(newState);
+        postSelfCompletion(result);
+    }
+
+    void DotIgnoreNode::commitSelfCompletion(SelfExecutionResult const* result) {
+        // TODO
     }
 
     void DotIgnoreNode::setStreamableType(uint32_t type) {

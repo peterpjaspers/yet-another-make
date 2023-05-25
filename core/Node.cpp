@@ -100,7 +100,6 @@ namespace YAM
             startPrerequisites();
         } else if (pendingStartSelf()) {
             _executionState = ExecutionState::Self;
-            _context->statistics().registerSelfExecuted(this);
             startSelf();
         }  else if (supportsPostrequisites()) {
             startPostrequisites();
@@ -218,7 +217,6 @@ namespace YAM
             }
             else if (pendingStartSelf()) {
                 _executionState = ExecutionState::Self;
-                _context->statistics().registerSelfExecuted(this);
                 startSelf();
             }
             else {
@@ -233,6 +231,12 @@ namespace YAM
             allOk = _prerequisites[i]->state() == Node::State::Ok;
         }
         return allOk;
+    }
+
+    void Node::startSelf() {
+        _context->statistics().registerSelfExecuted(this);
+        auto d = Delegate<void>::CreateLambda([this]() { selfExecute(); });
+        _context->threadPoolQueue().push(std::move(d));
     }
 
     void Node::startPostrequisites() {
@@ -321,19 +325,19 @@ namespace YAM
         return allOk;
     }
 
-    void Node::postSelfCompletion(Node::State newState) {
-        auto d = Delegate<void>::CreateLambda([this, newState]()
-            {
-                handleSelfCompletion(newState);
-            });
+    void Node::postSelfCompletion(std::shared_ptr<SelfExecutionResult> result) {
+        auto d = Delegate<void>::CreateLambda([this, result]() {
+            commitSelfCompletion(result.get());
+            handleSelfCompletion(result.get());
+        });
         _context->mainThreadQueue().push(std::move(d));
     }
 
-    void Node::handleSelfCompletion(Node::State newState) {
-        if (newState == Node::State::Ok && supportsPostrequisites()) {
+    void Node::handleSelfCompletion(SelfExecutionResult const * result) {
+        if (result->_newState == Node::State::Ok && supportsPostrequisites()) {
             startPostrequisites();
         } else {
-            postCompletion(newState);
+            notifyCompletion(result->_newState);
         }
     }
 
