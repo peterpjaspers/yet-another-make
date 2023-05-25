@@ -344,7 +344,7 @@ namespace
         EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Build order is not guaranteed"));
     }
 
-    TEST(CommandNode, warning_inputFromIndirectInputProducer) {
+    TEST(CommandNode, fail_inputFromIndirectInputProducer) {
         Commands cmds;
 
         EXPECT_TRUE(cmds.execute());
@@ -355,9 +355,8 @@ namespace
         cmds.janCmd->setInputProducers({ cmds.pietCmd });
         cmds.pietjanCmd->setInputProducers({ cmds.janCmd });
         EXPECT_TRUE(cmds.execute());
-        // TODO: verify that proper warning message is logged
-        EXPECT_EQ(Node::State::Ok, cmds.pietjanCmd->state());
-        EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Build order guaranteed by discouraged indirect input declaration"));
+        EXPECT_EQ(Node::State::Failed, cmds.pietjanCmd->state());
+        EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Build order is not guaranteed"));
     }
 
     TEST(CommandNode, fail_outputToSourceFile) {

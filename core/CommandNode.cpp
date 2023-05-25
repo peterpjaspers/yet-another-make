@@ -27,22 +27,6 @@ namespace
         return std::find(vec.begin(), vec.end(), el) != vec.end();
     }
 
-    // Return whether 'node' is a prerequisite (recursive) of 'command'.
-    // If node is a prerequisite then return the distance the between command
-    // and node in 'distance'.
-    bool isPrerequisite(CommandNode* command, Node* node, std::unordered_set<Node*>& visited, int& distance)    {
-        if (!visited.insert(node).second) return false; // node was already checked
-
-        std::unordered_set<Node*> parents = node->preParents();
-        if (parents.contains(command)) return true;
-
-        distance++;
-        for (auto parent : parents) {
-            if (isPrerequisite(command, parent, visited, distance)) return true;
-        }
-        return false;
-    }
-
     void logBuildOrderNotGuaranteed(
         CommandNode* cmd,
         GeneratedFileNode* inputFile
@@ -54,20 +38,6 @@ namespace
             << "Command   : " << cmd->name().string() << std::endl
             << "Input file: " << inputFile->name().string() << std::endl;
         LogRecord record(LogRecord::Error, ss.str());
-        cmd->context()->addToLogBook(record);
-    }
-
-    void logDiscouragedBuildOrderGuarantee(
-        CommandNode* cmd,
-        GeneratedFileNode* inputFile
-    ) {
-        std::stringstream ss;
-        ss
-            << "Build order guaranteed by discouraged indirect input declaration." << std::endl
-            << "Fix: declare input file as direct input of command." << std::endl
-            << "Command   : " << cmd->name().string() << std::endl
-            << "Input file: " << inputFile->name().string() << std::endl;
-        LogRecord record(LogRecord::Warning, ss.str());
         cmd->context()->addToLogBook(record);
     }
 
@@ -393,20 +363,12 @@ namespace YAM
             if (genInputFileNode != nullptr) {
                 valid = false;
                 for (auto const& ip : _inputProducers) {
-                    if (ip.get() == genInputFileNode->producer()) {
-                        valid = true;
-                        break;
-                    }
+                    valid = (ip.get() == genInputFileNode->producer());
+                    if (valid) break;
                 }
-                //int distance = 0;
-                //std::unordered_set<Node*> visitedNodes;
-                //valid = isPrerequisite(this, genInputFileNode->producer(), visitedNodes, distance);
                 if (!valid) {
                     logBuildOrderNotGuaranteed(this, genInputFileNode.get());
-                } 
-                //else if (distance > 0) {
-                //    logDiscouragedBuildOrderGuarantee(this, genInputFileNode.get());
-                //}
+                }
             } else if (dynamic_pointer_cast<SourceFileNode>(fileNode) == nullptr) {
                 throw std::exception("Unexpected input file node type");
             }
