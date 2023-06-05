@@ -98,7 +98,7 @@ namespace YAM
             context()->addToLogBook(error);
             return;
         }
-        auto fileResult = reinterpret_cast<ExecutionResult const*>(result);
+        auto fileResult = dynamic_cast<ExecutionResult const*>(result);
         bool changed = fileResult->_lastWriteTime != _result._lastWriteTime;
         if (changed) {
             _result = *fileResult;

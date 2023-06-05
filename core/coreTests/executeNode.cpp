@@ -35,11 +35,7 @@ namespace YAMTest
 
         void execute() {
             for (auto n : _nodes) {
-                bool complete =
-                    n->state() == Node::State::Ok
-                    || n->state() == Node::State::Failed
-                    || n->state() == Node::State::Canceled;
-                if (complete) {
+                if (completed(n)) {
                     _handleNodeCompletion(n);
                 } else {
                     _handles[n] = n->completor().Add(
@@ -53,11 +49,7 @@ namespace YAMTest
                 pair.first->completor().Remove(pair.second);
             }
             for (auto node : _nodes) {
-                bool completed =
-                    node->state() == Node::State::Ok
-                    || node->state() == Node::State::Failed
-                    || node->state() == Node::State::Canceled;
-                if (completed) _nCompleted++;
+                if (completed(node)) _nCompleted++;
             }
             _dispatcher.stop();
         }
@@ -75,11 +67,15 @@ namespace YAMTest
         DispatcherFrame _frame;
         std::atomic<unsigned int> _nCompleted;
 
-        void _handleNodeCompletion(Node* node) {
-            bool complete =
+        bool completed(Node* node) {
+            return
                 node->state() == Node::State::Ok
                 || node->state() == Node::State::Failed
                 || node->state() == Node::State::Canceled;
+        }
+
+        void _handleNodeCompletion(Node* node) {
+            bool const complete = completed(node);
             if (!complete) {
                 ASSERT_TRUE(complete);
             }

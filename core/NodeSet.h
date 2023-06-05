@@ -13,7 +13,7 @@ namespace YAM
     class Node;
     class Dispatcher;
 
-    // MT-safe class to store nodes that have unique names.
+    // Class to store nodes that have unique names.
     class __declspec(dllexport) NodeSet
     {
     public:

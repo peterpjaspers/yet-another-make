@@ -30,8 +30,7 @@ namespace YAM
         _nodes.clear();
     }
 
-    std::shared_ptr<Node> NodeSet::find(std::filesystem::path const& nodeName)
-    {
+    std::shared_ptr<Node> NodeSet::find(std::filesystem::path const& nodeName) {
         std::lock_guard<std::mutex> lock(_mutex);
         auto it = _nodes.find(nodeName);
         if (it != _nodes.end())
@@ -62,8 +61,7 @@ namespace YAM
         }
     }
 
-    bool NodeSet::contains(std::filesystem::path const& nodeName)
-    {
+    bool NodeSet::contains(std::filesystem::path const& nodeName) {
         std::lock_guard<std::mutex> lock(_mutex);
         auto it = _nodes.find(nodeName);
         return (it != _nodes.end());

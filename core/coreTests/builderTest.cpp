@@ -303,16 +303,16 @@ namespace
         EXPECT_TRUE(inputs.end() != std::find(inputs.begin(), inputs.end(), driver.janOut));
 
         // Verify nodes started for execution 
-        // 1  command node __scope (from Builder) for executing directorynode
-        // 2  command node __scope for executing compile and link nodes
+        // 1  command node _dirtySources (from Builder) for executing directorynode
+        // 2  command node _dirtyCommands for executing compile and link nodes
         // 3-4 dir nodes repo.dir, repo.dir/src
         // 5-6 source file nodes repo.dir/src/pietCpp, repo.dir/src/pietH
         // 7-8 source file nodes repo.dir/src/janCpp, repo.dir/src/janH
         // 9-11 generated file nodes pietOut, janOut, pietjanOut
         // 12-14 commandNodes ccPiet.cpp, ccJan linkPietjan
         // 15-20 root and src dir each have .ignore, .gitignore and .yamignore
-        EXPECT_EQ(20, driver.stats.nStarted); // __scope is started twice..
-        EXPECT_EQ(19, driver.stats.started.size()); // ..started contains unique nodes
+        EXPECT_EQ(20, driver.stats.nStarted); 
+        EXPECT_EQ(20, driver.stats.started.size());
         EXPECT_EQ(2, driver.stats.nDirectoryUpdates);
         // 4 source + 3 generated (before cmd exec) + 3 generated (after cmd exec)
         // + 2 .gitignore + 2 .yamignore
@@ -332,9 +332,8 @@ namespace
         EXPECT_TRUE(driver.stats.started.contains(driver.pietjanOut.get()));
 
         // Verify nodes self-executed 
-        // Note: __scope node is executed twice (repo directory and compile and link commands)
-        EXPECT_EQ(20, driver.stats.nSelfExecuted); // __scope self-executed twice..
-        EXPECT_EQ(19, driver.stats.selfExecuted.size()); // ..selfExectued contains unique nodes.
+        EXPECT_EQ(20, driver.stats.nSelfExecuted);
+        EXPECT_EQ(20, driver.stats.selfExecuted.size());
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(driver.repo.dir)));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(driver.repo.dir / "src")));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(driver.repo.pietCpp)));
@@ -426,17 +425,18 @@ namespace
         EXPECT_EQ(Node::State::Ok, driver.janOut->state());
         EXPECT_EQ(Node::State::Ok, driver.pietjanOut->state());
 
+        // selfStarted and selfExecuted also contain _dirtySources and 
+        // _dirtyCommands from Builder.
         EXPECT_EQ(0, driver.stats.nDirectoryUpdates);
         EXPECT_EQ(3, driver.stats.nRehashedFiles);
-        EXPECT_EQ(6, driver.stats.started.size());
+        EXPECT_EQ(7, driver.stats.started.size());
 
-        // selfExecuted also contains: __scope (from Builder)
         // 1: pendingStartSelf of ccJan sees changed hash of janCpp
         // 2: self-execution of ccJan => updates and rehashes janOut 
         // 3: pendingStartSelf of linkPietJan sees changed hash of janOut
         // 4: execution of linkPietJan updates and rehashes pietjanOut
         auto janCppNode = driver.context->nodes().find(driver.repo.janCpp);
-        EXPECT_EQ(6, driver.stats.selfExecuted.size());
+        EXPECT_EQ(7, driver.stats.selfExecuted.size());
         EXPECT_TRUE(driver.stats.selfExecuted.contains(janCppNode.get()));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.ccJan.get()));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.janOut.get()));

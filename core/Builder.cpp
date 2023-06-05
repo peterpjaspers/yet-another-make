@@ -18,13 +18,19 @@ namespace
     using namespace YAM;
 
     void appendDirtyFileAndDirectoryNodes(
-        std::shared_ptr<Node> node,
+        std::shared_ptr<SourceDirectoryNode> directory,
         std::vector<std::shared_ptr<Node>>& dirtyNodes
     ) {
-        if (node->state() == Node::State::Dirty) dirtyNodes.push_back(node);
-        std::vector<std::shared_ptr<Node>> postRequisites; // DirectoryNodes and/or FileNodes
-        node->getPostrequisites(postRequisites);
-        for (auto n : postRequisites) appendDirtyFileAndDirectoryNodes(n, dirtyNodes);
+        if (directory->state() == Node::State::Dirty) dirtyNodes.push_back(directory);
+        for (auto const& pair : directory->getContent()) {
+            auto child = pair.second;
+            auto sourceDir = dynamic_pointer_cast<SourceDirectoryNode>(child);
+            if (sourceDir != nullptr) {
+                appendDirtyFileAndDirectoryNodes(sourceDir, dirtyNodes);
+            } else {
+                if (child->state() == Node::State::Dirty) dirtyNodes.push_back(child);
+            }
+        }
     }
 
     bool isBuildFile(std::filesystem::path const& filePath) {
@@ -32,17 +38,14 @@ namespace
         return filePath.filename() == buildFileName;
     }
 
-    void appendBuildFileFileNodes(
-        std::shared_ptr<Node> node,
-        std::vector<std::shared_ptr<SourceFileNode>>& buildFiles
+    //TODO
+    void appendDirtyBuildFileNodes(
+        std::shared_ptr<SourceDirectoryNode> directory,
+        std::vector<std::shared_ptr<Node>>& dirtyBuildFiles
     ) {
-        auto sourceFile = dynamic_pointer_cast<SourceFileNode>(node);
-        if (sourceFile != nullptr && isBuildFile(sourceFile->name())) {
-            buildFiles.push_back(sourceFile);
-        }
-        std::vector<std::shared_ptr<Node>> postRequisites;
-        node->getPostrequisites(postRequisites);
-        for (auto n : postRequisites) appendBuildFileFileNodes(n, buildFiles);
+        //Take care: buildFileNode is NOT a source file node.
+        //A BuildFileNode references one or more build files and
+        //creates command nodes from the definitions in these files.
     }
 
     auto includeNode = Delegate<bool, std::shared_ptr<Node> const&>::CreateLambda(
@@ -59,9 +62,18 @@ namespace
 namespace YAM
 {
     Builder::Builder()
-        : _scope(std::make_shared<CommandNode>(&_context, "__scope__"))
+        : _dirtySources(std::make_shared<CommandNode>(&_context, "__dirtySources__"))
+        , _dirtyBuildFiles(std::make_shared<CommandNode>(&_context, "__dirtyBuildFiles__"))
+        , _dirtyCommands(std::make_shared<CommandNode>(&_context, "__dirtyCommands__"))
         , _result(nullptr)
-    {}
+    {
+        _dirtySources->completor().AddRaw(this, &Builder::_handleSourcesCompletion);
+        _dirtyBuildFiles->completor().AddRaw(this, &Builder::_handleBuildFilesCompletion);
+        _dirtyCommands->completor().AddRaw(this, &Builder::_handleCommandsCompletion);
+        _dirtySources->setState(Node::State::Ok);
+        _dirtyBuildFiles->setState(Node::State::Ok);
+        _dirtyCommands->setState(Node::State::Ok);
+    }
 
     ExecutionContext* Builder::context() {
         return &_context;
@@ -121,7 +133,6 @@ namespace YAM
     }
 
     void Builder::_start() {
-        _scope->setState(Node::State::Ok);
         std::vector<std::shared_ptr<Node>> dirtyDirsAndFiles;
         for (auto const& pair : _context.repositories()) {
             auto repo = dynamic_pointer_cast<SourceFileRepository>(pair.second);
@@ -132,59 +143,67 @@ namespace YAM
             }
         }
         if (dirtyDirsAndFiles.empty()) {
-            _handleRepoCompletion(_scope.get());
+            _handleSourcesCompletion(_dirtySources.get());
         } else {
-            _scope->setInputProducers(dirtyDirsAndFiles);
-            _scope->completor().AddRaw(this, &Builder::_handleRepoCompletion);
-            _scope->start();
+            _dirtySources->setInputProducers(dirtyDirsAndFiles);
+            _dirtySources->start();
         }
     }
 
-    void Builder::_handleRepoCompletion(Node* n) {
-        if (n != _scope.get()) throw std::exception("unexpected node");
-        if (_scope->state() != Node::State::Ok) {
-            _handleBuildCompletion(_scope.get());
+    void Builder::_handleSourcesCompletion(Node* n) {
+        if (n != _dirtySources.get()) throw std::exception("unexpected node");
+        if (_dirtySources->state() != Node::State::Ok) {
+            _dirtyBuildFiles->setState(_dirtySources->state());
+            _handleBuildFilesCompletion(_dirtyBuildFiles.get());
         } else {
-            _scope->completor().RemoveAll();
-            _scope->setInputProducers(std::vector<std::shared_ptr<Node>>());
-            _scope->setState(Node::State::Ok);
-            std::vector<std::shared_ptr<SourceFileNode>> buildFiles;
-            for (auto const& pair : _context.repositories()) {
-                auto repo = dynamic_pointer_cast<SourceFileRepository>(pair.second);
-                if (repo != nullptr) {
-                    auto dirNode = repo->directoryNode();
-                    appendBuildFileFileNodes(dirNode, buildFiles);
-                }
-            }
+            _dirtySources->setInputProducers(std::vector<std::shared_ptr<Node>>());
+            _dirtySources->setState(Node::State::Ok);
+            std::vector<std::shared_ptr<Node>> dirtyBuildFiles;
+            // TODO: find dirty build files
             // TODO: update set of BuildFileParserNodes to be in sync with
             // buildFiles. Then request dirty BuildFileParserNodes to suspend 
             // the CommandNodes they created during previous execution.
             // Then execute the dirty BuildFileParserNodes and the Dirty command nodes
             // as per design in Miro board.
-            std::vector<std::shared_ptr<Node>> dirtyCommands;
-            appendDirtyCommands(_context.nodes(), dirtyCommands);
-            if (dirtyCommands.empty()) {
-                _handleBuildCompletion(_scope.get());
+            if (dirtyBuildFiles.empty()) {
+                _handleBuildFilesCompletion(_dirtyBuildFiles.get());
             } else {
-                _scope->setInputProducers(dirtyCommands); // + dirtyBuildFileParsers
-                _scope->completor().AddRaw(this, &Builder::_handleBuildCompletion);
-                _scope->start();
+                _dirtyBuildFiles->setInputProducers(dirtyBuildFiles);
+                _dirtyBuildFiles->start();
             }
         }
     }
 
-    void Builder::_handleBuildCompletion(Node* n) {
-        if (n != _scope.get()) throw std::exception("unexpected node");
+    void Builder::_handleBuildFilesCompletion(Node* n) {
+        if (n != _dirtyBuildFiles.get()) throw std::exception("unexpected node");
+        if (_dirtyBuildFiles->state() != Node::State::Ok) {
+            _dirtyCommands->setState(_dirtyCommands->state());
+            _handleCommandsCompletion(_dirtyCommands.get());
+        } else {
+            _dirtyCommands->setInputProducers(std::vector<std::shared_ptr<Node>>());
+            _dirtyCommands->setState(Node::State::Ok);
+            std::vector<std::shared_ptr<Node>> dirtyCommands;
+            appendDirtyCommands(_context.nodes(), dirtyCommands);
+            if (dirtyCommands.empty()) {
+                _handleCommandsCompletion(_dirtyCommands.get());
+            } else {
+                _dirtyCommands->setInputProducers(dirtyCommands);
+                _dirtyCommands->start();
+            }
+        }
+    }
 
-        _result->succeeded(_scope->state() == Node::State::Ok);
+    void Builder::_handleCommandsCompletion(Node* n) {
+        if (n != _dirtyCommands.get()) throw std::exception("unexpected node");
+
+        _result->succeeded(_dirtyCommands->state() == Node::State::Ok);
         _result->nDirectoryUpdates(_context.statistics().nDirectoryUpdates);
         _result->nNodesExecuted(_context.statistics().nSelfExecuted);
         _result->nNodesStarted(_context.statistics().nStarted);
         _result->nRehashedFiles(_context.statistics().nRehashedFiles);
 
-        _scope->completor().RemoveAll();
-        _scope->setInputProducers(std::vector<std::shared_ptr<Node>>());
-        _scope->setState(Node::State::Ok);
+        _dirtyCommands->setInputProducers(std::vector<std::shared_ptr<Node>>());
+        _dirtyCommands->setState(Node::State::Ok);
         _notifyCompletion();
     }
 
@@ -201,7 +220,9 @@ namespace YAM
 
     void Builder::stop() {
         if (!running()) throw std::exception("cannot cancel a build while no one is running");
-       _scope->cancel();
+        _dirtySources->cancel();
+        _dirtyBuildFiles->cancel();
+        _dirtyCommands->cancel();
     }
 
     MulticastDelegate<std::shared_ptr<BuildResult>>& Builder::completor() {

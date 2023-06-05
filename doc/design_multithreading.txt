@@ -1,0 +1,125 @@
+- Scalable performance
+YAM delegates self-execution of a node to a thread pool.
+By default the pool contains 1 thread per processor core.
+Assume build time T when using 1 core, then ideally build time becomes T/N 
+when using N cores. In practive this cannot be achieved for several reasons:
+	- serialization inherent in build graph. E.g. link after compilation.
+	- serialization in YAM implementation
+	- compute platform limitations (I/O, OS overhead)
+
+- Concurrent access to shared data
+Node::selfExecute may access (read+write) 
+	- its own member variables
+	- members variables of other nodes, e.g. CommandNode rehashes its output
+	  file nodes after completion of its command script.
+	- its execution context, e.g.:
+		- SourceDirectoryNode adds/removes directory and file nodes
+		- BuildFileProcessorNode adds/removes/updates command nodes
+		- CommandNode finds file nodes associated with the files read by its
+		  command script
+
+At first glance there is no harm in a node updating its own member variables 
+because other nodes in other threads will not access this data during execution
+of that node. This however is not true for a thread that stores nodes to 
+persistent storage. 
+
+There are 2 design options to eliminate concurrent access to shared data:
+	A- access shared data in critical section
+	B- access shared data only from one thread
+
+YAM implements option B: only access shared data in main thread.
+Both threading design options impact the scalability of YAM because they limit
+the amount of parallellizable code, see Amdahl's law.
+
+- Scalability analysis
+Performance on  Intel(R) Core(TM) i5-4210M CPU@ 2.60GHz, mWindows 10, 16 GB
+std::unordered_set<std::shared_ptr<Node>>:
+	- Add: 600 ns
+	- Find: 320 ns
+	- Erase: 500 ns
+
+A YAM build is performed in 3 stages:
+	1- Mirror the source file repository in a tree of directory and file nodes
+	   and compute the hashes of directories and files.
+	   Rationale: see design_whenToAddSourceFileNodesToGraph.txt
+	2- Process build files to add/remove/update command nodes
+	3- Execute command nodes
+
+Executing these stages sequentially impacts scalability (Amdahl's law).
+E.g. changing a small include file (fast rehash) that triggers many 
+re-compilations and changing a large file (slow rehash) that triggers no
+re-executions. The slow rehash of the large file has a considerable impact
+on scalability. This can be mitigated when for each command all input files
+are declared in advance (as is done in Bazel). In that case hashing the files
+can become part of stage 3 (via Node preRequisites execution). Note that
+re-reading/re-hashing directories must still be done in stage 1.
+A hybrid form can be used: in build file specify the include directories on
+which an object file is allowed to depend. But register in object file cmd
+node only the actually used include files.
+To be discussed with Phil.
+
+Stage 2 and 3 can be executed in parallel, see MIRO board.
+YAM has choosen sequential execution of stage 2 and 3 because:
+    - Often there will be no modified build files.
+	- Executing stage 3 after completion of stage 2 improves scalability of 
+      stage 3 as will be shown below. 
+
+1- Mirror the source file repository in a tree of directory and file nodes
+Directory retrieval and new dir/file node creation is done in threadpool context
+as is rehashing of dir/file content. Adding/removing nodes to/from execution 
+context is done in main thread. This stage therefore fully adheres to MT-design 
+option B. 
+
+2- Process build files to add/remove/update command nodes
+Parsing the build files is done in threadpool context. Adding/removing/updating
+command nodes is done in main thread. This stage therefore fully adheres to MT-design 
+option B. 
+
+3- Execute command nodes
+Executing the command script in done in threadpool. This produces the list of
+files read by the script. For each file in this list the command node looks-up 
+the associated file node in ExecutionContext::nodes() and adds the found file
+node to its set of input file nodes. According to option B this should be done
+in main thread. However, during stage 3 no changes are made to the set of nodes.
+Therefore it safe to do the look-ups in threadpool context. This moves 320 ns
+per lookup from main to threadpool thread, thus improving scalability.
+E.g. assume a compile node with:
+	 - 1 second compilation time
+	 - lookup 1000 input file nodes => 320 us 
+	 - node storage time => 1 us (negligable wrt 320 us)
+Speedup when using 1024 threads with input file node lookup in
+	- main thread: 771
+	- thread pool: 1023
+	
+In addition to these look-ups the command node must remove itself from the
+preParents from input file nodes that were no longer detected as input files
+and add itself to the preParents of newly detected input file nodes.
+Given option B this must be done in main thread. A simple implementation
+looks like:
+        if (_inputs != newInputs) { // vector => O(N^2)
+            for (auto i : _inputs) i->removePreParent(this); // set => O(N)
+            _inputs = newInputs; O(N)
+            for (auto i : _inputs) i->addPreParent(this); // set => O(N)
+        }
+Time needed will be approximately twice lookup time of input file nodes, 
+e.g. 500 us. This reduces scalability considerably: speedup when using 1024 
+cores with input file node lookup in thread pool and updating preParents in
+main thread drops from 1023 to 677.
+In a clean build there will no prePreparent removals, assume time drops to 
+e.g. 250 ns. Speedup for 1024 cores in that case: 815
+
+The change in set of input files will often be small, certainly in a C++ code
+base. YAM uses this to reduce the overhead of updating preParents:
+    - std::set<std::shared_ptr<FileNode>> _inputs; (iso vector)
+	- compute, in thread pool, the difference between old and new input set
+	- in main thread: 
+		for (auto removed : removedInputs) {
+		    removed->removePreParent(this); 
+			_inputs.remove(removed);
+		}
+		for (auto added : addedInputs) {
+		    added->addPreParent(this); 
+			_inputs.add(added);
+	    }
+Note: the number of node re-executions in many typical development scenarios 
+will be small, thus limiting the effect of above optimization. 

@@ -41,18 +41,18 @@ namespace YAM
             , _env(env)
         {}
 
-        // Wait for the script to complete.
+        // Wait for the process to complete.
         virtual MonitoredProcessResult const& wait() = 0;
 
-        // Wait for the script to complete or for 'timoutInSeconds' to expire.
-        // Return whether script exited while waiting (i.e. return false on
+        // Wait for the process to complete or for 'timoutInSeconds' to expire.
+        // Return whether process exited while waiting (i.e. return false on
         // timeout).
         virtual bool wait_for(unsigned int timoutInMilliSeconds) = 0;
 
         // Terminate (kill) the process tree.
         // Example:
-        //     if (!executor.wait_for(std::chrono::seconds(10)) g.terminate();
-        //       auto result = executor.wait();
+        //    if (!process.wait_for(std::chrono::seconds(10)) process.terminate();
+        //    auto result = process.wait();
         virtual void terminate() = 0;
 
     protected:

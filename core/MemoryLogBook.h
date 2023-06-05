@@ -10,14 +10,14 @@ namespace YAM
     public:
         MemoryLogBook();
 
-        // MT-safe
         void add(LogRecord const& record) override;
 
-        // Not MT-safe, only to be used when no logging in progress
         std::vector<LogRecord> const& records();
 
+        // Log all previously added records to given 'log'.
+        void forwardTo(ILogBook& log) const;
+
     private:
-        std::mutex _mutex;
         std::vector<LogRecord> _records;
     };
 }

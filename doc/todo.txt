@@ -1,7 +1,10 @@
 Todo: core
-- NodeSet either MT-safe for add/remove nodes or post all NodeSet add/remove
-  to main thread. E.g. SourceDirectoryNode::updateContent()
-- DirectoryNode execution must (also) notify completion of self-execution.
+- Remove mutex from NodeSet. Instead post all NodeSet add/remove to main thread. 
+  To be changed: SourceDirectoryNode::updateContent(),
+  SourceDirectoryNode::SourceDirectoryNode(), DotIgnoreNode::setDotIgnoreFiles()
+- TODO: Builder::_dirtyCommands nodes must not be registered as dirty
+  nor modified. Solution: only register dirty/modified node when it is
+  in context::nodes().
 - decide on postrequisites
   Non-consistent interface: executing directory node builds entire tree when
   node is executed first time. Subsequent execution of the directory node
@@ -20,7 +23,6 @@ Todo: core
   this is not necessary. Possible refinement: add hasDirtyPostRequisites flag. Nodes in state Ok
   and hasDirtyPostRequisites only execute postRequisites that are dirty or hasDirtyPostRequisites.
 - decide on how to make finding dirty nodes O(1)
-- decide on MT-safe buildstate access: lock buildstate or post all updates to main thread
 - transaction across multiple btrees (tree of trees)
 - investigate scalability by measuring execution overhead, hashing overhead and 
   handling found file dependencies.
@@ -49,9 +51,15 @@ Todo: non-core
 
 
 Done
+- decide on MT-safe buildstate access: lock buildstate or post all node/buildstate access
+  to main thread.
+  Decision: post to main thread
+- DirectoryNode execution must (also) notify completion of self-execution.
 - ensure MT-safe access of preParents and postParents
   E.g. CommandNode::isPrerequisite()
-  Fixed by only checking for direct input producer
+  Fixed/workedaround by only checking for direct input producer.
+  If support for indirect input producer is needed then post this function to
+  main thread.
 - build state storage (PersistentBuildState)
 - streaming btree (provides streaming of value types into btree via ValueStreamer i/f)
 - SourceFileRepository: SourceDirectoryNode takes exclude (ignore) patterns

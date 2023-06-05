@@ -214,7 +214,7 @@ namespace YAM
 
     void SourceDirectoryNode::commitSelfCompletion(SelfExecutionResult const* result) {
         if (result->_newState == Node::State::Ok) {
-            auto r = reinterpret_cast<ExecutionResult const*>(result);
+            auto r = dynamic_cast<ExecutionResult const*>(result);
             if (r->_lastWriteTime != _lastWriteTime) {
                 _lastWriteTime = r->_lastWriteTime;
                 _content = r->_content;

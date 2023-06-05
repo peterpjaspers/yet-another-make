@@ -41,18 +41,21 @@ namespace YAM
         void _start();
         void _clean(std::shared_ptr<BuildRequest> request);
         void _stop();
-        void _handleRepoCompletion(Node* n);
-        void _handleBuildCompletion(Node* n);
+        void _handleSourcesCompletion(Node* n);
+        void _handleBuildFilesCompletion(Node* n);
+        void _handleCommandsCompletion(Node* n);
         void _notifyCompletion();
 
         ExecutionContext _context;
         MulticastDelegate<std::shared_ptr<BuildResult>> _completor;
 
-        // The nodes in build scope are collected in the input producers of
-        // _scope. This avoids duplicating execution logic already present
-        // in CommandNode (and its baseclass Node).
-        // _scope == nullptr when no build is in progress.
-        std::shared_ptr<CommandNode> _scope;
+        // Dirty source directory and source file nodes, dirty build file 
+        // nodes and dirty command nodes are collected as the input producers
+        // of command nodes. This avoids duplicating execution logic already 
+        // present in CommandNode (and its baseclass Node).
+        std::shared_ptr<CommandNode> _dirtySources;
+        std::shared_ptr<CommandNode> _dirtyBuildFiles;
+        std::shared_ptr<CommandNode> _dirtyCommands;
         std::shared_ptr<BuildResult> _result;
     };
 }

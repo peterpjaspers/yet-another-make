@@ -3,6 +3,7 @@
 #include "Node.h"
 #include "FileNode.h"
 #include "IMonitoredProcess.h"
+#include "MemoryLogBook.h"
 #include "../xxHash/xxhash.h"
 
 #include <atomic>
@@ -30,6 +31,8 @@ namespace YAM
     class __declspec(dllexport) CommandNode : public Node
     {
     public:
+        typedef std::map<std::filesystem::path, std::shared_ptr<FileNode>> InputNodes;
+
         CommandNode(); // needed for deserialization
         CommandNode(ExecutionContext* context, std::filesystem::path const& name);
         ~CommandNode();
@@ -97,34 +100,44 @@ namespace YAM
     private:
         struct ExecutionResult : public Node::SelfExecutionResult {
             // inputs detected during last script execution
-            std::vector<std::shared_ptr<FileNode>> _inputs;
-            // results of the re-executed (re-hashed) output nodes
+            InputNodes _inputs;
+            // Difference with previously detected input nodes
+            InputNodes _removedInputs;
+            InputNodes _addedInputs;
+            InputNodes _keptInputs;
+            // results of the re-executed (i.e. re-hashed) output nodes
             std::vector<std::shared_ptr<FileNode::ExecutionResult>> _outputNodeResults;
             XXH64_hash_t _executionHash;
         };
 
         void getSourceInputs(std::vector<std::shared_ptr<Node>> & sourceInputs) const;
-        void setInputs(std::vector<std::shared_ptr<FileNode>> const& newInputs);
+        void setInputs(ExecutionResult const* result);
         bool executeOutputFiles(std::vector<std::shared_ptr<FileNode::ExecutionResult>>& outputHashes);
         XXH64_hash_t computeExecutionHash() const;
         XXH64_hash_t computeExecutionHash(ExecutionResult const* result) const;
 
         std::shared_ptr<FileNode> findInputNode(
             std::filesystem::path const& input,
-            std::filesystem::path const& exclude);
+            MemoryLogBook& logBook);
         bool findInputNodes(
-            MonitoredProcessResult const& result,
+            std::set<std::filesystem::path> const& inputFilePaths,
             std::filesystem::path const& exclude,
-            std::vector<std::shared_ptr<FileNode>>& inputNodes);
+            ExecutionResult* result);
 
         std::shared_ptr<GeneratedFileNode> findOutputNode(
-            std::filesystem::path const& output);
+            std::filesystem::path const& output,
+            MemoryLogBook& logBook);
         bool findOutputNodes(
             MonitoredProcessResult const& result,
-            std::vector<std::shared_ptr<GeneratedFileNode>>& outputNodes);
-        bool verifyOutputNodes(std::vector<std::shared_ptr<GeneratedFileNode>> const& newOutputNodes);
+            std::vector<std::shared_ptr<GeneratedFileNode>>& outputNodes,
+            MemoryLogBook& logBook);
+        bool verifyOutputNodes(
+            std::vector<std::shared_ptr<GeneratedFileNode>> const& newOutputNodes,
+            MemoryLogBook& logBook);
 
-        MonitoredProcessResult executeScript(std::filesystem::path& scriptFile);
+        MonitoredProcessResult executeScript(
+            std::filesystem::path& scriptFile,
+        MemoryLogBook& logBook);
         void commitSelfCompletion(SelfExecutionResult const* result) override;
 
         // The name of the FileAspectSet that contains the aspects relevant for this
@@ -145,7 +158,7 @@ namespace YAM
         std::atomic<std::shared_ptr<IMonitoredProcess>> _scriptExecutor;
         
         // inputs detected during last script execution
-        std::vector<std::shared_ptr<FileNode>> _inputs;
+        InputNodes _inputs;
 
         // The hash of the hashes of all items that, when changed, invalidate
         // the output files. Items include the script, the output files and 

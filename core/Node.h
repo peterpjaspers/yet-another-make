@@ -3,6 +3,7 @@
 
 #include "Delegates.h"
 #include "IPersistable.h"
+#include "MemoryLogBook.h"
 
 #include <filesystem>
 #include <functional>
@@ -24,7 +25,6 @@ namespace YAM
     //     - Command node
     //       Execution produces one or more output files. Execution may read
     //       source files and/or output files produced by other nodes.
-    //       source files and/or output files produced by other nodes.
     //       E.g. a C++ compile node produces an object file and reads a cpp and
     //       header files.
     //     - Generated file node
@@ -38,8 +38,8 @@ namespace YAM
     // indeed references a file. In general however this need not be the case.
     // E.g. a command node may be given a name like 'name-of-first-output\_cmd'
     //
-    // The Node class supports a 3-stage execution of a node. This 3-stage
-    // execution is started by the start() member function. 
+    // The Node class supports a 3-stage execution. 3-stage execution is started
+    // by the start() member function. 
     //    stage 1: Execute the prerequisites of the node.
     //             Prerequisite nodes produce results that are needed as input
     //             by stage 2. E.g. the prerequisites of a link command node are
@@ -50,9 +50,9 @@ namespace YAM
     //             This stage is started by the startSelf() member function. 
     //    stage 3: Execute the postrequisites of the node.
     //             Postrequisite nodes are typically produced by stage 2.
-    //             E.g. the execution of a directory node must create a node 
-    //             hierachy that reflects the content of a directory tree in the
-    //             filesystem. Further it must compute for each directory and file 
+    //             E.g. the execution of a directory node creates a node tree
+    //             that reflects the content of a directory tree in the
+    //             filesystem. Further it computes for each directory and file 
     //             node a hash of their content. 
     //             The directory node has no prerequisites.
     //             The directory node's self-execution iterates a directory and
@@ -62,33 +62,17 @@ namespace YAM
     //             traversal of the filesystem directory tree.
     //
     // Name convention: node execution is synonym for 3-stage execution.
-    // 
-    // A 3-stage execution of a node must start with executing all dirty nodes
-    // in the postrequisites hierarchy:
-    //      dirtyNodes = getDirtyPostrequisiteNodesRecursively({node})
-    //      execute(dirtyNodes)
-    //
-    // The 3-stage execution is functionally equivalent to the following code 
-    // that only uses stage 1 + stage 2 execution:
-    //      dirtyNodes = getDirtyPostRequisiteNodesRecursively({node})
-    //      while (!dirtyNodes.empty()) {
-    //          execute(dirtyNodes) // can produce new dirty postrequisite nodes
-    //          dirtyNodes = getDirtyPostRequisiteNodesRecursively(dirtyNodes)
-    //      }
-    // Stage 3 execution provides better utilization of the threadpool than
-    // above equivalent algorithm because it queues postrequisites of a node 
-    // to the threadpool immediately after completion of stage 2.
     //
     // Node class is not MT-safe: unless specified otherwise member functions
     // must be called from ExecutionContext::mainThread(). Derived classes must
     // access node state and ExecutionContext::nodes() in mainThread only. 
-    // This implies that a node that (re-)executes in thread pool cannot
-    // store its execution results in its member variables. Instead it must 
-    // store these results in a temporary instance of (a derived class) of 
-    // SelfExecutionResult, post this result to the main thread via 
-    // Node::postSelfCompletion and store the result in its member variables in
-    // its override of commitSelfCompletion. The latter is posted to main thread
-    // by postSelfCompletion.
+    // This implies that a node, that (re-)executes in a thread pool thread,
+    // cannot store its execution results in its member variables. Instead it must:
+    //      - store these results in a temporary result object
+    //      - post this result to the main thread via Node::postSelfCompletion
+    //        which posts commitSelfCompletion to the main thread
+    //      - and finally store the result in its member variables in its override
+    //        of commitSelfCompletion.
     //  
     class __declspec(dllexport) Node : public IPersistable
     {
@@ -101,11 +85,11 @@ namespace YAM
             Canceled = 5,   // execution was canceled
             Deleted = 6        // node is deleted, to be removed from node graph
 
-            // A dirty node is a node whose output filess may no longer be valid. 
+            // A dirty node is a node whose output files may no longer be valid. 
             // E.g. because the output files have been tampered with or because 
             // input files have been modified. A node must be marked Dirty when:
             //  - it is created,
-            //    - its self-execution logic is modified,
+            //  - its self-execution logic is modified,
             //    e.g. the shell script of a command node is modified,
             //  - a prerequisite is marked Dirty.
             // 
@@ -122,6 +106,17 @@ namespace YAM
 
         struct SelfExecutionResult {
             Node::State _newState;
+            MemoryLogBook _log;
+
+            virtual ~SelfExecutionResult() {}
+        };
+
+        // Implementation of std::less
+        // Allows nodes to be stored in std::set in node->name() order.
+        struct CompareName {
+            constexpr bool operator()(const std::shared_ptr<Node>& lhs, const std::shared_ptr<Node>& rhs) const {
+                return lhs->name() < rhs->name();
+            }
         };
 
         Node(); // needed for deserialization
