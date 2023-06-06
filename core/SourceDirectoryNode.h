@@ -29,6 +29,10 @@ namespace YAM
 
         SourceDirectoryNode(ExecutionContext* context, std::filesystem::path const& dirName);
 
+        // Add the prerequisites (i.e. the DotIgnoreNode and its prerequisites)
+        // to the execution context.
+        void addPrerequisitesToContext();
+
         // Inherited via Node
         bool supportsPrerequisites() const override;
         void getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const override;
@@ -83,13 +87,12 @@ namespace YAM
             XXH64_hash_t _executionHash;
         };
 
-        std::shared_ptr<Node> createNode(std::filesystem::directory_entry const& dirEntry) const;
         std::chrono::time_point<std::chrono::utc_clock> retrieveLastWriteTime() const;
         std::shared_ptr<Node> getNode(
             std::filesystem::directory_entry const& dirEntry,
             std::unordered_set<std::shared_ptr<Node>>& added,
             std::unordered_set<std::shared_ptr<Node>>& kept) const;
-        void computeContent(
+        void retrieveContent(
             std::map<std::filesystem::path, std::shared_ptr<Node>>& content,
             std::unordered_set<std::shared_ptr<Node>>& added,
             std::unordered_set<std::shared_ptr<Node>>& kept,

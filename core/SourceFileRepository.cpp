@@ -28,6 +28,7 @@ namespace YAM
         , _directoryNode(std::make_shared<SourceDirectoryNode>(context, directory))
     {
         _context->nodes().add(_directoryNode);
+        _directoryNode->addPrerequisitesToContext();
     }
 
     std::shared_ptr<SourceDirectoryNode> SourceFileRepository::directoryNode() const {

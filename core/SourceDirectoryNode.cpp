@@ -8,9 +8,22 @@
 
 namespace
 {
+    using namespace YAM;
     uint32_t streamableTypeId = 0;
 
     auto minLwt = std::chrono::time_point<std::chrono::utc_clock>::min();
+
+    std::shared_ptr<Node> createNode(std::filesystem::directory_entry const& dirEntry, ExecutionContext* context) {
+        std::shared_ptr<Node> node = nullptr;
+        if (dirEntry.is_directory()) {
+            node = std::make_shared<SourceDirectoryNode>(context, dirEntry.path());
+        } else if (dirEntry.is_regular_file()) {
+            node = std::make_shared<SourceFileNode>(context, dirEntry.path());
+        } else {
+            // bool notHandled = true;
+        }
+        return node;
+    }
 }
 
 namespace YAM
@@ -18,9 +31,12 @@ namespace YAM
     SourceDirectoryNode::SourceDirectoryNode(ExecutionContext* context, std::filesystem::path const& dirName)
         : Node(context, dirName)
         , _dotIgnoreNode(std::make_shared<DotIgnoreNode>(context, dirName / ".dotignore", this))
-    {
+    {}
+
+    void SourceDirectoryNode::addPrerequisitesToContext() {
+        context()->nodes().add(_dotIgnoreNode);
         _dotIgnoreNode->addPreParent(this);
-        context->nodes().add(_dotIgnoreNode);
+        _dotIgnoreNode->addPrerequisitesToContext();
     }
 
     bool SourceDirectoryNode::supportsPrerequisites() const {
@@ -100,18 +116,6 @@ namespace YAM
         return decltype(lwt)::clock::to_utc(lwt);
     }
 
-    std::shared_ptr<Node> SourceDirectoryNode::createNode(std::filesystem::directory_entry const& dirEntry) const {
-        std::shared_ptr<Node> n = nullptr;
-        if (dirEntry.is_directory()) {
-            n = std::make_shared<SourceDirectoryNode>(context(), dirEntry.path());
-        } else if (dirEntry.is_regular_file()) {
-            n = std::make_shared<SourceFileNode>(context(), dirEntry.path());
-        } else {
-            bool notHandled = true;
-        }
-        return n;
-    }
-
     std::shared_ptr<Node> SourceDirectoryNode::getNode(
         std::filesystem::directory_entry const& dirEntry,
         std::unordered_set<std::shared_ptr<Node>>& added,
@@ -125,14 +129,14 @@ namespace YAM
                 child = it->second;
                 kept.insert(it->second);
             } else {
-                child = createNode(dirEntry);
+                child = createNode(dirEntry, context());
                 added.insert(child);
             }
         }
         return child;
     }
 
-    void SourceDirectoryNode::computeContent(
+    void SourceDirectoryNode::retrieveContent(
         std::map<std::filesystem::path, std::shared_ptr<Node>>& content,
         std::unordered_set<std::shared_ptr<Node>>& added,
         std::unordered_set<std::shared_ptr<Node>>& removed,
@@ -198,7 +202,7 @@ namespace YAM
             result->_kept.clear();
             result->_lastWriteTime = retrieveLastWriteTime();
             if (result->_lastWriteTime != _lastWriteTime) {
-                computeContent(result->_content, result->_added, result->_removed, result->_kept);
+                retrieveContent(result->_content, result->_added, result->_removed, result->_kept);
                 result->_executionHash = computeExecutionHash(result->_content);
             }
         } catch (std::filesystem::filesystem_error) {
@@ -222,6 +226,8 @@ namespace YAM
                 for (auto const& n : r->_added) {
                     n->addPostParent(this);
                     _context->nodes().add(n);
+                    auto const dir = dynamic_pointer_cast<SourceDirectoryNode>(n);
+                    if (dir != nullptr) dir->addPrerequisitesToContext();
                 }
                 for (auto const& n : r->_removed) {
                     _removeChildRecursively(n);

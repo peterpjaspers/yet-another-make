@@ -57,7 +57,6 @@ namespace YAM
         std::size_t size();
 
     private:
-        std::mutex _mutex;
         std::unordered_map<std::filesystem::path, std::shared_ptr<Node> > _nodes;
     };
 }

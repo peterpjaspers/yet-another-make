@@ -23,12 +23,14 @@ namespace
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
         context.addRepository(std::make_shared<FileRepository>("repo", rootDir));
-        SourceDirectoryNode dirNode(&context, rootDir);
-        EXPECT_EQ(Node::State::Dirty, dirNode.state());
+        auto dirNode = std::make_shared<SourceDirectoryNode>(&context, rootDir);
+        context.nodes().add(dirNode);
+        dirNode->addPrerequisitesToContext();
+        EXPECT_EQ(Node::State::Dirty, dirNode->state());
 
-        bool completed = YAMTest::executeNode(&dirNode);
+        bool completed = YAMTest::executeNode(dirNode.get());
         EXPECT_TRUE(completed);
-        verify(&testTree, &dirNode);
+        verify(&testTree, dirNode.get());
     }
 
     TEST(SourceDirectoryNode, update_threeDeepDirectoryTree) {
@@ -39,8 +41,10 @@ namespace
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
         context.addRepository(std::make_shared<FileRepository>("repo", rootDir));
-        SourceDirectoryNode dirNode(&context, rootDir);
-        bool completed = YAMTest::executeNode(&dirNode);
+        auto dirNode = std::make_shared<SourceDirectoryNode>(&context, rootDir);
+        context.nodes().add(dirNode);
+        dirNode->addPrerequisitesToContext();
+        bool completed = YAMTest::executeNode(dirNode.get());
         EXPECT_TRUE(completed);
 
         // Update file system
@@ -53,13 +57,13 @@ namespace
 
         // Find nodes affected by file system changes...
         std::vector<std::shared_ptr<SourceDirectoryNode>> subDirNodes;
-        dirNode.getSubDirs(subDirNodes);
+        dirNode->getSubDirs(subDirNodes);
         std::shared_ptr<SourceDirectoryNode> dirNode_S1 = subDirNodes[1];
         dirNode_S1->getSubDirs(subDirNodes);
         std::shared_ptr<SourceDirectoryNode> dirNode_S1_S2 = subDirNodes[2];
 
         // ...and mark these nodes dirty
-        dirNode.setState(Node::State::Dirty);
+        dirNode->setState(Node::State::Dirty);
         dirNode_S1->setState(Node::State::Dirty);
         dirNode_S1_S2->setState(Node::State::Dirty);
 
@@ -67,10 +71,10 @@ namespace
         context.statistics().reset();
         context.statistics().registerNodes = true;
         // re-execute directory node tree to sync with changed testTree
-        completed = YAMTest::executeNode(&dirNode);
+        completed = YAMTest::executeNode(dirNode.get());
         EXPECT_TRUE(completed);
 
-        verify(&testTree, &dirNode);
+        verify(&testTree, dirNode.get());
 
         // 13 nStarted and nSelfExecuted include the .ignore, .gitignore and
         // .yamignore of the added dir in testTree_S1_S2 
@@ -83,11 +87,11 @@ namespace
         // in testTree_S1_S2 
         EXPECT_EQ(8, context.statistics().nRehashedFiles);
         EXPECT_EQ(4, context.statistics().nDirectoryUpdates);
-        EXPECT_TRUE(context.statistics().updatedDirectories.contains(&dirNode));
+        EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode.get()));
         EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode_S1.get()));
         EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode_S1_S2.get()));
         std::vector<std::shared_ptr<FileNode>> files;
-        dirNode.getFiles(files);
+        dirNode->getFiles(files);
         EXPECT_TRUE(context.statistics().rehashedFiles.contains(files[files.size() - 1].get()));
 
         dirNode_S1->getFiles(files);

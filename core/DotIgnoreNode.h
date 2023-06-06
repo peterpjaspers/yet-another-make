@@ -28,7 +28,9 @@ namespace YAM
             std::filesystem::path const& name,
             SourceDirectoryNode *directory);
 
-        virtual ~DotIgnoreNode();
+        // Add the prerequisites (i.e, the .gitignore and .yamignore file nodes
+        // to the execution context.
+        void addPrerequisitesToContext();
 
         void setState(State newState) override;
 
@@ -66,9 +68,7 @@ namespace YAM
         friend class SourceDirectoryNode;
 
         void directory(SourceDirectoryNode* directory);
-        void setDotIgnoreFiles(std::vector<std::shared_ptr<SourceFileNode>> const& newFiles);
         XXH64_hash_t computeHash() const;
-        void execute();
 
         SourceDirectoryNode* _directory;
 

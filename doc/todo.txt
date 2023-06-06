@@ -1,7 +1,4 @@
 Todo: core
-- Remove mutex from NodeSet. Instead post all NodeSet add/remove to main thread. 
-  To be changed: SourceDirectoryNode::updateContent(),
-  SourceDirectoryNode::SourceDirectoryNode(), DotIgnoreNode::setDotIgnoreFiles()
 - TODO: Builder::_dirtyCommands nodes must not be registered as dirty
   nor modified. Solution: only register dirty/modified node when it is
   in context::nodes().
@@ -51,6 +48,9 @@ Todo: non-core
 
 
 Done
+- Remove mutex from NodeSet. Instead post all NodeSet add/remove to main thread. 
+  To be changed: SourceDirectoryNode::updateContent(),
+  SourceDirectoryNode::SourceDirectoryNode(), DotIgnoreNode::setDotIgnoreFiles()
 - decide on MT-safe buildstate access: lock buildstate or post all node/buildstate access
   to main thread.
   Decision: post to main thread

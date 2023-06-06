@@ -39,18 +39,23 @@ namespace YAM
         , _directory(directory)
         , _hash(rand())
     {
-        setDotIgnoreFiles({
-             std::make_shared<SourceFileNode>(context, _directory->name() / ".gitignore"),
-             std::make_shared<SourceFileNode>(context, _directory->name() / ".yamignore")
-        });
+        _dotIgnoreFiles.push_back(std::make_shared<SourceFileNode>(context, _directory->name() / ".gitignore"));
+        _dotIgnoreFiles.push_back(std::make_shared<SourceFileNode>(context, _directory->name() / ".yamignore"));
     }
 
-    DotIgnoreNode::~DotIgnoreNode() {
-        _dotIgnoreFiles.clear();
+    void DotIgnoreNode::addPrerequisitesToContext() {
+        for (auto file : _dotIgnoreFiles) {
+            context()->nodes().add(file);
+            file->addPreParent(this);
+        }
     }
 
     void DotIgnoreNode::clear() {
-        setDotIgnoreFiles(std::vector<std::shared_ptr<SourceFileNode>>());
+        for (auto file : _dotIgnoreFiles) {
+            context()->nodes().remove(file);
+            file->removePreParent(this);
+        }
+        _dotIgnoreFiles.clear();
     }
 
     void DotIgnoreNode::setState(State newState) {
@@ -96,21 +101,6 @@ namespace YAM
 
     void DotIgnoreNode::directory(SourceDirectoryNode* directory) {
         _directory = directory;
-    }
-
-    void DotIgnoreNode::setDotIgnoreFiles(std::vector<std::shared_ptr<SourceFileNode>> const& newInputs) {
-        if (_dotIgnoreFiles != newInputs) {
-            for (auto file : _dotIgnoreFiles) {
-                file->removePreParent(this);
-                context()->nodes().remove(file);
-            }
-            _dotIgnoreFiles = newInputs;
-            for (auto file : _dotIgnoreFiles) {
-                file->addPreParent(this);
-                context()->nodes().add(file);
-            }
-            modified(true);
-        }
     }
 
     bool DotIgnoreNode::pendingStartSelf() const {
