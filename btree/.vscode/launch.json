@@ -1,0 +1,34 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "(gdb) Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}\\test\\${fileBasenameNoExtension}.exe",
+            // "args": [ "1000000", "Uint32Uint32", "Uint16ArrayUint32", "Uint32Uint16Array", "Uint16ArrayUint16Array" ],
+            // "args": [ "1000", "Uint32Uint32", "Uint16ArrayUint32", "Uint32Uint16Array", "Uint16ArrayUint16Array" ],
+            // "args": [ "1000000", "Uint32Uint32" ],
+            // "args": [ "1000000", "Uint16ArrayUint32" ],
+            // "args": [ "1000000", "Uint32Uint16Array" ],
+            // "args": [ "1000000", "Uint16ArrayUint16Array" ],
+            "args": [ "100000", "Uint16ArrayUint16Array" ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}\\test",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin\\gdb.exe",
+            "setupCommands": [
+                {
+                    "description": "Enable breaking on exceptions",
+                    "text": "catch throw",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
+}

@@ -59,10 +59,12 @@ namespace BTree {
 
     PersistentPagePool::~PersistentPagePool() {
         // Ensure entire file has been written with valid data by filling holes in file.
-        // Not all consecutive pages may have been written after multiple modifications
+        // Not all persistent pages need be contiguous on file and furthermore not all
+        // consecutive pages may have been written after multiple modifications
         // between commits. A hole is a non-persistent page with an index less than
-        // a persistent page.
-        // First look for persistent page with largest index.
+        // a persistent page. Note that we need not write persistent pages as these
+        // would have been written during the most recent commit.
+        // First look (backward) for persistent page with largest index.
         int count = pages.size();
         PageLink largest;
         for (int i = 0; i < count; i++) {
@@ -92,6 +94,9 @@ namespace BTree {
                         for (auto link : holes) {
                             PageHeader* page =  pages[ link.index ];
                             page->free = 1; // Mark hole as free page...
+                            page->modified = 0;
+                            page->persistent = 0;
+                            page->recover = 0;
                             file.seekp( ((page->page.index * page->capacity) + sizeof(PageHeader)), file.beg );
                             file.write( reinterpret_cast<const char*>( page ), page->capacity );
                             if (!file.good()) break;
@@ -120,7 +125,7 @@ namespace BTree {
         // If that fails (i.e., file does not exist) open file for output.
         if (!file.good()) file.open( fileName, ios::out | ios::binary );
         if (file.good()) {
-            // Write all modified pages to file.
+            // Write all (non-free) modified pages to file.
             for (size_t p = 0; p < modifiedPages.size(); p++) {
                 const PageHeader* page = pages[ modifiedPages[ p ].index ];
                 page->modified = 0;

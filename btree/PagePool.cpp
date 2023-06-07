@@ -20,10 +20,10 @@ namespace BTree {
     // Create a PagePool with the given page size.
     PagePool::PagePool( PageSize pageSize ) : capacity( pageSize ), currentRoot( nullptr ) { commitLink.nullify(); }
     PagePool::~PagePool() {
-        for ( auto header : pages ) std::free( reinterpret_cast<void*>( header ) );
-        pages.clear();
         freePages.clear();
         modifiedPages.clear();
+        for ( auto header : pages ) std::free( reinterpret_cast<void*>( header ) );
+        pages.clear();
     };
     // Allocate a page in the memory pool.
     // Returns a PageLink that indexes the allocated page.

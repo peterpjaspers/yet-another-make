@@ -9,7 +9,7 @@
 namespace BTree {
 
     // A PagePool maintains a list of fixed size pages in which a B-Tree is stored.
-    // Pages are alllocated on demand and recycled via a list of free pages.
+    // Pages are allocated on demand and recycled via a list of free pages.
     // A page is referred to by a PageLink which is in effect an index in the
     // vector list of pages.
     class PagePool {

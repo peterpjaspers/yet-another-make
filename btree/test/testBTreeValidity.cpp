@@ -84,7 +84,7 @@ void destroyPagePool( bool persistent, PagePool* pool ) {
     if (persistent) {
         delete( dynamic_cast<PersistentPagePool*>(pool) );
     } else {
-        // delete( pool );
+        delete( pool );
     }
 }
 
@@ -404,23 +404,27 @@ public:
     uint32_t assign() {
         uint32_t errors = TreeTester<uint32_t,uint32_t>::assign();
         PagePool* temp = createPagePool( false, (BTreePageSize * 2) );
-        Tree<uint32_t,uint32_t> copy( *temp );
-        copy.assign( *tree );
-        size_t n = copy.size();
-        if (n != content.size()) {
-            log << "Expected size after assignment is " << content.size() << ", actual size is " << n << "!\n";
-            errors += 1;
-        }
-        tree->clear();
-        if (!tree->empty()) {
-            log << "Expected empty tree after clear, actual size is " << tree->size() << "!\n";
-            errors += 1;
-        }
-        tree->assign( copy );
-        n = tree->size();
-        if (n != content.size()) {
-            log << "Expected size after re-assignment is " << content.size() << ", actual size is " << n << "!\n";
-            errors += 1;
+        {
+            // Enclose in block to destruct B-Tree prior to destructing
+            // dynamically allocated PagePool
+            Tree<uint32_t,uint32_t> copy( *temp );
+            copy.assign( *tree );
+            size_t n = copy.size();
+            if (n != content.size()) {
+                log << "Expected size after assignment is " << content.size() << ", actual size is " << n << "!\n";
+                errors += 1;
+            }
+            tree->clear();
+            if (!tree->empty()) {
+                log << "Expected empty tree after clear, actual size is " << tree->size() << "!\n";
+                errors += 1;
+            }
+            tree->assign( copy );
+            n = tree->size();
+            if (n != content.size()) {
+                log << "Expected size after re-assignment is " << content.size() << ", actual size is " << n << "!\n";
+                errors += 1;
+            }
         }
         destroyPagePool( false, temp );
         return errors;
@@ -730,23 +734,27 @@ public:
     uint32_t assign() {
         uint32_t errors = TreeTester<uint16_t[],uint32_t>::assign();
         PagePool* temp = createPagePool( false, (BTreePageSize * 2) );
-        Tree<uint16_t[],uint32_t> copy( *temp );
-        copy.assign( *tree );
-        size_t n = copy.size();
-        if (n != content.size()) {
-            log << "Expected size after assignment is " << content.size() << ", actual size is " << n << "!\n";
-            errors += 1;
-        }
-        tree->clear();
-        if (!tree->empty()) {
-            log << "Expected empty tree after clear, actual size is " << tree->size() << "!\n";
-            errors += 1;
-        }
-        tree->assign( copy );
-        n = tree->size();
-        if (n != content.size()) {
-            log << "Expected size after re-assignment is " << content.size() << ", actual size is " << n << "!\n";
-            errors += 1;
+        {
+            // Enclose in block to destruct B-Tree prior to destructing
+            // dynamically allocated PagePool
+            Tree<uint16_t[],uint32_t> copy( *temp );
+            copy.assign( *tree );
+            size_t n = copy.size();
+            if (n != content.size()) {
+                log << "Expected size after assignment is " << content.size() << ", actual size is " << n << "!\n";
+                errors += 1;
+            }
+            tree->clear();
+            if (!tree->empty()) {
+                log << "Expected empty tree after clear, actual size is " << tree->size() << "!\n";
+                errors += 1;
+            }
+            tree->assign( copy );
+            n = tree->size();
+            if (n != content.size()) {
+                log << "Expected size after re-assignment is " << content.size() << ", actual size is " << n << "!\n";
+                errors += 1;
+            }
         }
         destroyPagePool( false, temp );
         return errors;
@@ -1002,23 +1010,27 @@ public:
     uint32_t assign() {
         uint32_t errors = TreeTester<uint32_t,uint16_t[]>::assign();
         PagePool* temp = createPagePool( false, (BTreePageSize * 2) );
-        Tree<uint32_t,uint16_t[]> copy( *temp );
-        copy.assign( *tree );
-        size_t n = copy.size();
-        if (n != content.size()) {
-            log << "Expected size after assignment is " << content.size() << ", actual size is " << n << "!\n";
-            errors += 1;
-        }
-        tree->clear();
-        if (!tree->empty()) {
-            log << "Expected empty tree after clear, actual size is " << tree->size() << "!\n";
-            errors += 1;
-        }
-        tree->assign( copy );
-        n = tree->size();
-        if (n != content.size()) {
-            log << "Expected size after re-assignment is " << content.size() << ", actual size is " << n << "!\n";
-            errors += 1;
+        {
+            // Enclose in block to destruct B-Tree prior to destructing
+            // dynamically allocated PagePool
+            Tree<uint32_t,uint16_t[]> copy( *temp );
+            copy.assign( *tree );
+            size_t n = copy.size();
+            if (n != content.size()) {
+                log << "Expected size after assignment is " << content.size() << ", actual size is " << n << "!\n";
+                errors += 1;
+            }
+            tree->clear();
+            if (!tree->empty()) {
+                log << "Expected empty tree after clear, actual size is " << tree->size() << "!\n";
+                errors += 1;
+            }
+            tree->assign( copy );
+            n = tree->size();
+            if (n != content.size()) {
+                log << "Expected size after re-assignment is " << content.size() << ", actual size is " << n << "!\n";
+                errors += 1;
+            }
         }
         destroyPagePool( false, temp );
         return errors;
@@ -1354,23 +1366,27 @@ public:
     uint32_t assign() {
         uint32_t errors = TreeTester<uint16_t[],uint16_t[]>::assign();
         PagePool* temp = createPagePool( false, (BTreePageSize * 2) );
-        Tree<uint16_t[],uint16_t[]> copy( *temp );
-        copy.assign( *tree );
-        size_t n = copy.size();
-        if (n != content.size()) {
-            log << "Expected size after assignment is " << content.size() << ", actual size is " << n << "!\n";
-            errors += 1;
-        }
-        tree->clear();
-        if (!tree->empty()) {
-            log << "Expected empty tree after clear, actual size is " << tree->size() << "!\n";
-            errors += 1;
-        }
-        tree->assign( copy );
-        n = tree->size();
-        if (n != content.size()) {
-            log << "Expected size after re-assignment is " << content.size() << ", actual size is " << n << "!\n";
-            errors += 1;
+        {
+            // Enclose in block to destruct B-Tree prior to destructing
+            // dynamically allocated PagePool
+            Tree<uint16_t[],uint16_t[]> copy( *temp );
+            copy.assign( *tree );
+            size_t n = copy.size();
+            if (n != content.size()) {
+                log << "Expected size after assignment is " << content.size() << ", actual size is " << n << "!\n";
+                errors += 1;
+            }
+            tree->clear();
+            if (!tree->empty()) {
+                log << "Expected empty tree after clear, actual size is " << tree->size() << "!\n";
+                errors += 1;
+            }
+            tree->assign( copy );
+            n = tree->size();
+            if (n != content.size()) {
+                log << "Expected size after re-assignment is " << content.size() << ", actual size is " << n << "!\n";
+                errors += 1;
+            }
         }
         destroyPagePool( false, temp );
         return errors;
