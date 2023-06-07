@@ -9,10 +9,10 @@
 
 namespace BTree {
 
-    // Compare functor operating on Page indeces.
+    // CompareKey functor operating on Page indeces.
     // Compares functor key with the key at argument index.
     // Derived classes operate on Leaf and Node pages with fixed and variable size keys.
-    class Compare {
+    class CompareKey {
     public:
         virtual KeyCompare operator()( PageIndex index ) const { return 0; };
         virtual PageSize size() const { return 0; };
@@ -60,7 +60,7 @@ namespace BTree {
         };
     };
     template< class K, class V, bool KA, bool VA > 
-    class LeafCompare : public Compare {
+    class LeafCompare : public CompareKey {
     protected:
         const Page<K,V,KA,VA>* page;
     public:
@@ -70,7 +70,7 @@ namespace BTree {
         PageSize size() const { return page->header.count; };
     };
     template< class K, bool KA > 
-    class NodeCompare : public Compare {
+    class NodeCompare : public CompareKey {
     protected:
         const Page<K,PageLink,KA,false>* page;
     public:

@@ -5,6 +5,11 @@
 
 namespace BTree {
     
+    // B-directional iterator on B-Trees.
+    //
+    // In addition to standard bi-directional iterator operations, it provides
+    // key() and value() to retrieve the key and value at particular iterator position.
+    //
     template< class K, class V, class T >
     class BTreeIterator : public std::iterator< std::bidirectional_iterator_tag, T, size_t, T*, T& > {
     private:
@@ -49,6 +54,7 @@ namespace BTree {
             const auto page = trail.page<B<KT>,B<V>,false,A<V>>();
             return page->key( trail.index() );
         }
+        // Retrieve key at current itertor position.
         template< class KT = K, std::enable_if_t<(A<KT>),bool> = true >
         std::pair< const B<KT>*, PageSize > key() const {
             if (trail.atSplit()) {
@@ -59,6 +65,7 @@ namespace BTree {
             const auto page = trail.page<B<KT>,B<V>,true,A<V>>();
             return{ page->key( trail.index() ), page->keySize( trail.index() ) };
         }
+        // Retrieve value at current itertor position.
         template< class VT = V, std::enable_if_t<(S<VT>),bool> = true >
         const B<VT>& value() const {
             const auto page = trail.page<B<K>,B<VT>,A<K>,false>();

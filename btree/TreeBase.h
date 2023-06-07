@@ -13,9 +13,9 @@ namespace BTree {
     };
     // Default array key comparison function making use of less<T> on type of key array elements.
     template< class K >
-    inline int defaultCompareArray( const K* a, PageIndex na, const K* b, PageIndex nb ) {
-        PageIndex n = (( na < nb ) ? na : nb );
-        for (PageIndex i = 0; i < n; i++) {
+    inline int defaultCompareArray( const K* a, PageSize na, const K* b, PageSize nb ) {
+        PageSize n = (( na < nb ) ? na : nb );
+        for (PageSize i = 0; i < n; i++) {
             if (std::less<K>()( a[ i ], b[ i ] )) {
                 return -1;
             } else if (std::less<K>()( b[ i ], a[ i ] )) {
@@ -42,14 +42,11 @@ namespace BTree {
         PersistentTransaction = 3  // copy-on-update behaviour with memory reuse (default for persistent pool)
     };
 
-    // A tree index identifies a B-tree in a forest.
-    // Each tree in a forest can have its own template types.
-    // For a B-Tree in a forest, the application may use the TreeIndex to instatiate the tree
-    // with the appropriate template arguments. In particular when recovering a B-Tree from a
-    // persistent store. Behaviour is undefined if a a B-Tree is recovered with template
-    // arguments that differ from those used when stored.
+    // A tree index identifies a B-Tree in a Forest.
+    // If a B-Tree does not reside in a Forest, it is a free-standing tree.
     typedef std::uint32_t TreeIndex;
-    static const std::uint32_t FreeStanding = UINT32_MAX;
+    static const TreeIndex FreeStandingTree = UINT32_MAX;
+    static const TreeIndex TreeIndexMax = ((1 << 30) - 1);
 
     // Access to pages of a B-Tree in a PagePool.
     // The B-Tree can be composed by starting at the root page.
@@ -70,6 +67,8 @@ namespace BTree {
         friend class Trail;
         friend class Forest;
     public:
+        // Return depth of B-tree, an indication of the log(N) complexity of B-tree operations.
+        PageDepth depth() const;
         // Consolidate all Page modifications.
         void commit() const;
         // Restore all Pages to last consolidated state.
@@ -77,7 +76,7 @@ namespace BTree {
     };
 
     TreeBase::TreeBase( PagePool& pagePool, PageHeader* page, UpdateMode updateMode ) :
-        pool( pagePool ), root( page ), mode( deriveMode( updateMode, pagePool ) ), index( FreeStanding )
+        pool( pagePool ), root( page ), mode( deriveMode( updateMode, pagePool ) ), index( FreeStandingTree )
     {}
     // Derive BTree update mode as function of requested mode and page pool persistence.
     UpdateMode TreeBase::deriveMode( UpdateMode mode, PagePool& pool ) {
@@ -85,14 +84,15 @@ namespace BTree {
         if (pool.persistent()) return PersistentTransaction;
         return InPlace;
     }
+    PageDepth TreeBase::depth() const { return( root->depth ); }
     void TreeBase::commit() const {
         static const char* signature = "void TreeBase::commit() const";
-        if (index != FreeStanding) throw std::string( signature ) + " - Cannot commit single tree in forest";
+        if (index != FreeStandingTree) throw std::string( signature ) + " - Cannot commit single tree in forest";
         pool.commit( root->page );
     }
     void TreeBase::recover() {
         static const char* signature = "void TreeBase::recover()";
-        if (index != FreeStanding) throw std::string( signature ) + " - Cannot recover single tree in forest";
+        if (index != FreeStandingTree) throw std::string( signature ) + " - Cannot recover single tree in forest";
         PageLink link( pool.recover() );
         recoverTree( link );
     }

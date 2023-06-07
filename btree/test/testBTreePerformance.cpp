@@ -21,7 +21,7 @@ inline uint16_t generateUint16() {
 inline uint32_t generateUint32() {
     return( (((uint32_t)rand() * (uint32_t)2097593) + (uint32_t)rand()) % (uint32_t)1000000000 );
 }
-PageIndex generateUint16Array( uint16_t* value ) {
+PageSize generateUint16Array( uint16_t* value ) {
     int n = (MinArray  + (rand() % (MaxArray - MinArray)));
     for (int i = 0; i < n; i++) value[ i ] = generateUint16();
     return n;
@@ -80,11 +80,11 @@ int main(int argc, char* argv[]) {
         BTree::Tree<uint32_t,uint16_t,false,true> tree( *pool );
         vector<uint32_t> keys;
         vector<uint16_t*> values;
-        vector<PageIndex> valueSizes;
+        vector<PageSize> valueSizes;
         for ( int i = 0; i < EntryCount; i++ ) {
             keys.push_back( generateUint32() );
             uint16_t valueArray[ MaxArray ];
-            PageIndex valueSize = generateUint16Array( valueArray );
+            PageSize valueSize = generateUint16Array( valueArray );
             uint16_t *value = static_cast<uint16_t*>( malloc( valueSize * sizeof( uint16_t ) ) );
             memcpy( value, valueArray, (valueSize * sizeof( uint16_t )) );
             values.push_back( value );
@@ -118,11 +118,11 @@ int main(int argc, char* argv[]) {
         PagePool *pool = createPagePool( true, "testBTreePerformance\\Uint16ArrayUint16.bt", BTreePageSize );
         BTree::Tree<uint16_t,uint16_t,true,false> tree( *pool );
         vector<uint16_t*> keys;
-        vector<PageIndex> keySizes;
+        vector<PageSize> keySizes;
         vector<uint16_t> values;
         for ( int i = 0; i < EntryCount; i++ ) {
             uint16_t keyArray[ MaxArray ];
-            PageIndex keySize = generateUint16Array( keyArray );
+            PageSize keySize = generateUint16Array( keyArray );
             uint16_t *key = static_cast<uint16_t*>( malloc( keySize * sizeof( uint16_t ) ) );
             memcpy( key, keyArray, (keySize * sizeof( uint16_t )) );
             keys.push_back( key );
@@ -157,18 +157,18 @@ int main(int argc, char* argv[]) {
         PagePool *pool = createPagePool( true, "testBTreePerformance\\Uint16ArrayUint16Array.bt", BTreePageSize );
         BTree::Tree<uint16_t,uint16_t,true,true> tree( *pool );
         vector<uint16_t*> keys;
-        vector<PageIndex> keySizes;
+        vector<PageSize> keySizes;
         vector<uint16_t*> values;
-        vector<PageIndex> valueSizes;
+        vector<PageSize> valueSizes;
         for ( int i = 0; i < EntryCount; i++ ) {
             uint16_t keyArray[ MaxArray ];
-            PageIndex keySize = generateUint16Array( keyArray );
+            PageSize keySize = generateUint16Array( keyArray );
             uint16_t *key = static_cast<uint16_t*>( malloc( keySize * sizeof( uint16_t ) ) );
             memcpy( key, keyArray, (keySize * sizeof( uint16_t )) );
             keys.push_back( key );
             keySizes.push_back( keySize );
             uint16_t valueArray[ MaxArray ];
-            PageIndex valueSize = generateUint16Array( valueArray );
+            PageSize valueSize = generateUint16Array( valueArray );
             uint16_t *value = static_cast<uint16_t*>( malloc( valueSize * sizeof( uint16_t ) ) );
             memcpy( value, valueArray, (valueSize * sizeof( uint16_t )) );
             values.push_back( value );

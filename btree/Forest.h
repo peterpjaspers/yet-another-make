@@ -42,27 +42,54 @@ namespace BTree {
         // and page UpdateMode with all other B-Trees in the Forest
         // ToDo; plant with user defined index...
         template< class K, class V, std::enable_if_t<(S<K>),bool> = true >
-        std::pair< Tree<K,V>*, TreeIndex > plant( int(*compareKey)( const B<K>&, const B<K>& ) = defaultCompareScalar<B<K>> ) {
-            Tree<K,V>* tree = new Tree<K,V>( pool, compareKey, mode, nullptr );
-            TreeIndex index = trees.size();
-            trees[ index ] = tree;
-            Tree<TreeIndex,PageLink>::insert( index, tree->root->page );
-            return{ tree, index };
+        std::pair< Tree<K,V>*, TreeIndex > plant( typename Tree<K,V>::ScalarKeyCompare compareKey = defaultCompareScalar<K> ) {
+            TreeIndex index = uniqueIndex();
+            return{ plant<K,V>( uniqueIndex(), compareKey ), index };
         }
         template< class K, class V, std::enable_if_t<(A<K>),bool> = true >
-        std::pair< Tree<K,V>*, TreeIndex > plant( int(*compareKey)( const B<K>*, PageIndex, const B<K>*, PageIndex ) = defaultCompareArray<B<K>> ) {
+        std::pair< Tree<K,V>*, TreeIndex > plant( typename Tree<K,V>::ArrayKeyCompare compareKey = defaultCompareArray<B<K>> ) {
+            TreeIndex index = uniqueIndex();
+            return{ plant<K,V>( uniqueIndex(), compareKey ), index };
+        }
+        template< class K, class V, std::enable_if_t<(S<K>),bool> = true >
+        Tree<K,V>* plant( TreeIndex index, typename Tree<K,V>::ScalarKeyCompare compareKey = defaultCompareScalar<K> ) {
+            static const char* signature = "Tree<K,V>* Forest::plant( TreeIndex, typename Tree<K,V>::ScalarKeyCompare )";
+            if (exists( index )) throw std::string( signature ) + " - TreeIndex already in use";
             Tree<K,V>* tree = new Tree<K,V>( pool, compareKey, mode, nullptr );
-            TreeIndex index = trees.size();
             trees[ index ] = tree;
             Tree<TreeIndex,PageLink>::insert( index, tree->root->page );
-            return{ tree, index };
+            return tree;
+        }
+        template< class K, class V, std::enable_if_t<(A<K>),bool> = true >
+        Tree<K,V>* plant( TreeIndex index, typename Tree<K,V>::ArrayKeyCompare compareKey = defaultCompareArray<B<K>> ) {
+            static const char* signature = "Tree<K,V>* Forest::plant( TreeIndex, typename Tree<K,V>::ArrayKeyCompare )";
+            if (exists( index )) throw std::string( signature ) + " - TreeIndex already in use";
+            Tree<K,V>* tree = new Tree<K,V>( pool, compareKey, mode, nullptr );
+            trees[ index ] = tree;
+            Tree<TreeIndex,PageLink>::insert( index, tree->root->page );
+            return tree;
+        }
+        template< class K, class V >
+        std::pair< Tree<K,V>*, TreeIndex > plant( const Tree<K,V>& source ) {
+            TreeIndex index = uniqueIndex();
+            return{ plant<K,V>( uniqueIndex(), source ), index };
+        }
+        template< class K, class V >
+        Tree<K,V>* plant( TreeIndex index, const Tree<K,V>& source ) {
+            static const char* signature = "std::pair< Tree<K,V>*, TreeIndex > Forest::plant( TreeIndex, const Tree<K,V>& )";
+            if (exists( index )) throw std::string( signature ) + " - TreeIndex already in use";
+            Tree<K,V>* tree = new Tree<K,V>( pool, source.keyCompare(), mode, nullptr );
+            tree->assign( source );
+            trees[ index ] = tree;
+            Tree<TreeIndex,PageLink>::insert( index, tree->root->page );
+            return tree;
         }
         // Access a B-Tree in the Forest via its TreeIndex obtained when the B-Tree was planted.
         // The key and value class template arguments (and optional key compae function) must match
         // those used to plant the B-Tree.
         template< class K, class V, std::enable_if_t<(S<K>),bool> = true >
-        Tree<K,V>* access( TreeIndex index, int(*compareKey)( const B<K>&, const B<K>& ) = defaultCompareScalar<B<K>> ) {
-            static const char* signature = "Tree<K,V>* Forest::access( TreeIndex index )";
+        Tree<K,V>* access( TreeIndex index, typename Tree<K,V>::ScalarKeyCompare compareKey = defaultCompareScalar<B<K>> ) {
+            static const char* signature = "Tree<K,V>* Forest::access( TreeIndex, typename Tree<K,V>::ScalarKeyCompare compareKey )";
             if (0 < trees.count( index )) return reinterpret_cast<Tree<K,V>*>( const_cast<TreeBase*>( trees[ index ] ) );
             if (!exists( index )) throw std::string( signature ) + " - Tree not in Forest";
             PageLink link = retrieve( index );
@@ -72,8 +99,8 @@ namespace BTree {
             return( tree );
         }
         template< class K, class V, std::enable_if_t<(A<K>),bool> = true >
-        Tree<K,V>* access( TreeIndex index, int(*compareKey)( const B<K>*, PageIndex, const B<K>*, PageIndex ) = defaultCompareArray<B<K>> ) {
-            static const char* signature = "Tree<K,V>* Forest::access( TreeIndex index )";
+        Tree<K,V>* access( TreeIndex index, typename Tree<K,V>::ArrayKeyCompare compareKey = defaultCompareArray<B<K>> ) {
+            static const char* signature = "Tree<K,V>* Forest::access( TreeIndex, typename Tree<K,V>::ArrayKeyCompare compareKey )";
             if (0 < trees.count( index )) return reinterpret_cast<Tree<K,V>*>( const_cast<TreeBase*>( trees[ index ] ) );
             if (!exists( index )) throw std::string( signature ) + " - Tree not in Forest";
             PageLink link = retrieve( index );
@@ -99,6 +126,8 @@ namespace BTree {
         using Tree< TreeIndex, PageLink >::insert;
         using Tree< TreeIndex, PageLink >::replace;
         using Tree< TreeIndex, PageLink >::remove;
+        // Generate a unique TreeIndex for a user
+        TreeIndex uniqueIndex() { return ((1 << 31) + trees.size()); }
     }; // class Forest
 
     inline std::ostream & operator<<( std::ostream & o, const Forest& tree ) { tree.stream( o ); return o; }

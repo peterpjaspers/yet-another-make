@@ -217,7 +217,7 @@ namespace BTree {
         // Return reference to scalar key at index.
         template <bool AK = KA, std::enable_if_t<(!AK),bool> = true>
         const K& key(PageIndex index) const {
-            static const char* signature( "const K& kPage<K,V,false,VA>::ey( PageIndex index ) const" );
+            static const char* signature( "const K& Page<K,V,false,VA>::ey( PageIndex index ) const" );
             if (header.count <= index) throw std::string( signature ) + " - Invalid index";
             return (keys()[index]);
         }

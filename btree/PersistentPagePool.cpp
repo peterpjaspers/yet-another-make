@@ -10,7 +10,7 @@ using namespace std;
 
 namespace BTree {
 
-    // Page pool with persistent store to file.
+    // Page pool with persistent storage in file.
 
     // Create a PersistentPagePool on a file.
     // If the file exists, the page pool is updated to reflect file content.
@@ -225,7 +225,7 @@ namespace BTree {
 
     // Update page pool administration to pristine state consiting soley of persistent pages.
     // All other pages are inserted in the free pages list. When complete, no pages are
-    // modified or require recovery.
+    // marked as modified or recover.
     PageHeader* PersistentPagePool::clean() {
         freePages.clear();
         modifiedPages.clear();

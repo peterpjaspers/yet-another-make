@@ -26,7 +26,7 @@ namespace BTree {
     private:
         const Tree<StreamKey,uint8_t[]>& tree;
         StreamKey key;
-        std::pair<const uint8_t*, PageIndex> buffer;
+        std::pair<const uint8_t*, PageSize> buffer;
         uint16_t position;
         void readBlock() {
             if ( buffer.second <= position ) {
