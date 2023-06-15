@@ -77,9 +77,6 @@ namespace BTree {
         return( page );
     };
 
-    // Mark a page as modified and queue page for file update.
-    // Page will be written to file with next commit() call,
-    // unless preceeded by a call to recover().
     void PagePool::modify( const PageHeader& page ) {
         if (page.modified == 0) {
             modifiedPages.push_back( page.page );
@@ -89,9 +86,9 @@ namespace BTree {
 
     // Commit all outstanding modify requests by defining new root.
     void PagePool::commit( const PageLink link ) {
-        for (int i = 0; i < modifiedPages.size(); i++) {
-            const PageHeader* modifiedPage = pages[ modifiedPages[ i ].index ];
-            modifiedPage->modified = 0;
+        for ( auto link : modifiedPages ) {
+            const PageHeader& modifiedPage = access( link );
+            modifiedPage.modified = 0;
         }
         modifiedPages.clear();
         commitLink = link;
@@ -99,12 +96,12 @@ namespace BTree {
     }
 
     // Discard all outstanding modify requests by recovering old root.
-    // Optionally free all modified pages.
+    // Optionally free modified pages.
     PageLink PagePool::recover( bool freeModifiedPages ) {
-        for (int i = 0; i < modifiedPages.size(); i++) {
-            const PageHeader* modifiedPage = pages[ modifiedPages[ i ].index ];
-            modifiedPage->modified = 0;
-            if ((modifiedPage->free == 0) && freeModifiedPages) free( modifiedPage );
+        for ( auto link : modifiedPages ) {
+            const PageHeader& modifiedPage = access( link );
+            modifiedPage.modified = 0;
+            if ((modifiedPage.free == 0) && freeModifiedPages) free( link );
         }
         modifiedPages.clear();
         return( commitLink );

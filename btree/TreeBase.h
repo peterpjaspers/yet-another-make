@@ -73,6 +73,8 @@ namespace BTree {
         void commit() const;
         // Restore all Pages to last consolidated state.
         void recover();
+        // Return PageLink of B-Tree root
+        PageLink rootLink() const;
     };
 
     TreeBase::TreeBase( PagePool& pagePool, PageHeader* page, UpdateMode updateMode ) :
@@ -96,6 +98,7 @@ namespace BTree {
         PageLink link( pool.recover() );
         recoverTree( link );
     }
+    PageLink TreeBase::rootLink() const { return root->page; }
 
 } // namespace BTree
 

@@ -6,6 +6,7 @@
 namespace BTree {
 
     inline PageSize PagePool::pageCapacity() const { return capacity; };
+    inline uint32_t PagePool::size() const { return pages.size(); };
     inline const PageHeader& PagePool::access( const PageLink& link ) const { return *pages[ link.index ]; };
     inline void PagePool::free( const PageHeader& header ) { free( header.page ); }
     inline void PagePool::free( const PageHeader* header ) { free( header->page ); }
@@ -20,7 +21,6 @@ namespace BTree {
         return( currentRoot );
     };
     inline PageHeader* PagePool::commitRoot() const { return reference( commitLink ); };
-    inline PageLink PagePool::rootLink() const { return commitLink; };
 
     template< class K, class V, bool KA, bool VA >
     inline Page<K,V,KA,VA>* PagePool::page( const PageDepth depth ) {

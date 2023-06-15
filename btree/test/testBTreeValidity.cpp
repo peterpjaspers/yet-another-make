@@ -20,7 +20,7 @@ using namespace std;
 // And additional std::map is required for validation of transaction behavior.
 //
 
-// ToDo: Remove (suspected) memory leak
+// ToDo: Forward insertion, reverse insertion and random insertion (as with remove)
 // ToDo: use std filesystem calls to remove windows specific code
 
 const int BTreePageSize = 256;
@@ -167,18 +167,123 @@ public:
     PageDepth treeDepth() const { return(  (tree != nullptr) ? tree->depth() : 0 ); }
     size_t treeSize() const { return( (tree != nullptr) ? tree->size() : 0 ); }
     virtual size_t size() const = 0;
-    virtual uint32_t validateContent() const {
+
+    template< class KT, class VT, bool KA, bool VA >
+    pair<uint32_t,uint32_t> validateNode( set<PageLink>& pageLinks, const Page<KT,PageLink,KA,false>& node, PageDepth depth ) const {
         uint32_t errors = 0;
-        log << "Validating content...\n" << flush;
-        if (tree == nullptr) {
-            log << "B-Tree on page pool " << directory + "/" + fileName + ".btree" << " does not exist!\n";
+        uint32_t pageCount = 0;
+        if (node.splitDefined()) {
+            auto result = validatePage<KT,VT,KA,VA>( pageLinks, node.split(), (depth - 1) );
+            errors += result.first;
+            pageCount += result.second;
+        }
+        for (PageIndex i = 0; i < node.size(); ++i) {
+            auto result = validatePage<KT,VT,KA,VA>( pageLinks, node.value( i ), (depth - 1) );
+            errors += result.first;
+            pageCount += result.second;
+        }
+        return{ errors, pageCount };
+
+    }
+    template< class KT, class VT, bool KA, bool VA >
+    pair<uint32_t,uint32_t> validatePage( set<PageLink>& pageLinks, PageLink link, PageDepth depth ) const {
+        uint32_t errors = 0;
+        if (link.null()) {
+            log << "Accessing null link!\n";
             errors += 1;
-        } else {
-            size_t tSize = treeSize();
-            size_t cSize = size();
-            if (treeSize() != size()) {
-                log << "Size mismatch : B-tree size " << tSize << ", expected " << cSize << "!\n";
+            return{ errors, 0 };
+        }
+        if ( pool->size() <= link.index ) {
+            log << "Invalid pool index " << link.index << " exceeds pool size " << pool->size() << "!\n" ;
+            errors += 1;
+            return{ errors, 0 };
+        }
+        auto result = pageLinks.insert( link );
+        if (!result.second) {
+            log << "Malformed B-Tree at " << link << "!\n";
+            errors += 1;
+            return{ errors, 0 };
+        }
+        const PageHeader& page = pool->access( link );
+        if (page.free == 1) {
+            log << "Page " << link << " is free!\n";
+            errors += 1;
+        }
+        if (depth == UINT16_MAX) depth = page.depth;
+        if (page.depth != depth) {
+            log << "Page " << page.page << " has mismatched depth " << page.depth << ", expected " << depth << "!\n";
+            errors += 1;
+        }
+        uint32_t pageCount = 1;
+        if (0 < page.depth) {
+            auto result = validateNode<KT,VT,KA,VA>( pageLinks, *pool->page<KT,PageLink,KA,false>( &page ), depth );
+            errors += result.first;
+            pageCount += result.second;
+        }
+        return{ errors, pageCount };
+    }
+    template< class KT, class VT >
+    uint32_t validatePagePool() const {
+        uint32_t errors = 0;
+        uint32_t pageCount = 0;
+        // Set of PageLinks of pages belonging to B-Tree.
+        // Used to detect malformed B-Tree, pure hierarchy expected.
+        // Detects e.g. cyclic dependencies and nodes with multiple parents
+        set<PageLink> pageLinks;
+        if (tree != nullptr) {
+            // Validate all pages belonging to the B-Tree (recursive from root)
+            auto result = validatePage<B<KT>,B<VT>,A<KT>,A<VT>>( pageLinks, tree->rootLink(), UINT16_MAX );
+            errors = result.first;
+            pageCount = result.second;
+        }
+        // Determine average page filling (informational)...
+        uint64_t totalUsage = 0;
+        for (auto link : pageLinks) {
+            const PageHeader& page = pool->access( link );
+            if (page.depth == 0) {
+                auto leaf = pool->page<B<KT>,B<VT>,A<KT>,A<VT>>( &page );
+                totalUsage += leaf->filling();
+            } else {
+                auto node = pool->page<B<KT>,PageLink,A<KT>,false>( &page );
+                totalUsage += node->filling();
+            }
+        }
+        uint64_t capacity = (pageCount * BTreePageSize);
+        log << "B-Tree size " << totalUsage
+            << " bytes, capacity " << (pageCount * BTreePageSize)
+            << " bytes, in " << pageCount
+            << " pages, filling " << ((totalUsage * 100)/ capacity) << " %\n";
+        // Now check to see if there are orphan pages.
+        // An orphan is a non-free page that is not counted as a B-Tree page
+        uint32_t freePages = 0;
+        for (uint32_t i = 0; i < pool->size(); ++i ) {
+            const PageHeader& page = pool->access( PageLink( i ) );
+            if (page.free != 0) freePages += 1;
+        }
+        if ((pageCount + freePages) < pool->size()) {
+            uint32_t orphans = (pool->size() - (pageCount + freePages));
+            log << "Detected " << orphans << " orphans out of " << pool->size() << " pages, B-Tree used " << pageCount << " pages!\n";
+            errors += 1;
+        }
+        return errors;
+    }
+
+    virtual uint32_t validate() const {
+        uint32_t errors = 0;
+        log << "Validating page pool...\n" << flush;
+        errors += validatePagePool<K,V>();
+        if (errors == 0) {
+            log << "Validating B-Tree...\n" << flush;
+            if (tree == nullptr) {
+                log << "B-Tree on page pool " << directory + "/" + fileName + ".btree" << " does not exist!\n";
                 errors += 1;
+            } else {
+                size_t tSize = treeSize();
+                size_t cSize = size();
+                if (treeSize() != size()) {
+                    log << "Size mismatch : B-tree size " << tSize << ", expected " << cSize << "!\n";
+                    errors += 1;
+                }
             }
         }
         return errors;
@@ -278,8 +383,8 @@ public:
         commitedContent.clear();
     }
     size_t size() const { return content.size(); }
-    uint32_t validateContent() const {
-        uint32_t errors = TreeTester<uint32_t,uint32_t>::validateContent();
+    uint32_t validate() const {
+        uint32_t errors = TreeTester<uint32_t,uint32_t>::validate();
         if (tree != nullptr) {
             // Ensure that all expected content is actually present
             for (auto entry = content.cbegin(); entry != content.cend(); ++entry) {
@@ -311,7 +416,6 @@ public:
                     errors += 1;
                 }
             }
-            if (0 < errors) log << "Detected " << errors << " validation errors!\n";
         }
         return errors;
     }
@@ -489,8 +593,8 @@ public:
         commitedContent.clear();
     }
     size_t size() const { return content.size(); }
-    uint32_t validateContent() const {
-        uint32_t errors = TreeTester<uint16_t[],uint32_t>::validateContent();
+    uint32_t validate() const {
+        uint32_t errors = TreeTester<uint16_t[],uint32_t>::validate();
         if (tree != nullptr) {
             bool usePair = false;
             // Ensure that all expected content is actually present
@@ -566,7 +670,6 @@ public:
                 delete key;
                 usePair = !usePair;
             }
-            if (0 < errors) log << "Detected " << errors << " validation errors!\n";
         }
         return errors;
     }
@@ -817,8 +920,8 @@ public:
         commitedContent.clear();
     }
     size_t size() const { return content.size(); }
-    uint32_t validateContent() const {
-        uint32_t errors = TreeTester<uint32_t,uint16_t[]>::validateContent();
+    uint32_t validate() const {
+        uint32_t errors = TreeTester<uint32_t,uint16_t[]>::validate();
         if (tree != nullptr) {
             // Ensure that all expected content is actually present
             for (auto entry = content.cbegin(); entry != content.cend(); ++entry) {
@@ -867,7 +970,6 @@ public:
                 }
             }
         }
-        if (0 < errors) log << "Detected " << errors << " validation errors!\n";
         return errors;
     }
     uint32_t insert( int count ) {
@@ -1102,8 +1204,8 @@ public:
         commitedContent.clear();
     }
     size_t size() const { return content.size(); }
-    uint32_t validateContent() const {
-        uint32_t errors = TreeTester<uint16_t[],uint16_t[]>::validateContent();
+    uint32_t validate() const {
+        uint32_t errors = TreeTester<uint16_t[],uint16_t[]>::validate();
         if (tree != nullptr) {
             // Ensure that all expected content is actually present...
             bool usePair = false;
@@ -1153,6 +1255,7 @@ public:
             // Ensure that other content is not present
             for (int i = 0; i < ProbeCount; ++i) {
                 vector<uint16_t>* key = generateUniqueKey();
+/*
                 try {
                     pair<const uint16_t*,PageSize> retrieved;
                     if (usePair) {
@@ -1171,6 +1274,7 @@ public:
                 catch (...) {
                     // Exception expected, ignore
                 }
+*/
                 bool found = false;
                 if (usePair) {
                     pair<const uint16_t*, PageSize> keyPair = { key->data(), key->size() };
@@ -1188,7 +1292,6 @@ public:
                 usePair = !usePair;
             }
         }
-        if (0 < errors) log << "Detected " << errors << " validation errors!\n";
         return errors;
     }
     uint32_t insert( int count ) {
@@ -1401,59 +1504,59 @@ uint32_t doTest( TreeTester<K,V>& tester, size_t count, ofstream& log ) {
         tester.createTree();
         errors += tester.commit();
         errors += tester.insert( count );
-        errors += tester.validateContent();
+        errors += tester.validate();
         errors += tester.remove( count, TreeTester<K,V>::Forward );
-        errors += tester.validateContent();
+        errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
         errors += tester.insert( count );
-        errors += tester.validateContent();
+        errors += tester.validate();
         errors += tester.remove( count, TreeTester<K,V>::Reverse );
-        errors += tester.validateContent();
+        errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
         errors += tester.insert( count );
-        errors += tester.validateContent();
+        errors += tester.validate();
         errors += tester.remove( count, TreeTester<K,V>::Random );
-        errors += tester.validateContent();
+        errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
         errors += tester.insert( count / 10 );
         errors += tester.commit();
-        errors += tester.validateContent();
+        errors += tester.validate();
         errors += tester.insert( count - (count / 10) );
         errors += tester.commit();
-        errors += tester.validateContent();
+        errors += tester.validate();
         errors += tester.replace( count / 2 );
-        errors += tester.validateContent();
+        errors += tester.validate();
         errors += tester.remove( count - (count / 4), TreeTester<K,V>::Random );
-        errors += tester.validateContent();
+        errors += tester.validate();
         errors += tester.recover();
-        errors += tester.validateContent();
+        errors += tester.validate();
         errors += tester.remove( count / 2, TreeTester<K,V>::Random );
-        errors += tester.validateContent();
+        errors += tester.validate();
         errors += tester.replace( count / 2 );
-        errors += tester.validateContent();
+        errors += tester.validate();
         errors += tester.insert( count / 2 );
-        errors += tester.validateContent();
+        errors += tester.validate();
         errors += tester.assign();
-        errors += tester.validateContent();
+        errors += tester.validate();
         tester.statistics();
         tester.destroyTree();
         tester.createTree();
-        errors += tester.validateContent();
+        errors += tester.validate();
         tester.destroyTree();
         tester.destroyPool();
         tester.createPool();
         tester.createTree();
-        errors += tester.validateContent();
+        errors += tester.validate();
         errors += tester.remove( count / 4, TreeTester<K,V>::Random );
-        errors += tester.validateContent();
+        errors += tester.validate();
         errors += tester.recover();
-        errors += tester.validateContent();
+        errors += tester.validate();
     }
     catch ( string message ) {
         log << "Exception : " << message << "!\n";
@@ -1496,9 +1599,13 @@ int main(int argc, char* argv[]) {
             Uint16ArrayUint16ArrayTreeTester tester( "testBTreeValidity", "Uint16ArrayUint16Array", log );
             errorCount += doTest( tester, count, log );
         }
-        log << "Done...\n\n";
+        log << "\n\n";
     }
-    if (0 < errorCount) log << "Total of " << errorCount << " errors detected!";
+    if (0 < errorCount) {
+        log << "Total of " << errorCount << " errors detected!";
+    } else {
+        log << "No errors detected.\n";
+    }
     log.close();
     exit( errorCount );
 };

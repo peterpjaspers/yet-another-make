@@ -506,7 +506,7 @@ namespace BTree {
                         node->replace( trail.index(), header.page );
                     }
                 } else {
-                    auto copy = allocatePage<PageLink>( node->header );
+                    auto copy = allocateNode( node->header.depth );
                     if (trail.atSplit()) {
                         node->split( header.page, copy );
                     } else {
@@ -524,18 +524,18 @@ namespace BTree {
         // Enforce update semantics being one of:
         //   InPlace -> no copy-on-update
         //   MemoryTransaction -> copy-on-update without memory reuse
-        //   PersistentTransaction -> copy-on-update with memory reuse
+        //   PersistentTransaction -> copy-on-update with memory reuse and back-up storage
         // Memory reuse (through recover) to be called after actual update is perfomed.
         // Does nothing if page is already modified; i.e., accessing copy of an earlier update.
         // The functions updatePage and recoverPage are used to enclose code that updates
         // the content of a page as follows:
         //   Page<K,V,KA,VT>* page = ...
         //   Page<K,V,KA,VT>* copy = updatePage<V>( trail );
-        //      ... code that updatedates page such as
+        //      ... code that updates page such as
         //      page->insert( index, key, value, copy );
         //      ...
         //   recoverPage( page->header, copy->header );
-        // The insert function is supplied with an additional argument for copy-on-update behavior.
+        // All page modification functions have an optional argument for copy-on-update behavior.
         template< class VT >
         Page<B<K>,B<VT>,A<K>,A<VT>>* updatePage( Trail& trail ) {
             auto page = this->page<VT>( trail.header() );
@@ -549,12 +549,6 @@ namespace BTree {
         // i.e., dst is the copy-on-update version of src.
         inline void recoverPage( const PageHeader& src, const PageHeader& dst ) {
             if (src.page != dst.page) pool.recover( src, true );
-        }
-        // Free page and recover (persistent) page if not mofified;
-        // i.e., (persistent) page is being freed but is not yet copied on update.
-        inline void recoverUnmodifiedPage( const PageHeader& page ) {
-            if (page.modified == 0) pool.recover( page, false );
-            pool.free( page );
         }
 
         // Find a particular key.
@@ -939,14 +933,12 @@ namespace BTree {
             return nullptr;
         }
         // Append content of src Page to dst Page, adjusting split key and
-        // removing node key to (appended) src page.
-        // Trail points to parent of src.
-        // Frees src Page
+        // removing node reference to (appended) src page.
+        // Trail arguments point to src and dst respectively.
         template< class KT, class VT>
         void mergePage( Trail& dstTrail, Trail& srcTrail ) {
             const auto src = page<VT>( srcTrail );
             auto dst = page<VT>( dstTrail );
-            auto srcCopy = updatePage<VT>( srcTrail );
             auto dstCopy = updatePage<VT>( dstTrail );
             srcTrail.pop();
             dstTrail.pop();
@@ -956,12 +948,12 @@ namespace BTree {
             PageLink ancestorLink = ancestor->value( index );
             // Page being merged must have a split value as it cannot be leftmost leaf.
             appendSplit<VT>( *dst, *ancestor, index, *src, dstCopy );
-            src->shiftLeft( *dstCopy, src->header.count, srcCopy );
+            src->shiftLeft( *dstCopy, src->header.count );
             recoverPage( dst->header, dstCopy->header );
-            recoverPage( src->header, srcCopy->header );
+            pool.recover( src->header, true );
             // Recursively merge ancestor nodes where possible
-            // A non-empty node must exist as we just merged two *this
-            pruneBranch<PageLink>( srcTrail );
+            // A non-empty node must exist as we just merged two pages
+            pruneBranch( srcTrail );
             // Remove link to recently merged page
             auto parent = node( srcTrail );
             if (parent == ancestor) {
@@ -988,21 +980,19 @@ namespace BTree {
         }
         // Pune tree of degenerate nodes up to non-empty node
         // A degenerate node being a node containing only a split link
-        template< class VT >
         void pruneBranch( Trail& trail ) {
-            auto node = page<VT>( trail );
+            auto node = page<PageLink>( trail );
             while (node->size() == 0) {
-                pool.free( node->header );
-                node = page<VT>( trail.pop() );
+                pool.recover( node->header, true );
+                node = page<PageLink>( trail.pop() );
             }
         }
         // Set new root if current root is degenerate.
         void pruneRoot() {
-            if ((root->count == 0) && (0 < root->depth)) {
-                // Pruned root to single branch, replace trunk with branch (either a node or leaf Page)
+            while ((root->count == 0) && (0 < root->depth)) {
                 auto rootPage = page<PageLink>( this->root );
                 root = pool.reference( rootPage->split() );
-                pool.free( rootPage->header );
+                pool.recover( rootPage->header, true );
             }
         }
         template< class KT, std::enable_if_t<(S<KT>),bool> = true >
@@ -1076,7 +1066,7 @@ namespace BTree {
                     if (node->splitDefined()) freeAll( pool.access( node->split() ) );
                     for (PageIndex i = 0; i < node->size(); i++) freeAll( pool.access( node->value( i ) ) );
                 }
-                pool.free( page );
+                pool.recover( page, true );
             }
         }
 

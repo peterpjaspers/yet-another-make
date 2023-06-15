@@ -36,6 +36,7 @@ namespace BTree {
         ~PagePool();
         PageSize pageCapacity() const;
         PageHeader* allocate();
+        uint32_t size() const;
         PageHeader* reference( const PageLink& link ) const;
         const PageHeader& access( const PageLink& link ) const;
         void free( const PageLink& link );
@@ -43,7 +44,7 @@ namespace BTree {
         void free( const PageHeader* header );
         bool valid( const PageLink& link );
         bool valid( const PageHeader& header );
-        void modify( const PageHeader& page );
+        virtual void modify( const PageHeader& page );
         virtual bool persistent() const;
         virtual void recover( const PageHeader& page, bool reuse = false );
         virtual void commit( const PageLink link );
@@ -51,10 +52,8 @@ namespace BTree {
         virtual PageHeader* clean();
         // Return page header of last commited root
         PageHeader* commitRoot() const;
-        // Return link to the last commited root.
-        PageLink rootLink() const;
 
-        // Generate a new Page
+        // Allocate a new Page
         template< class K, class V, bool KA, bool VA >
         Page<K,V,KA,VA>* page( const PageDepth depth );
         // Access a Page given a pointer to its PageHeader

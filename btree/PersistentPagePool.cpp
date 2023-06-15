@@ -31,24 +31,21 @@ namespace BTree {
                 if (!file.good()) throw string( signature ) + " - File read error";
                 if (root.capacity != pageSize) throw string( signature ) + " - Invalid root page size";
                 commitLink = root.page;
-                for (size_t index = 0; index < pageCount; index++) {
+                for (size_t index = 0; index < pageCount; ++index) {
                     void* buffer = malloc( pageSize );
+                    pages[ index ] = reinterpret_cast<PageHeader*>( buffer );
                     file.read( reinterpret_cast<char*>( buffer ), pageSize );
                     if (!file.good()) throw string( signature ) + " - File read error";
-                    PageHeader* page = reinterpret_cast<PageHeader*>( buffer );
-                    if (page->capacity != pageSize) throw string( signature ) + "  - Invalid page size";
-                    else if (page->page == commitLink) {
-                        // Validate that root page content matches assigned root
-                        if (
-                            (page->depth != root.depth) ||
-                            (page->count != root.count) ||
-                            (page->split != root.split)
-                        ) {
+                    PageLink link( index );
+                    const PageHeader& page = access( link );
+                    if (page.capacity != pageSize) throw string( signature ) + "  - Invalid page size";
+                    if (link == commitLink) {
+                        // Validate that root page content matches root (header)
+                        if ((page.depth != root.depth) || (page.count != root.count) || (page.split != root.split)) {
                             throw string( signature ) + " - Mismatched root page content";
                         }
                     }
-                    pages[ index ] = page;
-                    if (page->free == 1) freePages.push_back( page->page );
+                    if (page.free == 1) freePages.push_back( link );
                 }
             } else {
                 throw string( signature ) + " - Page file must contain at least one page";
@@ -67,8 +64,8 @@ namespace BTree {
         // First look (backward) for persistent page with largest index.
         int count = pages.size();
         PageLink largest;
-        for (int i = 0; i < count; i++) {
-            PageHeader* page = pages[ count - i - 1 ];
+        for (int i = 0; i < count; ++i) {
+            const PageHeader* page = pages[ count - i - 1 ];
             if (page->persistent == 1) {
                 largest = page->page;
                 break;
@@ -77,8 +74,8 @@ namespace BTree {
         if ( !largest.null() ) {
             // There are persistent pages, collect holes (if any)
             vector<PageLink> holes;
-            for (int i = 0; i < largest.index; i++) {
-                PageHeader* page = pages[ i ];
+            for (int i = 0; i < largest.index; ++i) {
+                const PageHeader* page = pages[ i ];
                 if (page->persistent == 0) holes.push_back( page->page );
             }
             if (0 < holes.size()) {
@@ -91,14 +88,15 @@ namespace BTree {
                     size_t fileSize = file.tellg();
                     size_t pageCount = ((fileSize - sizeof(PageHeader)) / capacity);
                     if (pageCount == (largest.index + 1)) {
-                        for (auto link : holes) {
-                            PageHeader* page =  pages[ link.index ];
-                            page->free = 1; // Mark hole as free page...
-                            page->modified = 0;
-                            page->persistent = 0;
-                            page->recover = 0;
-                            file.seekp( ((page->page.index * page->capacity) + sizeof(PageHeader)), file.beg );
-                            file.write( reinterpret_cast<const char*>( page ), page->capacity );
+                        // Write all holes as free pages
+                        for ( auto link : holes ) {
+                            const PageHeader& page =  access( link );
+                            page.free = 1;
+                            page.modified = 0;
+                            page.persistent = 0;
+                            page.recover = 0;
+                            file.seekp( ((link.index * page.capacity) + sizeof(PageHeader)), file.beg );
+                            file.write( reinterpret_cast<const char*>( &page ), page.capacity );
                             if (!file.good()) break;
                         }
                     }
@@ -112,51 +110,71 @@ namespace BTree {
     // The given PageLink defines the (new) root of the updated B-tree.
     void PersistentPagePool::commit( const PageLink link ) {
         static const char* signature( "void PersistentPagePool::commit( const PageLink link )" );
-        // Purge modified list of free pages, modified pages may have been freed.
-        vector<PageLink> nonFreeModifiedPages;
-        for (int i = 0; i < modifiedPages.size(); i++) {
-            const PageHeader* modifiedPage = pages[ modifiedPages[ i ].index ];
-            if (modifiedPage->free == 0) nonFreeModifiedPages.push_back( modifiedPage->page );
+        // Purge modified list of free pages, modified pages may subsequently have been freed.
+        vector<PageLink> purgedPages;
+        for ( auto link : modifiedPages ) {
+            const PageHeader& modifiedPage = access( link );
+            if (modifiedPage.free == 0) purgedPages.push_back( link );
         }
-        modifiedPages = nonFreeModifiedPages;
+        modifiedPages = purgedPages;
+        // Now look for freed persistent pages. These must be freed-up in the
+        // persistent store (as they will be orphaned when recovered).
+        vector<PageLink> freePersistentPages;
+        for ( auto link : freePages ) {
+            const PageHeader& freePage = access( link );
+            if (freePage.persistent == 1) freePersistentPages.push_back( link );
+        }
         fstream file;
         // First try opening existing file for update (without actually reading).
+        // In this case, the file exists and already contains (persistent) data.
         file.open( fileName, ios::in | ios::out | ios::binary );
-        // If that fails (i.e., file does not exist) open file for output.
+        // If that fails (i.e., file does not exist) open file for output only.
+        // This is the first time the persistent file is being written.
         if (!file.good()) file.open( fileName, ios::out | ios::binary );
         if (file.good()) {
-            // Write all (non-free) modified pages to file.
-            for (size_t p = 0; p < modifiedPages.size(); p++) {
-                const PageHeader* page = pages[ modifiedPages[ p ].index ];
-                page->modified = 0;
-                page->persistent = 1;
-                page->recover = 0;
-                file.seekp( ((page->page.index * page->capacity) + sizeof(PageHeader)), file.beg );
-                file.write( reinterpret_cast<const char*>( page ), page->capacity );
+            // Write all (valid) modified pages to file.
+            for ( auto link : modifiedPages ) {
+                const PageHeader& page = access( link );
+                page.free = 0;
+                page.modified = 0;
+                page.persistent = 1;
+                page.recover = 0;
+                file.seekp( ((link.index * page.capacity) + sizeof(PageHeader)), file.beg );
+                file.write( reinterpret_cast<const char*>( &page ), page.capacity );
+                if (!file.good()) throw string( signature ) + " - File write error";
+            }
+            // Write all free persistent pages as free pages to file.
+            for ( auto link : freePersistentPages ) {
+                const PageHeader& page = access( link );
+                page.free = 1;
+                page.modified = 0;
+                page.persistent = 0;
+                page.recover = 0;
+                file.seekp( ((link.index * page.capacity) + sizeof(PageHeader)), file.beg );
+                file.write( reinterpret_cast<const char*>( &page ), page.capacity );
                 if (!file.good()) throw string( signature ) + " - File write error";
             }
             // Finally, write root page header to file.
             file.seekp( 0, file.beg );
-            PageHeader* rootPage = reference( link );
-            file.write( reinterpret_cast<char*>( rootPage ), sizeof(PageHeader) );
+            const PageHeader& rootPage = access( link );
+            file.write( reinterpret_cast<const char*>( &rootPage ), sizeof(PageHeader) );
             if (!file.good()) throw string( signature ) + " - File write error";
             file.close();
         } else {
             throw string( signature ) + " - Could not open file";
         }
-        // Discard all outstanding recover requests.
-        for (int i = 0; i < recoverPages.size(); i++) pages[ recoverPages[ i ].index ]->recover = 0;
+        // Discard all outstanding recover requests (possibly in free or modified list).
+        for (auto link : recoverPages) access( link ).recover = 0;
         recoverPages.clear();
         PagePool::commit( link );
     };
 
     // Mark page as pending recover and queue page for (possible) recover.
     // Page will be read from file with next recover() call, unless preceeded by a call to commit().
-    // Only persistent pages are actually recovered (does nothing if page is not persistent).
+    // Only persistent pages (i.e., pages that have previously been commited) are actually recovered.
     // Page memory is optionally reused (frees page when resue == true).
     void PersistentPagePool::recover( const PageHeader& page, bool reuse ) {
-        if (page.persistent == 0) return;
-        if (page.recover == 0) {
+        if ((page.persistent == 1) && (page.recover == 0)) {
             recoverPages.push_back( page.page );
             page.recover = 1;
         }
@@ -168,33 +186,18 @@ namespace BTree {
     // Returns PageLink of the recoverd B-tree root page.
     PageLink PersistentPagePool::recover( bool freeModifiedPages ) {
         static const char* signature( "PageLink PersistentPagePool::recover( bool freeModifiedPages )" );
-        // Purge modified list of recover pages.
-        vector<PageLink> nonRecoverModifiedPages;
-        for (int i = 0; i < modifiedPages.size(); i++) {
-            const PageHeader* modifiedPage = pages[ modifiedPages[ i ].index ];
-            if (modifiedPage->recover == 0) nonRecoverModifiedPages.push_back( modifiedPage->page );
-        }
-        modifiedPages = nonRecoverModifiedPages;
-        // Purge modified list of free pages.
-        // Modified pages may subsequently be freed.
-        vector<PageLink> nonFreeModifiedPages;
-        for (int i = 0; i < modifiedPages.size(); i++) {
-            const PageHeader* modifiedPage = pages[ modifiedPages[ i ].index ];
-            if (modifiedPage->free == 0) nonFreeModifiedPages.push_back( modifiedPage->page );
-        }
-        modifiedPages = nonFreeModifiedPages;
         // Purge free list of recover pages.
-        // Pages to be recovered may reside in free list when reusing copy-on-update page memory.
-        vector<PageLink> nonRecoverFreePages;
-        for (int i = 0; i < freePages.size(); i++) {
-            const PageHeader* freePage = pages[ freePages[ i ].index ];
-            if (freePage->recover == 0) {
-                nonRecoverFreePages.push_back( freePage->page );
+        // Pages to be recovered may reside in free (or modified) list when reusing copy-on-update page memory.
+        vector<PageLink> purgedPages;
+        for ( auto link : freePages ) {
+            const PageHeader& freePage = access( link );
+            if (freePage.recover == 1) {
+                freePage.free = 0;
             } else {
-                freePage->free = 0;
+                purgedPages.push_back( link );
             }
         }
-        freePages = nonRecoverFreePages;
+        freePages = purgedPages;
         fstream file( fileName, ios::in | ios::binary );
         if (file.good()) {
             PageHeader root;
@@ -204,31 +207,41 @@ namespace BTree {
             if (root.capacity != capacity) throw string( signature ) + " - Invalid root page size";
             else if (root.page != commitLink) throw string( signature ) + " - Mismatched root link";
             // Read all pages marked for recover from file.
-            for (size_t p = 0; p < recoverPages.size(); p++) {
-                PageHeader* page = pages[ recoverPages[ p ].index ];
-                file.seekg( ((page->page.index * page->capacity) + sizeof(PageHeader)), file.beg );
-                file.read( reinterpret_cast<char*>( page ), capacity );
+            for ( auto link : recoverPages ) {
+                const PageHeader& page = access( link );
+                file.seekg( ((link.index * page.capacity) + sizeof(PageHeader)), file.beg );
+                file.read( reinterpret_cast<char*>( const_cast<PageHeader*>( &page ) ), capacity );
                 if (!file.good()) throw string( signature ) + " - File read error";
-                if (page->capacity != capacity) throw string( signature ) + " - Invalid page size";
-                if (page->free != 0) throw string( signature ) + " - Recovering free page";
-                if (page->page == commitLink) {
+                if (page.capacity != capacity) throw string( signature ) + " - Invalid page size";
+                // Sanity check, ensure page has expected attributes.
+                // These should match attributes defined by commit()
+                if ((page.free != 0) || (page.modified != 0) || (page.persistent != 1) || (page.recover != 0)) {
+                    throw string( signature ) + " - Recovering corrupt page";
+                }
+                if (link == commitLink) {
                     // Validate that root page content matches assigned root
-                    if (
-                        (page->depth != root.depth) ||
-                        (page->count != root.count) ||
-                        (page->split != root.split)
-                    ) {
+                    if ((page.depth != root.depth) || (page.count != root.count) || (page.split != root.split)) {
                         throw string( signature ) + " - Mismatched root page content";
                     }
                 }
             }
             file.close();
         }
+        // Purge modified list or (recently) recovered pages
+        for ( auto link : modifiedPages ) {
+            const PageHeader& modifiedPage = access( link );
+            if (modifiedPage.recover == 1) {
+                modifiedPage.recover = 0;
+            } else {
+                purgedPages.push_back( link );
+            }
+        }
+        modifiedPages = purgedPages;
         recoverPages.clear();
         return PagePool::recover( freeModifiedPages );
     };
 
-    // Update page pool administration to pristine state consiting soley of persistent pages.
+    // Update page pool administration to pristine state consisting soley of persistent pages.
     // All other pages are inserted in the free pages list. When complete, no pages are
     // marked as modified or recover.
     PageHeader* PersistentPagePool::clean() {
