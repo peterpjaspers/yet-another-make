@@ -1,0 +1,97 @@
+1. YAM (Yet Another Make) uses a directed acyclic graph (DAG)
+Question to chatGPT: 
+Explain the use of a directed acyclic graph in software build systems
+
+The answer of chatGPT:
+
+A directed acyclic graph (DAG) is a data structure that consists of nodes 
+connected by directed edges, where the edges only flow in one direction and
+there are no cycles. DAGs have various applications in computer science, 
+including software build systems.
+
+In the context of software build systems, a DAG is often used to represent the
+dependencies between different components or modules of a software project. 
+Each node in the DAG represents a component, and the edges represent the 
+dependencies between the components. The directed edges indicate the direction
+of dependency, meaning that one component depends on another for its build or
+execution.
+
+Here's how a DAG is used in a software build system:
+
+Dependency Management: The DAG helps manage dependencies between components. 
+When a component changes, only the components directly or indirectly dependent
+on it need to be rebuilt. By traversing the DAG, the build system can determine
+the minimal set of components that need to be rebuilt, avoiding unnecessary 
+builds and saving time.
+
+Build Order Determination: The DAG defines the order in which components should
+be built. Since the edges in the DAG indicate the dependencies, a build system
+can traverse the DAG in a topological order, where each component is built 
+after all its dependencies have been built. This ensures that a component is 
+built using the most up-to-date version of its dependencies.
+
+Incremental Builds: With a DAG, a build system can perform incremental builds 
+by tracking changes in the DAG. When a component or its dependencies change, 
+the build system can identify the affected components by examining the paths in
+the DAG and rebuild only those components. This approach saves time by avoiding
+unnecessary rebuilding of unaffected components.
+
+Parallelization: The DAG allows for parallel execution of independent build 
+tasks. Since a DAG represents the dependencies between components, build tasks
+that are not dependent on each other can be executed concurrently. This enables
+the build system to take advantage of multi-core processors or distributed build
+environments, leading to faster builds.
+
+Popular software build systems like Make, Apache Maven, and Gradle utilize DAGs
+to manage dependencies, determine build order, and optimize the build process.
+By representing the dependencies between components as a DAG, these build
+systems can efficiently and accurately build software projects while minimizing
+unnecessary work and maximizing parallelization.
+
+2. YAM's main features and behaviors
+YAM's feature set and behaviors are influenced by Mike Shal's paper 
+"Build System Rules and Algorithms" and by the "tup" build system.
+https://gittup.org/tup/build_system_rules_and_algorithms.pdf
+https://gittup.org/tup/
+This is how YAM adheres to Mike Shal's Rules and Algorithms:
+    - Scalability - Beta build
+      Beta build is an algorithm that reduces the complexity of the overhead
+      of an incremental build from O(#AllFiles) to O(#ModifiedFiles).
+    - Scalability - Parallel execution of independent build tasks
+    - Scalability - Build avoidance by using file aspect dependencies
+      This feature avoids re-execution of a build task when its output is not
+      affected by the changes in its input files. E.g. it is not needed to
+      re-execute compilation when only comments in a C++ file were changed.
+      In YAM the compilation task depends on the code aspect (i.e. all file 
+      content except comments) of the source file. Recompilation only happens
+      when the code aspect changes.
+    - Scalability - build avoidance by using a build cache
+      Builds can be configured to store their outputs in a build cache and to
+      re-use previously stored outputs when possible. 
+    - Correctness - DAG enforcement
+      YAM detects for each build task which files were read/written during the
+      execution of that task. YAM uses this to verify that the dependencies
+      in the DAG as declared by the user match the actual dependencies.
+      E.g. YAM detects that build task U reads file F. F is produced by build
+      task P. The user however did not declare U to depend on F. Due to this
+      missing dependency declaration there is no guarantee that YAM executes P
+      before U, thus putting U at risk to produce incorrect output by reading
+      an out-dated version of F. YAM therefore fails the build. The user must
+      resolve this build error by either adding F to the dependencies of U or
+      by changing build task U to no longer depend on F.
+    - Correctness - reproducability
+      YAM detects the input files of the build tasks as they get executed. The 
+      input file names and the file versions are stored in the YAM build state. 
+      This info can be used in several ways: 
+          - Copy all files used by the build into a sandbox. The build can now
+            reliably be reproduced by running it in the sandbox.
+          - By comparing build states of builds A and B one can verify whether
+            B reproduces A.
+    - Usability
+      Running YAM is the only thing you need to (and can) do to build the 
+      system. YAM handles file renames, changes in build task definitions,
+      deletion of stale output files and quickly (typically sub-second) starts
+      the build tasks that need to re-execute. 
+
+
+
