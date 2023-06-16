@@ -47,8 +47,8 @@ namespace YAM
             for (auto const& n : _nodes) nodes.push_back(n.get());
             break;
         }
-        case Preparents: {
-            for (auto n : node->preParents()) nodes.push_back(n);
+        case Dependants: {
+            for (auto n : node->dependants()) nodes.push_back(n);
             break;
         }
         case Postparents: {

@@ -25,7 +25,7 @@ namespace YAM
         , _watcher(std::make_shared<FileRepositoryWatcher>(directory, context))
         , _excludePatterns(excludes)
         , _context(context)
-        , _directoryNode(std::make_shared<SourceDirectoryNode>(context, directory))
+        , _directoryNode(std::make_shared<SourceDirectoryNode>(context, directory, nullptr))
     {
         _context->nodes().add(_directoryNode);
         _directoryNode->addPrerequisitesToContext();

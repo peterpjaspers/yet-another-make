@@ -92,33 +92,33 @@ Speedup when using 1024 threads with input file node lookup in
 	- thread pool: 1023
 	
 In addition to these look-ups the command node must remove itself from the
-preParents from input file nodes that were no longer detected as input files
-and add itself to the preParents of newly detected input file nodes.
+dependants of input file nodes that were no longer detected as input files
+and add itself to the dependants of newly detected input file nodes.
 Given option B this must be done in main thread. A simple implementation
 looks like:
         if (_inputs != newInputs) { // vector => O(N^2)
-            for (auto i : _inputs) i->removePreParent(this); // set => O(N)
+            for (auto i : _inputs) i->removeDependant(this); // set => O(N)
             _inputs = newInputs; O(N)
-            for (auto i : _inputs) i->addPreParent(this); // set => O(N)
+            for (auto i : _inputs) i->addDependant(this); // set => O(N)
         }
 Time needed will be approximately twice lookup time of input file nodes, 
 e.g. 500 us. This reduces scalability considerably: speedup when using 1024 
-cores with input file node lookup in thread pool and updating preParents in
+cores with input file node lookup in thread pool and updating dependants in
 main thread drops from 1023 to 677.
-In a clean build there will no prePreparent removals, assume time drops to 
+In a clean build there will no dependant removals, assume time drops to 
 e.g. 250 ns. Speedup for 1024 cores in that case: 815
 
 The change in set of input files will often be small, certainly in a C++ code
-base. YAM uses this to reduce the overhead of updating preParents:
+base. YAM uses this to reduce the overhead of updating dependants:
     - std::set<std::shared_ptr<FileNode>> _inputs; (iso vector)
 	- compute, in thread pool, the difference between old and new input set
 	- in main thread: 
 		for (auto removed : removedInputs) {
-		    removed->removePreParent(this); 
+		    removed->removeDependant(this); 
 			_inputs.remove(removed);
 		}
 		for (auto added : addedInputs) {
-		    added->addPreParent(this); 
+		    added->addDependant(this); 
 			_inputs.add(added);
 	    }
 Note: the number of node re-executions in many typical development scenarios 

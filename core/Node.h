@@ -29,10 +29,10 @@ namespace YAM
     //       header files.
     //     - Generated file node
     //       An output file of a command node. 
-    //       Execution (re-)computes hashes of the file content. 
+    //       Execution computes hashes of the file content. 
     //     - Source file node
     //       Associated with a source file.
-    //       Execution (re-)computes hashes of the file content.
+    //       Execution computes hashes of the file content.
     //
     // A node's name takes the form of a file path. For file nodes this path
     // indeed references a file. In general however this need not be the case.
@@ -40,26 +40,30 @@ namespace YAM
     //
     // The Node class supports a 3-stage execution. 3-stage execution is started
     // by the start() member function. 
-    //    stage 1: Execute the prerequisites of the node.
-    //             Prerequisite nodes produce results that are needed as input
-    //             by stage 2. E.g. the prerequisites of a link command node are
-    //             compilation nodes that produce the object files to be linked.
+    //    stage 1: Execute the prerequisite nodes of the node.
+    //             Prerequisite nodes must be executed before stage 2 because
+    //             prerequisites produce outputs needed by stage 2. E.g.
+    //             the prerequisites of a link command node are compilation
+    //             nodes that produce the object files to be linked. Stage 1
+    //             execution results in a depth-first execution of the 
+    //             prerequisites graph.
     //    stage 2: Self-execution of the node.
-    //             In this stage the node can perform node-specific computation.
-    //             E.g. link C++ object files into a library.
-    //             This stage is started by the startSelf() member function. 
+    //             In this stage the node performs node-specific computation.
+    //             E.g. a file node computes hashes of the file content.
+    //             E.g. a link command node links C++ object files.
+    //             E.g. a directory node retrieves directory entries and
+    //             creates for each entry a file or directory node.
     //    stage 3: Execute the postrequisites of the node.
-    //             Postrequisite nodes are typically produced by stage 2.
+    //             Postrequisited nodes must be executed after stage 2 because
+    //             they are created or modified by stage 2.
     //             E.g. the execution of a directory node creates a node tree
-    //             that reflects the content of a directory tree in the
-    //             filesystem. Further it computes for each directory and file 
-    //             node a hash of their content. 
-    //             The directory node has no prerequisites.
-    //             The directory node's self-execution iterates a directory and
-    //             creates for each directory entry a file or directory node.
-    //             The postrequisites are the file and directory nodes created in 
-    //             stage 2. The stage 3 execution results in a breadth-first 
-    //             traversal of the filesystem directory tree.
+    //             that reflects the content of a directory tree in the file
+    //             system. For each directory and file node a hash of their
+    //             content is computed. 
+    //             For a directory node D its postrequisites are the file and
+    //             directory nodes created by D in stage 2. Stage 3 execution 
+    //             results in a breadth-first execution of the postrequisites
+    //             graph.
     //
     // Name convention: node execution is synonym for 3-stage execution.
     //
@@ -67,23 +71,24 @@ namespace YAM
     // must be called from ExecutionContext::mainThread(). Derived classes must
     // access node state and ExecutionContext::nodes() in mainThread only. 
     // This implies that a node, that (re-)executes in a thread pool thread,
-    // cannot store its execution results in its member variables. Instead it must:
+    // cannot store its execution results in its member variables. Instead it 
+    // must:
     //      - store these results in a temporary result object
     //      - post this result to the main thread via Node::postSelfCompletion
-    //        which posts commitSelfCompletion to the main thread
-    //      - and finally store the result in its member variables in its override
-    //        of commitSelfCompletion.
+    //        (which posts commitSelfCompletion to the main thread)
+    //      - and finally store the result in its member variables in its 
+    //        override of commitSelfCompletion.
     //  
     class __declspec(dllexport) Node : public IPersistable
     {
     public:
         enum class State {
-            Dirty = 1,        // needs execution
-            Executing = 2,    // execution is in progress
-            Ok = 3,            // execution has succeeded
-            Failed = 4,         // execution has failed
-            Canceled = 5,   // execution was canceled
-            Deleted = 6        // node is deleted, to be removed from node graph
+            Dirty = 1,      // needs execution
+            Executing = 2,  // execution is in progress
+            Ok = 3,         // execution has succeeded
+            Failed = 4,     // execution has failed in current build
+            Canceled = 5,   // execution was canceled in current build
+            Deleted = 6     // node is deleted, to be removed from node graph
 
             // A dirty node is a node whose output files may no longer be valid. 
             // E.g. because the output files have been tampered with or because 
@@ -95,10 +100,10 @@ namespace YAM
             // 
             // Nodes without prerequisites are reset to Dirty depending on their
             // type. E.g. for file and directory nodes:
-            // At start of alpha-build all file and directory nodes are set Dirty.
-            // At start of beta-build only files and directories reported by the 
-            // filesystem to have been write-accessed since previous build are set
-            // dirty.
+            // At start of alpha-build: set Dirty all file and directory nodes.
+            // At start of beta-build: only set Dirty the files and directories
+            // reported by the filesystem to have been write-accessed since 
+            // previous build.
             //
             // Failed and Canceled states become meaningless when starting a new
             // build and must therefore be reset to Dirty at start of build.
@@ -138,14 +143,6 @@ namespace YAM
 
         // Pre: supportsPrerequisites()
         // Append prerequisite nodes to 'prerequisites'.
-        // The prerequisites vector contains one or more of:
-        //        - (command) nodes that produce output nodes. 
-        //          Output nodes are only allowed to be used as inputs by this
-        //          node when the nodes that produce these outputs are in
-        //          prerequisites.
-        //        - source nodes used as inputs by last execution of this node.
-        //        - output nodes of this node.
-        // 
         // Source/output nodes are typically, but not necessarily, file nodes.
         virtual void getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const {};
 
@@ -160,23 +157,20 @@ namespace YAM
         // Append postrequisite nodes to 'postrequisites'.
         virtual void getPostrequisites(std::vector<std::shared_ptr<Node>>& postrequisites) const { return; }
 
-        // A preParent node is a node that has this node as a prerequisite. This node 
-        // propagates its Dirty state to all its preParents. 
-        // E.g. a C++ header file that is set Dirty will propagate the Dirty states to
-        // all C++ compilation commands that have the header file as input node.
-        // The compilation command on its turn propagates the Dirty state to all link
-        // command nodes that have the object file as input.
-        // The preParent node must:
-        //    - add itself to the preParents of this node when it uses this node as 
-        //      prerequisite.
-        //    - remove itself from the preParents of this node when it stops using 
-        //     this node as prerequisite.
-        // The preParent relation causes a cyclic dependency between preParent and this
-        // node. Therefore raw pointer to preParent is used iso shared_ptr. This is safe 
-        // as long as preParent adheres to the add/remove protocol. 
-        std::unordered_set<Node*> const& preParents() const { return _preParents; }
-        void addPreParent(Node* parent);
-        void removePreParent(Node* parent);
+        // If node B is a prerequisite of A then A is called a dependant of B.
+        // Responsibilities:
+        //     - A adds/removes itself to/from the dependants of B when B 
+        //       is added/removed to/from the prerequisites of A
+        //     - B propagates its Dirty state to its dependants
+        // 
+        // E.g. the prerequisites of a C++ compilation node are the file nodes
+        // associated with the compiled C++ files (.cpp and included .h files).
+        // A file node execution computes hashes of file content. The file
+        // nodes must be prerequisites because these hashes are used by the
+        // compile node to detect changes in input files.
+        std::unordered_set<Node*> const& dependants() const { return _dependants; }
+        void addDependant(Node* dependant);
+        void removeDependant(Node* dependant);
 
         // A postParent node is a node that has this node as a postrequisite. 
         // This node does NOT propagate its Dirty state to its postParents.
@@ -252,7 +246,6 @@ namespace YAM
         // was not yet processed by main thread.
         bool busy() const;
 
-        // Pre: busy()
         // Request cancelation of execution.
         // Return immediately, do not block caller until execution has completed.
         // Notify execution completion as specified by start() function. 
@@ -373,7 +366,7 @@ namespace YAM
 
     private:
         State _state;
-        std::unordered_set<Node*> _preParents;
+        std::unordered_set<Node*> _dependants;
         std::unordered_set<Node*> _postParents;
 
         // Node execution members

@@ -272,9 +272,9 @@ namespace YAM
 
     void CommandNode::setOutputs(std::vector<std::shared_ptr<GeneratedFileNode>> const & newOutputs) {
         if (_outputs != newOutputs) {
-            for (auto i : _outputs) i->removePreParent(this);
+            for (auto i : _outputs) i->removeDependant(this);
             _outputs = newOutputs;
-            for (auto i : _outputs) i->addPreParent(this);
+            for (auto i : _outputs) i->addDependant(this);
             modified(true);
             setState(State::Dirty);
         }
@@ -290,9 +290,9 @@ namespace YAM
 
     void CommandNode::setInputProducers(std::vector<std::shared_ptr<Node>> const& newInputProducers) {
         if (_inputProducers != newInputProducers) {
-            for (auto i : _inputProducers) i->removePreParent(this);
+            for (auto i : _inputProducers) i->removeDependant(this);
             _inputProducers = newInputProducers;
-            for (auto i : _inputProducers) i->addPreParent(this);
+            for (auto i : _inputProducers) i->addDependant(this);
             _executionHash = rand();
             modified(true);
             setState(State::Dirty);
@@ -376,11 +376,11 @@ namespace YAM
 
     void CommandNode::setInputs(ExecutionResult const* result) {
         for (auto const& pair : result->_removedInputs) {
-            pair.second->removePreParent(this);
+            pair.second->removeDependant(this);
             _inputs.erase(pair.first);
         }
         for (auto const& pair : result->_addedInputs) {
-            pair.second->addPreParent(this);
+            pair.second->addDependant(this);
             _inputs.insert(pair);
         }
         modified(true);
@@ -631,9 +631,9 @@ namespace YAM
 
     void CommandNode::prepareDeserialize() {
         Node::prepareDeserialize();
-        for (auto const& i : _inputProducers) i->removePreParent(this);
-        for (auto const& i : _outputs) i->removePreParent(this);
-        for (auto const& p : _inputs) p.second->removePreParent(this);
+        for (auto const& i : _inputProducers) i->removeDependant(this);
+        for (auto const& i : _outputs) i->removeDependant(this);
+        for (auto const& p : _inputs) p.second->removeDependant(this);
         _inputProducers.clear();
         _outputs.clear();
         _inputs.clear();
@@ -641,11 +641,11 @@ namespace YAM
 
     void CommandNode::restore(void* context) {
         Node::restore(context);
-        for (auto const& i : _inputProducers) i->addPreParent(this);
+        for (auto const& i : _inputProducers) i->addDependant(this);
         for (auto const& i : _outputs) {
-            i->addPreParent(this);
+            i->addDependant(this);
             i->producer(this);
         }
-        for (auto const& p : _inputs) p.second->addPreParent(this);
+        for (auto const& p : _inputs) p.second->addDependant(this);
     }
 }

@@ -13,23 +13,23 @@ namespace YAMTest
         , _executionHash(rand()) 
     {
         _sum->number(rand());
-        _sum->addPreParent(this);
+        _sum->addDependant(this);
     }
 
     AdditionNode::~AdditionNode() {
         clearOperands();
-        _sum->removePreParent(this);
+        _sum->removeDependant(this);
     }
 
     void AdditionNode::addOperand(std::shared_ptr<NumberNode> operand) {
         _operands.push_back(operand);
-        operand->addPreParent(this);
+        operand->addDependant(this);
         setState(State::Dirty);
     }
 
     void AdditionNode::clearOperands() {
         if (!_operands.empty()) {
-            for (auto op : _operands) op->removePreParent(this);
+            for (auto op : _operands) op->removeDependant(this);
             _operands.clear();
             setState(State::Dirty);
         }

@@ -27,7 +27,10 @@ namespace YAM
     public:
         SourceDirectoryNode() {} // needed for deserialization
 
-        SourceDirectoryNode(ExecutionContext* context, std::filesystem::path const& dirName);
+        SourceDirectoryNode(
+            ExecutionContext* context, 
+            std::filesystem::path const& dirName,
+            SourceDirectoryNode* parent);
 
         // Add the prerequisites (i.e. the DotIgnoreNode and its prerequisites)
         // to the execution context.
@@ -46,6 +49,8 @@ namespace YAM
         bool supportsInputs() const override;
         void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const override;
         // End of Inherited via Node
+
+        SourceDirectoryNode* parent() const;
 
         // Query the directory content, vector content is sorted by node name.
         void getFiles(std::vector<std::shared_ptr<FileNode>>& filesInDir);
@@ -77,6 +82,8 @@ namespace YAM
         void commitSelfCompletion(SelfExecutionResult const* result) override;
 
     private:
+        void parent(SourceDirectoryNode* parent);
+
         struct ExecutionResult : public Node::SelfExecutionResult {
             std::chrono::time_point<std::chrono::utc_clock> _lastWriteTime;
             std::map<std::filesystem::path, std::shared_ptr<Node>> _content;
@@ -101,6 +108,7 @@ namespace YAM
         void _removeChildRecursively(std::shared_ptr<Node> const& child);
         void selfExecute(ExecutionResult* result) const;
 
+        SourceDirectoryNode* _parent;
         std::shared_ptr<DotIgnoreNode> _dotIgnoreNode;
         std::chrono::time_point<std::chrono::utc_clock> _lastWriteTime;
         std::map<std::filesystem::path, std::shared_ptr<Node>> _content;

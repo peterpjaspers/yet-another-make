@@ -55,7 +55,7 @@ Done
   to main thread.
   Decision: post to main thread
 - DirectoryNode execution must (also) notify completion of self-execution.
-- ensure MT-safe access of preParents and postParents
+- ensure MT-safe access of dependants and postParents
   E.g. CommandNode::isPrerequisite()
   Fixed/workedaround by only checking for direct input producer.
   If support for indirect input producer is needed then post this function to

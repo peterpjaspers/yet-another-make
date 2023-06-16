@@ -42,18 +42,18 @@ namespace YAM
         if (_state != newState) {
             _state = newState;
             if (_state == Node::State::Dirty) {
-                for (auto p : _preParents) p->setState(Node::State::Dirty);
+                for (auto p : _dependants) p->setState(Node::State::Dirty);
             }
         }
     }
 
-    void Node::addPreParent(Node* parent) {
-        auto p = _preParents.insert(parent);
-        if (!p.second) throw std::runtime_error("Attempt to add duplicate preParent");
+    void Node::addDependant(Node* dependant) {
+        auto p = _dependants.insert(dependant);
+        if (!p.second) throw std::runtime_error("Attempt to add duplicate dependant");
     }
 
-    void Node::removePreParent(Node* parent) {
-        if (0 == _preParents.erase(parent)) throw std::runtime_error("Attempt to remove unknown preParent");
+    void Node::removeDependant(Node* dependant) {
+        if (0 == _dependants.erase(dependant)) throw std::runtime_error("Attempt to remove unknown dependant");
     }
 
     void Node::addPostParent(Node* parent) {
@@ -145,11 +145,10 @@ namespace YAM
 
     void Node::handlePrerequisiteCompletion(Node* prerequisite) {
         // When a prerequisite completes it calls this function for all if
-        // its preParents. There may be parents that are not part of the build 
+        // its dependants. There may be parents that are not part of the build 
         // scope. So ignore the callback when this node is in Idle state.
         //
         if (_executionState == ExecutionState::Prerequisites) {
-
             auto preqState = prerequisite->state();
             bool preqCompleted =
                 preqState == Node::State::Ok
@@ -359,15 +358,11 @@ namespace YAM
 
         setState(newState);
 
-        for (auto p : _preParents) p->handlePrerequisiteCompletion(this);
+        for (auto p : _dependants) p->handlePrerequisiteCompletion(this);
         for (auto p : _postParents) p->handlePostrequisiteCompletion(this);
         _completor.Broadcast(this);
     }
 
-    // Pre: busy()
-    // Request cancelation of execution.
-    // Return immediately, do not block caller until execution has completed.
-    // Notify execution completion as specified by start() function. 
     bool Node::busy() const {
         return _state == State::Executing;
     }

@@ -13,10 +13,14 @@ namespace
 
     auto minLwt = std::chrono::time_point<std::chrono::utc_clock>::min();
 
-    std::shared_ptr<Node> createNode(std::filesystem::directory_entry const& dirEntry, ExecutionContext* context) {
+    std::shared_ptr<Node> createNode(
+        SourceDirectoryNode* parent,
+        std::filesystem::directory_entry const& dirEntry, 
+        ExecutionContext* context
+    ) {
         std::shared_ptr<Node> node = nullptr;
         if (dirEntry.is_directory()) {
-            node = std::make_shared<SourceDirectoryNode>(context, dirEntry.path());
+            node = std::make_shared<SourceDirectoryNode>(context, dirEntry.path(), parent);
         } else if (dirEntry.is_regular_file()) {
             node = std::make_shared<SourceFileNode>(context, dirEntry.path());
         } else {
@@ -28,14 +32,19 @@ namespace
 
 namespace YAM
 {
-    SourceDirectoryNode::SourceDirectoryNode(ExecutionContext* context, std::filesystem::path const& dirName)
+    SourceDirectoryNode::SourceDirectoryNode(
+        ExecutionContext* context, 
+        std::filesystem::path const& dirName,
+        SourceDirectoryNode* parent)
         : Node(context, dirName)
+        , _parent(parent)
         , _dotIgnoreNode(std::make_shared<DotIgnoreNode>(context, dirName / ".dotignore", this))
+        , _executionHash(rand())
     {}
 
     void SourceDirectoryNode::addPrerequisitesToContext() {
         context()->nodes().add(_dotIgnoreNode);
-        _dotIgnoreNode->addPreParent(this);
+        _dotIgnoreNode->addDependant(this);
         _dotIgnoreNode->addPrerequisitesToContext();
     }
 
@@ -60,6 +69,9 @@ namespace YAM
     }
 
     void SourceDirectoryNode::getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const {
+        for (auto it = _content.begin(); it != _content.end(); ++it) {
+            outputs.push_back(it->second);
+        }
     }
 
     bool SourceDirectoryNode::supportsInputs() const {
@@ -71,6 +83,14 @@ namespace YAM
 
     XXH64_hash_t SourceDirectoryNode::executionHash() const {
         return _executionHash;
+    }
+
+    SourceDirectoryNode* SourceDirectoryNode::parent() const { 
+        return _parent;
+    }
+
+    void SourceDirectoryNode::parent(SourceDirectoryNode* parent) {
+        _parent = parent;
     }
 
     void SourceDirectoryNode::getFiles(std::vector<std::shared_ptr<FileNode>>& filesInDir) {
@@ -129,7 +149,7 @@ namespace YAM
                 child = it->second;
                 kept.insert(it->second);
             } else {
-                child = createNode(dirEntry, context());
+                child = createNode(const_cast<SourceDirectoryNode*>(this), dirEntry, context());
                 added.insert(child);
             }
         }
@@ -170,7 +190,7 @@ namespace YAM
     void SourceDirectoryNode::clear() {
         if (_dotIgnoreNode != nullptr) {
             _dotIgnoreNode->clear();
-            _dotIgnoreNode->removePreParent(this);
+            _dotIgnoreNode->removeDependant(this);
             context()->nodes().remove(_dotIgnoreNode);
             _dotIgnoreNode = nullptr;
         }
@@ -275,7 +295,7 @@ namespace YAM
 
     void SourceDirectoryNode::prepareDeserialize() {
         Node::prepareDeserialize();
-        if (_dotIgnoreNode != nullptr) _dotIgnoreNode->removePreParent(this);
+        if (_dotIgnoreNode != nullptr) _dotIgnoreNode->removeDependant(this);
         for (auto const& p : _content) {
             p.second->removePostParent(this);
         }
@@ -286,11 +306,13 @@ namespace YAM
     void SourceDirectoryNode::restore(void* context) {
         Node::restore(context);
         _dotIgnoreNode->directory(this);
-        _dotIgnoreNode->addPreParent(this);
+        _dotIgnoreNode->addDependant(this);
         std::vector<std::shared_ptr<Node>> nodes;
         for (auto const& p : _content) {
             nodes.push_back(p.second);            
             p.second->addPostParent(this);
+            auto dir = dynamic_cast<SourceDirectoryNode*>(p.second.get());
+            if (dir != nullptr) dir->parent(this);
         }
         _content.clear();
         for (auto n : nodes) _content.insert({ n->name(), n });

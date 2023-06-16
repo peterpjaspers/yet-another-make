@@ -16,7 +16,7 @@ namespace YAM
         {
             Prerequisites,
             Postrequisites,
-            Preparents,
+            Dependants,
             Postparents
         };
 

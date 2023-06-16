@@ -46,14 +46,14 @@ namespace YAM
     void DotIgnoreNode::addPrerequisitesToContext() {
         for (auto file : _dotIgnoreFiles) {
             context()->nodes().add(file);
-            file->addPreParent(this);
+            file->addDependant(this);
         }
     }
 
     void DotIgnoreNode::clear() {
         for (auto file : _dotIgnoreFiles) {
             context()->nodes().remove(file);
-            file->removePreParent(this);
+            file->removeDependant(this);
         }
         _dotIgnoreFiles.clear();
     }
@@ -151,7 +151,7 @@ namespace YAM
     void DotIgnoreNode::prepareDeserialize() {
         Node::prepareDeserialize();
         for (auto file : _dotIgnoreFiles) {
-            file->removePreParent(this);
+            file->removeDependant(this);
         }
         _dotIgnoreFiles.clear();
     }
@@ -159,7 +159,7 @@ namespace YAM
     void DotIgnoreNode::restore(void* context) {
         Node::restore(context);
         for (auto file : _dotIgnoreFiles) {
-            file->addPreParent(this);
+            file->addDependant(this);
         }
     }
 }
