@@ -1,9 +1,15 @@
-1. YAM (Yet Another Make) uses a directed acyclic graph (DAG)
+1. What is YAM?
+YAM (Yet Another Make) is a software build system. There are already many 
+software build systems, e.g. Make, Apache Maven, Gradle, Bazel, MSBuild, tup.
+So why create another one? Section 3-Features and behaviors- tries to answer 
+this question.
+
+2. Directed Acyclic Graph (DAG)
+Like all build systems YAM uses a DAG.
 Question to chatGPT: 
 Explain the use of a directed acyclic graph in software build systems
 
 The answer of chatGPT:
-
 A directed acyclic graph (DAG) is a data structure that consists of nodes 
 connected by directed edges, where the edges only flow in one direction and
 there are no cycles. DAGs have various applications in computer science, 
@@ -48,50 +54,197 @@ By representing the dependencies between components as a DAG, these build
 systems can efficiently and accurately build software projects while minimizing
 unnecessary work and maximizing parallelization.
 
-2. YAM's main features and behaviors
-YAM's feature set and behaviors are influenced by Mike Shal's paper 
-"Build System Rules and Algorithms" and by the "tup" build system.
-https://gittup.org/tup/build_system_rules_and_algorithms.pdf
-https://gittup.org/tup/
-This is how YAM adheres to Mike Shal's Rules and Algorithms:
-    - Scalability - Beta build
-      Beta build is an algorithm that reduces the complexity of the overhead
-      of an incremental build from O(#AllFiles) to O(#ModifiedFiles).
-    - Scalability - Parallel execution of independent build tasks
-    - Scalability - Build avoidance by using file aspect dependencies
-      This feature avoids re-execution of a build task when its output is not
-      affected by the changes in its input files. E.g. it is not needed to
-      re-execute compilation when only comments in a C++ file were changed.
-      In YAM the compilation task depends on the code aspect (i.e. all file 
-      content except comments) of the source file. Recompilation only happens
-      when the code aspect changes.
-    - Scalability - build avoidance by using a build cache
-      Builds can be configured to store their outputs in a build cache and to
-      re-use previously stored outputs when possible. 
-    - Correctness - DAG enforcement
-      YAM detects for each build task which files were read/written during the
-      execution of that task. YAM uses this to verify that the dependencies
-      in the DAG as declared by the user match the actual dependencies.
-      E.g. YAM detects that build task U reads file F. F is produced by build
-      task P. The user however did not declare U to depend on F. Due to this
-      missing dependency declaration there is no guarantee that YAM executes P
-      before U, thus putting U at risk to produce incorrect output by reading
-      an out-dated version of F. YAM therefore fails the build. The user must
-      resolve this build error by either adding F to the dependencies of U or
-      by changing build task U to no longer depend on F.
-    - Correctness - reproducability
-      YAM detects the input files of the build tasks as they get executed. The 
-      input file names and the file versions are stored in the YAM build state. 
-      This info can be used in several ways: 
-          - Copy all files used by the build into a sandbox. The build can now
-            reliably be reproduced by running it in the sandbox.
-          - By comparing build states of builds A and B one can verify whether
-            B reproduces A.
-    - Usability
-      Running YAM is the only thing you need to (and can) do to build the 
-      system. YAM handles file renames, changes in build task definitions,
-      deletion of stale output files and quickly (typically sub-second) starts
-      the build tasks that need to re-execute. 
+End of chatGPT answer. 
+
+For readers not familiar with build systems the following example illustrates
+the use of a DAG in C++ development.
+Given a C++ header file c.h and C++ implementation files a.cpp and b.cpp.
+Both a.cpp and b.cpp #include c.h. 
+The .cpp files are compiled into object files a.obj and b.obj:
+      cc a.cpp -out a.obj
+      cc b.cpp -out b.obj
+The object files are linked into an executable app.exe:
+      link.exe a.obj b.obj -out app.exe
+
+This build scenario is represented by the following DAG: 
+
+++---------++--------------------------------------------++-----------------++
+|| Inputs  ||                  Build task                ||      Outputs    ||
+++---------++--------------------------------------------++-----------------++
+           ||                                            ||
+           ||                                            ||
+      +----||------> link a.obj b.obj -out app.exe ------||-----> app.exe
+      |    ||                                            ||
+      +----||--------------------------------------------||-----------------+
+           ||                                            ||                 |                                                                     +
+a.cpp -----||------> cc a.cpp -out a.obj ----------------||-----> a.obj ----+
+           ||      |                                     ||                 |
+c. h ------||------>                                     ||                 |
+           ||      |                                     ||                 |
+b.cpp -----||------> cc b.cpp -out b.obj ----------------||-----> b.obj ----+
+           ||                                            ||
+           ||                                            ||
+++---------++--------------------------------------------++-----------------++
+
+YAM executes the build tasks defined by this DAG as follows:
+- compilations will be done before linking (as enforced by DAG topology)
+- a.obj is re-compiled upon a change in a.cpp and/or c.h and/or in the compile 
+  command and/or when the user tampered with a.obj (e.g. deleted it).
+- b.obj is re-compiled upon a change in b.cpp and/or c.h and/or in the compile 
+  command and/or when the user tampered with b.obj (e.g. deleted it).
+- app.exe is re-linked upon a change in a.obj and/or b.obj and/or in the link
+  command and/or when the user tampered with app.exe (e.g. deleted it).
+
+
+Note that YAM makes no assumptions about the kind of problem that the user tries
+to solve: the user defines the DAG, including the logic of the build tasks. YAM 
+merely executes the build tasks when needed, i.e. when inputs or task logic 
+change or when outputs have been tampered with.
+
+3. Features and behaviors
+YAM is heavily influenced by Mike Shal's paper "Build System Rules and 
+Algorithms" https://gittup.org/tup/build_system_rules_and_algorithms.pdf 
+and by the "tup" build system https://gittup.org/tup/
+The paper discusses typical problems in build systems and defines rules
+and algorithms that solve these problems. Mike Shal implemented these
+rules and algorithms in tup. And so does YAM, with additions and improvements
+that intend to make it an even better build system than tup.
+The following sections describe how YAM adheres to Mike Shal's Rules and 
+Algorithms.
+
+3.1 Correctness - Incremental build
+YAM detects the in/output files of a build task as it gets executed. The name,
+last-write-time and version (a hash of the file content) of each of these files
+is stored in the DAG. When YAM detects that the last-write-time of a file has 
+changed it re-computes the version of this file. When the version has changed
+it re-executes all build tasks that depend on the changed file.
+
+Note: many build systems, re-execute build tasks when a file last-write-time
+has changed. In YAM editing a file, saving it, undoing all edits and then
+running YAM will not cause re-execution of build tasks because, although the
+file last-write-time has changed, the file version has not.
+
+Note: the detection of input files by YAM implies that the user need not 
+specify the C++ source files as input of the compile commands in the C++ 
+example in section 2. YAM will detect those input files and add them to the 
+DAG. YAM also detects that a.obj and b.obj are outputs of the respective 
+compilation tasks and that a.obj and b.obj are inputs of the link task.
+There is however no way for YAM to find out that the compilation tasks must be
+executed before the link task. Best case the link fails because the object
+files were not yet produced, worst case the link task links out-dated object
+files. YAM therefore requires the user to specify the outputs of build tasks 
+and for tasks that read those outputs to specify those output files as their inputs.
+
+3.2 Correctness - DAG enforcement
+YAM uses the detected in/outputs to verify that the in/outputs in the DAG, as
+declared by the user, match the detected in/outputs. YAM fails the build when 
+detected in/inputs do not match declared in/outputs.
+
+3.3 Correctness - Reproducability      
+The info in the YAM DAG can be used in several ways to facilitate reproduction
+of a build: 
+    - Copy all input files used by the build into a sandbox. The build can now
+      reliably be reproduced by running it in the sandbox.
+    - By comparing build states of builds A and B one can verify whether A and
+      B are equal (i.e. use same build task logic, use same input versions and 
+      produce same output versions).
+
+3.4 Scalability - Build avoidance by using file aspect versions
+Definition: a file aspect version is a hash of an aspect (subset) of the file.
+Examples:
+    - the 'code aspect version' is a hash of the code sections in a source code
+      file, excluding comment sections from the hash computation.
+    - the 'comment aspect version' is a hash of the comment sections in a
+      source code file.
+    - the 'size aspect version' is a hash of the size of the file.
+    - the 'last-write-time aspect version' is a hash of the last-write-time
+      of the file.
+
+The file version as defined in section 3.1 is shorthand for the 'entire file 
+aspect version', a hash of all content of the file.
+
+YAM by default configures a build task to depend on input file versions, i.e.
+to re-execute when input file versions change.
+YAM allows the build task to be re-configured to depend on changes in selected 
+input file aspect versions, i.e. to re-execute only when the selected input
+file aspect versions change.
+
+Example - compilation
+Re-compiling a C++ file that only has changes in comment sections will produce 
+the same object file. In YAM the compilation task can be configured to depend 
+on the code aspect versions of its .cpp and .h input files, i.e. to re-compile
+only when the code aspect version of one or more input files has changed. 
+Rationale: you have no more excuses to refrain yourself from improving the
+comments in a C++ include file because of the massive amount of re-compilations
+that would otherwise be triggered by such a change.
+
+Example - linking of dynamic load libraries
+In the Windows operating system a dynamic load library, e.g. C.dll, has a
+so-called import library C.lib. Executables and dlls that want to load C.dll at
+run-time must be statically linked with C.lib. Relinking of exes and dlls that
+depend on C.lib is only necessary when the exports section (i.e. the interface
+of the dll) of C.lib changes.
+In YAM this can be achieved by configuring the link task to depend on the 
+exports aspect version of its .lib input files. The exports aspect version is a
+hash of only the exports section of the .lib file.
+Rationale: when using plain file versions changing implementation and/or 
+interface of a dll will recursively re-link all dlls and exes that depend on
+the changed dll. In large software systems the dll dependency graph is often 
+very wide and/or deep, thus causing massive re-linking.
+Using the exports aspect version, instead of the plain file version, breaks the
+recursive re-linking:
+    - when only dll implementation aspects were changed: only the changed dll  
+      is re-linked.
+    - when also dll interface aspects were changed: only the changed dll and
+      the dlls and exes that directly depend on it will be re-linked.
+
+3.3 Scalability - Build avoidance by using a build cache
+Builds can be configured to store their outputs in a build cache and to
+re-use previously stored outputs when possible, i.e. when build task logic and
+all input file (aspect) versions are identical 
+
+3.4 Scalability - Beta build
+Many build systems are alpha-build systems. An alpha build retrieves the 
+last-write-times of all files involved in the the build to figure out which
+files have changed since the previous build. The time complexity of an alpha 
+build is therefore O(#AllFiles). A beta build only retrieves the last-write-
+times of files that have been write-accessed since the previous build. The time
+complexity of a beta build is therefore O(#ModifiedFiles). Beta build enables 
+YAM to quickly start the build tasks that need to re-execute. Start time will 
+be sub-second in the typical development scenario where only a few files were
+modified since the previous build, also in a repository that contains a huge 
+number of files.
+
+Note: YAM uses a server that continuously monitors the file system to register
+which files were write-accessed since previous build. The server also 
+re-computes the versions of the write-accessed files in-between builds as to 
+not delay build task execution when the user starts the next build.
+
+Note: the first build after restart of the YAM server is an alpha build.
+
+3.5 Scalability - Parallel execution of independent build tasks
+By default YAM parallellizes build execution by queuing independent build tasks
+to a thread pool. The pool contains 1 thread per available processing core.
+The user can adjust the number of cores used by YAM.
+YAM has gone to great length to minimize the amount of non-parallelizable code.
+As shown by Amdahl's law such serial code is detrimental for scalability.
+YAM claims a speedup of ~800 when using 1000 cores to execute build tasks that 
+each take 1 second, assuming tasks are independent (i.e. can run in parallel),
+the build runs on a system with infinite large I/O bandwidth and zero overhead. 
+E.g. a build that executes 1000 compilations that each take 1 second will take
+1000/800 = 1,25* seconds. 
+Note: scalability de/increases as build tasks take less/more execution time.
+
+3.6 Usability - One command 
+Running YAM is the only thing you need to (and can) do to build the system.
+YAM takes care of:
+    - changes in files and directories (creation/modification/deletion/rename),
+      i.e. re-execute build tasks that depend on the changed files/directories.
+    - changes in build task definitions, i.e. execute the changed tasks.
+    - deletion of stale output files. An output file becomes stale when the 
+      build task that produced the file is changed to no longer produce this
+      output.
+    - detection of build order issues, as explained in section 3.2.
 
 
 
