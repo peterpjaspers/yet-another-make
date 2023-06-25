@@ -24,8 +24,6 @@ namespace BTree {
     public:
         // Create a persistent page pool on the file path with pages of the given capacity.
         PersistentPagePool( PageSize pageCapacity, const std::string path );
-        // Destroy the persistent page pool, updating the file to a consistent state.
-        ~PersistentPagePool();
         // Mark a page as modified and queue page for file update.
         // Page will be written to file if commit() preceeds recover() or page is freed.
         // Page will be recovered from file if recover() preceeds commit().
@@ -38,11 +36,11 @@ namespace BTree {
         inline bool persistent() const { return true; };
         // Mark a page as pending recovery.
         // Frees the page if reuse is enabled.
-        void recover( const PageHeader& page, bool reuse = false );
+        void recover( const PageHeader& page, bool reuse = true );
         // Write all valid modified pages to the file.
         void commit( const PageLink link );
         // Retrieve all pages pending recovery from file.
-        PageLink recover( bool freeModifiedPages = false );
+        PageLink recover( bool freeModifiedPages = true );
         // Clean-up page pool.
         // The only valid pages will be persistent pages.
         PageHeader* clean();

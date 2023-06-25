@@ -31,8 +31,8 @@ namespace BTree {
     // For transaction behaviour:
     //   Modifications are consolidated with a call to commit(), transaction succeeds.
     //   Modifications are discarded with a call to recover(), transaction fails.
-    // During a transaction modified *this are registered with a call to modify() and
-    // *this to be recoverd (i.e., copied-on-update) are registered with a call to recover().
+    // During a transaction modified pages are registered with a call to modify() and
+    // pages to be recoverd (i.e., copied-on-update) are registered with a call to recover().
     // Pages copied-on-update with a persistent pool may be reused reducing memory footprint
     // (particularly for large transactions).
     enum UpdateMode {
@@ -95,7 +95,7 @@ namespace BTree {
     void TreeBase::recover() {
         static const char* signature = "void TreeBase::recover()";
         if (index != FreeStandingTree) throw std::string( signature ) + " - Cannot recover single tree in forest";
-        PageLink link( pool.recover() );
+        PageLink link( pool.recover( mode == PersistentTransaction ) );
         recoverTree( link );
     }
     PageLink TreeBase::rootLink() const { return root->page; }

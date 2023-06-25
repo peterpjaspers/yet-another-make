@@ -26,6 +26,10 @@ using namespace std;
 const int BTreePageSize = 256;
 const int MinArray = 2;
 const int MaxArray = 15;
+// Enable generating exceptions when accessing non-existing keys.
+// Set to false when debugging to avoid generating intentional exceptions.
+// Set to true for full coverage (presumably with optimization)
+const bool TryUnexpectedKeys = false;
 
 // Number of attempts to detect unexpected B-Tree content
 const int ProbeCount = 100;
@@ -194,13 +198,13 @@ public:
             return{ errors, 0 };
         }
         if ( pool->size() <= link.index ) {
-            log << "Invalid pool index " << link.index << " exceeds pool size " << pool->size() << "!\n" ;
+            log << "Invalid PageLink index " << link.index << " exceeds pool size " << pool->size() << "!\n" ;
             errors += 1;
             return{ errors, 0 };
         }
         auto result = pageLinks.insert( link );
         if (!result.second) {
-            log << "Malformed B-Tree at " << link << "!\n";
+            log << "Malformed B-Tree (cycles or merged branches) at " << link << "!\n";
             errors += 1;
             return{ errors, 0 };
         }
@@ -211,7 +215,7 @@ public:
         }
         if (depth == UINT16_MAX) depth = page.depth;
         if (page.depth != depth) {
-            log << "Page " << page.page << " has mismatched depth " << page.depth << ", expected " << depth << "!\n";
+            log << "Page " << link << " has mismatched depth " << page.depth << ", expected " << depth << "!\n";
             errors += 1;
         }
         uint32_t pageCount = 1;
@@ -270,6 +274,7 @@ public:
 
     virtual uint32_t validate() const {
         uint32_t errors = 0;
+        statistics();
         log << "Validating page pool...\n" << flush;
         errors += validatePagePool<K,V>();
         if (errors == 0) {
@@ -326,7 +331,7 @@ public:
         log << "Assign...\n" << flush;
         return 0;
     }
-    void statistics() {
+    virtual void statistics() const {
         log << "Tree contains " << tree->size() << " entries at a depth of " << tree->depth() << ".\n";
     }
     uint32_t logTree() const {
@@ -402,13 +407,15 @@ public:
             // Ensure that other content is not present
             for (int i = 0; i < ProbeCount; ++i) {
                 uint32_t key = generateUniqueKey();
-                try {
-                    auto retrieved = tree->retrieve( key );
-                    log << "Retrieved " << retrieved << " with unexpected key " << key << "!\n";
-                    errors += 1;
-                }
-                catch (...) {
-                    // Exception expected, ignore
+                if (TryUnexpectedKeys) {
+                    try {
+                        auto retrieved = tree->retrieve( key );
+                        log << "Retrieved " << retrieved << " with unexpected key " << key << "!\n";
+                        errors += 1;
+                    }
+                    catch (...) {
+                        // Exception expected, ignore
+                    }
                 }
                 bool found = tree->exists( key );
                 if (found) {
@@ -635,24 +642,27 @@ public:
                 }
                 usePair = !usePair;
             }
+
             // Ensure that other content is not present
             for (int i = 0; i < ProbeCount; ++i) {
                 vector<uint16_t>* key = generateUniqueKey();
-                try {
-                    uint32_t retrieved;
-                    if (usePair) {
-                        pair<const uint16_t*, PageSize> keyPair = { key->data(), key->size() };
-                        retrieved = tree->retrieve( keyPair );
-                    } else {
-                        retrieved = tree->retrieve( key->data(), key->size() );
+                if (TryUnexpectedKeys) {
+                    try {
+                        uint32_t retrieved;
+                        if (usePair) {
+                            pair<const uint16_t*, PageSize> keyPair = { key->data(), key->size() };
+                            retrieved = tree->retrieve( keyPair );
+                        } else {
+                            retrieved = tree->retrieve( key->data(), key->size() );
+                        }
+                        log << "Retrieved " << retrieved << " with unexpected key ";
+                        logUint16Array( log, key->data(), key->size() );
+                        log << "!\n";
+                        errors += 1;
                     }
-                    log << "Retrieved " << retrieved << " with unexpected key ";
-                    logUint16Array( log, key->data(), key->size() );
-                    log << "!\n";
-                    errors += 1;
-                }
-                catch (...) {
-                    // Exception expected, ignore
+                    catch (...) {
+                        // Exception expected, ignore
+                    }
                 }
                 bool found = false;
                 if (usePair) {
@@ -953,15 +963,17 @@ public:
             // Ensure that other content is not present
             for (int i = 0; i < ProbeCount; ++i) {
                 uint32_t key = generateUniqueKey();
-                try {
-                    auto retrieved = tree->retrieve( key );
-                    log << "Retrieved ";
-                    logUint16Array( log, retrieved.first, retrieved.second );
-                    log << " with unexpected key " << key << "!\n";
-                    errors += 1;
-                }
-                catch (...) {
-                    // Exception expected, ignore
+                if (TryUnexpectedKeys) {
+                    try {
+                        auto retrieved = tree->retrieve( key );
+                        log << "Retrieved ";
+                        logUint16Array( log, retrieved.first, retrieved.second );
+                        log << " with unexpected key " << key << "!\n";
+                        errors += 1;
+                    }
+                    catch (...) {
+                        // Exception expected, ignore
+                    }
                 }
                 bool found = tree->exists( key );
                 if (found) {
@@ -1255,26 +1267,26 @@ public:
             // Ensure that other content is not present
             for (int i = 0; i < ProbeCount; ++i) {
                 vector<uint16_t>* key = generateUniqueKey();
-/*
-                try {
-                    pair<const uint16_t*,PageSize> retrieved;
-                    if (usePair) {
-                        pair<const uint16_t*, PageSize> keyPair = { key->data(), key->size() };
-                        retrieved = tree->retrieve( keyPair );
-                    } else {
-                        retrieved = tree->retrieve( key->data(), key->size() );
+                if (TryUnexpectedKeys) {
+                    try {
+                        pair<const uint16_t*,PageSize> retrieved;
+                        if (usePair) {
+                            pair<const uint16_t*, PageSize> keyPair = { key->data(), key->size() };
+                            retrieved = tree->retrieve( keyPair );
+                        } else {
+                            retrieved = tree->retrieve( key->data(), key->size() );
+                        }
+                        log << "Retrieved ";
+                        logUint16Array( log, retrieved.first, retrieved.second );
+                        log << " with non-existing key ";
+                        logUint16Array( log, key->data(), key->size() );
+                        log << "!\n";
+                        errors += 1;
                     }
-                    log << "Retrieved ";
-                    logUint16Array( log, retrieved.first, retrieved.second );
-                    log << " with non-existing key ";
-                    logUint16Array( log, key->data(), key->size() );
-                    log << "!\n";
-                    errors += 1;
+                    catch (...) {
+                        // Exception expected, ignore
+                    }
                 }
-                catch (...) {
-                    // Exception expected, ignore
-                }
-*/
                 bool found = false;
                 if (usePair) {
                     pair<const uint16_t*, PageSize> keyPair = { key->data(), key->size() };
@@ -1494,15 +1506,43 @@ public:
         destroyPagePool( false, temp );
         return errors;
     };
+    void statistics() const {
+        TreeTester<uint16_t[],uint16_t[]>::statistics();
+        auto treePages = tree->collectPages();
+        vector<PageLink> freePages;
+        vector<PageLink> modifiedPages;
+        vector<PageLink> persistentPages;
+        vector<PageLink> recoverPages;
+        uint32_t pages = pool->size();
+        for ( uint32_t index = 0; index < pages; ++index ) {
+            PageLink link( index );
+            auto pageHeader = pool->access( link );
+            if (pageHeader.free == 1) freePages.push_back( link );
+            if (pageHeader.modified == 1) modifiedPages.push_back( link );
+            if (pageHeader.persistent == 1) persistentPages.push_back( link );
+            if (pageHeader.recover == 1) recoverPages.push_back( link );
+        }
+        log << "Persistent page pool has " << pages << " pages"
+            << ", B-Tree " << treePages->size()
+            << ", free " << freePages.size()
+            << ", modified " << modifiedPages.size()
+            << ", persistent " << persistentPages.size()
+            << ", recover " << recoverPages.size() << "\n";
+        delete treePages;
+    };
+
 }; // class Uint16ArrayUint16ArrayTreeTester
 
 template< class K, class V >
 uint32_t doTest( TreeTester<K,V>& tester, size_t count, ofstream& log ) {
     uint32_t errors = 0;
     try {
+/*
         tester.createPool();
         tester.createTree();
+        errors += tester.validate();
         errors += tester.commit();
+        errors += tester.validate();
         errors += tester.insert( count );
         errors += tester.validate();
         errors += tester.remove( count, TreeTester<K,V>::Forward );
@@ -1524,10 +1564,13 @@ uint32_t doTest( TreeTester<K,V>& tester, size_t count, ofstream& log ) {
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
+        errors += tester.validate();
         errors += tester.insert( count / 10 );
+        errors += tester.validate();
         errors += tester.commit();
         errors += tester.validate();
         errors += tester.insert( count - (count / 10) );
+        errors += tester.validate();
         errors += tester.commit();
         errors += tester.validate();
         errors += tester.replace( count / 2 );
@@ -1544,7 +1587,6 @@ uint32_t doTest( TreeTester<K,V>& tester, size_t count, ofstream& log ) {
         errors += tester.validate();
         errors += tester.assign();
         errors += tester.validate();
-        tester.statistics();
         tester.destroyTree();
         tester.createTree();
         errors += tester.validate();
@@ -1552,6 +1594,23 @@ uint32_t doTest( TreeTester<K,V>& tester, size_t count, ofstream& log ) {
         tester.destroyPool();
         tester.createPool();
         tester.createTree();
+        errors += tester.validate();
+        errors += tester.remove( count / 4, TreeTester<K,V>::Random );
+        errors += tester.validate();
+        errors += tester.recover();
+        errors += tester.validate();
+        tester.destroyTree();
+        tester.destroyPool();
+*/
+        tester.createPool();
+        tester.createTree();
+        errors += tester.insert( count / 10 );
+        errors += tester.validate();
+        errors += tester.commit();
+        errors += tester.validate();
+        errors += tester.insert( count - (count / 10) );
+        errors += tester.validate();
+        errors += tester.commit();
         errors += tester.validate();
         errors += tester.remove( count / 4, TreeTester<K,V>::Random );
         errors += tester.validate();

@@ -12,7 +12,8 @@
 #include "CompareKey.h"
 
 // ToDo: Align with C++ map (method naming and interface in general)
-// ToDo: Fix problem in clear() and/or assign( ... )
+// ToDo: Fix problem with orphaned pages
+// ToDo: Provide function to compact B-Tree to contiguous pages (reducing memory usage and persistent file size)
 
 namespace BTree {
 
@@ -63,8 +64,7 @@ namespace BTree {
             ArrayKeyCompare compareKey = defaultCompareArray<B<KT>>,
             UpdateMode updateMode = UpdateMode::Auto
         ) : Tree<KT,VT>( pagePool, compareKey, updateMode, pagePool.clean() ) {}
-        // Destruct B-Tree making sure to leave PagePool behind in a consistent state.
-        ~Tree() { pool.recover(); freeAll( *root ); }
+        ~Tree() { pool.recover(); freeAll( *root, true ); }
         // Insert a key-value entry in the B-Tree.
         // Returns true if the value was inserted, false if the key was already present.
         // O(log(n)) complexity.
@@ -401,7 +401,7 @@ namespace BTree {
         // Empty the B-Tree
         // O(n) complexity.
         void clear() {
-            freeAll( *root );
+            freeAll( *root, true );
             root = &allocateLeaf()->header;
         }
         // Test if B-Tree is empty
@@ -415,7 +415,7 @@ namespace BTree {
         }
         // Return the number of key-value entries in the B-tree.
         // O(n) complexity.
-        size_t size() const { return( pageCount( root ) ); }
+        size_t size() const { return( pageCount( *root ) ); }
         // Test if particular key exists.
         // O(log(n)) complexity.
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>),bool> = true >
@@ -442,26 +442,32 @@ namespace BTree {
             return compare.array;
         }
 
+        // Collect PageLinks to all pages in use by the B-Tree.
+        std::vector<PageLink>* collectPages() const {
+            auto links = new std::vector<PageLink>();
+            collectPage( *links, root->page  );
+            return links;
+        }
 
     private:
 
-        // Allocate a new Page
+        // Allocate a new Page from the page pool and (optionally) mark it as modified.
         template< class VT >
-        inline Page<B<K>,B<VT>,A<K>,A<VT>>* allocatePage( const PageDepth depth ) const {
+        inline Page<B<K>,B<VT>,A<K>,A<VT>>* allocatePage( const PageDepth depth, bool modify = true ) const {
             Page<B<K>,B<VT>,A<K>,A<VT>>* page = pool.page<B<K>,B<VT>,A<K>,A<VT>>( depth );
-            pool.modify( page->header );
+            if (modify) pool.modify( page->header );
             return( page );
         }
         template< class VT >
-        inline Page<B<K>,B<VT>,A<K>,A<VT>>* allocatePage( const PageHeader& header ) const {
-            return( allocatePage<VT>( header.depth ) );
+        inline Page<B<K>,B<VT>,A<K>,A<VT>>* allocatePage( const PageHeader& header, bool modify = true ) const {
+            return( allocatePage<VT>( header.depth, modify ) );
         }
     
-        inline Page<B<K>,B<V>,A<K>,A<V>>* allocateLeaf() const {
-            return allocatePage<V>( 0 );
+        inline Page<B<K>,B<V>,A<K>,A<V>>* allocateLeaf( bool modify = true ) const {
+            return allocatePage<V>( 0, modify );
         }
-        inline Page<B<K>,PageLink,A<K>,false>* allocateNode( const PageDepth depth ) const {
-            return( allocatePage<PageLink>( depth ) );
+        inline Page<B<K>,PageLink,A<K>,false>* allocateNode( const PageDepth depth, bool modify = true ) const {
+            return( allocatePage<PageLink>( depth, modify ) );
         }
 
         // Convert a PageHeader pointer to a Page instance.
@@ -935,6 +941,7 @@ namespace BTree {
         // Append content of src Page to dst Page, adjusting split key and
         // removing node reference to (appended) src page.
         // Trail arguments point to src and dst respectively.
+        // Merging is always from right to left (using Page::shiftLeft)
         template< class KT, class VT>
         void mergePage( Trail& dstTrail, Trail& srcTrail ) {
             const auto src = page<VT>( srcTrail );
@@ -952,7 +959,7 @@ namespace BTree {
             recoverPage( dst->header, dstCopy->header );
             pool.recover( src->header, true );
             // Recursively merge ancestor nodes where possible
-            // A non-empty node must exist as we just merged two pages
+            // A non-empty ancestor node must exist as we just merged two pages
             pruneBranch( srcTrail );
             // Remove link to recently merged page
             auto parent = node( srcTrail );
@@ -961,7 +968,7 @@ namespace BTree {
                 srcTrail.deletedIndex();
             } else {
                 // Replace split key in ancestor with next largest key in parent
-                auto keyPark = allocateNode( parent->header.depth );
+                auto keyPark = allocateNode( parent->header.depth, false );
                 appendSplit<PageLink>( *keyPark, *parent, 0, *parent );
                 parent->split( parent->value( 0 ) );
                 parent->remove( 0 );
@@ -978,7 +985,7 @@ namespace BTree {
                 if (parent->filling() < (LowPageThreshold * parent->header.capacity) ) merge<KT,PageLink>( srcTrail );
             }
         }
-        // Pune tree of degenerate nodes up to non-empty node
+        // Prune tree of degenerate nodes up to non-empty node
         // A degenerate node being a node containing only a split link
         void pruneBranch( Trail& trail ) {
             auto node = page<PageLink>( trail );
@@ -1059,28 +1066,38 @@ namespace BTree {
         }
 
         // Free a page and all pages that it references; i.e., free an entire (sub-) tree.
-        void freeAll( const PageHeader& page ) {
+        void freeAll( const PageHeader& page, bool recover ) {
             if (page.free != 1) {
                 if (0 < page.depth) {
                     Page<B<K>,PageLink,A<K>,false>* node = this->page<PageLink>( &page );
-                    if (node->splitDefined()) freeAll( pool.access( node->split() ) );
-                    for (PageIndex i = 0; i < node->size(); i++) freeAll( pool.access( node->value( i ) ) );
+                    if (node->splitDefined()) freeAll( pool.access( node->split() ), recover );
+                    for (PageIndex i = 0; i < node->size(); i++) freeAll( pool.access( node->value( i ) ), recover );
                 }
-                pool.recover( page, true );
+                if (recover) pool.recover( page, true );
             }
         }
 
         // Recursively count the number of key-value entries in a page.
-        size_t pageCount( const PageHeader* header ) const {
-            static const char* signature( "size_t Tree<K,V>::pageCount( PageHeader* header ) const" );
-            if (header->free == 1)  throw std::string(signature) + " - Accessing freed page.";
-            size_t count = header->count;
-            if (0 < header->depth) {
-                const auto node = page<PageLink>( header );
-                if (node->splitDefined()) count += pageCount( pool.reference( node->split() ) );
-                for (PageIndex i = 0; i < node->size(); i++) count += pageCount( pool.reference( node->value( i )) );
+        size_t pageCount( const PageHeader& header ) const {
+            static const char* signature( "size_t Tree<K,V>::pageCount( const PageHeader& header ) const" );
+            if (header.free == 1)  throw std::string(signature) + " - Accessing freed page.";
+            size_t count = header.count;
+            if (0 < header.depth) {
+                const Page<B<K>,PageLink,A<K>,false>& node = *page<PageLink>( &header );
+                if (node.splitDefined()) count += pageCount( pool.access( node.split() ) );
+                for (PageIndex i = 0; i < header.count; i++) count += pageCount( pool.access( node.value( i )) );
             }
             return( count );
+        }
+
+        void collectPage( std::vector<PageLink>& links, PageLink link ) const {
+            links.push_back( link );
+            const PageHeader& header = pool.access( link );
+            if ( 0 < header.depth ) {
+                const Page<B<K>,PageLink,A<K>,false>& node = *pool.page<B<K>,PageLink,A<K>,false>( link );
+                if (node.splitDefined()) collectPage( links, node.split() );
+                for (PageIndex i = 0; i < header.count; ++i) collectPage( links, node.value( i ) );
+            }
         }
 
         void streamPage( std::ostream & o, PageLink link, PageDepth depth ) const {
@@ -1142,7 +1159,7 @@ namespace BTree {
         void recoverTree( PageLink link ) {
             if (link.null()) {
                 // No previous B-Tree state, recover to empty BTree
-                freeAll( *root );
+                freeAll( *root, true );
                 root = &allocateLeaf()->header;
             } else {
                 root = pool.reference( link );

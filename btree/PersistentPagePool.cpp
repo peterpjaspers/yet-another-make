@@ -10,8 +10,6 @@ using namespace std;
 
 namespace BTree {
 
-    // Page pool with persistent storage in file.
-
     // Create a PersistentPagePool on a file.
     // If the file exists, the page pool is updated to reflect file content.
     // If the file does not exist, an empty page pool is created. 
@@ -23,86 +21,40 @@ namespace BTree {
             file.seekg( 0, file.end );
             size_t fileSize = file.tellg();
             size_t pageCount = ((fileSize - sizeof(PageHeader)) / pageSize);
-            if (0 < pageCount) {
-                pages.assign( pageCount, nullptr );
-                PageHeader root;
-                file.seekg( 0, file.beg );
-                file.read( reinterpret_cast<char*>( &root ), sizeof(PageHeader) );
+            if (pageCount == 0) throw string( signature ) + " - Page file must contain at least one page";
+            pages.assign( pageCount, nullptr );
+            PageHeader root;
+            file.seekg( 0, file.beg );
+            file.read( reinterpret_cast<char*>( &root ), sizeof(PageHeader) );
+            if (!file.good()) throw string( signature ) + " - File read error";
+            if (root.capacity != pageSize) throw string( signature ) + " - File page size does not match requested page size";
+            if (fileSize != ((pageCount * pageSize) + sizeof(PageHeader))) throw string( signature ) + " - Invalid page file size";
+            commitLink = root.page;
+            for (size_t index = 0; index < pageCount; ++index) {
+                pages[ index ] = reinterpret_cast<PageHeader*>( malloc( pageSize ) );
+                PageLink link( index );
+                PageHeader& page = const_cast<PageHeader&>( access( link ) );
+                file.read( reinterpret_cast<char*>( &page ), pageSize );
                 if (!file.good()) throw string( signature ) + " - File read error";
-                if (root.capacity != pageSize) throw string( signature ) + " - Invalid root page size";
-                commitLink = root.page;
-                for (size_t index = 0; index < pageCount; ++index) {
-                    void* buffer = malloc( pageSize );
-                    pages[ index ] = reinterpret_cast<PageHeader*>( buffer );
-                    file.read( reinterpret_cast<char*>( buffer ), pageSize );
-                    if (!file.good()) throw string( signature ) + " - File read error";
-                    PageLink link( index );
-                    const PageHeader& page = access( link );
-                    if (page.capacity != pageSize) throw string( signature ) + "  - Invalid page size";
-                    if (link == commitLink) {
-                        // Validate that root page content matches root (header)
-                        if ((page.depth != root.depth) || (page.count != root.count) || (page.split != root.split)) {
-                            throw string( signature ) + " - Mismatched root page content";
-                        }
+                if (page.capacity != pageSize) throw string( signature ) + "  - Invalid page size";
+                if (page.free == 1) {
+                    if ((page.modified != 0) || (page.persistent != 0) || (page.recover != 0)) {
+                        throw string( signature ) + " - Read corrupt free page";
                     }
-                    if (page.free == 1) freePages.push_back( link );
+                    freePages.push_back( link );
+                } else {
+                    if ((page.modified != 0) || (page.persistent != 1) || (page.recover != 0)) {
+                        throw string( signature ) + " - Read corrupt persistent page";
+                    }
                 }
-            } else {
-                throw string( signature ) + " - Page file must contain at least one page";
+                if (link == commitLink) {
+                    // Validate that root page content matches root (header)
+                    if ((page.depth != root.depth) || (page.count != root.count) || (page.split != root.split)) {
+                        throw string( signature ) + " - Mismatched root page content";
+                    }
+                }
             }
             file.close();
-        }
-    };
-
-    PersistentPagePool::~PersistentPagePool() {
-        // Ensure entire file has been written with valid data by filling holes in file.
-        // Not all persistent pages need be contiguous on file and furthermore not all
-        // consecutive pages may have been written after multiple modifications
-        // between commits. A hole is a non-persistent page with an index less than
-        // a persistent page. Note that we need not write persistent pages as these
-        // would have been written during the most recent commit.
-        // First look (backward) for persistent page with largest index.
-        int count = pages.size();
-        PageLink largest;
-        for (int i = 0; i < count; ++i) {
-            const PageHeader* page = pages[ count - i - 1 ];
-            if (page->persistent == 1) {
-                largest = page->page;
-                break;
-            }
-        }
-        if ( !largest.null() ) {
-            // There are persistent pages, collect holes (if any)
-            vector<PageLink> holes;
-            for (int i = 0; i < largest.index; ++i) {
-                const PageHeader* page = pages[ i ];
-                if (page->persistent == 0) holes.push_back( page->page );
-            }
-            if (0 < holes.size()) {
-                // There are holes, write those pages to file as free pages.
-                fstream file( fileName, ios::in | ios::out | ios::binary );
-                if (file.good()) {
-                    // Perform consistency check:
-                    // File size must match largest persistent page index
-                    file.seekg( 0, file.end );
-                    size_t fileSize = file.tellg();
-                    size_t pageCount = ((fileSize - sizeof(PageHeader)) / capacity);
-                    if (pageCount == (largest.index + 1)) {
-                        // Write all holes as free pages
-                        for ( auto link : holes ) {
-                            const PageHeader& page =  access( link );
-                            page.free = 1;
-                            page.modified = 0;
-                            page.persistent = 0;
-                            page.recover = 0;
-                            file.seekp( ((link.index * page.capacity) + sizeof(PageHeader)), file.beg );
-                            file.write( reinterpret_cast<const char*>( &page ), page.capacity );
-                            if (!file.good()) break;
-                        }
-                    }
-                }
-                file.close();
-            }
         }
     };
 
@@ -110,20 +62,31 @@ namespace BTree {
     // The given PageLink defines the (new) root of the updated B-tree.
     void PersistentPagePool::commit( const PageLink link ) {
         static const char* signature( "void PersistentPagePool::commit( const PageLink link )" );
+        // Ensure committed file contains only pages that either belong to the committed B-Tree
+        // (marked as persistent) or are free (marked as free). Note that we may need to write
+        // free pages to file as pages of the committed B-Tree need not all be contiguous in the
+        // persistent page file.
         // Purge modified list of free pages, modified pages may subsequently have been freed.
+        PageLink largest;
         vector<PageLink> purgedPages;
         for ( auto link : modifiedPages ) {
             const PageHeader& modifiedPage = access( link );
-            if (modifiedPage.free == 0) purgedPages.push_back( link );
+            if (modifiedPage.free == 0) {
+                purgedPages.push_back( link );
+                if (largest.null() || (largest < link)) largest = link;
+            }
         }
         modifiedPages = purgedPages;
         // Now look for freed persistent pages. These must be freed-up in the
         // persistent store (as they will be orphaned when recovered).
-        vector<PageLink> freePersistentPages;
+        // Simultaneously, look for non-persistent free pages with an PageLink less than the largest
+        // PageLink being commited. These will create holes in the persistent store file.
+        vector<PageLink> freedPages;
         for ( auto link : freePages ) {
             const PageHeader& freePage = access( link );
-            if (freePage.persistent == 1) freePersistentPages.push_back( link );
+            if ((freePage.persistent == 1) || largest.null() || (link < largest)) freedPages.push_back( link );
         }
+        // ToDo: Truncate file to largest persistent page.
         fstream file;
         // First try opening existing file for update (without actually reading).
         // In this case, the file exists and already contains (persistent) data.
@@ -132,7 +95,7 @@ namespace BTree {
         // This is the first time the persistent file is being written.
         if (!file.good()) file.open( fileName, ios::out | ios::binary );
         if (file.good()) {
-            // Write all (valid) modified pages to file.
+            // Write all modified pages to file as persistent pages.
             for ( auto link : modifiedPages ) {
                 const PageHeader& page = access( link );
                 page.free = 0;
@@ -143,8 +106,8 @@ namespace BTree {
                 file.write( reinterpret_cast<const char*>( &page ), page.capacity );
                 if (!file.good()) throw string( signature ) + " - File write error";
             }
-            // Write all free persistent pages as free pages to file.
-            for ( auto link : freePersistentPages ) {
+            // Write all freed persistent pages as free pages to file.
+            for ( auto link : freedPages ) {
                 const PageHeader& page = access( link );
                 page.free = 1;
                 page.modified = 0;
@@ -198,6 +161,17 @@ namespace BTree {
             }
         }
         freePages = purgedPages;
+        purgedPages.clear();
+        // Purge modified list of pages to be recovered
+        for ( auto link : modifiedPages ) {
+            const PageHeader& modifiedPage = access( link );
+            if (modifiedPage.recover == 1) {
+                modifiedPage.recover = 0;
+            } else {
+                purgedPages.push_back( link );
+            }
+        }
+        modifiedPages = purgedPages;
         fstream file( fileName, ios::in | ios::binary );
         if (file.good()) {
             PageHeader root;
@@ -208,7 +182,7 @@ namespace BTree {
             else if (root.page != commitLink) throw string( signature ) + " - Mismatched root link";
             // Read all pages marked for recover from file.
             for ( auto link : recoverPages ) {
-                const PageHeader& page = access( link );
+                PageHeader& page = const_cast<PageHeader&>( access( link ) );
                 file.seekg( ((link.index * page.capacity) + sizeof(PageHeader)), file.beg );
                 file.read( reinterpret_cast<char*>( const_cast<PageHeader*>( &page ) ), capacity );
                 if (!file.good()) throw string( signature ) + " - File read error";
@@ -227,16 +201,6 @@ namespace BTree {
             }
             file.close();
         }
-        // Purge modified list or (recently) recovered pages
-        for ( auto link : modifiedPages ) {
-            const PageHeader& modifiedPage = access( link );
-            if (modifiedPage.recover == 1) {
-                modifiedPage.recover = 0;
-            } else {
-                purgedPages.push_back( link );
-            }
-        }
-        modifiedPages = purgedPages;
         recoverPages.clear();
         return PagePool::recover( freeModifiedPages );
     };
