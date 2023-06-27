@@ -47,8 +47,8 @@ namespace BTree {
         virtual void modify( const PageHeader& page );
         virtual bool persistent() const;
         virtual void recover( const PageHeader& page, bool reuse = false );
-        virtual void commit( const PageLink link );
-        virtual PageLink recover( bool freeModifiedPages = false );
+        virtual void commit( const PageLink link, BTreeStatistics* stats = nullptr );
+        virtual PageLink recover( bool freeModifiedPages = false, BTreeStatistics* stats = nullptr );
         virtual PageHeader* clean();
         // Return page header of last commited root
         PageHeader* commitRoot() const;

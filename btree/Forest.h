@@ -112,12 +112,14 @@ namespace BTree {
         // Commit modifications to all B-Trees in the Forest.
         // The commit is atomic for the entire Forest.
         void commit() {
+            if (stats) stats->commits += 1;
             for ( auto tree : trees ) { Tree<TreeIndex,PageLink>::replace( tree.first, tree.second->root->page ); }
-            pool.commit( root->page );
+            pool.commit( root->page, stats );
         }
         // Recover all B-Trees in the Forest to their last committed state.
         // The recover is atomic for the entire Forest.
         void recover() {
+            if (stats) stats->recovers += 1;
             PageLink link( pool.recover() );
             Tree<TreeIndex,PageLink>::recoverTree( link );
             for ( auto tree : trees ) { const_cast<TreeBase*>(tree.second)->recoverTree( Tree<TreeIndex,PageLink>::retrieve( tree.first ) ); }

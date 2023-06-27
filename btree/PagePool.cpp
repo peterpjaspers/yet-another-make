@@ -85,7 +85,7 @@ namespace BTree {
     };
 
     // Commit all outstanding modify requests by defining new root.
-    void PagePool::commit( const PageLink link ) {
+    void PagePool::commit( const PageLink link, BTreeStatistics* stats ) {
         for ( auto link : modifiedPages ) {
             const PageHeader& modifiedPage = access( link );
             modifiedPage.modified = 0;
@@ -97,7 +97,7 @@ namespace BTree {
 
     // Discard all outstanding modify requests by recovering old root.
     // Optionally free modified pages.
-    PageLink PagePool::recover( bool freeModifiedPages ) {
+    PageLink PagePool::recover( bool freeModifiedPages, BTreeStatistics* stats ) {
         for ( auto link : modifiedPages ) {
             const PageHeader& modifiedPage = access( link );
             modifiedPage.modified = 0;

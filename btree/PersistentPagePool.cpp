@@ -60,13 +60,12 @@ namespace BTree {
 
     // Write all page modifications (since the last commit or its creation) to persistent store.
     // The given PageLink defines the (new) root of the updated B-tree.
-    void PersistentPagePool::commit( const PageLink link ) {
+    void PersistentPagePool::commit( const PageLink link, BTreeStatistics* stats ) {
         static const char* signature( "void PersistentPagePool::commit( const PageLink link )" );
         // Ensure committed file contains only pages that either belong to the committed B-Tree
-        // (marked as persistent) or are free (marked as free). Note that we may need to write
-        // free pages to file as pages of the committed B-Tree need not all be contiguous in the
-        // persistent page file.
-        // Purge modified list of free pages, modified pages may subsequently have been freed.
+        // (marked as persistent) or are free (marked as free). We may need to write free pages
+        // as pages of the committed B-Tree need not all be contiguous in the file.
+        // First, purge modified list of free pages (modified pages may subsequently have been freed).
         PageLink largest;
         vector<PageLink> purgedPages;
         for ( auto link : modifiedPages ) {
@@ -81,12 +80,13 @@ namespace BTree {
         // persistent store (as they will be orphaned when recovered).
         // Simultaneously, look for non-persistent free pages with an PageLink less than the largest
         // PageLink being commited. These will create holes in the persistent store file.
+        // ToDo: Truncate file to largest persistent page.
         vector<PageLink> freedPages;
         for ( auto link : freePages ) {
             const PageHeader& freePage = access( link );
-            if ((freePage.persistent == 1) || largest.null() || (link < largest)) freedPages.push_back( link );
+            // if ((freePage.persistent == 1) || largest.null() || (link < largest)) freedPages.push_back( link );
+            if (freePage.persistent == 1) freedPages.push_back( link );
         }
-        // ToDo: Truncate file to largest persistent page.
         fstream file;
         // First try opening existing file for update (without actually reading).
         // In this case, the file exists and already contains (persistent) data.
@@ -97,6 +97,7 @@ namespace BTree {
         if (file.good()) {
             // Write all modified pages to file as persistent pages.
             for ( auto link : modifiedPages ) {
+                if (stats) stats->pageWrites += 1;
                 const PageHeader& page = access( link );
                 page.free = 0;
                 page.modified = 0;
@@ -108,6 +109,7 @@ namespace BTree {
             }
             // Write all freed persistent pages as free pages to file.
             for ( auto link : freedPages ) {
+                if (stats) stats->pageWrites += 1;
                 const PageHeader& page = access( link );
                 page.free = 1;
                 page.modified = 0;
@@ -147,7 +149,7 @@ namespace BTree {
     // Discard all page modifications by reverting to persistent store content.
     // This effectively recovers the B-tree to the state of the last commit.
     // Returns PageLink of the recoverd B-tree root page.
-    PageLink PersistentPagePool::recover( bool freeModifiedPages ) {
+    PageLink PersistentPagePool::recover( bool freeModifiedPages, BTreeStatistics* stats ) {
         static const char* signature( "PageLink PersistentPagePool::recover( bool freeModifiedPages )" );
         // Purge free list of recover pages.
         // Pages to be recovered may reside in free (or modified) list when reusing copy-on-update page memory.
@@ -182,6 +184,7 @@ namespace BTree {
             else if (root.page != commitLink) throw string( signature ) + " - Mismatched root link";
             // Read all pages marked for recover from file.
             for ( auto link : recoverPages ) {
+                if (stats) stats->pageReads += 1;
                 PageHeader& page = const_cast<PageHeader&>( access( link ) );
                 file.seekg( ((link.index * page.capacity) + sizeof(PageHeader)), file.beg );
                 file.read( reinterpret_cast<char*>( const_cast<PageHeader*>( &page ) ), capacity );

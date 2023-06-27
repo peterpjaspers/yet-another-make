@@ -12,7 +12,6 @@
 #include "CompareKey.h"
 
 // ToDo: Align with C++ map (method naming and interface in general)
-// ToDo: Fix problem with orphaned pages
 // ToDo: Provide function to compact B-Tree to contiguous pages (reducing memory usage and persistent file size)
 
 namespace BTree {
@@ -28,7 +27,7 @@ namespace BTree {
     //
     // For example:
     //   Tree< int, float > - maps integer keys to float values.
-    // Either or both arguments may be arrays.
+    // Either or both arguments may be (variable length) arrays.
     //   Tree< char[], float > - maps C-string keys to float values.
     //   Tree< int, char[] > - maps integer keys to C-string values.
     //   Tree< char[], uint16_t[] > - maps C-string keys to arrays of 16-bit unsigned integers.
@@ -70,6 +69,7 @@ namespace BTree {
         // O(log(n)) complexity.
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&S<VT>),bool> = true >
         bool insert( const K& key, const V& value ) {
+            if (stats) stats->insertions += 1;
             Trail trail( *this );
             if (!find<KT>( key, trail )) {
                 auto page = leaf( trail );
@@ -84,13 +84,14 @@ namespace BTree {
                 } else {
                     page->insert( (trail.index() + 1), key, value, copyPage );
                 }
-                recoverPage( page->header, copyPage->header );
+                recoverUpdatedPage( page->header, copyPage->header );
                 return( true );
             }
             return( false );
         }
         template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&S<VT>),bool> = true >
         bool insert( const B<KT>* key, PageSize keySize, const V& value ) {
+            if (stats) stats->insertions += 1;
             Trail trail( *this );
             if (!find<KT>( key, keySize, trail )) {
                 auto page = leaf( trail );
@@ -105,7 +106,7 @@ namespace BTree {
                 } else {
                     page->insert( (trail.index() + 1), key, keySize, value, copyPage );
                 }
-                recoverPage( page->header, copyPage->header );
+                recoverUpdatedPage( page->header, copyPage->header );
                 return( true );
             }
             return( false );
@@ -116,6 +117,7 @@ namespace BTree {
         }
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&A<VT>),bool> = true >
         bool insert( const K& key, const B<VT>* value, PageSize valueSize ) {
+            if (stats) stats->insertions += 1;
             Trail trail( *this );
             if (!find<KT>( key, trail )) {
                 auto page = leaf( trail );
@@ -130,7 +132,7 @@ namespace BTree {
                 } else {
                     page->insert( (trail.index() + 1), key, value, valueSize, copyPage );
                 }
-                recoverPage( page->header, copyPage->header );
+                recoverUpdatedPage( page->header, copyPage->header );
                 return( true );
             }
             return( false );
@@ -141,6 +143,7 @@ namespace BTree {
         }
         template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&A<VT>),bool> = true >
         bool insert( const B<KT>* key, PageSize keySize, const B<VT>* value, PageSize valueSize ) {
+            if (stats) stats->insertions += 1;
             Trail trail( *this );
             if (!find<KT>( key, keySize, trail )) {
                 auto page = leaf( trail );
@@ -155,7 +158,7 @@ namespace BTree {
                 } else {
                     page->insert( (trail.index() + 1), key, keySize, value, valueSize, copyPage );
                 }
-                recoverPage( page->header, copyPage->header );
+                recoverUpdatedPage( page->header, copyPage->header );
                 return( true );
             }
             return( false );
@@ -170,6 +173,7 @@ namespace BTree {
         // O(log(n)) complexity.
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&S<VT>),bool> = true >
         bool replace( const K& key, const V& value ) {
+            if (stats) stats->replacements += 1;
             Trail trail( *this );
             if (find<KT>( key, trail )) {
                 auto page = leaf( trail );
@@ -179,13 +183,14 @@ namespace BTree {
                 } else {
                     page->replace( trail.index(), value, copyPage );
                 }
-                recoverPage( page->header, copyPage->header );
+                recoverUpdatedPage( page->header, copyPage->header );
                 return( true );
             }
             return( false );
         }
         template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&S<VT>),bool> = true >
         bool replace( const B<KT>* key, PageSize keySize, const V& value ) {
+            if (stats) stats->replacements += 1;
             Trail trail( *this );
             if (find<KT>( key, keySize, trail )) {
                 auto page = leaf( trail );
@@ -195,7 +200,7 @@ namespace BTree {
                 } else {
                     page->replace( trail.index(), value, copyPage );
                 }
-                recoverPage( page->header, copyPage->header );
+                recoverUpdatedPage( page->header, copyPage->header );
                 return( true );
             }
             return( false );
@@ -206,6 +211,7 @@ namespace BTree {
         }
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&A<VT>),bool> = true >
         bool replace( const K& key, const B<VT>* value, PageSize valueSize ) {
+            if (stats) stats->replacements += 1;
             Trail trail( *this );
             if (find<KT>( key, trail )) {
                 auto page = leaf( trail );
@@ -222,7 +228,7 @@ namespace BTree {
                 } else {
                     page->replace( trail.index(), value, valueSize, copyPage );
                 }
-                recoverPage( page->header, copyPage->header );
+                recoverUpdatedPage( page->header, copyPage->header );
                 return( true );
             }
             return( false );
@@ -233,6 +239,7 @@ namespace BTree {
         }
         template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&A<VT>),bool> = true >
         bool replace( const B<KT>* key, PageSize keySize, const B<VT>* value, PageSize valueSize ) {
+            if (stats) stats->replacements += 1;
             Trail trail( *this );
             if (find<KT>( key, keySize, trail )) {
                 auto page = leaf( trail );
@@ -249,7 +256,7 @@ namespace BTree {
                 } else {
                     page->replace( trail.index(), value, valueSize, copyPage );
                 }
-                recoverPage( page->header, copyPage->header );
+                recoverUpdatedPage( page->header, copyPage->header );
                 return( true );
             }
             return( false );
@@ -265,6 +272,7 @@ namespace BTree {
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&S<VT>),bool> = true >
         const VT& retrieve( const KT& key) const {
             static const char* signature = "const V& Tree<K,V>::retrieve( const K& key) const";
+            if (stats) stats->retrievals += 1;
             Trail trail( *this );
             if (!find<KT>( key, trail )) throw std::string( signature ) + " - Key not found";
             return value<VT>( trail );
@@ -272,6 +280,7 @@ namespace BTree {
         template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&S<VT>),bool> = true >
         const VT& retrieve( const B<KT>* key, PageSize keySize ) const {
             static const char* signature = "const V& Tree<K,V>::retrieve( const K* key, PageSize keySize ) const";
+            if (stats) stats->retrievals += 1;
             Trail trail( *this );
             if (!find<KT>( key, keySize, trail )) throw std::string( signature ) + " - Key not found";
             return value<VT>( trail );
@@ -283,6 +292,7 @@ namespace BTree {
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&A<VT>),bool> = true >
         std::pair<const B<VT>*, PageSize> retrieve( const KT& key) const {
             static const char* signature = "std::pair<const V*, PageSize> Tree<K,V>::retrieve( const K& key) const";
+            if (stats) stats->retrievals += 1;
             Trail trail( *this );
             if (!find<KT>( key, trail )) throw std::string( signature ) + " - Key not found";
             return value<VT>( trail );
@@ -290,6 +300,7 @@ namespace BTree {
         template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&A<VT>),bool> = true >
         std::pair<const B<VT>*, PageSize> retrieve( const B<KT>* key, PageSize keySize ) const {
             static const char* signature = "std::pair<const V*, PageSize> Tree<K,V>::retrieve( const K* key, PageSize keySize ) const";
+            if (stats) stats->retrievals += 1;
             Trail trail( *this );
             if (!find<KT>( key, keySize, trail )) throw std::string( signature ) + " - Key not found";
             return value<VT>( trail );
@@ -398,11 +409,15 @@ namespace BTree {
             return iterator->end();
         }
 
+        inline void rootUpdate( PageHeader* page ) {
+            if (stats) stats->rootUpdates += 1;
+            root = page;
+        }
         // Empty the B-Tree
         // O(n) complexity.
         void clear() {
             freeAll( *root, true );
-            root = &allocateLeaf()->header;
+            rootUpdate( &allocateLeaf()->header );
         }
         // Test if B-Tree is empty
         // O(1) complexity.
@@ -454,6 +469,7 @@ namespace BTree {
         // Allocate a new Page from the page pool and (optionally) mark it as modified.
         template< class VT >
         inline Page<B<K>,B<VT>,A<K>,A<VT>>* allocatePage( const PageDepth depth, bool modify = true ) const {
+            if (stats) stats->pageAllocations += 1;
             Page<B<K>,B<VT>,A<K>,A<VT>>* page = pool.page<B<K>,B<VT>,A<K>,A<VT>>( depth );
             if (modify) pool.modify( page->header );
             return( page );
@@ -502,7 +518,7 @@ namespace BTree {
             PageIndex index = trail.index();
             trail.pop();
             if (trail.depth() == 0) {
-                root = &( const_cast<PageHeader&>(header) );
+                rootUpdate( &( const_cast<PageHeader&>(header) ) );
             } else {
                 auto node = page<PageLink>( trail.header() );
                 if (node->header.modified) {
@@ -518,7 +534,7 @@ namespace BTree {
                     } else {
                         node->replace( trail.index(), header.page, copy );
                     }
-                    recoverPage( node->header, copy->header );
+                    recoverPage( node->header, (mode == PersistentTransaction) );
                     updateNodeTrail( trail, copy->header );
                 }
             }
@@ -533,14 +549,14 @@ namespace BTree {
         //   PersistentTransaction -> copy-on-update with memory reuse and back-up storage
         // Memory reuse (through recover) to be called after actual update is perfomed.
         // Does nothing if page is already modified; i.e., accessing copy of an earlier update.
-        // The functions updatePage and recoverPage are used to enclose code that updates
+        // The functions updatePage and recoverUpdatedPage are used to enclose code that updates
         // the content of a page as follows:
         //   Page<K,V,KA,VT>* page = ...
         //   Page<K,V,KA,VT>* copy = updatePage<V>( trail );
         //      ... code that updates page such as
         //      page->insert( index, key, value, copy );
         //      ...
-        //   recoverPage( page->header, copy->header );
+        //   recoverUpdatedPage( page->header, copy->header );
         // All page modification functions have an optional argument for copy-on-update behavior.
         template< class VT >
         Page<B<K>,B<VT>,A<K>,A<VT>>* updatePage( Trail& trail ) {
@@ -553,8 +569,12 @@ namespace BTree {
         }
         // Recover (persistent) src page if it differs from dst page;
         // i.e., dst is the copy-on-update version of src.
-        inline void recoverPage( const PageHeader& src, const PageHeader& dst ) {
-            if (src.page != dst.page) pool.recover( src, true );
+        inline void recoverUpdatedPage( const PageHeader& src, const PageHeader& dst ) {
+            if (src.page != dst.page) recoverPage( src, (mode == PersistentTransaction) );
+        }
+        inline void recoverPage( const PageHeader& page, bool free ) const {
+            if (stats && free) stats->pageFrees += 1;
+            pool.recover( page, free );
         }
 
         // Find a particular key.
@@ -567,6 +587,7 @@ namespace BTree {
         // Find a scalar key.
         template< class KT, std::enable_if_t<(S<KT>),bool> = true >
         bool find( const KT& key, Trail& trail, PageDepth to = 0 ) const {
+            if (stats) stats->finds += 1;
             bool found = false;
             bool keyFound;
             auto leafPage = leaf( trail );
@@ -596,6 +617,7 @@ namespace BTree {
         // Find an array key.
         template< class KT, std::enable_if_t<(A<KT>),bool> = true >
         bool find( const B<KT>* key, PageSize keySize, Trail& trail, PageDepth to = 0 ) const {
+            if (stats) stats->finds += 1;
             bool found = false;
             bool keyFound;
             auto leafPage = leaf( trail );
@@ -639,7 +661,7 @@ namespace BTree {
                 if (Trail::MaxHeight < (root->depth + 1)) throw std::string( signature ) + " - Max BTree heigth exceeded";
                 PageHeader* oldRoot = root;
                 auto node = allocateNode( root->depth + 1 );
-                root = &node->header;
+                rootUpdate( &node->header );
                 node->split( oldRoot->page );
                 node->insert( 0, key, link );
                 trail.clear();
@@ -656,7 +678,7 @@ namespace BTree {
                 } else {
                     parent->insert( (trail.index() + 1), key, link, copy );
                 }
-                recoverPage( parent->header, copy->header );
+                recoverUpdatedPage( parent->header, copy->header );
             }
         }
         // Insert array key-link
@@ -667,7 +689,7 @@ namespace BTree {
                 if (Trail::MaxHeight < (root->depth + 1)) throw std::string( signature ) + " - Max BTree heigth exceeded";
                 PageHeader* oldRoot = root;
                 auto parent = allocateNode( root->depth + 1 );
-                root = &parent->header;
+                rootUpdate( &parent->header );
                 parent->split( oldRoot->page );
                 parent->insert( 0, key, keySize, link );
                 trail.clear();
@@ -684,7 +706,7 @@ namespace BTree {
                 } else {
                     parent->insert( (trail.index() + 1), key, keySize, link, copy );
                 }
-                recoverPage( parent->header, copy->header );
+                recoverUpdatedPage( parent->header, copy->header );
             }
         }
         template< class VT, std::enable_if_t<(S<VT>),bool> = true >
@@ -741,6 +763,7 @@ namespace BTree {
         // This can fail if maximum tree depth is exceeded.
         template< class VT >
         void grow( Trail& trail ) {
+            if (stats) stats->grows += 1;
             auto node = page<VT>( trail );
             auto copyNode = updatePage<VT>( trail );
             auto right = allocatePage<VT>( node->header );
@@ -749,7 +772,7 @@ namespace BTree {
             setSplit<VT>( *right, *copyNode, splitKeyIndex );
             insertSplitKey<K,VT>( trail.pop(), *copyNode, splitKeyIndex, right->header.page );
             copyNode->remove( splitKeyIndex );
-            recoverPage( node->header, copyNode->header );
+            recoverUpdatedPage( node->header, copyNode->header );
         }
 
         // Remove current split and set split in Page to next key-value (if any)
@@ -757,6 +780,7 @@ namespace BTree {
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>),bool> = true >
         void nextSplit( Trail& trail, const K& key ) {
             // Set split for fixed size keys
+            if (stats) stats->splitUpdates += 1;
             auto page = this->page<VT>( trail );
             if (0 < page->header.count) {
                 // Shift Page value 0 into split and update corresponding Node key to Page key 0
@@ -776,20 +800,21 @@ namespace BTree {
                 } else {
                     parent->replace( trail.index(), page->key(0), newPage->header.page, copyParent );
                 }
-                recoverPage( parent->header, copyParent->header );
+                recoverUpdatedPage( parent->header, copyParent->header );
                 trail.pushSplit( &newPage->header );
                 conditionalMerge( trail );
             } else {
                 // Page is empty after removing split...
                 removeAt<KT,PageLink>( trail.pop(), key );
             }
-            pool.recover( page->header, true );
+            recoverPage( page->header, (mode == PersistentTransaction) );
         }
         // Remove current split and set split in Page to next key-value (if any)
         // Add new split key to appropriate node
         template< class KT = K, class VT = V, std::enable_if_t<(A<KT>),bool> = true >
         void nextSplit( Trail& trail, const B<KT>* key, PageSize keySize ) {
             // Set split for variable size keys
+            if (stats) stats->splitUpdates += 1;
             auto page = this->page<VT>( trail );
             if (0 < page->header.count) {
                 // Shift Page key 0 into split and update corresponding Node key to match
@@ -814,19 +839,20 @@ namespace BTree {
                 } else {
                     parent->replace( trail.index(), page->key(0), page->keySize(0), newPage->header.page, copyParent );
                 }
-                recoverPage( parent->header, copyParent->header );
+                recoverUpdatedPage( parent->header, copyParent->header );
                 trail.pushSplit( &newPage->header );
                 conditionalMerge( trail );
             } else {
                 removeAt<KT,PageLink>( trail.pop(), key, keySize );
             }
-            pool.recover( page->header, true );
+            recoverPage( page->header, (mode == PersistentTransaction) );
         }
 
         // Remove entry at trail.
         // Remove scalar key entry at trail.
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>),bool> = true >
         void removeAt( Trail& trail, const KT& key ) {
+            if (stats) stats->removals += 1;
             auto page = this->page<VT>( trail );
             if (trail.atIndex()) {
                 // Removing a key-value pair in this page.
@@ -834,7 +860,7 @@ namespace BTree {
                 auto copyPage = updatePage<VT>( trail );
                 page->remove( index, copyPage );
                 trail.deletedIndex();
-                recoverPage( page->header, copyPage->header );
+                recoverUpdatedPage( page->header, copyPage->header );
                 conditionalMerge( trail );
             } else {
                 // Removing key to split value in this page.
@@ -845,6 +871,7 @@ namespace BTree {
         // Remove array key entry at trail.
         template< class KT = K, class VT = V, std::enable_if_t<(A<KT>),bool> = true >
         void removeAt( Trail& trail, const B<KT>* key, PageSize keySize ) {
+            if (stats) stats->removals += 1;
             auto page = this->page<VT>( trail );
             if (trail.atIndex()) {
                 // Removing a key-value pair in this page.
@@ -852,7 +879,7 @@ namespace BTree {
                 auto copyPage = updatePage<VT>( trail );
                 page->remove( index, copyPage );
                 trail.deletedIndex();
-                recoverPage( page->header, copyPage->header );
+                recoverUpdatedPage( page->header, copyPage->header );
                 conditionalMerge( trail );
             } else {
                 // Removing key to split value in this page.
@@ -944,6 +971,7 @@ namespace BTree {
         // Merging is always from right to left (using Page::shiftLeft)
         template< class KT, class VT>
         void mergePage( Trail& dstTrail, Trail& srcTrail ) {
+            if (stats) stats->pageMerges += 1;
             const auto src = page<VT>( srcTrail );
             auto dst = page<VT>( dstTrail );
             auto dstCopy = updatePage<VT>( dstTrail );
@@ -956,8 +984,8 @@ namespace BTree {
             // Page being merged must have a split value as it cannot be leftmost leaf.
             appendSplit<VT>( *dst, *ancestor, index, *src, dstCopy );
             src->shiftLeft( *dstCopy, src->header.count );
-            recoverPage( dst->header, dstCopy->header );
-            pool.recover( src->header, true );
+            recoverUpdatedPage( dst->header, dstCopy->header );
+            recoverPage( src->header, (mode == PersistentTransaction) );
             // Recursively merge ancestor nodes where possible
             // A non-empty ancestor node must exist as we just merged two pages
             pruneBranch( srcTrail );
@@ -975,6 +1003,7 @@ namespace BTree {
                 ancestor->remove( index );
                 srcTrail.popToMatch().deletedIndex();
                 insertSplitKey<KT,PageLink>( srcTrail, *keyPark, 0, ancestorLink );
+                if (stats) stats->pageFrees += 1;
                 pool.free( keyPark->header );
             }
             pruneRoot();
@@ -990,7 +1019,7 @@ namespace BTree {
         void pruneBranch( Trail& trail ) {
             auto node = page<PageLink>( trail );
             while (node->size() == 0) {
-                pool.recover( node->header, true );
+                recoverPage( node->header, (mode == PersistentTransaction) );
                 node = page<PageLink>( trail.pop() );
             }
         }
@@ -998,8 +1027,8 @@ namespace BTree {
         void pruneRoot() {
             while ((root->count == 0) && (0 < root->depth)) {
                 auto rootPage = page<PageLink>( this->root );
-                root = pool.reference( rootPage->split() );
-                pool.recover( rootPage->header, true );
+                rootUpdate( pool.reference( rootPage->split() ) );
+                recoverPage( rootPage->header, (mode == PersistentTransaction) );
             }
         }
         template< class KT, std::enable_if_t<(S<KT>),bool> = true >
@@ -1022,6 +1051,7 @@ namespace BTree {
         // This may result recursively merging Pages higher up in BTree, eventually reducing BTree height.
         template< class KT, class VT >
         void merge( Trail& trail ) {
+            if (stats) stats->mergeAttempts += 1;
             const PageHeader* header = trail.header();
             if (header != root) {
                 Trail pageTrail( trail );
@@ -1073,7 +1103,7 @@ namespace BTree {
                     if (node->splitDefined()) freeAll( pool.access( node->split() ), recover );
                     for (PageIndex i = 0; i < node->size(); i++) freeAll( pool.access( node->value( i ) ), recover );
                 }
-                if (recover) pool.recover( page, true );
+                if (recover) recoverPage( page, (mode == PersistentTransaction) );
             }
         }
 
@@ -1139,7 +1169,7 @@ namespace BTree {
             UpdateMode updateMode,
             PageHeader* pageRoot
         ) : TreeBase( pagePool, pageRoot, updateMode ) {
-            if (root == nullptr) root = &allocateLeaf()->header;
+            if (root == nullptr) rootUpdate( &allocateLeaf()->header );
             compare.scalar = compareKey;
         }
         template< class KT = K, class VT = V >
@@ -1149,7 +1179,7 @@ namespace BTree {
             UpdateMode updateMode,
             PageHeader* pageRoot
         ) : TreeBase( pagePool, pageRoot, updateMode ) {
-            if (root == nullptr) root = &allocateLeaf()->header;
+            if (root == nullptr) rootUpdate( &allocateLeaf()->header );
             compare.array = compareKey;
         }
 
@@ -1160,9 +1190,9 @@ namespace BTree {
             if (link.null()) {
                 // No previous B-Tree state, recover to empty BTree
                 freeAll( *root, true );
-                root = &allocateLeaf()->header;
+                rootUpdate( &allocateLeaf()->header );
             } else {
-                root = pool.reference( link );
+                rootUpdate( pool.reference( link ) );
             }
         }
         

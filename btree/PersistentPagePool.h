@@ -38,9 +38,9 @@ namespace BTree {
         // Frees the page if reuse is enabled.
         void recover( const PageHeader& page, bool reuse = true );
         // Write all valid modified pages to the file.
-        void commit( const PageLink link );
+        void commit( const PageLink link, BTreeStatistics* stats = nullptr );
         // Retrieve all pages pending recovery from file.
-        PageLink recover( bool freeModifiedPages = true );
+        PageLink recover( bool freeModifiedPages = true, BTreeStatistics* stats = nullptr );
         // Clean-up page pool.
         // The only valid pages will be persistent pages.
         PageHeader* clean();

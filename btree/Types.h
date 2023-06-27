@@ -88,6 +88,41 @@ namespace BTree {
     template< class T >
     constexpr bool S = bool((std::rank_v<T> == 0) || (0 < std::extent_v<T,0>));
 
+    // B-Tree statistics consist of a collection of function counters.
+    // Counters are updated when the corresponding B-Tree function is executed.
+    // The gathering of statistics on a B-Tree is controlled via the functions:
+    //      enableStatistics
+    //      disableStatistics
+    //      clearStatistics
+    //      statisticsEnabled
+    //      statistics
+    // See BTree::TreeBase for further information.
+    struct BTreeStatistics {
+        uint32_t    insertions;
+        uint32_t    retrievals;
+        uint32_t    replacements;
+        uint32_t    removals;
+        uint32_t    finds;
+        uint32_t    grows;
+        uint32_t    pageAllocations;
+        uint32_t    pageFrees;
+        uint32_t    mergeAttempts;
+        uint32_t    pageMerges;
+        uint32_t    rootUpdates;
+        uint32_t    splitUpdates;
+        uint32_t    commits;
+        uint32_t    recovers;
+        uint32_t    pageWrites;
+        uint32_t    pageReads;
+        BTreeStatistics();
+        // Set all counters to zero.
+        BTreeStatistics* clear();
+        // Assign counters to given counter values.
+        BTreeStatistics* operator=( const BTreeStatistics& stats );
+        // Increment counters with given counter values.
+        BTreeStatistics* operator+( const BTreeStatistics& stats );
+    };
+
 } // namespace BTree
 
 #endif // BTREE_TYPES_H

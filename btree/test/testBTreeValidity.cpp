@@ -155,6 +155,7 @@ public:
         log << "Constructing B-Tree on " << directory + "/" + fileName + ".btree" << " ...\n" << flush;
         if (tree == nullptr) {
             tree = new Tree< K, V >( *pool );
+            tree->enableStatistics();
         } else {
             log << "B-Tree on " << directory + "/" + fileName + ".btree" << " already exists!\n" << flush;
         }
@@ -162,6 +163,7 @@ public:
     virtual void destroyTree() {
         log << "Deleting B-Tree...\n" << flush;
         if (tree != nullptr) {
+            logStatistics();
             delete( tree );
             tree = nullptr;
         } else {
@@ -334,6 +336,33 @@ public:
     virtual void statistics() const {
         log << "Tree contains " << tree->size() << " entries at a depth of " << tree->depth() << ".\n";
     }
+    void logStatistics() const {
+        if (tree != nullptr) {
+            BTreeStatistics stats;
+            if (tree->statistics( stats )) {
+                log << "B-Tree statistics\n"
+                    << "    Insertions        " << stats.insertions << "\n"
+                    << "    Retrievals        " << stats.retrievals << "\n"
+                    << "    Replacements      " << stats.replacements << "\n"
+                    << "    Removals          " << stats.removals << "\n"
+                    << "    Finds             " << stats.finds << "\n"
+                    << "    Grows             " << stats.grows << "\n"
+                    << "    Page allocations  " << stats.pageAllocations << "\n"
+                    << "    Page frees        " << stats.pageFrees << "\n"
+                    << "    Merge attempts    " << stats.mergeAttempts << "\n"
+                    << "    Page merges       " << stats.pageMerges << "\n"
+                    << "    Root updates      " << stats.rootUpdates << "\n"
+                    << "    Split updates     " << stats.splitUpdates << "\n"
+                    << "    Commits           " << stats.commits << "\n"
+                    << "    Recovers          " << stats.recovers << "\n"
+                    << "    Page writes       " << stats.pageWrites << "\n"
+                    << "    Page reads        " << stats.pageReads << "\n";
+            }
+        }
+    }
+    void clearStatistics() const {
+        if (tree != nullptr) tree->clearStatistics();
+    }
     uint32_t logTree() const {
         uint32_t errors = 0;
         log << "Printing B-Tree content...\n" << flush;
@@ -389,6 +418,8 @@ public:
     }
     size_t size() const { return content.size(); }
     uint32_t validate() const {
+        BTreeStatistics stats;
+        bool statsEnabled = ((tree != nullptr) && tree->disableStatistics( &stats ));
         uint32_t errors = TreeTester<uint32_t,uint32_t>::validate();
         if (tree != nullptr) {
             // Ensure that all expected content is actually present
@@ -424,6 +455,7 @@ public:
                 }
             }
         }
+        if (statsEnabled) tree->enableStatistics( &stats );
         return errors;
     }
     uint32_t insert( int count ) {
@@ -601,6 +633,8 @@ public:
     }
     size_t size() const { return content.size(); }
     uint32_t validate() const {
+        BTreeStatistics stats;
+        bool statsEnabled = ((tree != nullptr) && tree->disableStatistics( &stats ));
         uint32_t errors = TreeTester<uint16_t[],uint32_t>::validate();
         if (tree != nullptr) {
             bool usePair = false;
@@ -681,6 +715,7 @@ public:
                 usePair = !usePair;
             }
         }
+        if (statsEnabled) tree->enableStatistics( &stats );
         return errors;
     }
     uint32_t insert( int count ) {
@@ -931,6 +966,8 @@ public:
     }
     size_t size() const { return content.size(); }
     uint32_t validate() const {
+        BTreeStatistics stats;
+        bool statsEnabled = ((tree != nullptr) && tree->disableStatistics( &stats ));
         uint32_t errors = TreeTester<uint32_t,uint16_t[]>::validate();
         if (tree != nullptr) {
             // Ensure that all expected content is actually present
@@ -982,6 +1019,7 @@ public:
                 }
             }
         }
+        if (statsEnabled) tree->enableStatistics( &stats );
         return errors;
     }
     uint32_t insert( int count ) {
@@ -1217,6 +1255,8 @@ public:
     }
     size_t size() const { return content.size(); }
     uint32_t validate() const {
+        BTreeStatistics stats;
+        bool statsEnabled = ((tree != nullptr) && tree->disableStatistics( &stats ));
         uint32_t errors = TreeTester<uint16_t[],uint16_t[]>::validate();
         if (tree != nullptr) {
             // Ensure that all expected content is actually present...
@@ -1304,6 +1344,7 @@ public:
                 usePair = !usePair;
             }
         }
+        if (statsEnabled) tree->enableStatistics( &stats );
         return errors;
     }
     uint32_t insert( int count ) {
@@ -1534,7 +1575,7 @@ public:
 }; // class Uint16ArrayUint16ArrayTreeTester
 
 template< class K, class V >
-uint32_t doTest( TreeTester<K,V>& tester, size_t count, ofstream& log ) {
+uint32_t doTest( TreeTester<K,V>& tester, size_t count1, size_t count2, ofstream& log ) {
     uint32_t errors = 0;
     try {
 /*
@@ -1543,47 +1584,47 @@ uint32_t doTest( TreeTester<K,V>& tester, size_t count, ofstream& log ) {
         errors += tester.validate();
         errors += tester.commit();
         errors += tester.validate();
-        errors += tester.insert( count );
+        errors += tester.insert( count1 );
         errors += tester.validate();
-        errors += tester.remove( count, TreeTester<K,V>::Forward );
-        errors += tester.validate();
-        tester.logTree();
-        tester.destroyTree();
-        tester.createTree();
-        errors += tester.insert( count );
-        errors += tester.validate();
-        errors += tester.remove( count, TreeTester<K,V>::Reverse );
+        errors += tester.remove( count1, TreeTester<K,V>::Forward );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
-        errors += tester.insert( count );
+        errors += tester.insert( count1 );
         errors += tester.validate();
-        errors += tester.remove( count, TreeTester<K,V>::Random );
+        errors += tester.remove( count1, TreeTester<K,V>::Reverse );
+        errors += tester.validate();
+        tester.logTree();
+        tester.destroyTree();
+        tester.createTree();
+        errors += tester.insert( count1 );
+        errors += tester.validate();
+        errors += tester.remove( count1, TreeTester<K,V>::Random );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
         errors += tester.validate();
-        errors += tester.insert( count / 10 );
+        errors += tester.insert( count1 / 10 );
         errors += tester.validate();
         errors += tester.commit();
         errors += tester.validate();
-        errors += tester.insert( count - (count / 10) );
+        errors += tester.insert( count1 - (count1 / 10) );
         errors += tester.validate();
         errors += tester.commit();
         errors += tester.validate();
-        errors += tester.replace( count / 2 );
+        errors += tester.replace( count1 / 2 );
         errors += tester.validate();
-        errors += tester.remove( count - (count / 4), TreeTester<K,V>::Random );
+        errors += tester.remove( count1 - (count1 / 4), TreeTester<K,V>::Random );
         errors += tester.validate();
         errors += tester.recover();
         errors += tester.validate();
-        errors += tester.remove( count / 2, TreeTester<K,V>::Random );
+        errors += tester.remove( count1 / 2, TreeTester<K,V>::Random );
         errors += tester.validate();
-        errors += tester.replace( count / 2 );
+        errors += tester.replace( count1 / 2 );
         errors += tester.validate();
-        errors += tester.insert( count / 2 );
+        errors += tester.insert( count1 / 2 );
         errors += tester.validate();
         errors += tester.assign();
         errors += tester.validate();
@@ -1595,7 +1636,7 @@ uint32_t doTest( TreeTester<K,V>& tester, size_t count, ofstream& log ) {
         tester.createPool();
         tester.createTree();
         errors += tester.validate();
-        errors += tester.remove( count / 4, TreeTester<K,V>::Random );
+        errors += tester.remove( count1 / 4, TreeTester<K,V>::Random );
         errors += tester.validate();
         errors += tester.recover();
         errors += tester.validate();
@@ -1604,18 +1645,27 @@ uint32_t doTest( TreeTester<K,V>& tester, size_t count, ofstream& log ) {
 */
         tester.createPool();
         tester.createTree();
-        errors += tester.insert( count / 10 );
+/*
+        errors += tester.insert( count1 / 10 );
         errors += tester.validate();
         errors += tester.commit();
         errors += tester.validate();
-        errors += tester.insert( count - (count / 10) );
+        errors += tester.insert( count1 - (count1 / 10) );
+        errors += tester.validate();
+        errors += tester.commit();
+*/
+        errors += tester.insert( count1 );
         errors += tester.validate();
         errors += tester.commit();
         errors += tester.validate();
-        errors += tester.remove( count / 4, TreeTester<K,V>::Random );
+        tester.logStatistics();
+//        errors += tester.remove( count1 / 4, TreeTester<K,V>::Random );
+        tester.clearStatistics();
+        errors += tester.remove( count2, TreeTester<K,V>::Forward );
         errors += tester.validate();
         errors += tester.recover();
         errors += tester.validate();
+        tester.logStatistics();
     }
     catch ( string message ) {
         log << "Exception : " << message << "!\n";
@@ -1635,28 +1685,30 @@ int main(int argc, char* argv[]) {
     ofstream log;
     log.open( "testBTreeValidity\\logBTreeValidity.txt" );
     uint32_t errorCount = 0;
-    size_t count = 0;
-    if (2 <= argc) count = stoi( argv[ 1 ] );
-    for (int arg = 2; arg < argc; arg++) {
+    size_t count1 = 0;
+    size_t count2 = 0;
+    if (2 <= argc) count1 = stoi( argv[ 1 ] );
+    if (3 <= argc) count2 = stoi( argv[ 2 ] );
+    for (int arg = 3; arg < argc; arg++) {
         if (string( "Uint32Uint32" ) == argv[ arg ]) {
             log << "32-bit unsigned integer key to 32-bit unsigned integer B-Tree...\n" << flush;
             Uint32Uint32TreeTester tester( "testBTreeValidity", "Uint32Uint32", log );
-            errorCount += doTest( tester, count, log );
+            errorCount += doTest( tester, count1, count2, log );
         }
         if (string( "Uint16ArrayUint32" ) == argv[ arg ]) {
             log << "16-bit unsigned integer array key to 32-bit unsigned integer B-Tree.\n" << flush;
             Uint16ArrayUint32TreeTester tester( "testBTreeValidity", "Uint16ArrayUint32", log );
-            errorCount += doTest( tester, count, log );
+            errorCount += doTest( tester, count1, count2, log );
         }
         if (string( "Uint32Uint16Array" ) == argv[ arg ]) {
             log << "32-bit unsigned integer key to 16-bit unsigned integer array B-Tree.\n" << flush;
             Uint32Uint16ArrayTreeTester tester( "testBTreeValidity", "Uint32Uint16Array", log );
-            errorCount += doTest( tester, count, log );
+            errorCount += doTest( tester, count1, count2, log );
         }
         if (string( "Uint16ArrayUint16Array" ) == argv[ arg ]) {
             log << "16-bit unsigned integer array key to 16-bit unsigned integer array B-Tree.\n" << flush;
             Uint16ArrayUint16ArrayTreeTester tester( "testBTreeValidity", "Uint16ArrayUint16Array", log );
-            errorCount += doTest( tester, count, log );
+            errorCount += doTest( tester, count1, count2, log );
         }
         log << "\n\n";
     }
