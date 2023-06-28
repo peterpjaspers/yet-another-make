@@ -1,0 +1,361 @@
+1. What is YAM?
+YAM (Yet Another Make) is a software build system. There are already many 
+software build systems, e.g. Make, Apache Maven, Gradle, Bazel, MSBuild, tup.
+So why create another one? Section 3-Features and behaviors- tries to answer 
+this question.
+
+2. Directed Acyclic Graph (DAG)
+Like all build systems YAM uses a DAG.
+Question to chatGPT: 
+Explain the use of a directed acyclic graph in software build systems
+
+The answer of chatGPT:
+A directed acyclic graph (DAG) is a data structure that consists of nodes 
+connected by directed edges, where the edges only flow in one direction and
+there are no cycles. DAGs have various applications in computer science, 
+including software build systems.
+
+In the context of software build systems, a DAG is often used to represent the
+dependencies between different components or modules of a software project. 
+Each node in the DAG represents a component, and the edges represent the 
+dependencies between the components. The directed edges indicate the direction
+of dependency, meaning that one component depends on another for its build or
+execution.
+
+Here's how a DAG is used in a software build system:
+
+Dependency Management: The DAG helps manage dependencies between components. 
+When a component changes, only the components directly or indirectly dependent
+on it need to be rebuilt. By traversing the DAG, the build system can determine
+the minimal set of components that need to be rebuilt, avoiding unnecessary 
+builds and saving time.
+
+Build Order Determination: The DAG defines the order in which components should
+be built. Since the edges in the DAG indicate the dependencies, a build system
+can traverse the DAG in a topological order, where each component is built 
+after all its dependencies have been built. This ensures that a component is 
+built using the most up-to-date version of its dependencies.
+
+Incremental Builds: With a DAG, a build system can perform incremental builds 
+by tracking changes in the DAG. When a component or its dependencies change, 
+the build system can identify the affected components by examining the paths in
+the DAG and rebuild only those components. This approach saves time by avoiding
+unnecessary rebuilding of unaffected components.
+
+Parallelization: The DAG allows for parallel execution of independent build 
+tasks. Since a DAG represents the dependencies between components, build tasks
+that are not dependent on each other can be executed concurrently. This enables
+the build system to take advantage of multi-core processors or distributed build
+environments, leading to faster builds.
+
+Popular software build systems like Make, Apache Maven, and Gradle utilize DAGs
+to manage dependencies, determine build order, and optimize the build process.
+By representing the dependencies between components as a DAG, these build
+systems can efficiently and accurately build software projects while minimizing
+unnecessary work and maximizing parallelization.
+
+End of chatGPT answer. 
+
+For readers not familiar with build systems the following example illustrates
+the use of a DAG in C++ development.
+Given a C++ header file c.h and C++ implementation files a.cpp and b.cpp.
+Both a.cpp and b.cpp #include c.h. 
+The .cpp files are compiled into object files a.obj and b.obj:
+      cc a.cpp -out a.obj
+      cc b.cpp -out b.obj
+The object files are linked into an executable app.exe:
+      link.exe a.obj b.obj -out app.exe
+
+This build scenario is represented by the following DAG: 
+
+++---------++--------------------------------------------++-----------------++
+|| Inputs  ||                  Build task                ||      Outputs    ||
+++---------++--------------------------------------------++-----------------++
+           ||                                            ||
+           ||                                            ||
+      +----||------> link a.obj b.obj -out app.exe ------||-----> app.exe
+      |    ||                                            ||
+      +----||--------------------------------------------||-----------------+
+           ||                                            ||                 |                                                                     +
+a.cpp -----||------> cc a.cpp -out a.obj ----------------||-----> a.obj ----+
+           ||      |                                     ||                 |
+c. h ------||------>                                     ||                 |
+           ||      |                                     ||                 |
+b.cpp -----||------> cc b.cpp -out b.obj ----------------||-----> b.obj ----+
+           ||                                            ||
+           ||                                            ||
+++---------++--------------------------------------------++-----------------++
+
+YAM executes the build tasks defined by this DAG as follows:
+- compilations will be done before linking (as enforced by DAG topology)
+- a.obj is re-compiled upon a change in a.cpp and/or c.h and/or in the compile 
+  command and/or when for whatever reason a.obj is modified (e.g. deleted).
+- b.obj is re-compiled upon a change in b.cpp and/or c.h and/or in the compile 
+  command and/or when for whatever reason b.obj is modified (e.g. deleted).
+- app.exe is re-linked upon a change in a.obj and/or b.obj and/or in the link
+  command and/or when for whatever reason app.exe is modified (e.g. deleted it).
+
+
+YAM makes no assumptions about how or in what order a program is developed, it only
+requires all program dependencies including build task logic be defined, either
+explicitly or implicitly. YAM executes the required build tasks when needed ensuring 
+the program is up-to-date.
+
+3. Features and behaviors
+YAM is heavily influenced by Mike Shal's paper "Build System Rules and 
+Algorithms" https://gittup.org/tup/build_system_rules_and_algorithms.pdf 
+and by the "tup" build system https://gittup.org/tup/
+The paper discusses typical problems in build systems and defines rules
+and algorithms that solve these problems. Mike Shal implemented these
+rules and algorithms in tup. And so does YAM, with additions and improvements
+that intend to make it an even better build system than tup.
+The following sections describe how YAM adheres to Mike Shal's Rules and 
+Algorithms.
+
+3.1 Correctness - Incremental build
+YAM detects the in/output files of a build task as it executes. The name,
+last-write-time and version (a hash of file content) of each file
+is stored in the DAG. When YAM detects that the last-write-time of a file has 
+changed it re-computes its version. When a version is changed
+it re-executes all build tasks that depend on the changed file.
+(touch on the fact that versions do not imply an ordering; i.e., last-write-time
+may actually change backward in time)
+
+Most build systems, re-execute build tasks when a file last-write-time
+has changed. In YAM editing a file, saving it, undoing all edits and then
+running YAM will not cause re-execution of build tasks because, although the
+file last-write-time has changed, the file version has not.
+(but version will be recomputed)
+
+(reword this section)
+The implicit detection of input files by YAM implies that the user need not 
+specify the source files as input of the compile commands in the 
+example in section 2. YAM will detect those input files and add them to the 
+DAG. YAM also detects that a.obj and b.obj are outputs of the respective 
+compilation tasks and that a.obj and b.obj are inputs of the link task.
+There is however no way for YAM to determine that compilation tasks must be
+executed prior to link tasks. In the best case the link fails because the object
+files were not yet produced, in the worst case the link task links out-dated object
+files. YAM therefore requires the explicit definition of build task outputs 
+and as well as defining such output files as inputs to build tasks.
+(Not sure if you should use best/worst to characterize this behaviour. Simply describe
+three cases 1: one or more object files are not present (link fails), 2: link performed before
+required compilations complete (link produces incorrect result), 3: link performed after required
+compilations (link produces correct result))
+(describe implicit dependency detection through wildcarding and file tracking)
+(mention implicit dependency detection as a strong feature of YAM; i.e., a reason to use YAM)
+
+3.2 Correctness - DAG enforcement
+(terminology : define <-> declare)
+YAM uses the detected in/outputs to verify that the in/outputs in the DAG, as
+defined by the user, match the detected in/outputs. YAM fails the build when 
+detected in/inputs do not match declared in/outputs.
+
+3.3 Correctness - Reproducability      
+The information in the YAM DAG can be used in several ways to facilitate 
+flawless reproduction of a build: 
+    - Copy all input files to an empty sandbox.
+      The build is reproduced by running it in the sandbox.
+    - By comparing build states of builds A and B one can verify that A and
+      B are identical.
+(Explain why reproducibility is a big deal and that this requires 
+comprehensive definition/declaration of dependencies)
+(Define build state as an instantiated DAG, also say that a successfull YAM build results in a fully instantiated DAG.
+On the surface the reader may assume that the DAG only represents dependecies but as YAM executes,
+the DAG is filled with build state)
+
+3.4 Scalability - Build avoidance via file aspect versions
+Definition: a file aspect version is a hash of an aspect (subset) of the file.
+Examples:
+    - the 'code aspect version' is a hash of the code sections in a source code
+      file, excluding comment sections from the hash computation.
+    - the 'comment aspect version' is a hash of the comment sections in a
+      source code file.
+    - the 'size aspect version' is a hash of the size of the file. (usage?)
+    - the 'last-write-time aspect version' is a hash of the last-write-time
+      of the file. (usage?)
+    - the export aspect version of a dynamic link library
+    - the content aspect version of a dynamic link library
+(Promote file aspect versioning as a strong (uinque?) feature of YAM and a reason to use it.
+E.g., use case in which documentation is generated from source file comments.
+Aspect versioning requires parsing of source files. This only makes sense if significantly
+faster than compilation/translation as a recompile will not cause further nuild activity
+if the output file does not change)
+(Documentation aspect in which not only file comments but also function signatures are hashed.)
+(Distingiush between dynamic linking and dynamic loading, YAM is only concerned with dynamic linking.
+Dynamic loading must be coded by the application.)
+
+The file version as defined in section 3.1 is shorthand for the 'entire file 
+aspect version', a hash of all content of the file.
+
+YAM by default configures a build task to depend on input file versions, i.e.
+to re-execute when input file versions change.
+YAM allows the build task to be re-configured to depend on changes in selected 
+input file aspect versions, i.e. to re-execute only when the selected input
+file aspect versions change.
+
+Example - compilation
+Re-compiling a source file that only has changes in comment sections will produce 
+the same object file. In YAM the compilation task can be configured to depend 
+on the code aspect versions of its .cpp and .h input files, i.e. to re-compile
+only when the code aspect version of one or more input files has changed. 
+Rationale: you have excuse to refrain yourself from improving the
+comments in an include file because of the massive re-compilation
+that might otherwise be triggered by such a change.
+
+Example - Dynamic load libraries linking
+In the Windows operating system a dynamic load library, e.g. C.dll, has a
+so-called import library C.lib. Executables and dlls that want to load C.dll at
+run-time must be statically linked with C.lib. Relinking of exes and dlls that
+depend on C.lib is only necessary when the exports section (i.e. the interface
+of the dll) of C.lib changes.
+(not only Windows, reword to apply to Windows, Linux and MacOS)
+In YAM this can be achieved by configuring the link task to depend on the 
+exports aspect version of its .lib input files. The exports aspect version is a
+hash of only the exports section of the .lib file.
+Rationale: when using plain file versions changing implementation and/or 
+interface of a dll will recursively re-link all dlls and exes that depend on
+the changed dll. In large software systems the dll dependency graph is often 
+very wide and/or deep, thus causing massive re-linking.
+Using the exports aspect version, instead of the plain file version, breaks the
+recursive re-linking:
+    - when only dll implementation aspects were changed: only the changed dll  
+      is re-linked.
+    - when also dll interface aspects were changed: only the changed dll and
+      the dlls and exes that directly depend on it will be re-linked.
+
+3.3 Scalability - Build avoidance via build cache
+Builds can be configured to store their outputs in a build cache and to
+re-use previously stored outputs when possible, i.e. when build task logic and
+all input file (aspect) versions are identical.
+(define build cache scope, i.e., accross users and program versions)
+
+3.4 Scalability - Beta build
+Many build systems are alpha-build systems. An alpha build retrieves the 
+last-write-times of all files involved in the the build to figure out which
+files have changed since the previous build. The time complexity of an alpha 
+build is therefore O(#AllFiles). A beta build only retrieves the last-write-
+times of files that have been write-accessed since the previous build. The time
+complexity of a beta build is therefore O(#ModifiedFiles). Beta build enables 
+YAM to quickly start the build tasks that need to re-execute. Start time will 
+be sub-second in the typical development scenario where only a few files were
+modified since the previous build, also in a repository that contains a huge 
+number of files.
+(not strictly so, only dependency analysis is O(#AllFiles) for Alpha)
+(YAM build time indepedent of archive size, only on #modified files)
+
+Note: YAM uses a server that continuously monitors the file system to register
+which files were write-accessed since previous build. The server also 
+re-computes the versions of the write-accessed files in-between builds as to 
+not delay build task execution when the user starts the next build.
+(consider describing monitoring as an optional feature)
+
+Note: the first build after restart of the YAM server is an alpha build.
+
+3.5 Scalability - Parallel execution of independent build tasks
+By default YAM parallellizes build execution by queuing independent build tasks
+to a thread pool. The pool contains 1 thread per available processing core.
+The user can adjust the number of cores used by YAM.
+(I would not use specific numbers to substantiate scalability; also avoid
+implying that parallel execution is restricted to multi-core but also possible on
+grid computers e.g. via IncrediBuild)
+YAM has gone to great length to minimize the amount of non-parallelizable code.
+As shown by Amdahl's law such serial code is detrimental for scalability.
+YAM claims a speedup of ~800 when using 1000 cores to execute build tasks that 
+each take 1 second, assuming tasks are independent (i.e. can run in parallel),
+the build runs on a system with infinite large I/O bandwidth and zero overhead. 
+E.g. a build that executes 1000 compilations that each take 1 second will take
+1000/800 = 1,25* seconds. 
+Note: scalability de/increases as build tasks take less/more execution time.
+(also not stricly so as increased execution time may frustrate scalability due
+to dependencies)
+
+3.6 Usability - Single versatile build command 
+Running YAM is the only thing you need to do to build the system.
+YAM takes care of:
+    - changes in files and directories (creation/modification/deletion/rename),
+      i.e. re-execute build tasks that depend on the changed files/directories.
+    - changes in build task definitions, i.e. execute the changed tasks.
+    - deletion of stale output files. An output file becomes stale when the 
+      build task that produced the file is changed to no longer produce this
+      output.
+    - detection of build order issues, as explained in section 3.2.
+
+AS YAM guaratees absolute correctness and optimal scalability, there is no need for ad-hoc
+tools or techniques to 'optimize' program development. Many build systems do not fully 
+provide such qualities forcing users to introduce tools such as 'clean'(to ensure reproducibility) 
+or 'build partial' (for incremental build).
+
+(Define what is meant by build, not only program generation via compile and link, but also
+automation of all other tools typical in program development, e.g., document generation and
+targetting. Scalability increases with expanded build scope.)
+
+(Introduce file monitoring and file tracking. Explain that tracking is required for correctness
+and monitoring is required for scalability)
+(Still not clear why YAM is unique and/or attractive; i.e., why YAM is better than existing build systems)
+(Mention that YAM makes no assumption on which tools are used during a build, it only depends on file
+versions. This may be seen as a restriction (e.g., there is value in parsing source files to extract
+information) but also as an attractive feature due to simplicity of explicit dependency definition/declaration.)
+
+Terminology:
+
+version                         An unsigned integer value that uniquely corresponds to file content.
+                                File version values differ if and only if corresponding file content differs.
+
+aspect version                  A version that depends only on specific file content.
+
+code aspect version             A source code version excluding comments.
+
+comment aspect version          A source code version including only comments.
+                                (consider naming this document aspect and include function signatures)
+
+implementation aspect version   A dynamic link library version excluding export declarations.
+
+export aspect version           A dynamic link library version including only export declarations.
+
+build                           A process that generates target files from source files, build rules and build scripts.
+
+build rule                      A script applied to set of files defined via a pattern to which file names are matched.
+
+build script                    A sequence of commands to be executed during a build.
+
+build state                     A DAG representing precisely how target files were generated.
+
+directed acyclic graph          A data structure with vertices (nodes) and edges, with each edge directed from one vertex
+                                to another, such that following those directions will never form a closed loop.
+
+DAG                             Directed Acyclic Graph
+
+YAM                             Yet Another Build
+
+correctness                     A build system behavior that guarantees correct target files under all circumstances.
+                                (? self referencing definition)
+
+scalability                     A build system behavior that ensures minimum run time to produce target files.
+                                (? parallel processing, archive size...)
+
+incremental build               A build that generates only a sub-set of target files.
+
+alpha build                     A build that inspects all files to deduce what to update.
+
+beta build                      A build that inspects only files modified since the last sucessful build
+                                to deduce what to update.
+
+dependency                      A relation between a source file and a target file.
+                                A target file depends on a source file if it is required for its generation.
+
+implicit dependency             A dependency deduced from file access behavior during a build.
+
+explicit dependency             A dependency defined by a build rule or script.
+
+source file                     The input to a build rule or script.
+
+target file                     The ouput of a build rule or script.
+
+derived file                    A file generated during a build.
+
+node                            A vertex in the build state DAG.
+
+file node                       A node representing a version of a source or target file.
+
+command node                    A node representing the execution of a build rule or script.
