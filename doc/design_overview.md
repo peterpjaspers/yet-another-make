@@ -7,24 +7,22 @@ working on design and implementation of YAM. Some sections are primarily
 targeted to YAM developers. These sections are identified as such.
 
 The document focusses on definition of terms and concepts.
- ***Bold italic font*** is used on introduction of a new term.
+ ***Bold italic font*** is used when defining a new term.
  Terms are defined before they are used. The document is therefore best read
  sequentially.
 
-The design of YAM is all about:
+The design of YAM is mostly about:
 - its Directed Acyclic Graph (DAG)
 - how the DAG is used to perform builds
 
 ## The example software system
 
-This document uses an example C++ software system to illustrate many of the 
-YAM design aspects. The example software system consists of: 
-- a C++ utility library consisting of files util.cpp and util.h.
+Many design aspects are illustrated by using an example C++ software system. The example software system consists of: 
+- A C++ utility library consisting of files util.cpp and util.h.
   util.cpp includes util.h
-- a main module main.cpp that uses the util library
+- A main module main.cpp that uses the util library.
   main.cpp includes util.h
-
-This software is built by the following commands:
+- A set of commands used to build the system:
 ```
     gcc -c util.cpp               // compile util.cpp into util.o 
     gcc -c main.cpp               // compile main.cpp into main.o 
@@ -86,32 +84,45 @@ End of chatGPT answer.
 
 # YAM DAG
 
+In math a DAG is said to contain vertices and directed edges. The YAM DAG is said to 
+contain nodes and dependencies. A node corresponds to a vertex in the graph, a dependency 
+to a directed edge. YAM does not follow the typical implementation pattern where a graph is stored in memory as a list of vertices and a list of edges, an edge being a pair of vertex ids. Instead YAM follows an object oriented design in which a node X contains one or
+more lists of dependencies, a dependency being a node on which node X depends.
+
+The following sections describe node and dependency types.
+
 ## Node types
 
-The YAM DAG contains nodes (vertices) with the following types:
+The YAM DAG contains nodes of the following types:
 - ***Command node***   
-  A command node has a ***command script*** and one or more  ***output files***.  
-  A command script can either be a single command, e.g. gcc -c util.cpp, or a shell script. Output files are produced by executing the command script. An output
-  file can be produced by one and only one command.
+  A command node has a ***command script***, one or more  ***output files*** and a 
+  ***command execution version***.  
+  A command script can either be a single command, e.g. gcc -c util.cpp, or a shell script.Output files are produced by executing the command script. An output file can be produced
+  by one and one command only.
+  The command execution version allows YAM to detect that the command needs (re-)execution.
   The user defines commands, command scripts and output files in one or more 
-  ***build files***. Build files will be discussed in later sections.
+  ***build files***. Build files are discussed in section [TBD].
 - ***Derived file node***  
-  A derived file node is associated with a derived file. A ***derived file*** is an
-  output file of a command. Executing the command script derives the output file(s)
-  from one or more input files.  
-  E.g. util.o is derived from util.cpp and util.h, main.exe is derived from util.o
-  and main.o.
+  A derived file node is associated with a ***derived file*** and its ***file version***. 
+  A derived file is an output file of a command. Executing the command script derives the 
+  output file(s) from one or more input files. E.g. util.o is derived from util.cpp and util.h, main.exe is derived from util.o
+  and main.o.  
+  The file version is a hash of the file content.
 - ***Source file node***  
-  A source file node is associated with a ***source file***. A source file is a 
-  file that is not a derived file.  
+  A source file node is associated with a ***source file*** and its file version. 
+  A source file is a file that is not a derived file.  
   Source files are created/modified by users of YAM and are typically version
   controlled, e.g. stored a git repository. E.g. util.cpp, util.h and main.cpp
   are source files.
 
-Nodes have a unique name. The name of a file node is the pathname of its associated file. The name of a command node is derived from its first output file name.
+Nodes have unique names:
+- A file node name is the absolute pathname of its associated file.  
+  This allows a user to build a subset of the derived files by specifying the pathnames of
+  these files on the command line. E.g. 'build util.o'.
+- The name of a command node is the pathname of its first output file name followed by "_cmd".
 
-A (derived or source) file node computes the version of its associated file.
-Versions are explained in [this section](#finding-the-command-nodes-to-execute).
+YAM uses file and command execution versions to detect that file have changed and to decide
+which command nodes need (re-)execution. Details are described in section [Finding the command nodes to execute](#finding-the-command-nodes-to-execute).
 
 Note: the term file node is not to be confused with file: file nodes exist in the DAG,
 files exist in the filesystem. In this document the term file is often used as 
@@ -122,32 +133,36 @@ shorthand for its associated file node.
 The YAM DAG contains dependencies (edges) of the following types:
 - ***Output file dependency***  
   An edge from a command node to a derived file node whose associated derived 
-  file is produced by the command.
+  file is produced by the command. The edge is stored in the command node as a
+  reference to the output derived file node.
 - ***Source file dependency***  
   An edge from a command node to a source file node whose associated source
-  file is input of the command. A file is input of a command when the file is
-  read during the execution of the command.  
+  file is input of the command. A file is input of a command when the file was
+  read during the execution of the command. The edge is stored in the command node
+  as a reference to the input source file node.
 - ***Derived file dependency***  
   An edge from a command node C to a derived file node F where:
   - file F is output of some command node P, P != C
   - file F is input of command C
   A derived file dependency dictates build order: it tells YAM to execute P before
-  C. This ensures that C uses an existing and up-to-date F. 
+  C. This ensures that C uses an up-to-date F.  
+  The edge is stored in the command node as a reference to the input derived file node.
 
-Although the graph is directed and acyclic YAM supports efficient bi-directional 
-traversal of edges:
-- given a source or derived file node F YAM can quickly find the command nodes that
-  read file F.
-- given a derived file node F YAM can quickly find the command node that produces file F.
+YAM supports efficient bi-directional traversal of edges:
+- A command node contains references to its output, source and derived file dependencies
+- A source or derived file node contains references to the command nodes that depend on it.
+- A derived file node contains a reference to the command node that produces the
+  derived file.
 
 ## Command DAG
 
 The ***command DAG*** is the graph that is constructed from information stored in the
-build files. For for our example software system the command DAG looks as follows:
+build files. For our example software system the command DAG looks as follows:
 <figure>
-    <img src="DAG_before_build.PNG">
+    <img src="command_DAG.PNG">
     <figcaption>Command DAG of the example software system .</figcaption>
 </figure>
+
 
 # YAM build 
 
@@ -159,64 +174,79 @@ On completion of a successfull build all output files are up-to-date, i.e. outpu
 
 ## Incremental build
 
-A YAM build is an ***incremental build***: a build where YAM executes a command
-node if and only if one or more of the following is true:
-- Output files of the command node do not exist.  
-  E.g. zero output files exist at time of the first build and all commands are
-  executed.  
+A YAM build is an ***incremental build*** because YAM only (re-)executes a command 
+when one or more of its output files are outdated.  
+An output file is outdated when one or more of the following is true:
+- One or more of the output files of the command node do not exist.  
+  E.g. no output files exist at time of the first build and all commands are
+  executed.
   Note: a build that executes all commands is called a ***full build***. For YAM a full
   build is just like any build.
-- Output files of the command node were tampered with.  
-  E.g. an output file was deleted by the user.
-  Note: the wording 'tampered with' is used because users are not supposed to
-  modify or delete output files.
-- Command script of the command node was modified.  
-  E.g. the user modified a build file to add options to the gcc command line.
-- Derived file dependencies of the command node were modified/added/removed.  
-  E.g. the link command is executed because util.o was recompiled or because a
-  new object file was added.
+- Output files of the command node were ***tampered with***.
+  An output file is said to be tampered with when it was deleted or modified by the user
+  or by a software process other than the YAM build process.
+  Note: the wording 'tampered with' emphasises that YAM owns the output files and that
+  users are not supposed to delete or modify output files.
+- Command node definition was modified.  
+  Typically because the user modified a build file. E.g. to add compilation options to 
+  the gcc compilation command, to add/remove object files to/from the derived file
+  dependencies of the gcc link command.
+- Derived file dependencies of the command node were modified.  
+  E.g. the link command is executed because util.o was recompiled.
 - Source file dependencies of the command node were modified.  
-  E.g. the user edited/renamed/deleted a source file.
+  E.g. the user edited/renamed/deleted a source file, e.g. a source code formatter 
+  was applied to a source file.  
+  Note: In-place source code formatting cannot be implemented as a YAM command because
+  YAM does not support a file to be both source and derived file.
 
-## Incremental build overhead
+## Incremental build delay
 
-The overhead of an incremental build is dominated by the time needed to detect which 
-files have changed since the previous build. The user experiences this overhead as the time between starting the build and the time that command executions begin.
+The ***incremental build delay*** is the time between starting the build and the time that command execution begins. During this time YAM determines which commands need to be
+executed. This time is dominated by the time needed to detect which files have changed
+since the previous build.
 
-## Implicit source file dependencies
-
-For a correct incremental build all source and derived file dependencies must be in
-the graph. The command graph however does not contain source file dependencies. How then can YAM guarantee correct incremental builds?  
-
-YAM guarantees correct incremental builds by:
-- tracing all file access performed by an executing command. 
-- adding, for each accessed source file, a source file node to the source file
-  dependencies of the command node.
-
-These so-called ***implicit source file dependencies*** relieve the user from the error-prone task of defining source file dependencies in the build files. Error-prone because:
-- Not defining used source file dependencies causes incorrect build results
-- Defining not-used source file dependencies causes unnecessary command re-executions
+The time complexity of YAM's incremental build delay is O(D) where D is the number of
+files that were modified since the previous build. This ensures a sub-second delay for
+the typical development scenario in which only a few files are modified, even in a SW 
+system with hundreds of thousands of files.
 
 ## Buildstate
 
-The YAM ***buildstate*** is the command DAG augmented, during a build, with 
-implicit source file dependencies and file versions.
+For a correct incremental build the graph must contain all source and derived file 
+dependencies as well as all file versions used by the previous build. The command graph however does not contain source file dependencies nor file versions. How then can YAM guarantee correct incremental builds?  
 
-After execution of the build the state of the system is as follows: 
+YAM guarantees correct incremental builds by (during the build):
+- Adding to each command node its ***implicit source file dependencies***.  
+  The implicit source file dependencies are found by:
+  - Tracing all file access performed by the executing command.  
+  - Adding, for each accessed source file, a source file node to the source file
+    dependencies of the command node.
+- Adding to each source file node the file version used by the build.
+- Adding to each derived file node the file version produced by the build.
+
+Note: implicit source file dependencies relieve the user from the error-prone task of manually defining source file dependencies in the build files. Error-prone because:
+- Not defining used source file dependencies causes incorrect build results
+- Defining not-used source file dependencies causes unnecessary command re-executions
+
+The YAM ***buildstate*** is the command DAG augmented with the implicit source file 
+dependencies and source and derived file versions as found and computed during a build.  
+
+Each build uses the buildstate left by the previous build to detect changes to files 
+and commands and to decide which commands to execute, as explained in the next section. 
+YAM therefore stores, after each build, the buildstate in a file.
+
+After execution of the build the state the system is as follows: 
 <figure>
-    <img src="DAG_after_build.PNG">
-    <figcaption>File system and DAG of the example software system after first build.
+    <img src="buildstate.PNG">
+    <figcaption>File system and buildstate of the example software system after build.
     </figcaption>
-    <figcaption>Detected source file dependencies are added to the graph and the DAG 
-    is stored in the buildstate.</figcaption>
+    <figcaption>Detected source file dependencies are added to the command graph.</figcaption>
+    <figcaption>The resulting buildstate is stored in the filesystem.</figcaption>
 </figure> 
-
-This buildstate is essential for YAM's incremental build. YAM therefore stores, after
-each build, the buildstate in a file.
 
 ## Finding the command nodes to execute.
 
-This section explains how YAM uses dirty bits, file versions and command node
+This section explains how YAM uses dirty bits, file versions and command execution
 versions to find the command nodes that need to be executed.
 
 ### File node version
@@ -229,20 +259,21 @@ therefore only re-computes a file node version when the file last-write-time
 changed since the previous build. Last-write-time and version are stored in the
 file node.
 
-### Command node version
+### Command execution version
 
-A ***command node version*** is a hash of:
-- The file node versions of all source and derived file dependencies.
+A command node contains a ***command execution version***, being a hash of:
+- The file node versions of the source and derived file dependencies of the command node.
 - The command script version  
   The ***command script version*** is a hash of the command script text.
 
-The command node version is updated after completion of command execution.
+A command execution version is updated after completion of the command execution.
 
 ### Dirty bit
 
 Each node (command, derived, source) has a ***dirty bit***. A set dirty bit
-indicates that the node version is possibly out-dated and that it needs to be updated.  
-[Processing a build request](#processing-a-build-request) explains what it means to 
+indicates that the node version is possibly outdated. A dirty node needs a 
+***node update***. A node update determines whether the node version is indeed outdated 
+and recomputes the version if it is outdated. [Processing a build request](#processing-a-build-request) explains in more detail what it means to 
 update a node.
 
 The dirty bit of a file node is set when there has been, or may have been, 
