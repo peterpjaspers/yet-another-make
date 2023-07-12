@@ -1,15 +1,14 @@
 # Introduction
 
-This document gives a detailed overview of the design of YAM.
+This document describes the design of YAM.
 
-The document is intended to be read by the users of YAM and by the developers
-working on design and implementation of YAM. Some sections are primarily 
-targeted to YAM developers. These sections are identified as such.
+The document is intended to be read by the developers working on the design and
+implementation of YAM. The document may also be interesting for users that want 
+to gain a deeper understanding of YAM.
 
-The document focusses on definition of terms and concepts.
- ***Bold italic font*** is used when defining a new term.
- Terms are defined before they are used. The document is therefore best read
- sequentially.
+ ***Bold italic font*** is used when a new term is defined. Most terms are 
+defined before they are used, else a reference to the definition of the term is
+provided. The document is therefore best read sequentially.
 
 The design of YAM is mostly about:
 - its Directed Acyclic Graph (DAG)
@@ -17,7 +16,8 @@ The design of YAM is mostly about:
 
 ## The example software system
 
-Many design aspects are illustrated by using an example C++ software system. The example software system consists of: 
+Many design aspects are illustrated by using an example C++ software system. The
+ example software system consists of: 
 - A C++ utility library consisting of files util.cpp and util.h.
   util.cpp includes util.h
 - A main module main.cpp that uses the util library.
@@ -29,7 +29,7 @@ Many design aspects are illustrated by using an example C++ software system. The
     gcc util.o main.o -o main.exe // link util.o and main.o into main.exe
 ```
 
-# Directed Acyclic Graph (DAG)
+## Directed Acyclic Graph (DAG)
 
 Like all build systems YAM uses a DAG as its main data structure.  
 Question to chatGPT:  
@@ -84,80 +84,118 @@ End of chatGPT answer.
 
 # YAM DAG
 
-In math a DAG is said to contain vertices and directed edges. The YAM DAG is said to 
-contain nodes and dependencies. A node corresponds to a vertex in the graph, a dependency 
-to a directed edge. YAM does not follow the typical implementation pattern where a graph is stored in memory as a list of vertices and a list of edges, an edge being a pair of vertex ids. Instead YAM follows an object oriented design in which a node X contains one or
-more lists of dependencies, a dependency being a node on which node X depends.
+In mathematics a graph contains vertices and edges. YAM does not follow this
+terminology. Instead it uses the term ***node*** instead of vertex and the term
+***dependency*** instead of edge.  
 
-The following sections describe node and dependency types.
+YAM also does not follow the typical implementation pattern where a graph is
+stored as a list of vertices and a list of edges, an edge being a pair of vertex
+ids. Instead YAM follows an object oriented design in which a node X contains a
+list of dependencies, a dependency being a reference to a node on which node X
+depends.  
 
-## Node types
+The object oriented design implies that the YAM graph is fully described by its
+node types (classes). The following sections introduce the most important node
+classes. More node classes will be introduced in later sections.
 
-The YAM DAG contains nodes of the following types:
-- ***Command node***   
-  A command node has a ***command script***, one or more  ***output files*** and a 
-  ***command execution version***.  
-  A command script can either be a single command, e.g. gcc -c util.cpp, or a shell script.Output files are produced by executing the command script. An output file can be produced
-  by one and one command only.
-  The command execution version allows YAM to detect that the command needs (re-)execution.
-  The user defines commands, command scripts and output files in one or more 
-  ***build files***. Build files are discussed in section [TBD].
-- ***Derived file node***  
-  A derived file node is associated with a ***derived file*** and its ***file version***. 
-  A derived file is an output file of a command. Executing the command script derives the 
-  output file(s) from one or more input files. E.g. util.o is derived from util.cpp and util.h, main.exe is derived from util.o
-  and main.o.  
-  The file version is a hash of the file content.
-- ***Source file node***  
-  A source file node is associated with a ***source file*** and its file version. 
-  A source file is a file that is not a derived file.  
-  Source files are created/modified by users of YAM and are typically version
-  controlled, e.g. stored a git repository. E.g. util.cpp, util.h and main.cpp
-  are source files.
+## Node class diagram
 
-Nodes have unique names:
-- A file node name is the absolute pathname of its associated file.  
-  This allows a user to build a subset of the derived files by specifying the pathnames of
-  these files on the command line. E.g. 'build util.o'.
-- The name of a command node is the pathname of its first output file name followed by "_cmd".
+The following class diagram shows the main node classes in YAM.
 
-YAM uses file and command execution versions to detect that file have changed and to decide
-which command nodes need (re-)execution. Details are described in section [Finding the command nodes to execute](#finding-the-command-nodes-to-execute).
+<figure>
+    <img src="nodeClassDiagram.PNG">
+    <figcaption>Main classes in YAM DAG
+    </figcaption>
+</figure> 
 
-Note: the term file node is not to be confused with file: file nodes exist in the DAG,
-files exist in the filesystem. In this document the term file is often used as 
-shorthand for its associated file node.
+Node and FileNode are abstract base classes, i.e. they cannot be instantiated.  
 
-## Dependency types
+The diagram does not restrict graphs to be DAGs. YAM however constrains its 
+graph to be a DAG.
 
-The YAM DAG contains dependencies (edges) of the following types:
-- ***Output file dependency***  
-  An edge from a command node to a derived file node whose associated derived 
-  file is produced by the command. The edge is stored in the command node as a
-  reference to the output derived file node.
-- ***Source file dependency***  
-  An edge from a command node to a source file node whose associated source
-  file is input of the command. A file is input of a command when the file was
-  read during the execution of the command. The edge is stored in the command node
-  as a reference to the input source file node.
-- ***Derived file dependency***  
-  An edge from a command node C to a derived file node F where:
-  - file F is output of some command node P, P != C
-  - file F is input of command C
-  A derived file dependency dictates build order: it tells YAM to execute P before
-  C. This ensures that C uses an up-to-date F.  
-  The edge is stored in the command node as a reference to the input derived file node.
+For an efficient build efficient bi-directional traversal of the input and
+output arrows is required. YAM implements this by adding the following
+redundant references:
+- from FileNode to CommandNodes that use the FileNode as input
+- from DerivedFileNode to the CommandNode that produces the derived file.
 
-YAM supports efficient bi-directional traversal of edges:
-- A command node contains references to its output, source and derived file dependencies
-- A source or derived file node contains references to the command nodes that depend on it.
-- A derived file node contains a reference to the command node that produces the
-  derived file.
+These references are not depicted in the class diagram.
+
+## Node
+
+Node provides a framework to (recursively) execute a node. Executing node X 
+will:
+1. Execute the ***prerequisites*** of X.  
+   Prerequisites of X are nodes that produce output that is used by X.
+   Prerequisites must hence be executed before X.  
+   Providing the list of prerequisites is a sub-class responsibility.
+2. Determine whether the output of X is out-dated.  
+   This is a sub-class responsibility.  
+3. ***Self-execute*** X if its output is out-dated.  
+   Self-execution produces the output of X.  
+   Self-execution is a sub-class responsibility.
+
+A node has a name. This allows users to request YAM to execute a specific node
+by specifying the node name on the YAM command line.  
+
+## FileNode
+
+A FileNode is associated with a file in the filesystem. The name of a FileNode
+is the pathname of the associated file.  
+FileNode self-execution computes the version of the file, the version being a 
+hash of the file content.
+A FileNode has no prerequisites.
+
+Note: the computed file version is the output of the node execution.
+
+Note: the term file node is not to be confused with file: file nodes exist in 
+the DAG, files exist in the filesystem. In this document the term file is 
+sometimes used as shorthand for its associated file node.
+
+## DerivedFileNode
+
+A DerivedFileNode is associated with a derived file. A derived file is an output
+file of a [CommandNode](#commandnode).  
+E.g. derived file util.o is derived from 
+source files util.cpp and util.h by the command that compiles util.cpp.  
+E.g. derived file main.exe is derived from derived files from util.o and main.o 
+by the command that links main.exe.  
+
+## SourceFileNode
+
+A SourceFileNode is associated with a source file. A source file is a file that
+is not a derived file. Source files are created/modified by users of YAM. E.g. 
+util.cpp, util.h and main.cpp are source files.
+  
+## CommandNode
+
+CommandNode self-execution executes a ***command script***, a shell script or
+a single command like ```gcc -c util.cpp```.  
+Self-execution produces one or more output files, represented by the output 
+DerivedFileNodes.  
+Self-execution also updates the ***command execution version***, a hash of the 
+command script and of the versions of the input and output files. The 
+execution version allows the command to determine whether its output files are
+out-dated, i.e. whether no changes were made to its script, input and output 
+files since the previous build.    
+The prerequisites of a CommandNode are the union of:  
+- The output DerivedFileNodes.
+- The input SourceFileNodes.
+- The CommandNodes associated with the input DerivedFileNodes. 
+These prerequisites ensure that the command 'sees'' the latest versions of 
+input and output files when determining whether its output files are out-dated.
+The output files of the command are out-dated when the execution version 
+computed from latest versions of input and output files is not equal to the
+execution version as computed during last self-execution of the command.
+
+The user defines commands in [Build files](#build-files).
 
 ## Command DAG
 
-The ***command DAG*** is the graph that is constructed from information stored in the
-build files. For our example software system the command DAG looks as follows:
+The ***command DAG*** is the graph that is constructed from information stored 
+in the build files. The following figure shows the command DAG for the example 
+software system.  
+
 <figure>
     <img src="command_DAG.PNG">
     <figcaption>Command DAG of the example software system .</figcaption>
@@ -261,8 +299,8 @@ file node.
 
 ### Command execution version
 
-A command node contains a ***command execution version***, being a hash of:
-- The file node versions of the source and derived file dependencies of the command node.
+A command node contains a ***command execution version***, being a hash of the
+command script and the of the file node versions of its input and output filest
 - The command script version  
   The ***command script version*** is a hash of the command script text.
 
@@ -272,11 +310,11 @@ A command execution version is updated after completion of the command execution
 
 Each node (command, derived, source) has a ***dirty bit***. A set dirty bit
 indicates that the node version is possibly outdated. A dirty node needs a 
-***node update***. A node update determines whether the node version is indeed outdated 
-and recomputes the version if it is outdated. [Processing a build request](#processing-a-build-request) explains in more detail what it means to 
+***node update*** to determine whether the node version is indeed outdated 
+and to recompute the version if it is outdated. [Processing a build request](#processing-a-build-request) explains in more detail what it means to 
 update a node.
 
-The dirty bit of a file node is set when there has been, or may have been, 
+The dirty bit of a file node is set when there has been or may have been
 write-access to the file. The set bit is propagated to all command nodes that 
 have an output, derived or source file dependency on the file.
 
@@ -289,17 +327,15 @@ Setting the dirty bit propagation is recursive. Clearing the dirty bit is not.
 **TODO**: add figures examples showing the dirty nodes in the buildstate after 
 modification of an output file, a source file and command.
 
-## Client-server design
+##  9. <a name='Client-serverdesign'></a>Client-server design
 
 YAM uses a client-server design for the following reasons:
-- Loading the buildstate for each new build is too time-consuming.  
-  This is avoided by letting the server cache the build state.
-- Finding all files that were write-accessed since the previous build is 
-  time-consuming.  
-  This is avoided by letting the server subscribe at the filesystem to be notified
+- Retrieving the buildstate from file for each build is too time-consuming.  
+  This is avoided by caching the buildstate in server memory.
+- The incremental build delay must be O(D), D being the number of modified files since the last build. This can only be realized by continuously monitoring the filesystem.
+  This is realized by letting the server subscribe at the filesystem to be notified
   of file write-accesses. The server handles these notifications by setting
-  the dirty bit of affected file nodes. Only files whose dirty bit is set
-  need to be inspected for change.
+  the dirty bit of affected file nodes.
 
 Client responsibilities:
 - Start the server if it was not yet running.
@@ -326,28 +362,22 @@ Server responsibilities after startup:
   delaying updates of command nodes.  
   [Processing a build request](#processing-a-build-request) explains what it means to 
   update a node.
-- Perform a build on the cached buildstate on receipt of a client request.
-- Store the buildstate on completion of build. 
+- Perform a build, using the cached buildstate, on receipt of a build request.
+- Store the updated buildstate on completion of a build. 
 
 Note: the write-access notifications are fundamentally different from the file-access
-tracing described in section [Implicit Dependencies](#implicit-source-file-dependencies). The latter monitors the file-access performed 
+tracing described in section [Buildstate](#buildstate). The latter monitors the file-access performed 
 by one specific process, being the process that executes the command script. The former
 monitors write-access to files by any process without YAM caring about the process.
 
-### Processing a build request 
-
-TODO: explain mirroring of source file repository.
+###  9.1. <a name='Processingabuildrequest'></a>Processing a build request 
 
 On receipt of a build request from the client the server performs the following steps:
-1. Consume the notification queue. 
-   Consumption sets the dirty bits of the file nodes associated with the
-   write-accessed files and clears the notification queue. It is needed because
-   new notifications may have been received since the last periodic consumption.
-2. Collect all dirty nodes.
-3. Update the collected dirty derived file, source file and source directory nodes.
-4. Reparse modified build files
-3. Update the collected dirty (file and command) nodes.
-4. Store the buildstate.
+1. Consume the notification queue.  
+Consumption is needed because new notifications may have been received since 
+the last periodic consumption.
+4. Update the dirty nodes.
+5. Store the buildstate.
 
 ***Updating a file node*** entails:
 1. Retrieve the file last-write-time.
@@ -357,73 +387,72 @@ On receipt of a build request from the client the server performs the following 
 
 ***Updating a command node*** entails:
 1. Update its output file dependencies.
-2. Update the command nodes that produce its derived file dependencies.  
-   This recursive process ensures proper build order. The recursion ends at the 
-   leafs of the graph, being the source file nodes.
-3. Update its source file dependencies.
-4. Compute the command node version.  
+2. Update its source file dependencies.
+3. Update the command nodes that produce its derived file dependencies.  
+   This recursive process ensures proper build order.
+4. Compute the command execution version.  
 Note that steps 1..3 ensure that the version is computed from up-to-date 
 versions of the derived and source file dependencies. 
-5. Execute the command script if and only if the newly computed command version
-differs from the version computed in the previous build.
-6. If executed: update the source file dependencies as described in section [Implicit Dependencies](#implicit-source-file-dependencies).
-6. If executed: set the command node version to the new version.
+5. Execute the command script if and only if the newly computed command execution
+version differs from the execution version computed in the previous build.
+6. After execution: update the implicit source file dependencies as described in section [Buildstate](#buildstate).
+6. If executed: set the command execution version to the new version.
 7. Clear the dirty bit.
 
 Note: many build systems use the file last-write-time as if it was the file version.  
-An advantage of YAM using a file version, being is a hash of the file, is that this avoids unnecessary command re-executions.  
+An advantage of the YAM file version (a hash of file content), is that this prevents unnecessary command re-executions.  
 Example: in YAM editing a source file, saving it (and not starting a build), undoing the edits and then starting build will not cause re-execution of commands that depend on the file because, although the file 
 last-write-time has changed, the file version has not.  
 Example: editing only comments in a source file, then running a build. The build will recompile the source file but the resulting object file does not change. Link commands
 that depend on the object file will not re-execute because, although the object file 
 last-write-time has changed, the object file version has not.  
 
-A disadvantage is the additional cost of hashing the file content. For situations 
-where hashing is considered a too large overhead YAM can be configured to compute
-the file version as a hash of the file last-write-time.
+A disadvantage is the additional cost of hashing the file content.
+YAM can be configured to compute the file version as a (very inexpensive) hash of the file last-write-time for situations where the cost of hashing is considered too large.
 
-### File aspect version
+# Advanced topics
 
-The previous section explained how the use of YAM file versions prevent unnecessary 
-command re-executions. But still scenarios exist in wich commands are re-exeucted 
-without need. Such unnecessary re-executions can be avoided by using so-called
-file aspect versions.  
+##  10. <a name='Fileaspectversions'></a>File aspect versions
 
-A file aspect version is a hash of an aspect (a well-defined subset of the content) 
-of the file. Examples:
-    - The code aspect version' is a hash of the code sections in a source code
-      file. Comment sections are excluded from the hash computation.
-    - The comment aspect version is a hash of the comment sections in a
-      source code file.
+As explained earlier the use of YAM file versions prevent unnecessary 
+command re-executions. But still scenarios exist in wich commands are
+executed without need. Such unnecessary executions can be avoided by 
+using ***file aspect versions***.  
 
-Note: the file version as defined in section [File version](#file-node-version) is 
-shorthand for entire file aspect version, i.e. a hash of all the file content.
+A file aspect version is a hash of a specific subset of file content or file
+properties.
+For example:
+    - ***code aspect version*** is a hash of the code sections in a source 
+      code file. Comment sections are excluded from the hash computation.
+    - ***comment aspect version*** is a hash of the comment sections in
+      a source code file.
 
-YAM allows the user to configure a command node to compute its command node version
-from specific file aspect versions of its (derived and source) file dependencies.
+Note: the file version as defined in section [File version](#file-node-version)
+is shorthand for entire file aspect version, i.e. a hash of all the file content.
 
-A few examples illustrate the use of file aspect versions.
+YAM allows the user to configure a command node to compute its command node 
+version from specific file aspect versions of its (derived and source) file
+dependencies. A few examples illustrate the use of file aspect versions.
 
-### Example - compilation
+###  10.1. <a name='Example-compilation'></a>Example - compilation
 
 Re-compiling a C++ file that only has changes in comment sections will produce 
 the same object file. In YAM such an unnecessary re-compilation can be avoided
-by configuring the compilation command node to compute its command node version
-from the code aspect versions (instead of from the entire aspect versions) of 
-its input files.
+by configuring the compilation command node to compute its command execution
+version from the code aspect versions (instead of from the entire file aspect 
+versions) of its input files.
 
-Benefit: you have no more excuses to refrain yourself from improving the
-comments in a C++ include file because of the massive amount of re-compilations
-that would otherwise be triggered by such a change.
+Benefit: software engineers no longer have to refrain themselves from
+improving the comments in a C++ include file because of the massive amount of
+re-compilations that would otherwise be triggered by such a change.
 
 Note: some compilers, e.g. the Microsoft C++ compiler, are not deterministic:
 they will not produce a bitwise identical object file when re-compiling the same 
 source file or when re-compiling a source file where only comment was changed.
-The produced object file is (of course) functionally identical.
-Non-determinism is often caused by the inclusion of file path names and file 
-last-write-times in the object file. 
+This is caused by the inclusion of file path name and/or file last-write-time
+in the object file. 
 
-### Example - linking of dynamic link libraries
+###  10.2. <a name='Example-dynamiclinklibraries'></a>Example - dynamic link libraries
 
 Dynamic link libraries are supported by operating systems like Linux (.so files)
 and Windows (.dll files). A dynamic link library has an external interface
@@ -433,11 +462,12 @@ as long as it has the same interface.
 This example focuses on Windows but similar reasoning applies to Linux.
 
 In the Windows operating system a dynamic link library C.dll has an associated
-so-called import library C.lib. The import library contains, amongst others, the
+import library C.lib. The import library contains, amongst others, the
 interface of the dll: its exported symbols and the name of the dll. 
 Windows dictates that executables and dlls that require C.dll to be linked at 
-run-time must be statically linked with C.lib. Relinking of exes and dlls link
-C.lib is only necessary when the interface section of C.lib has changed.
+run-time must be statically linked with C.lib. Relinking of exes and dlls 
+that link C.lib is only necessary when the interface section of C.lib has 
+changed.
 
 In YAM this can be achieved by configuring the link task to depend on the 
 interface aspect version of its .lib input files. The interface aspect version 
@@ -451,15 +481,38 @@ re-linking of all dlls and exes that depend directly and indirectly on the
 chanaged import lib. In large software systems the dll dependency graph is often
 very wide and/or deep, thus causing massive re-linking and long build times.  
 
-The amount of re-linking is minimized when using the interface aspect version, 
-instead of the entire file version:
+Using the interface aspect version reduces re-linking to its minimum:
     - when only dll implementation aspects were changed: only the changed dll  
       is re-linked.
     - when also dll interface aspects were changed: only the changed dll and
       the dlls and exes that directly depend on it will be re-linked.
+Indirect dependencies on the import lib will not be re-linked.
+
+# Build phases
+##  11. <a name='Repositorymirroring'></a>Repository mirroring
+##  12. <a name='Buildfileparsing'></a>Build file parsing
+##  13. <a name='Commandexecution'></a>Command execution
+
+# Using multiple repositories
+
+# Build reproducability
+##  14. <a name='Filedependencyverification'></a>File dependency verification
+##  15. <a name='Environmentvariables'></a>Environment variables
+##  16. <a name='Uniquetemporarydirectories'></a>Unique temporary directories
+##  17. <a name='Sandboxing'></a>Sandboxing
+##  18. <a name='Builstatecomparison'></a>Builstate comparison
+
+# Build cache
+##  19. <a name='Cachebuildoutputs'></a>Cache build outputs
+##  20. <a name='Retrievebuildoutputs'></a>Retrieve build outputs
+###  20.1. <a name='Commandwinkinversion'></a>Command winkin version
+
+# Parallellization
+
+# Build files
 
 
-### 
+### Overview ends here
 
 # Features
 
