@@ -42,6 +42,7 @@ namespace BTree {
             header->modified = 0;
             header->persistent = 0;
             header->recover = 0;
+            header->stored = 0;
             header->depth = MaxPageDepth;
             header->count = 0;
             header->split = 0;

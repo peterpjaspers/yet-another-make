@@ -33,6 +33,9 @@ namespace BTree {
         friend bool operator== ( const PageLink& a, const PageLink& b );
         friend bool operator!= ( const PageLink& a, const PageLink& b );
         friend bool operator<  ( const PageLink& a, const PageLink& b );
+        friend bool operator<= ( const PageLink& a, const PageLink& b );
+        friend bool operator>  ( const PageLink& a, const PageLink& b );
+        friend bool operator>= ( const PageLink& a, const PageLink& b );
         friend std::ostream & operator<<( std::ostream & stream, PageLink const & link );
     };
     
@@ -41,13 +44,17 @@ namespace BTree {
     inline bool operator== ( const PageLink& a, const PageLink& b ) { return( a.index == b.index ); }
     inline bool operator!= ( const PageLink& a, const PageLink& b ) { return( a.index != b.index ); }
     inline bool operator<  ( const PageLink& a, const PageLink& b ) { return( a.index <  b.index ); };
+    inline bool operator<= ( const PageLink& a, const PageLink& b ) { return( a.index <=  b.index ); };
+    inline bool operator>  ( const PageLink& a, const PageLink& b ) { return( a.index >  b.index ); };
+    inline bool operator>= ( const PageLink& a, const PageLink& b ) { return( a.index >=  b.index ); };
 
     struct PageHeader {
         PageLink page;                   // Link to this page (self reference)
         mutable uint16_t free : 1;       // Page is free (not in use)
         mutable uint16_t modified : 1;   // Page is modified (changed after last commit or allocate)
-        mutable uint16_t persistent : 1; // Page is present in persistent store (previously commited)
+        mutable uint16_t persistent : 1; // Page is defined in persistent store (previously commited)
         mutable uint16_t recover : 1;    // Page may need to be recovered (modified after last commit)
+        mutable uint16_t stored : 1;     // Page present in persistent store (either free or persistent)
         uint16_t depth : 12;             // The depth in the BTree of this Page, 0 for leaf pages.
         PageSize capacity;               // Page capacity in bytes
         PageSize count;                  // Number of key-value pairs in Page

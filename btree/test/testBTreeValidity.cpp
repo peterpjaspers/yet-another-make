@@ -25,11 +25,11 @@ using namespace std;
 
 const int BTreePageSize = 256;
 const int MinArray = 2;
-const int MaxArray = 15;
+const int MaxArray = 14;
 // Enable generating exceptions when accessing non-existing keys.
 // Set to false when debugging to avoid generating intentional exceptions.
 // Set to true for full coverage (presumably with optimization)
-const bool TryUnexpectedKeys = false;
+const bool TryUnexpectedKeys = true;
 
 // Number of attempts to detect unexpected B-Tree content
 const int ProbeCount = 100;
@@ -45,13 +45,13 @@ inline uint32_t generateUint32() {
 void generateUint16Array( vector<uint16_t>& value ) {
     value.clear();
     int n = (MinArray  + (gen32() % (MaxArray - MinArray)));
-    for (int i = 0; i < n; i++) value.push_back( generateUint16() );
+    for (int i = 0; i < n; ++i) value.push_back( generateUint16() );
 }
 
 void logUint16Array( ostream& log, const uint16_t* value, PageSize valueSize ) {
     log << "[ ";
     if (0 < valueSize) {
-        for (int i = 0; i < (valueSize - 1); i++)  log << value[ i ] << ", ";
+        for (int i = 0; i < (valueSize - 1); ++i)  log << value[ i ] << ", ";
         log << value[ valueSize - 1 ];
     }
     log << " ]";
@@ -64,7 +64,7 @@ struct Uint16ArrayCompare {
     }
     static int compare( const uint16_t* lhs, PageSize ln, const uint16_t* rhs, PageSize rn ) {
         PageSize n = ((ln < rn) ? ln : rn);
-        for (int i = 0; i < n; i++) if (lhs[ i ] < rhs[ i ]) return( -1 ); else if (rhs[ i ] < lhs[ i ]) return( +1 );
+        for (int i = 0; i < n; ++i) if (lhs[ i ] < rhs[ i ]) return( -1 ); else if (rhs[ i ] < lhs[ i ]) return( +1 );
         if (rn < ln) return( -1 );
         if (ln < rn) return( +1 );
         return( 0 );
@@ -174,6 +174,85 @@ public:
     size_t treeSize() const { return( (tree != nullptr) ? tree->size() : 0 ); }
     virtual size_t size() const = 0;
 
+    uint32_t validatePersistentPagePool( PageSize pageSize ) const {
+        string path = directory + "/" + fileName + ".btree";
+        log << "Reading from persistent page file " << path << "\n";
+        uint32_t errors = 0;
+        fstream file( path, ios::in | ios::binary );
+        if (file.good()) {
+            file.seekg( 0, file.end );
+            size_t fileSize = file.tellg();
+            size_t pageCount = ((fileSize - sizeof(PageHeader)) / pageSize);
+            if (pageCount == 0) {
+                log << "Page file contains less than 1 page!\n";
+                errors += 1;
+            };
+            PageHeader root;
+            file.seekg( 0, file.beg );
+            file.read( reinterpret_cast<char*>( &root ), sizeof(PageHeader) );
+            if (file.good()) {
+                if (root.capacity != pageSize) {
+                    log << "Root page capacity " << root.capacity << " does not match expected capacity " << pageSize << "!\n";
+                    errors += 1;
+                }
+                if (fileSize != ((pageCount * pageSize) + sizeof(PageHeader))) {
+                    log << "File size " << fileSize << " does not match expected size for " << pageCount << " pages!\n";
+                    errors += 1;
+                }
+                uint8_t buffer[ pageSize ];
+                for (size_t index = 0; index < pageCount; ++index) {
+                    file.read( reinterpret_cast<char*>( &buffer ), pageSize );
+                    PageHeader* page = reinterpret_cast<PageHeader*>( buffer );
+                    if (!file.good()) {
+                        log << "File read error on page " << index << " !\n";
+                        errors += 1;
+                        break;
+                    }
+                    if (page->free == 1) {
+                        if (
+                            (page->modified != 0) ||
+                            (page->persistent != 0) ||
+                            (page->recover != 0) ||
+                            (page->stored != 1) ||
+                            (page->capacity != BTreePageSize)
+                        ) {
+                            log << "Free page " << index << " is corrupt : "
+                                << " modified " << page->modified
+                                << ", persistent " << page->persistent
+                                << ", recover " << page->recover
+                                << ", stored " << page->stored
+                                << ", capacity " << page->capacity
+                                << "!\n";
+                            errors += 1;
+                        }
+                    } else {
+                        if (
+                            (page->modified != 0) ||
+                            (page->persistent != 1) ||
+                            (page->recover != 0) ||
+                            (page->stored != 1) ||
+                            (page->capacity != BTreePageSize)
+                        ) {
+                            log << "Persistentent page " << index << " is corrupt : "
+                                << " modified " << page->modified
+                                << ", persistent " << page->persistent
+                                << ", recover " << page->recover
+                                << ", stored " << page->stored
+                                << ", capacity " << page->capacity
+                                << "!\n";
+                            errors += 1;
+                        }
+                    }
+                }
+            } else {
+                log << "File read error on root header!\n";
+                errors += 1;
+
+            }
+            file.close();
+        }
+        return errors;
+    }
     template< class KT, class VT, bool KA, bool VA >
     pair<uint32_t,uint32_t> validateNode( set<PageLink>& pageLinks, const Page<KT,PageLink,KA,false>& node, PageDepth depth ) const {
         uint32_t errors = 0;
@@ -261,22 +340,55 @@ public:
             << " pages, filling " << ((totalUsage * 100)/ capacity) << " %\n";
         // Now check to see if there are orphan pages.
         // An orphan is a non-free page that is not counted as a B-Tree page
+        // ToDo: Validate that free pages matched free page vector size
         uint32_t freePages = 0;
+        uint32_t modifiedPages = 0;
+        uint32_t recoverPages = 0;
+        uint32_t persistentPages = 0;
         for (uint32_t i = 0; i < pool->size(); ++i ) {
             const PageHeader& page = pool->access( PageLink( i ) );
             if (page.free != 0) freePages += 1;
+            if (page.modified != 0) modifiedPages += 1;
+            if (page.recover != 0) recoverPages += 1;
+            if (page.persistent != 0) persistentPages += 1;
+            if ((page.recover != 0) && (page.persistent == 0)) {
+                log << "Recovering non-persistent page " << page.page << "!\n";
+                errors += 1;
+            }
+        }
+        if (freePages != pool->sizeFreed()) {
+            log << "Free pages list size " << pool->sizeFreed() << " does not match detected number of free pages " << freePages << "!\n";
+            errors += 1;
+        }
+        if (modifiedPages != pool->sizeModified()) {
+            log << "Modified pages list size " << pool->sizeModified() << " does not match detected number of modified pages " << modifiedPages << "!\n";
+            errors += 1;
+        }
+        if (recoverPages != pool->sizeRecover()) {
+            log << "Recover pages list size " << pool->sizeRecover() << " does not match detected number of recover pages " << recoverPages << "!\n";
+            errors += 1;
+        }
+        if (persistentPages < recoverPages) {
+            log << "Number of recover pages " << recoverPages << " exceeds number of persistent pages " << persistentPages << "!/n";
         }
         if ((pageCount + freePages) < pool->size()) {
             uint32_t orphans = (pool->size() - (pageCount + freePages));
             log << "Detected " << orphans << " orphans out of " << pool->size() << " pages, B-Tree used " << pageCount << " pages!\n";
             errors += 1;
         }
+        log << "Page pool consists of " << pool->size() << " pages, "
+            << freePages << " free, "
+            << modifiedPages << " modified, "
+            << persistentPages << " persistent, "
+            << recoverPages << " recover.\n";
         return errors;
     }
 
     virtual uint32_t validate() const {
         uint32_t errors = 0;
         statistics();
+        log << "Validating page pool file...\n" << flush;
+        errors += validatePersistentPagePool( BTreePageSize );
         log << "Validating page pool...\n" << flush;
         errors += validatePagePool<K,V>();
         if (errors == 0) {
@@ -460,7 +572,7 @@ public:
     }
     uint32_t insert( int count ) {
         uint32_t errors = TreeTester<uint32_t,uint32_t>::insert( count );
-        for( int i = 0; i < count; i++) {
+        for( int i = 0; i < count; ++i) {
             uint32_t key = generateUniqueKey();
             uint32_t value = generateUint32();
             if (!tree->insert( key, value )) {
@@ -482,7 +594,7 @@ public:
     };
     uint32_t replace( int count ) {
         uint32_t errors = TreeTester<uint32_t,uint32_t>::replace( count );
-        for( int i = 0; i < count; i++) {
+        for( int i = 0; i < count; ++i) {
             size_t range = keys.size();
             if (0 < range) {
                 uint32_t key = keys[ generateIndex( range ) ];
@@ -511,15 +623,15 @@ public:
         if (range < count) count = range;
         if (order == Forward) {
             sort( keys.begin(), keys.end() );
-            for ( int i = 0; i < count; i++) errors += removeKey( keys[ i ] );
+            for ( int i = 0; i < count; ++i) errors += removeKey( keys[ i ] );
             keys.erase( keys.begin(), keys.begin() + count );
         } else if (order == Reverse) {
             sort( keys.begin(), keys.end() );
-            for ( int i = 0; i < count; i++) errors += removeKey( keys[ range - i - 1 ] );
+            for ( int i = 0; i < count; ++i) errors += removeKey( keys[ range - i - 1 ] );
             keys.erase( keys.end() - count, keys.end() );
         } else if (order == Random) {
             shuffle( keys.begin(), keys.end(), gen32 );
-            for ( int i = 0; i < count; i++) errors += removeKey( keys[ i ] );
+            for ( int i = 0; i < count; ++i) errors += removeKey( keys[ i ] );
             keys.erase( keys.begin(), (keys.begin() + count) );
         }
         for (int i = 0; i < ProbeCount; ++i) {
@@ -721,7 +833,7 @@ public:
     uint32_t insert( int count ) {
         uint32_t errors = TreeTester<uint16_t[],uint32_t>::insert( count );
         bool usePair = false;
-        for( int i = 0; i < count; i++) {
+        for( int i = 0; i < count; ++i) {
             vector<uint16_t>* key = generateUniqueKey();
             uint32_t value = generateUint32();
             bool inserted = false;
@@ -766,7 +878,7 @@ public:
         size_t range = keys.size();
         if (range < count) count = range;
         bool usePair = false;
-        for( int i = 0; i < count; i++) {
+        for( int i = 0; i < count; ++i) {
             vector<uint16_t>* key = keys[ generateIndex( count ) ];
             uint32_t value = generateUint32();
             bool replaced = false;
@@ -814,21 +926,21 @@ public:
         bool usePair = false;
         if (order == Forward) {
             sort( keys.begin(), keys.end(), compare );
-            for ( int i = 0; i < count; i++) {
+            for ( int i = 0; i < count; ++i) {
                 errors += removeKey( keys[ i ], usePair );
                 usePair = !usePair;
             }
             keys.erase( keys.begin(), keys.begin() + count );
         } else if (order == Reverse) {
             sort( keys.begin(), keys.end(), compare );
-            for ( int i = 0; i < count; i++) {
+            for ( int i = 0; i < count; ++i) {
                 errors += removeKey( keys[ range - i - 1 ], usePair );
                 usePair = !usePair;
             }
             keys.erase( keys.end() - count, keys.end() );
         } else if (order == Random) {
             shuffle( keys.begin(), keys.end(), gen32 );
-            for ( int i = 0; i < count; i++) {
+            for ( int i = 0; i < count; ++i) {
                 errors += removeKey( keys[ i ], usePair );
                 usePair = !usePair;
             }
@@ -1026,7 +1138,7 @@ public:
         uint32_t errors = TreeTester<uint32_t,uint16_t[]>::insert( count );
         bool usePair = false;
         bool inserted = false;
-        for( int i = 0; i < count; i++) {
+        for( int i = 0; i < count; ++i) {
             uint32_t key = generateUniqueKey();
             vector<uint16_t>* value = generateValue();
             if (usePair) {
@@ -1066,7 +1178,7 @@ public:
         size_t range = keys.size();
         if (range < count) count = range;
         bool usePair = false;
-        for( int i = 0; i < count; i++) {
+        for( int i = 0; i < count; ++i) {
             uint32_t key = keys[ generateIndex( range ) ];
             vector<uint16_t>* value = generateValue();
             bool replaced = false;
@@ -1113,15 +1225,15 @@ public:
         if (range < count) count = range;
         if (order == Forward) {
             sort( keys.begin(), keys.end() );
-            for ( int i = 0; i < count; i++) errors += removeKey( keys[ i ] );
+            for ( int i = 0; i < count; ++i) errors += removeKey( keys[ i ] );
             keys.erase( keys.begin(), keys.begin() + count );
         } else if (order == Reverse) {
             sort( keys.begin(), keys.end() );
-            for ( int i = 0; i < count; i++) errors += removeKey( keys[ range - i - 1 ] );
+            for ( int i = 0; i < count; ++i) errors += removeKey( keys[ range - i - 1 ] );
             keys.erase( keys.end() - count, keys.end() );
         } else if (order == Random) {
             shuffle( keys.begin(), keys.end(), gen32 );
-            for ( int i = 0; i < count; i++) errors += removeKey( keys[ i ] );
+            for ( int i = 0; i < count; ++i) errors += removeKey( keys[ i ] );
             keys.erase( keys.begin(), (keys.begin() + count) );
         }
         for (int i = 0; i < ProbeCount; ++i) {
@@ -1351,7 +1463,7 @@ public:
         uint32_t errors = TreeTester<uint16_t[],uint16_t[]>::insert( count );
         bool usePair = false;
         bool inserted = false;
-        for( int i = 0; i < count; i++) {
+        for( int i = 0; i < count; ++i) {
             vector<uint16_t>* key = generateUniqueKey();
             vector<uint16_t>* value = generateValue();
             if (usePair) {
@@ -1397,7 +1509,7 @@ public:
         size_t range = keys.size();
         if (range < count) count = range;
         bool usePair = false;
-        for( int i = 0; i < count; i++) {
+        for( int i = 0; i < count; ++i) {
             vector<uint16_t>* key = keys[ generateIndex( range ) ];
             vector<uint16_t>* value = generateValue();
             bool replaced = false;
@@ -1452,21 +1564,21 @@ public:
         bool usePair = false;
         if (order == Forward) {
             sort( keys.begin(), keys.end(), compare );
-            for ( int i = 0; i < count; i++) {
+            for ( int i = 0; i < count; ++i) {
                 errors += removeKey( keys[ i ], usePair );
                 usePair = !usePair;
             }
             keys.erase( keys.begin(), keys.begin() + count );
         } else if (order == Reverse) {
             sort( keys.begin(), keys.end(), compare );
-            for ( int i = 0; i < count; i++) {
+            for ( int i = 0; i < count; ++i) {
                 errors += removeKey( keys[ range - i - 1 ], usePair );
                 usePair = !usePair;
             }
             keys.erase( keys.end() - count, keys.end() );
         } else if (order == Random) {
             shuffle( keys.begin(), keys.end(), gen32 );
-            for ( int i = 0; i < count; i++) {
+            for ( int i = 0; i < count; ++i) {
                 errors += removeKey( keys[ i ], usePair );
                 usePair = !usePair;
             }
@@ -1578,7 +1690,6 @@ template< class K, class V >
 uint32_t doTest( TreeTester<K,V>& tester, size_t count1, size_t count2, ofstream& log ) {
     uint32_t errors = 0;
     try {
-/*
         tester.createPool();
         tester.createTree();
         errors += tester.validate();
@@ -1586,21 +1697,21 @@ uint32_t doTest( TreeTester<K,V>& tester, size_t count1, size_t count2, ofstream
         errors += tester.validate();
         errors += tester.insert( count1 );
         errors += tester.validate();
-        errors += tester.remove( count1, TreeTester<K,V>::Forward );
+        errors += tester.remove( count2, TreeTester<K,V>::Forward );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
         errors += tester.insert( count1 );
         errors += tester.validate();
-        errors += tester.remove( count1, TreeTester<K,V>::Reverse );
+        errors += tester.remove( count2, TreeTester<K,V>::Reverse );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
         errors += tester.insert( count1 );
         errors += tester.validate();
-        errors += tester.remove( count1, TreeTester<K,V>::Random );
+        errors += tester.remove( count2, TreeTester<K,V>::Random );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
@@ -1640,32 +1751,6 @@ uint32_t doTest( TreeTester<K,V>& tester, size_t count1, size_t count2, ofstream
         errors += tester.validate();
         errors += tester.recover();
         errors += tester.validate();
-        tester.destroyTree();
-        tester.destroyPool();
-*/
-        tester.createPool();
-        tester.createTree();
-/*
-        errors += tester.insert( count1 / 10 );
-        errors += tester.validate();
-        errors += tester.commit();
-        errors += tester.validate();
-        errors += tester.insert( count1 - (count1 / 10) );
-        errors += tester.validate();
-        errors += tester.commit();
-*/
-        errors += tester.insert( count1 );
-        errors += tester.validate();
-        errors += tester.commit();
-        errors += tester.validate();
-        tester.logStatistics();
-//        errors += tester.remove( count1 / 4, TreeTester<K,V>::Random );
-        tester.clearStatistics();
-        errors += tester.remove( count2, TreeTester<K,V>::Forward );
-        errors += tester.validate();
-        errors += tester.recover();
-        errors += tester.validate();
-        tester.logStatistics();
     }
     catch ( string message ) {
         log << "Exception : " << message << "!\n";
@@ -1689,28 +1774,31 @@ int main(int argc, char* argv[]) {
     size_t count2 = 0;
     if (2 <= argc) count1 = stoi( argv[ 1 ] );
     if (3 <= argc) count2 = stoi( argv[ 2 ] );
-    for (int arg = 3; arg < argc; arg++) {
+    for (int arg = 3; arg < argc; ++arg) {
+        uint32_t errors;
         if (string( "Uint32Uint32" ) == argv[ arg ]) {
             log << "32-bit unsigned integer key to 32-bit unsigned integer B-Tree...\n" << flush;
             Uint32Uint32TreeTester tester( "testBTreeValidity", "Uint32Uint32", log );
-            errorCount += doTest( tester, count1, count2, log );
+            errors = doTest( tester, count1, count2, log );
         }
         if (string( "Uint16ArrayUint32" ) == argv[ arg ]) {
             log << "16-bit unsigned integer array key to 32-bit unsigned integer B-Tree.\n" << flush;
             Uint16ArrayUint32TreeTester tester( "testBTreeValidity", "Uint16ArrayUint32", log );
-            errorCount += doTest( tester, count1, count2, log );
+            errors = doTest( tester, count1, count2, log );
         }
         if (string( "Uint32Uint16Array" ) == argv[ arg ]) {
             log << "32-bit unsigned integer key to 16-bit unsigned integer array B-Tree.\n" << flush;
             Uint32Uint16ArrayTreeTester tester( "testBTreeValidity", "Uint32Uint16Array", log );
-            errorCount += doTest( tester, count1, count2, log );
+            errors = doTest( tester, count1, count2, log );
         }
         if (string( "Uint16ArrayUint16Array" ) == argv[ arg ]) {
             log << "16-bit unsigned integer array key to 16-bit unsigned integer array B-Tree.\n" << flush;
             Uint16ArrayUint16ArrayTreeTester tester( "testBTreeValidity", "Uint16ArrayUint16Array", log );
-            errorCount += doTest( tester, count1, count2, log );
+            errors = doTest( tester, count1, count2, log );
         }
-        log << "\n\n";
+        if (0 < errors) log << errors << " errors detected!\n";
+        errorCount += errors;
+        log << "\n";
     }
     if (0 < errorCount) {
         log << "Total of " << errorCount << " errors detected!";

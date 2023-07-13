@@ -5,6 +5,7 @@
 // ToDo: Provide transaction behaviour for file updates.
 // ToDo: Lazy read of pages from file.
 // ToDo: Swap pages to/from file to save memory based on usage count.
+// ToDo: Truncate file to largest persistent page during commit (to reduce use of persistent store).
 
 using namespace std;
 
@@ -36,14 +37,25 @@ namespace BTree {
                 PageHeader& page = const_cast<PageHeader&>( access( link ) );
                 file.read( reinterpret_cast<char*>( &page ), pageSize );
                 if (!file.good()) throw string( signature ) + " - File read error";
-                if (page.capacity != pageSize) throw string( signature ) + "  - Invalid page size";
                 if (page.free == 1) {
-                    if ((page.modified != 0) || (page.persistent != 0) || (page.recover != 0)) {
+                    if (
+                        (page.modified != 0) ||
+                        (page.persistent != 0) ||
+                        (page.recover != 0) ||
+                        (page.stored != 1) ||
+                        (page.capacity != capacity)
+                    ) {
                         throw string( signature ) + " - Read corrupt free page";
                     }
                     freePages.push_back( link );
                 } else {
-                    if ((page.modified != 0) || (page.persistent != 1) || (page.recover != 0)) {
+                    if (
+                        (page.modified != 0) ||
+                        (page.persistent != 1) ||
+                        (page.recover != 0) ||
+                        (page.stored != 1) ||
+                        (page.capacity != capacity)
+                    ) {
                         throw string( signature ) + " - Read corrupt persistent page";
                     }
                 }
@@ -76,58 +88,59 @@ namespace BTree {
             }
         }
         modifiedPages = purgedPages;
-        // Now look for freed persistent pages. These must be freed-up in the
-        // persistent store (as they will be orphaned when recovered).
-        // Simultaneously, look for non-persistent free pages with an PageLink less than the largest
-        // PageLink being commited. These will create holes in the persistent store file.
-        // ToDo: Truncate file to largest persistent page.
-        vector<PageLink> freedPages;
-        for ( auto link : freePages ) {
-            const PageHeader& freePage = access( link );
-            // if ((freePage.persistent == 1) || largest.null() || (link < largest)) freedPages.push_back( link );
-            if (freePage.persistent == 1) freedPages.push_back( link );
-        }
         fstream file;
         // First try opening existing file for update (without actually reading).
         // In this case, the file exists and already contains (persistent) data.
         file.open( fileName, ios::in | ios::out | ios::binary );
-        // If that fails (i.e., file does not exist) open file for output only.
-        // This is the first time the persistent file is being written.
-        if (!file.good()) file.open( fileName, ios::out | ios::binary );
         if (file.good()) {
-            // Write all modified pages to file as persistent pages.
-            for ( auto link : modifiedPages ) {
-                if (stats) stats->pageWrites += 1;
-                const PageHeader& page = access( link );
-                page.free = 0;
-                page.modified = 0;
-                page.persistent = 1;
-                page.recover = 0;
-                file.seekp( ((link.index * page.capacity) + sizeof(PageHeader)), file.beg );
-                file.write( reinterpret_cast<const char*>( &page ), page.capacity );
-                if (!file.good()) throw string( signature ) + " - File write error";
-            }
-            // Write all freed persistent pages as free pages to file.
-            for ( auto link : freedPages ) {
-                if (stats) stats->pageWrites += 1;
-                const PageHeader& page = access( link );
-                page.free = 1;
-                page.modified = 0;
-                page.persistent = 0;
-                page.recover = 0;
-                file.seekp( ((link.index * page.capacity) + sizeof(PageHeader)), file.beg );
-                file.write( reinterpret_cast<const char*>( &page ), page.capacity );
-                if (!file.good()) throw string( signature ) + " - File write error";
-            }
-            // Finally, write root page header to file.
-            file.seekp( 0, file.beg );
-            const PageHeader& rootPage = access( link );
-            file.write( reinterpret_cast<const char*>( &rootPage ), sizeof(PageHeader) );
-            if (!file.good()) throw string( signature ) + " - File write error";
-            file.close();
+            // Determine current number of pages in file...
+            file.seekg( 0, file.end );
+            size_t fileSize = file.tellg();
+            size_t pageCount = ((fileSize - sizeof(PageHeader)) / capacity);
         } else {
-            throw string( signature ) + " - Could not open file";
+            // File does not exist, open file for output only.
+            // This is the first time the persistent file is being written.
+            file.open( fileName, ios::out | ios::binary );
+            if (!file.good()) throw string( signature ) + " - Could not open file";
         }
+        // Write all modified pages to file as persistent pages.
+        for ( auto link : modifiedPages ) {
+            if (stats) stats->pageWrites += 1;
+            const PageHeader& page = access( link );
+            page.free = 0;
+            page.modified = 0;
+            page.persistent = 1;
+            page.recover = 0;
+            page.stored = 1;
+            file.seekp( ((link.index * page.capacity) + sizeof(PageHeader)), file.beg );
+            file.write( reinterpret_cast<const char*>( &page ), page.capacity );
+            if (!file.good()) throw string( signature ) + " - Persistent page file write error";
+        }
+        // Now look for pages to be freed in store.
+        vector<PageLink> freedPages;
+        for (auto link : freePages) {
+            const PageHeader& freePage = access( link );
+            if ((freePage.stored == 0) || (freePage.persistent == 1)) freedPages.push_back( link );
+        }
+        // Write all un-stored or freed persistent pages as free pages to file.
+        for ( auto link : freedPages ) {
+            if (stats) stats->pageWrites += 1;
+            const PageHeader& page = access( link );
+            page.free = 1;
+            page.modified = 0;
+            page.persistent = 0;
+            page.recover = 0;
+            page.stored = 1;
+            file.seekp( ((link.index * page.capacity) + sizeof(PageHeader)), file.beg );
+            file.write( reinterpret_cast<const char*>( &page ), page.capacity );
+            if (!file.good()) throw string( signature ) + " - Free page file write error";
+        }
+        // Finally, write root page header to file.
+        file.seekp( 0, file.beg );
+        const PageHeader& rootPage = access( link );
+        file.write( reinterpret_cast<const char*>( &rootPage ), sizeof(PageHeader) );
+        if (!file.good()) throw string( signature ) + " - Root headr file write error";
+        file.close();
         // Discard all outstanding recover requests (possibly in free or modified list).
         for (auto link : recoverPages) access( link ).recover = 0;
         recoverPages.clear();
@@ -189,10 +202,16 @@ namespace BTree {
                 file.seekg( ((link.index * page.capacity) + sizeof(PageHeader)), file.beg );
                 file.read( reinterpret_cast<char*>( const_cast<PageHeader*>( &page ) ), capacity );
                 if (!file.good()) throw string( signature ) + " - File read error";
-                if (page.capacity != capacity) throw string( signature ) + " - Invalid page size";
-                // Sanity check, ensure page has expected attributes.
+                // Sanity check, ensure page has expected attributes and capacity.
                 // These should match attributes defined by commit()
-                if ((page.free != 0) || (page.modified != 0) || (page.persistent != 1) || (page.recover != 0)) {
+                if (
+                    (page.free != 0) ||
+                    (page.modified != 0) ||
+                    (page.persistent != 1) ||
+                    (page.recover != 0) ||
+                    (page.stored != 1) ||
+                    (page.capacity != capacity)
+                ) {
                     throw string( signature ) + " - Recovering corrupt page";
                 }
                 if (link == commitLink) {

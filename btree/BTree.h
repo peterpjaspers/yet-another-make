@@ -69,9 +69,9 @@ namespace BTree {
         // O(log(n)) complexity.
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&S<VT>),bool> = true >
         bool insert( const K& key, const V& value ) {
-            if (stats) stats->insertions += 1;
             Trail trail( *this );
             if (!find<KT>( key, trail )) {
+                if (stats) stats->insertions += 1;
                 auto page = leaf( trail );
                 if (!page->entryFit()) {
                     grow<VT>( trail );
@@ -91,9 +91,9 @@ namespace BTree {
         }
         template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&S<VT>),bool> = true >
         bool insert( const B<KT>* key, PageSize keySize, const V& value ) {
-            if (stats) stats->insertions += 1;
             Trail trail( *this );
             if (!find<KT>( key, keySize, trail )) {
+                if (stats) stats->insertions += 1;
                 auto page = leaf( trail );
                 if (!page->entryFit( keySize )) {
                     grow<VT>( trail );
@@ -117,9 +117,9 @@ namespace BTree {
         }
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&A<VT>),bool> = true >
         bool insert( const K& key, const B<VT>* value, PageSize valueSize ) {
-            if (stats) stats->insertions += 1;
             Trail trail( *this );
             if (!find<KT>( key, trail )) {
+                if (stats) stats->insertions += 1;
                 auto page = leaf( trail );
                 if (!page->entryFit( valueSize )) {
                     grow<VT>( trail );
@@ -143,9 +143,9 @@ namespace BTree {
         }
         template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&A<VT>),bool> = true >
         bool insert( const B<KT>* key, PageSize keySize, const B<VT>* value, PageSize valueSize ) {
-            if (stats) stats->insertions += 1;
             Trail trail( *this );
             if (!find<KT>( key, keySize, trail )) {
+                if (stats) stats->insertions += 1;
                 auto page = leaf( trail );
                 if (!page->entryFit( keySize, valueSize )) {
                     grow<VT>( trail );
@@ -173,9 +173,9 @@ namespace BTree {
         // O(log(n)) complexity.
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&S<VT>),bool> = true >
         bool replace( const K& key, const V& value ) {
-            if (stats) stats->replacements += 1;
             Trail trail( *this );
             if (find<KT>( key, trail )) {
+                if (stats) stats->replacements += 1;
                 auto page = leaf( trail );
                 auto copyPage = updatePage<VT>( trail );
                 if (trail.atSplit()) {
@@ -190,9 +190,9 @@ namespace BTree {
         }
         template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&S<VT>),bool> = true >
         bool replace( const B<KT>* key, PageSize keySize, const V& value ) {
-            if (stats) stats->replacements += 1;
             Trail trail( *this );
             if (find<KT>( key, keySize, trail )) {
+                if (stats) stats->replacements += 1;
                 auto page = leaf( trail );
                 auto copyPage = updatePage<VT>( trail );
                 if (trail.atSplit()) {
@@ -211,9 +211,9 @@ namespace BTree {
         }
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&A<VT>),bool> = true >
         bool replace( const K& key, const B<VT>* value, PageSize valueSize ) {
-            if (stats) stats->replacements += 1;
             Trail trail( *this );
             if (find<KT>( key, trail )) {
+                if (stats) stats->replacements += 1;
                 auto page = leaf( trail );
                 // Only grow if value size actually increases...
                 PageSize oldSize = ((trail.atSplit()) ? page->splitValueSize() : page->valueSize( trail.index() ));
@@ -239,9 +239,9 @@ namespace BTree {
         }
         template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&A<VT>),bool> = true >
         bool replace( const B<KT>* key, PageSize keySize, const B<VT>* value, PageSize valueSize ) {
-            if (stats) stats->replacements += 1;
             Trail trail( *this );
             if (find<KT>( key, keySize, trail )) {
+                if (stats) stats->replacements += 1;
                 auto page = leaf( trail );
                 // Only grow if value size actually increases...
                 PageSize oldSize = ((trail.atSplit()) ? page->splitValueSize() : page->valueSize( trail.index() ));
@@ -317,6 +317,7 @@ namespace BTree {
         bool remove( const KT& key ) {
             Trail trail( *this );
             if (!find<KT>( key, trail )) return false;
+            if (stats) stats->removals += 1;
             removeAt<KT,V>( trail, key );
             return true;
         }
@@ -324,6 +325,7 @@ namespace BTree {
         bool remove( const B<KT>* key, PageSize keySize ) {
             Trail trail( *this );
             if (!find<KT>( key, keySize, trail )) return false;
+            if (stats) stats->removals += 1;
             removeAt<KT,V>( trail, key, keySize );
             return true;
         }
@@ -653,7 +655,7 @@ namespace BTree {
             return find<KT>( page->key( 0 ), page->keySize( 0 ), trail, page->header.depth );
         }
         // Insert a key-link in a Node Page.
-        // Insert scalar key-link
+        // Recursively grow tree as required, this can fail if maximum tree depth is exceeded.
         template< class KT, std::enable_if_t<(S<KT>),bool> = true >
         void nodeInsert( Trail& trail, const K& key, PageLink link ) {
             static const char* signature( "void Tree<K,V>::nodeInsert( Trail& trail, const K& key, PageLink link )" );
@@ -681,7 +683,6 @@ namespace BTree {
                 recoverUpdatedPage( parent->header, copy->header );
             }
         }
-        // Insert array key-link
         template< class KT, std::enable_if_t<(A<KT>),bool> = true >
         void nodeInsert( Trail& trail, const B<KT>* key, PageSize keySize, PageLink link ) {
             static const char* signature( "void Tree<K,V>::nodeInsert( Trail& trail, const K* key, PageSize keySize, PageLink link )" );
@@ -740,7 +741,7 @@ namespace BTree {
                     leftFill = node->filling( probe );
                     rightFill = (fill - leftFill);
                     PageSize newBalance = ((leftFill < rightFill) ? (rightFill - leftFill) : (leftFill - rightFill));
-                    if (balance < newBalance) return( cut );
+                    if (balance <= newBalance) return( cut );
                     balance = newBalance;
                     cut = probe;
                 }
@@ -750,7 +751,7 @@ namespace BTree {
                     leftFill = node->filling( probe );
                     rightFill = (fill - leftFill);
                     PageSize newBalance = ((leftFill < rightFill) ? (rightFill - leftFill) : (leftFill - rightFill));
-                    if (balance < newBalance) return( cut );
+                    if (balance <= newBalance) return( cut );
                     balance = newBalance;
                     cut = probe;
                 }
@@ -760,7 +761,6 @@ namespace BTree {
         // Create room in Page for insertion by adding a Page to the right
         // This will result in adding a key to the parent page.
         // Content is is shifted to the newly created Page, making room in both Pages.
-        // This can fail if maximum tree depth is exceeded.
         template< class VT >
         void grow( Trail& trail ) {
             if (stats) stats->grows += 1;
@@ -852,7 +852,6 @@ namespace BTree {
         // Remove scalar key entry at trail.
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>),bool> = true >
         void removeAt( Trail& trail, const KT& key ) {
-            if (stats) stats->removals += 1;
             auto page = this->page<VT>( trail );
             if (trail.atIndex()) {
                 // Removing a key-value pair in this page.
@@ -871,7 +870,6 @@ namespace BTree {
         // Remove array key entry at trail.
         template< class KT = K, class VT = V, std::enable_if_t<(A<KT>),bool> = true >
         void removeAt( Trail& trail, const B<KT>* key, PageSize keySize ) {
-            if (stats) stats->removals += 1;
             auto page = this->page<VT>( trail );
             if (trail.atIndex()) {
                 // Removing a key-value pair in this page.
@@ -968,7 +966,7 @@ namespace BTree {
         // Append content of src Page to dst Page, adjusting split key and
         // removing node reference to (appended) src page.
         // Trail arguments point to src and dst respectively.
-        // Merging is always from right to left (using Page::shiftLeft)
+        // Merging is always from right/src to left/dst (using Page::shiftLeft)
         template< class KT, class VT>
         void mergePage( Trail& dstTrail, Trail& srcTrail ) {
             if (stats) stats->pageMerges += 1;
@@ -977,39 +975,54 @@ namespace BTree {
             auto dstCopy = updatePage<VT>( dstTrail );
             srcTrail.pop();
             dstTrail.pop();
+            // Look for ancestor of page being merged.
+            // This is a common ancestor of pages being merged. 
             PageDepth offset = srcTrail.match();
             PageIndex index = srcTrail.index( offset );
             Page<B<KT>,PageLink,A<KT>,false>* ancestor = page<PageLink>( srcTrail.header( offset ) );
-            PageLink ancestorLink = ancestor->value( index );
             // Page being merged must have a split value as it cannot be leftmost leaf.
             appendSplit<VT>( *dst, *ancestor, index, *src, dstCopy );
-            src->shiftLeft( *dstCopy, src->header.count );
+            if (0 < src->header.count) src->shiftLeft( *dstCopy, src->header.count );
             recoverUpdatedPage( dst->header, dstCopy->header );
             recoverPage( src->header, (mode == PersistentTransaction) );
-            // Recursively merge ancestor nodes where possible
             // A non-empty ancestor node must exist as we just merged two pages
-            pruneBranch( srcTrail );
             // Remove link to recently merged page
+            pruneBranch( srcTrail );
             auto parent = node( srcTrail );
             if (parent == ancestor) {
+                // Links to src and dst reside in single (parent) node.
+                // Link to src is an indexed entry as it is to the right of link to dst
                 ancestor->remove( index );
                 srcTrail.deletedIndex();
             } else {
-                // Replace split key in ancestor with next largest key in parent
+                // Links to src and dst reside in separate (parent) nodes.
+                // Link to src is split value of its parent.
+                // Link to dst is last value of its parent.
+                // Promote key 0 in parent to split key in ancestor
                 auto keyPark = allocateNode( parent->header.depth, false );
+                auto parentCopy = updatePage<PageLink>( srcTrail );
                 appendSplit<PageLink>( *keyPark, *parent, 0, *parent );
-                parent->split( parent->value( 0 ) );
-                parent->remove( 0 );
+                parent->split( parent->value( 0 ), parentCopy );
+                parentCopy->remove( 0 );
+                // Re-access ancestor as it may have changed due to copy-on-update of parent
+                srcTrail.popToMatch();
+                ancestor = page<PageLink>( srcTrail.header() );
+                PageLink ancestorLink = ancestor->value( index );
                 ancestor->remove( index );
-                srcTrail.popToMatch().deletedIndex();
+                srcTrail.deletedIndex();
+                // ToDo: Ensure that new key actually fits in parent, otherwise grow
                 insertSplitKey<KT,PageLink>( srcTrail, *keyPark, 0, ancestorLink );
+                recoverUpdatedPage( parent->header, parentCopy->header );
                 if (stats) stats->pageFrees += 1;
                 pool.free( keyPark->header );
             }
             pruneRoot();
+            // Recursively merge ancestor nodes where possible
             // Merged page (dstCopy) has at least one key-value entry, find it using key( 0 )
+            // ToDo: Find using key to parent of deleted page (possibly not key( 0 ))
             find<KT,VT>( dstCopy, srcTrail.clear() );
             if (1 < srcTrail.depth()) {
+                // Attempt to merge parent that just lost an entry.
                 parent = node( srcTrail.pop() );
                 if (parent->filling() < (LowPageThreshold * parent->header.capacity) ) merge<KT,PageLink>( srcTrail );
             }
@@ -1023,10 +1036,10 @@ namespace BTree {
                 node = page<PageLink>( trail.pop() );
             }
         }
-        // Set new root if current root is degenerate.
+        // Set new root if current root only has a split value.
         void pruneRoot() {
             while ((root->count == 0) && (0 < root->depth)) {
-                auto rootPage = page<PageLink>( this->root );
+                auto rootPage = page<PageLink>( root );
                 rootUpdate( pool.reference( rootPage->split() ) );
                 recoverPage( rootPage->header, (mode == PersistentTransaction) );
             }

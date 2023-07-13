@@ -35,16 +35,31 @@ namespace BTree {
         PagePool( PageSize pageCapacity );
         ~PagePool();
         PageSize pageCapacity() const;
+        // Allocate a page.
         PageHeader* allocate();
+        // Return number of pages.
         uint32_t size() const;
+        // Return number of free pages.
+        uint32_t sizeFreed() const;
+        // Return number of modified pages.
+        uint32_t sizeModified() const;
+        // Return number of recover pages (in a persistent pool).
+        virtual uint32_t sizeRecover() const;
+        // Reference a page.
+        // Throws an exception if the page is free.
         PageHeader* reference( const PageLink& link ) const;
+        // Access a page.
         const PageHeader& access( const PageLink& link ) const;
+        // Free a page.
         void free( const PageLink& link );
         void free( const PageHeader& header );
         void free( const PageHeader* header );
+        // Check if a link is valid; i.e., references a page in the pool.
         bool valid( const PageLink& link );
+        // Check if a page is valid.
         bool valid( const PageHeader& header );
         virtual void modify( const PageHeader& page );
+        // Determine if this pool is persistent.
         virtual bool persistent() const;
         virtual void recover( const PageHeader& page, bool reuse = false );
         virtual void commit( const PageLink link, BTreeStatistics* stats = nullptr );
