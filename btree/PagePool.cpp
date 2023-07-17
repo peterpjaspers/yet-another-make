@@ -6,9 +6,6 @@ using namespace std;
 
 namespace BTree {
 
-    // ToDo: Lazy read of pages from file.
-    // ToDo: Swap pages to/from file to save memory based on usage count.
-
     // Maintain a pool of fixed size memory pages.
     // Each page in the memory pool is accessed via a PageLink.
     // The use of (32-bit) PageLink links avoids the use of (64-bit) memory pointers, significantly

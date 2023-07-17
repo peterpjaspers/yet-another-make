@@ -3,8 +3,6 @@
 
 #include "PageStreamASCII.h"
 
-// ToDo: Key specific streaming, pass as program argument to constructor
-
 namespace BTree {
 
     template <class K, class V>

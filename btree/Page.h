@@ -9,9 +9,6 @@
 #include "PageFunctions.h"
 #include "PageStreamASCII.h"
 
-// ToDo: Key specific streaming, pass as program argument to constructor
-// ToDo: Add modifier functions for const Page copying modified content to newly allocated Page
-
 namespace BTree {
 
     // Template arguments:
@@ -29,15 +26,11 @@ namespace BTree {
         Page() = delete;
         Page( const PageDepth depth ) {
             static const char* signature( "Page<K,V,KA,KV>::Page( const PageDepth depth )" );
-            if (maxKeySize() < sizeof(K)) throw std::string( signature ) + " - Invalid key size";
-            if (maxValueSize() < sizeof(V)) throw std::string( signature ) + " - Invalid value size";
             header.depth = depth;
             header.count = 0;
             initialize<KA,VA>();
         }
         inline bool empty() const { return ((header.count == 0) && (header.split == 0)); }
-        inline PageSize maxKeySize() const { return ((header.capacity - sizeof(PageHeader)) / 8); };
-        inline PageSize maxValueSize() const { return ((header.capacity - sizeof(PageHeader)) / 8); };
         friend class PageFunctions;
         friend class ASCIIPageStreamer;
     private:
@@ -69,8 +62,6 @@ namespace BTree {
         //   key data      : Variable size key data
         //   value data    : Variable size value data
         //
-
-        inline Page<K,V,KA,VA>& dst( Page<K,V,KA,VA>* copy ) { return( copy ? *copy : *this ); }
 
         inline uint8_t* content() const {
             return ((reinterpret_cast<uint8_t*>(const_cast<PageHeader *>(&header))) + sizeof(PageHeader));
@@ -284,144 +275,197 @@ namespace BTree {
 
         // Set scalar split value
         template <bool AV = VA, std::enable_if_t<(!AV),bool> = true>
-        void split( const V& value, Page<K,V,KA,false>* copy = nullptr ) {
-            static const char* signature( "void Page<K,V,KA,false>::split( const V& value, Page<K,V,KA,false>* copy )" );
-            if ((header.split == 0) && (header.capacity < (filling() + sizeof(V)))) throw std::string( signature ) + " - Overflow";
-            PageFunctions::pageSplit( *this, dst( copy ), value );
+        void split( const V& value, Page<K,V,KA,false>* copy )  const {
+            static const char* signature( "void Page<K,V,KA,false>::split( const V& value, Page<K,V,KA,false>* copy ) const" );
+            if ((header.split == 0) && (header.capacity < (filling() + sizeof(V)))) {
+                throw std::string( signature ) + " - Overflow";
+            }
+            PageFunctions::pageSplit( *this, *copy, value );
         }
+        template <bool AV = VA, std::enable_if_t<(!AV),bool> = true>
+        inline void split( const V& value ) { split( value, this ); }
          // Set array split value
         template <bool AV = VA, std::enable_if_t<(AV),bool> = true>
-        void split( const V* value, PageSize valueSize, Page<K,V,KA,true>* copy = nullptr ) {
-            static const char* signature( "void Page<K,V,KA,true>::split( const V* value, PageSize valueSize, Page<K,V,KA,true>* copy )" );
+        void split( const V* value, PageSize valueSize, Page<K,V,KA,true>* copy ) const {
+            static const char* signature( "void Page<K,V,KA,true>::split( const V* value, PageSize valueSize, Page<K,V,KA,true>* copy ) const" );
             if ((header.split < valueSize) && (header.capacity < (filling() + (valueSize - header.split) * sizeof(V)))) {
                 throw std::string( signature ) + " - Overflow";
             }
-            PageFunctions::pageSplit( *this, dst( copy ), value, valueSize );
+            PageFunctions::pageSplit( *this, *copy, value, valueSize );
         }
+        template <bool AV = VA, std::enable_if_t<(AV),bool> = true>
+        inline void split( const V* value, PageSize valueSize ) { split( value, valueSize, this ); }
 
         // Remove split value in scalar key - scalar value page
-        void removeSplit( Page<K,V,KA,VA>* copy = nullptr ) {
-            static const char* signature( "void Page<K,V,KA,VA>::removeSplit( Page<K,V,KA,VA>* copy )" );
+        void removeSplit( Page<K,V,KA,VA>* copy ) const {
+            static const char* signature( "void Page<K,V,KA,VA>::removeSplit( Page<K,V,KA,VA>* copy ) const" );
             if (header.split == 0) throw std::string( signature ) + " - No split defined";
-            PageFunctions::pageRemoveSplit( *this, dst( copy ) );
+            PageFunctions::pageRemoveSplit( *this, copy );
         }
+        inline void removeSplit() { removeSplit( *this ); }
 
         // Insert an scalar key - scalar value entry at an index
         template <bool AK = KA, bool AV = VA, std::enable_if_t<(!AK&&!AV), bool> = true>
-        void insert( PageIndex index, const K& key, const V& value, Page<K,V,false,false>* copy = nullptr) {
-            static const char* signature( "void Page<K,V,false,false>::insert( PageIndex index, const K& key, const V& value, Page<K,V,false,false>* copy )" );
+        void insert( PageIndex index, const K& key, const V& value, Page<K,V,false,false>* copy ) const {
+            static const char* signature( "void Page<K,V,false,false>::insert( PageIndex index, const K& key, const V& value, Page<K,V,false,false>* copy ) const" );
             if (header.count < index) throw std::string( signature ) + " - Invalid index";
             if (header.capacity < (filling() + entryFilling())) throw std::string( signature ) + " - Overflow";
-            PageFunctions::pageInsert( *this, dst( copy ), index, key, value );
+            PageFunctions::pageInsert( *this, *copy, index, key, value );
+        }
+        template <bool AK = KA, bool AV = VA, std::enable_if_t<(!AK&&!AV), bool> = true>
+        inline void insert( PageIndex index, const K& key, const V& value ) {
+            insert( index, key, value, this );
         }
         // Insert an array key - scalar value entry at an index
         template <bool AK = KA, bool AV = VA, std::enable_if_t<(AK&&!AV), bool> = true>
-        void insert( PageIndex index, const K* key, const PageSize keySize, const V& value, Page<K,V,true,false>* copy = nullptr) {
-            static const char* signature( "void Page<K,V,true,false>::insert( PageIndex index, const K* key, const PageSize keySize, const V& value, Page<K,V,true,false>* copy )" );
+        void insert( PageIndex index, const K* key, const PageSize keySize, const V& value, Page<K,V,true,false>* copy ) const {
+            static const char* signature( "void Page<K,V,true,false>::insert( PageIndex index, const K* key, const PageSize keySize, const V& value, Page<K,V,true,false>* copy ) const" );
             if (header.count < index) throw std::string( signature ) + " - Invalid index";
-            if ((keySize == 0) || (maxKeySize() < (keySize * sizeof(K)))) throw std::string( signature ) + " - Invalid key size";
+            if (keySize == 0) throw std::string( signature ) + " - Invalid key size";
             if (header.capacity < (filling() + entryFilling( keySize ))) throw std::string( signature ) + " - Overflow";
-            PageFunctions::pageInsert( *this, dst( copy ), index, key, keySize, value );
+            PageFunctions::pageInsert( *this, *copy, index, key, keySize, value );
+        }
+        template <bool AK = KA, bool AV = VA, std::enable_if_t<(AK&&!AV), bool> = true>
+        inline void insert( PageIndex index, const K* key, const PageSize keySize, const V& value ) {
+            insert( index, key, keySize, value, this );
         }
         // Insert a scalar key - array value entry at an index
         template <bool AK = KA, bool AV = VA, std::enable_if_t<(!AK&&AV), bool> = true>
-        void insert( PageIndex index, const K& key, const V* value, const PageSize valueSize, Page<K,V,false,true>* copy = nullptr) {
-            static const char* signature( "void Page<K,V,false,true>::insert( PageIndex index, const K& key, const V* value, const PageSize valueSize, Page<K,V,false,true>* copy ) - Invalid index" );
+        void insert( PageIndex index, const K& key, const V* value, const PageSize valueSize, Page<K,V,false,true>* copy ) const {
+            static const char* signature( "void Page<K,V,false,true>::insert( PageIndex index, const K& key, const V* value, const PageSize valueSize, Page<K,V,false,true>* copy ) const" );
             if (header.count < index) throw std::string( signature ) + " - Invalid index";
-            if ((valueSize == 0) || (maxValueSize() < (valueSize * sizeof(V)))) throw std::string( signature ) + " - Invalid value size";
+            if (valueSize == 0) throw std::string( signature ) + " - Invalid value size";
             if (header.capacity < (filling() + entryFilling( valueSize ))) throw std::string( signature ) + " - Overflow";
-            PageFunctions::pageInsert( *this, dst( copy ), index, key, value, valueSize );
+            PageFunctions::pageInsert( *this, *copy, index, key, value, valueSize );
+        }
+        template <bool AK = KA, bool AV = VA, std::enable_if_t<(!AK&&AV), bool> = true>
+        inline void insert( PageIndex index, const K& key, const V* value, const PageSize valueSize ) {
+            insert( index, key, value, valueSize, this );
         }
         // Insert an array key - array value entry at an index
         template <bool AK = KA, bool AV = VA, std::enable_if_t<(AK&&AV), bool> = true>
-        void insert( PageIndex index, const K* key, const PageSize keySize, const V* value, const PageSize valueSize, Page<K,V,true,true>* copy = nullptr) {
-            static const char* signature( "void Page<K,V,true,true>::insert( PageIndex index, const K* key, const PageSize keySize, const V* value, const PageSize valueSize, Page<K,V,true,true>* copy )" );
+        void insert( PageIndex index, const K* key, const PageSize keySize, const V* value, const PageSize valueSize, Page<K,V,true,true>* copy ) const {
+            static const char* signature( "void Page<K,V,true,true>::insert( PageIndex index, const K* key, const PageSize keySize, const V* value, const PageSize valueSize, Page<K,V,true,true>* copy ) const" );
             if (header.count < index) throw std::string( signature ) + " - Invalid index";
-            if ((keySize == 0) || (maxKeySize() < (keySize * sizeof(K)))) throw std::string( signature ) + " - Invalid key size";
-            if ((valueSize == 0) || (maxValueSize() < (valueSize * sizeof(V)))) throw std::string( signature ) + " - Invalid value size";
+            if (keySize == 0) throw std::string( signature ) + " - Invalid key size";
+            if (valueSize == 0) throw std::string( signature ) + " - Invalid value size";
             if (header.capacity < (filling() + entryFilling( keySize, valueSize ))) throw std::string( signature ) + " - Overflow";
-            PageFunctions::pageInsert( *this, dst( copy ), index, key, keySize, value, valueSize );
+            PageFunctions::pageInsert( *this, *copy, index, key, keySize, value, valueSize );
         }
-
+        template <bool AK = KA, bool AV = VA, std::enable_if_t<(AK&&AV), bool> = true>
+        inline void insert( PageIndex index, const K* key, const PageSize keySize, const V* value, const PageSize valueSize ) {
+            insert( index, key, keySize, value, valueSize, this );
+        }
+        
         // Replace a value at an index
         // Replace a scalar value
         template <bool AV = VA, std::enable_if_t<(!AV),bool> = true>
-        void replace( PageIndex index, const V& value, Page<K,V,KA,false>* copy = nullptr) {
-            static const char* signature( "void Page<K,V,KA,false>::replace( PageIndex index, const V& value, Page<K,V,KA,false>* copy )" );
+        void replace( PageIndex index, const V& value, Page<K,V,KA,false>* copy ) const {
+            static const char* signature( "void Page<K,V,KA,false>::replace( PageIndex index, const V& value, Page<K,V,KA,false>* copy ) const" );
             if (header.count < index) throw std::string( signature ) + " - Invalid index";
-            PageFunctions::pageReplace( *this, dst( copy ), index, value );
+            PageFunctions::pageReplace( *this, *copy, index, value );
+        }
+        template <bool AV = VA, std::enable_if_t<(!AV),bool> = true>
+        inline void replace( PageIndex index, const V& value ) {
+            replace( index, value, this );
         }
         // Replace an array value at an index
         template <bool AV = VA, std::enable_if_t<(AV),bool> = true>
-        void replace( PageIndex index, const V* value, const PageSize valueSize, Page<K,V,KA,true>* copy = nullptr) {
-            static const char* signature( "void Page<K,V,KA,true>::replace( PageIndex index, const V* value, const PageSize valueSize, Page<K,V,KA,true>* copy )" );
+        void replace( PageIndex index, const V* value, const PageSize valueSize, Page<K,V,KA,true>* copy ) const {
+            static const char* signature( "void Page<K,V,KA,true>::replace( PageIndex index, const V* value, const PageSize valueSize, Page<K,V,KA,true>* copy ) const" );
             if (header.count < index) throw std::string( signature ) + " - Invalid index";
             if ((this->valueSize(index) < valueSize) && (header.capacity < (filling() + ((valueSize - this->valueSize(index)) * sizeof(V))))) {
                 throw std::string( signature ) + " - Overflow";
             }
-            PageFunctions::pageReplace( *this, dst( copy ), index, value, valueSize );
+            PageFunctions::pageReplace( *this, *copy, index, value, valueSize );
         }
-
+        template <bool AV = VA, std::enable_if_t<(AV),bool> = true>
+        inline void replace( PageIndex index, const V* value, const PageSize valueSize ) {
+            replace( index, value, valueSize, *this );
+        }
         // Replace a key-value entry at an index
         // Replace a scalar key scalar value entry
         template <bool AK = KA, bool AV = VA, std::enable_if_t<(!AK&&!AV), bool> = true>
-        void replace(PageIndex index, const K& key, const V& value, Page<K,V,false,false>* copy = nullptr) {
-            static const char* signature( "void Page<K,V,false,false>::replace( PageIndex index, const K& key, const V* value, const PageSize valueSize, Page<K,V,false,false>* copy )" );
+        void replace(PageIndex index, const K& key, const V& value, Page<K,V,false,false>* copy ) const {
+            static const char* signature( "void Page<K,V,false,false>::replace( PageIndex index, const K& key, const V* value, const PageSize valueSize, Page<K,V,false,false>* copy ) const" );
             if (header.count < index) throw std::string( signature ) + " - Invalid index";
-            PageFunctions::pageReplace( *this, dst( copy ), index, key, value );
+            PageFunctions::pageReplace( *this, *copy, index, key, value );
+        }
+        template <bool AK = KA, bool AV = VA, std::enable_if_t<(!AK&&!AV), bool> = true>
+        inline void replace(PageIndex index, const K& key, const V& value ) {
+            replace( index, key, value, this );
         }
         // Replace an array key scalar value entry
         template <bool AK = KA, bool AV = VA, std::enable_if_t<(AK&&!AV), bool> = true>
-        void replace( PageIndex index, const K* key, const PageSize keySize, const V& value, Page<K,V,true,false>* copy = nullptr) {
-            static const char* signature( "void Page<K,V,true,false>::replace( PageIndex index, const K* key, const PageSize keySize, const V& value, Page<K,V,true,false>* copy )" );
+        void replace( PageIndex index, const K* key, const PageSize keySize, const V& value, Page<K,V,true,false>* copy ) const {
+            static const char* signature( "void Page<K,V,true,false>::replace( PageIndex index, const K* key, const PageSize keySize, const V& value, Page<K,V,true,false>* copy ) const" );
             if (header.count < index) throw std::string( signature ) + " - Invalid index";
-            if ((keySize == 0) || (maxKeySize() < (keySize * sizeof(K)))) throw std::string( signature ) + " - Invalid key size";
+            if (keySize == 0) throw std::string( signature ) + " - Invalid key size";
             if ((this->keySize(index) < keySize) && (header.capacity < (filling() + (keySize - this->keySize(index)) * sizeof(K)))) throw std::string( signature ) + " - Overflow";
-            PageFunctions::pageReplace( *this, dst( copy ), index, key, keySize, value );
+            PageFunctions::pageReplace( *this, *copy, index, key, keySize, value );
+        }
+        template <bool AK = KA, bool AV = VA, std::enable_if_t<(AK&&!AV), bool> = true>
+        inline void replace( PageIndex index, const K* key, const PageSize keySize, const V& value ) {
+            replace( index, key, keySize, value, this );
         }
         // Replace a scalar key array value entry
         template <bool AK = KA, bool AV = VA, std::enable_if_t<(!AK&&AV), bool> = true>
-        void replace( PageIndex index, const K& key, const V* value, const PageSize valueSize, Page<K,V,false,true>* copy = nullptr) {
-            static const char* signature( "void Page<K,V,false,true>::replace( PageIndex index, const K& key, const V* value, const PageSize valueSize, Page<K,V,false,true>* copy )" );
+        void replace( PageIndex index, const K& key, const V* value, const PageSize valueSize, Page<K,V,false,true>* copy ) const {
+            static const char* signature( "void Page<K,V,false,true>::replace( PageIndex index, const K& key, const V* value, const PageSize valueSize, Page<K,V,false,true>* copy ) const" );
             if (header.count < index) throw std::string( signature ) + " - Invalid index";
-            if ((valueSize == 0) || (maxValueSize() < (valueSize * sizeof(V)))) throw std::string( signature ) + " - Invalid value size";
+            if (valueSize == 0) throw std::string( signature ) + " - Invalid value size";
             if ((this->valueSize(index) < valueSize) && (header.capacity < (filling() + (valueSize - this->valueSize(index))*sizeof(V)))) throw std::string( signature ) + " - Overflow";
-            PageFunctions::pageReplace( *this, dst( copy ), index, key, value, valueSize );
+            PageFunctions::pageReplace( *this, *copy, index, key, value, valueSize );
+        }
+        template <bool AK = KA, bool AV = VA, std::enable_if_t<(!AK&&AV), bool> = true>
+        inline void replace( PageIndex index, const K& key, const V* value, const PageSize valueSize ) {
+            replace( index, key, value, valueSize, *this );
         }
         // Replace an array key array value entry
         template <bool AK = KA, bool AV = VA, std::enable_if_t<(AK&&AV), bool> = true>
-        void replace( PageIndex index, const K* key, const PageSize keySize, const V* value, const PageSize valueSize, Page<K,V,true,true>* copy = nullptr) {
-            static const char* signature( "void Page<K,V,true,true>::replace( PageIndex index, const K* key, const PageSize keySize, const V* value, const PageSize valueSize, Page<K,V,true,true>* copy )" ) ;
+        void replace( PageIndex index, const K* key, const PageSize keySize, const V* value, const PageSize valueSize, Page<K,V,true,true>* copy ) const {
+            static const char* signature( "void Page<K,V,true,true>::replace( PageIndex index, const K* key, const PageSize keySize, const V* value, const PageSize valueSize, Page<K,V,true,true>* copy ) const" ) ;
             if (header.count < index) throw std::string( signature ) + " - Invalid index";
-            if ((keySize == 0) || (maxKeySize() < (keySize * sizeof(K)))) throw std::string( signature ) + " - Invalid key size";
-            if ((valueSize == 0) || (maxValueSize() < (valueSize * sizeof(V)))) throw std::string( signature ) + " - Invalid value size";
+            if (keySize == 0) throw std::string( signature ) + " - Invalid key size";
+            if (valueSize == 0) throw std::string( signature ) + " - Invalid value size";
             if (
                 (entryFilling( this->keySize(index), this->valueSize(index) ) - entryFilling( keySize, valueSize )) &&
                 (header.capacity < (filling() + entryFilling( keySize, valueSize ) - entryFilling( this->keySize(index), this->valueSize(index) )))
             ) throw std::string( signature ) + " - Overflow";
-            PageFunctions::pageReplace( *this, dst( copy ), index, key, keySize, value, valueSize );
+            PageFunctions::pageReplace( *this, *copy, index, key, keySize, value, valueSize );
+        }
+        template <bool AK = KA, bool AV = VA, std::enable_if_t<(AK&&AV), bool> = true>
+        inline void replace( PageIndex index, const K* key, const PageSize keySize, const V* value, const PageSize valueSize ) {
+            replace( index, key, keySize, value, valueSize, * this );
         }
 
         // Remove the key - value entry at an index
-        void remove( PageIndex index, Page<K,V,KA,VA>* copy = nullptr ) {
-            static const char* signature( "void Page<K,V,KA,VA>::remove( PageIndex index, Page<K,V,KA,VA>* copy" );
+        void remove( PageIndex index, Page<K,V,KA,VA>* copy ) const {
+            static const char* signature( "void Page<K,V,KA,VA>::remove( PageIndex index, Page<K,V,KA,VA>* copy ) const" );
             if (header.count <= index) throw std::string( signature ) + " - Invalid index";
-            PageFunctions::pageRemove( *this, dst( copy ), index );
+            PageFunctions::pageRemove( *this, *copy, index );
         }
+        inline void remove( PageIndex index ) { remove( index, this ); }
 
         // Shift page content from indexed entry up to last entry to lower entries in another page
-        void shiftRight( Page<K,V,KA,VA>& right, PageIndex index, Page<K,V,KA,VA>* copy = nullptr, Page<K,V,KA,VA>* copyRight = nullptr ) {
-            static const char* signature( "void Page<K,V,KA,VA>::shiftRight( Page<K,V,KA,VA>& right, PageIndex index, Page<K,V,KA,VA>* copy, Page<K,V,KA,VA>* copyRight" );
+        void shiftRight( Page<K,V,KA,VA>& right, PageIndex index, Page<K,V,KA,VA>* copy, Page<K,V,KA,VA>* copyRight ) const {
+            static const char* signature( "void Page<K,V,KA,VA>::shiftRight( Page<K,V,KA,VA>& right, PageIndex index, Page<K,V,KA,VA>* copy, Page<K,V,KA,VA>* copyRight ) const" );
             if (header.count < index) throw std::string( signature ) + " - Invalid index or empty page";
             if (right.header.capacity < (right.filling() + (indexedFilling( header.count ) - indexedFilling( index )))) throw std::string( signature ) + " - Overflow";
-            PageFunctions::pageShiftRight( *this, right, dst( copy ), ((copyRight) ? *copyRight : right), index );
+            PageFunctions::pageShiftRight( *this, right, *copy, *copyRight, index );
+        }
+        inline void shiftRight( Page<K,V,KA,VA>& right, PageIndex index ) {
+            shiftRight( right, index, this, &right );
         }
         // Shift page content from first entry up to indexed entry up to higher entries in another page
-        void shiftLeft( Page& left, PageIndex index, Page* copy = nullptr, Page* copyLeft = nullptr ) {
-            static const char* signature( "void Page<K,V,KA,VA>::shiftLeft( Page<K,V,KA,VA>& left, PageIndex index, Page<K,V,KA,VA>* copy, Page<K,V,KA,VA>* copyLeft" );
+        void shiftLeft( Page& left, PageIndex index, Page* copy, Page* copyLeft ) const {
+            static const char* signature( "void Page<K,V,KA,VA>::shiftLeft( Page<K,V,KA,VA>& left, PageIndex index, Page<K,V,KA,VA>* copy, Page<K,V,KA,VA>* copyLeft ) const" );
             if (header.count < index) throw std::string( signature ) + " - Invalid index or empty page";
             if (left.header.capacity < (left.filling() + indexedFilling( index ))) throw std::string( signature ) + " - Overflow";
-            PageFunctions::pageShiftLeft( *this, left, dst( copy ), ((copyLeft) ? *copyLeft : left), index );
+            PageFunctions::pageShiftLeft( *this, left, *copy, *copyLeft, index );
+        }
+        inline void shiftLeft( Page& left, PageIndex index ) {
+            shiftLeft( left, index, this, &left );
         }
 
     }; // template <class K, class V, bool KA, bool VA> class Page

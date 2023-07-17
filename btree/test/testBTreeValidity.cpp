@@ -12,24 +12,32 @@ using namespace BTree;
 using namespace std;
 //using namespace boost::filesystem;
 
-// Test program to measure BTree validity.
-// BTree validity is performed in a comprehensive set of use cases.
+// Test program to measure B-Tree validity.
+// B-Tree validity is performed via a comprehensive set of use cases.
+// Tests are performed on four types of B-Trees:
 //
-// An administration of which entries are in the BTree is maintained in an std::map data structure.
-// This enables validating which entries should be present in the BTree and which should not.
-// And additional std::map is required for validation of transaction behavior.
+//   Uint32 -> Uint32           32-bit scalar keys -> 32-bit scalar values
+//   [ Uint16 ] -> Uint32       16-bit array keys  -> 32-bit scalar values
+//   Uint32 -> [ Uint16 ]       32-bit scalar keys -> 16-bit array values
+//   [ Uint16 ] -> [ Uint16 ]   16-bit array keys  -> 16-bit array values
 //
+// An administration of which entries are in the B-Tree is maintained in an std::map data structure.
+// This enables validating which entries should be present in the B-Tree and which should not.
+// And additional std::map is used for validation of transaction behavior. This map contains
+// values held in the B-Tree at the last commit.
 
-// ToDo: Forward insertion, reverse insertion and random insertion (as with remove)
 // ToDo: use std filesystem calls to remove windows specific code
 
+// B-Tree page size is kept low to maximize B-Tree depth improving test coverage
+// MaxArray chosen to comform to maximum entry size constraint
 const int BTreePageSize = 256;
 const int MinArray = 2;
 const int MaxArray = 14;
 // Enable generating exceptions when accessing non-existing keys.
 // Set to false when debugging to avoid generating intentional exceptions.
-// Set to true for full coverage (presumably with optimization)
+// Set to true for full coverage (presumably when compiled with optimization)
 const bool TryUnexpectedKeys = true;
+// const bool TryUnexpectedKeys = false;
 
 // Number of attempts to detect unexpected B-Tree content
 const int ProbeCount = 100;
@@ -101,12 +109,12 @@ protected:
     PagePool* pool;
     Tree< K, V >* tree;
 public:
-    enum RemoveOrder {
+    enum KeyOrder {
         Forward,
         Reverse,
         Random
     };
-    string order2String ( RemoveOrder order ) {
+    string order2String ( KeyOrder order ) {
         if (order == Forward) return "Forward";
         else if (order == Reverse) return "Reverse";
         else if (order == Random) return "Random";
@@ -340,7 +348,6 @@ public:
             << " pages, filling " << ((totalUsage * 100)/ capacity) << " %\n";
         // Now check to see if there are orphan pages.
         // An orphan is a non-free page that is not counted as a B-Tree page
-        // ToDo: Validate that free pages matched free page vector size
         uint32_t freePages = 0;
         uint32_t modifiedPages = 0;
         uint32_t recoverPages = 0;
@@ -407,15 +414,15 @@ public:
         }
         return errors;
     }
-    virtual uint32_t insert( int count ) {
-        log << "Inserting " << count << " keys...\n" << flush;
+    virtual uint32_t insert( int count, KeyOrder order ) {
+        log << "Inserting " << count << " keys in " << order2String(order) << " order...\n" << flush;
         return 0;
     };
     virtual uint32_t replace( int count ) {
         log << "Replacing " << count << " keys...\n" << flush;
         return 0;
     }
-    virtual uint32_t remove( int count, RemoveOrder order ) {
+    virtual uint32_t remove( int count, KeyOrder order ) {
         log << "Removing " << count << " keys in " << order2String(order) << " order...\n" << flush;
         return 0;
     }
@@ -493,6 +500,34 @@ class Uint32Uint32TreeTester : public TreeTester< uint32_t, uint32_t > {
     map<uint32_t,uint32_t> content;
     map<uint32_t,uint32_t> commitedContent;
 private:
+    uint32_t generateUniqueKey() const {
+        uint32_t key = generateUint32();
+        while (content.count( key ) == 1) key = generateUint32();
+        return key;
+    };
+    vector<uint32_t>* generateUniqueKeys( uint32_t count ) const {
+        auto keys = new vector<uint32_t>();
+        set<uint32_t> keySet;
+        for ( int i = 0; i < count; ++i) {
+            uint32_t key = generateUint32();
+            while ((keySet.count( key ) == 1) || (content.count( key ) == 1)) key = generateUint32();
+            keys->push_back( key );
+            keySet.insert( key );
+        }
+        return keys;
+    }
+    uint32_t insertKey( uint32_t key ) {
+        uint32_t errors = 0;
+        uint32_t value = generateUint32();
+        if (!tree->insert( key, value )) {
+            log << "Insert with non-existing key " << key << " returned false!\n";
+            errors += 1;
+        } else {
+            keys.push_back( key );
+            content[ key ] = value;
+        }
+        return errors;
+    }
     uint32_t removeKey( uint32_t key ) {
         uint32_t errors = 0;
         bool removed = tree->remove( key );
@@ -504,11 +539,6 @@ private:
         }
         return errors;
     }
-    uint32_t generateUniqueKey() const {
-        uint32_t key = generateUint32();
-        while (content.count( key ) == 1) key = generateUint32();
-        return key;
-    };
 public:
     Uint32Uint32TreeTester() = delete;
     Uint32Uint32TreeTester( const string dir, const string file, ostream& logStream ) :
@@ -570,19 +600,20 @@ public:
         if (statsEnabled) tree->enableStatistics( &stats );
         return errors;
     }
-    uint32_t insert( int count ) {
-        uint32_t errors = TreeTester<uint32_t,uint32_t>::insert( count );
-        for( int i = 0; i < count; ++i) {
-            uint32_t key = generateUniqueKey();
-            uint32_t value = generateUint32();
-            if (!tree->insert( key, value )) {
-                log << "Insert with non-existing key " << key << " returned false!\n";
-                errors += 1;
-            } else {
-                keys.push_back( key );
-                content[ key ] = value;
-            }
+    uint32_t insert( int count, KeyOrder order ) {
+        uint32_t errors = TreeTester<uint32_t,uint32_t>::insert( count, order );
+        vector<uint32_t>* insertKeys = generateUniqueKeys( count );
+        if (order == Forward) {
+            sort( insertKeys->begin(), insertKeys->end() );
+            for ( auto key : *insertKeys ) { errors += insertKey( key ); }
+        } else if (order == Reverse) {
+            sort( insertKeys->rbegin(), insertKeys->rend() );
+            for ( auto key : *insertKeys ) { errors += insertKey( key ); }
+        } else if (order == Random) {
+            shuffle( insertKeys->begin(), insertKeys->end(), gen32 );
+            for ( auto key : *insertKeys ) { errors += insertKey( key ); }
         }
+        delete insertKeys;
         for( auto entry : content ) {
             if (tree->insert( entry.first, entry.second )) {
                 log << "Insert with existing key " << entry.first << " returned true!\n";
@@ -617,7 +648,7 @@ public:
         if (0 < errors) log << "Detected " << errors << " relpace errors.\n";
         return errors;
     }
-    uint32_t remove( int count, RemoveOrder order ) {
+    uint32_t remove( int count, KeyOrder order ) {
         uint32_t errors = TreeTester<uint32_t,uint32_t>::remove( count, order );
         size_t range = keys.size();
         if (range < count) count = range;
@@ -626,8 +657,8 @@ public:
             for ( int i = 0; i < count; ++i) errors += removeKey( keys[ i ] );
             keys.erase( keys.begin(), keys.begin() + count );
         } else if (order == Reverse) {
-            sort( keys.begin(), keys.end() );
-            for ( int i = 0; i < count; ++i) errors += removeKey( keys[ range - i - 1 ] );
+            sort( keys.rbegin(), keys.rend() );
+            for ( int i = 0; i < count; ++i) errors += removeKey( keys[ i ] );
             keys.erase( keys.end() - count, keys.end() );
         } else if (order == Random) {
             shuffle( keys.begin(), keys.end(), gen32 );
@@ -693,10 +724,47 @@ protected:
     map<vector<uint16_t>*,uint32_t,Uint16ArrayCompare> content;
     map<vector<uint16_t>*,uint32_t,Uint16ArrayCompare> commitedContent;
 private:
-    uint32_t removeKey( vector<uint16_t>* key, bool usePair ) {
+    vector<uint16_t>* generateUniqueKey() const {
+        auto key = new vector<uint16_t>;
+        generateUint16Array( *key );
+        while (content.count( key ) == 1) generateUint16Array( *key );
+        return( key );
+    };
+    vector<vector<uint16_t>*>* generateUniqueKeys( uint32_t count ) {
+        auto keys = new vector<vector<uint16_t>*>();
+        set<vector<uint16_t>*,Uint16ArrayCompare> keySet;
+        for ( int i = 0; i < count; ++i) {
+            auto key = new vector<uint16_t>;
+            generateUint16Array( *key );
+            while ((keySet.count( key ) == 1) || (content.count( key ) == 1)) generateUint16Array( *key );
+            keys->push_back( key );
+            keySet.insert( key );
+        }
+        return keys;
+    }
+    uint32_t insertKey( vector<uint16_t>* key, bool* usePair ) {
+        uint32_t errors = 0;
+        uint32_t value = generateUint32();
+        bool inserted = false;
+        if (*usePair) {
+            pair<const uint16_t*, PageSize> keyPair = { key->data(), key->size() };
+            inserted = tree->insert( keyPair, value );
+        } else {
+            inserted = tree->insert( key->data(), key->size(), value );
+        }
+        if (!inserted) {
+            log << "Insert on non-existing key "; logUint16Array( log, key->data(), key->size() ); log << " returned false!\n";
+            errors += 1;
+        } else {
+            keys.push_back( key );
+            content[ key ] = value;
+        }
+        return errors;
+    }
+    uint32_t removeKey( vector<uint16_t>* key, bool* usePair ) {
         uint32_t errors = 0;
         bool removed = false;
-        if (usePair) {
+        if (*usePair) {
             pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( key->size() ) };
             removed = tree->remove( keyPair );
         } else {
@@ -708,14 +776,9 @@ private:
         } else {
             content.erase( key );        
         }
+        *usePair = !(*usePair);
         return errors;
     }
-    vector<uint16_t>* generateUniqueKey() const {
-        auto key = new vector<uint16_t>;
-        generateUint16Array( *key );
-        while (content.count( key ) == 1) generateUint16Array( *key );
-        return( key );
-    };
 public:
     Uint16ArrayUint32TreeTester() = delete;
     Uint16ArrayUint32TreeTester( const string dir, const string file, ostream& logStream ) :
@@ -830,30 +893,21 @@ public:
         if (statsEnabled) tree->enableStatistics( &stats );
         return errors;
     }
-    uint32_t insert( int count ) {
-        uint32_t errors = TreeTester<uint16_t[],uint32_t>::insert( count );
+    uint32_t insert( int count, KeyOrder order ) {
+        uint32_t errors = TreeTester<uint16_t[],uint32_t>::insert( count, order );
         bool usePair = false;
-        for( int i = 0; i < count; ++i) {
-            vector<uint16_t>* key = generateUniqueKey();
-            uint32_t value = generateUint32();
-            bool inserted = false;
-            if (usePair) {
-                pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( key->size() ) };
-                inserted = tree->insert( keyPair, value );
-            } else {
-                inserted = tree->insert( key->data(), PageSize( key->size() ), value );
-            }
-            if (!inserted) {
-                log << "Insert with non-existing key ";
-                logUint16Array( log, key->data(), key->size() );
-                log << " returned false!\n";
-                errors += 1;
-            } else {
-                keys.push_back( key );
-                content[ key ] = value;
-            }
-            usePair = !usePair;
+        auto insertKeys = generateUniqueKeys( count );
+        if (order == Forward) {
+            sort( insertKeys->begin(), insertKeys->end() );
+            for ( auto key : *insertKeys ) { errors += insertKey( key, &usePair ); }
+        } else if (order == Reverse) {
+            sort( insertKeys->rbegin(), insertKeys->rend() );
+            for ( auto key : *insertKeys ) { errors += insertKey( key, &usePair ); }
+        } else if (order == Random) {
+            shuffle( insertKeys->begin(), insertKeys->end(), gen32 );
+            for ( auto key : *insertKeys ) { errors += insertKey( key, &usePair ); }
         }
+        delete insertKeys;
         for( auto entry : content ) {
             bool inserted = false;
             if (usePair) {
@@ -919,31 +973,22 @@ public:
         if (0 < errors) log << "Detected " << errors << " replace errors.\n";
         return errors;
     }
-    uint32_t remove( int count, RemoveOrder order ) {
+    uint32_t remove( int count, KeyOrder order ) {
         uint32_t errors = TreeTester<uint16_t[],uint32_t>::remove( count, order );
         size_t range = keys.size();
         if (range < count) count = range;
         bool usePair = false;
         if (order == Forward) {
             sort( keys.begin(), keys.end(), compare );
-            for ( int i = 0; i < count; ++i) {
-                errors += removeKey( keys[ i ], usePair );
-                usePair = !usePair;
-            }
+            for ( int i = 0; i < count; ++i) { errors += removeKey( keys[ i ], &usePair ); }
             keys.erase( keys.begin(), keys.begin() + count );
         } else if (order == Reverse) {
-            sort( keys.begin(), keys.end(), compare );
-            for ( int i = 0; i < count; ++i) {
-                errors += removeKey( keys[ range - i - 1 ], usePair );
-                usePair = !usePair;
-            }
+            sort( keys.rbegin(), keys.rend(), compare );
+            for ( int i = 0; i < count; ++i) { errors += removeKey( keys[ i ], &usePair ); }
             keys.erase( keys.end() - count, keys.end() );
         } else if (order == Random) {
             shuffle( keys.begin(), keys.end(), gen32 );
-            for ( int i = 0; i < count; ++i) {
-                errors += removeKey( keys[ i ], usePair );
-                usePair = !usePair;
-            }
+            for ( int i = 0; i < count; ++i) { errors += removeKey( keys[ i ], &usePair ); }
             keys.erase( keys.begin(), (keys.begin() + count) );
         }
         for (int i = 0; i < ProbeCount; ++i) {
@@ -1027,6 +1072,47 @@ protected:
     map<uint32_t,vector<uint16_t>*> content;
     map<uint32_t,vector<uint16_t>*> commitedContent;
 private:
+    uint32_t generateUniqueKey() const {
+        uint32_t key = generateUint32();
+        while (content.count( key ) == 1) key = generateUint32();
+        return key;
+    };
+    vector<uint32_t>* generateUniqueKeys( uint32_t count ) const {
+        auto keys = new vector<uint32_t>();
+        set<uint32_t> keySet;
+        for ( int i = 0; i < count; ++i) {
+            uint32_t key = generateUint32();
+            while ((keySet.count( key ) == 1) || (content.count( key ) == 1)) key = generateUint32();
+            keys->push_back( key );
+            keySet.insert( key );
+        }
+        return keys;
+    }
+    vector<uint16_t>* generateValue() const {
+        auto value = new vector<uint16_t>;
+        generateUint16Array( *value );
+        return( value );
+    };
+    uint32_t insertKey( uint32_t key, bool* usePair ) {
+        uint32_t errors = 0;
+        auto value = generateValue();
+        bool inserted = false;
+        if (*usePair) {
+            pair<const uint16_t*, PageSize> valuePair = { value->data(), PageSize( value->size() ) };
+            inserted = tree->insert( key, valuePair );
+        } else {
+            inserted = tree->insert( key, value->data(), PageSize( value->size() ) );
+        }
+        if (!inserted) {
+            log << "Insert on non-existing key " << key << " returned false!\n";
+            errors += 1;
+        } else {
+            keys.push_back( key );
+            content[ key ] = value;
+        }
+        *usePair = !(*usePair);
+        return errors;
+    }
     uint32_t removeKey( uint32_t key ) {
         uint32_t errors = 0;
         bool removed = tree->remove( key );
@@ -1038,16 +1124,6 @@ private:
         }
         return errors;
     }
-    uint32_t generateUniqueKey() const {
-        uint32_t key = generateUint32();
-        while (content.count( key ) == 1) key = generateUint32();
-        return key;
-    };
-    vector<uint16_t>* generateValue() const {
-        auto value = new vector<uint16_t>;
-        generateUint16Array( *value );
-        return( value );
-    };
 public:
     Uint32Uint16ArrayTreeTester() = delete;
     Uint32Uint16ArrayTreeTester( const string dir, const string file, ostream& logStream ) :
@@ -1134,28 +1210,21 @@ public:
         if (statsEnabled) tree->enableStatistics( &stats );
         return errors;
     }
-    uint32_t insert( int count ) {
-        uint32_t errors = TreeTester<uint32_t,uint16_t[]>::insert( count );
+    uint32_t insert( int count, KeyOrder order ) {
+        uint32_t errors = TreeTester<uint32_t,uint16_t[]>::insert( count, order );
         bool usePair = false;
-        bool inserted = false;
-        for( int i = 0; i < count; ++i) {
-            uint32_t key = generateUniqueKey();
-            vector<uint16_t>* value = generateValue();
-            if (usePair) {
-                pair<const uint16_t*, PageSize> valuePair = { value->data(), PageSize( value->size() ) };
-                inserted = tree->insert( key, valuePair );
-            } else {
-                inserted = tree->insert( key, value->data(), PageSize( value->size() ) );
-            }
-            if (!inserted) {
-                log << "Insert on non-existing key " << key << " returned false!\n";
-                errors += 1;
-            } else {
-                keys.push_back( key );
-                content[ key ] = value;
-            }
-            usePair = !usePair;
+        vector<uint32_t>* insertKeys = generateUniqueKeys( count );
+        if (order == Forward) {
+            sort( insertKeys->begin(), insertKeys->end() );
+            for ( auto key : *insertKeys ) { errors += insertKey( key, &usePair ); }
+        } else if (order == Reverse) {
+            sort( insertKeys->rbegin(), insertKeys->rend() );
+            for ( auto key : *insertKeys ) { errors += insertKey( key, &usePair ); }
+        } else if (order == Random) {
+            shuffle( insertKeys->begin(), insertKeys->end(), gen32 );
+            for ( auto key : *insertKeys ) { errors += insertKey( key, &usePair ); }
         }
+        delete insertKeys;
         for( auto entry : content ) {
             bool inserted = false;
             if (usePair) {
@@ -1219,7 +1288,7 @@ public:
         return errors;
     }
 
-    uint32_t remove( int count, RemoveOrder order ) {
+    uint32_t remove( int count, KeyOrder order ) {
         uint32_t errors = TreeTester<uint32_t,uint16_t[]>::remove( count, order );
         size_t range = keys.size();
         if (range < count) count = range;
@@ -1228,8 +1297,8 @@ public:
             for ( int i = 0; i < count; ++i) errors += removeKey( keys[ i ] );
             keys.erase( keys.begin(), keys.begin() + count );
         } else if (order == Reverse) {
-            sort( keys.begin(), keys.end() );
-            for ( int i = 0; i < count; ++i) errors += removeKey( keys[ range - i - 1 ] );
+            sort( keys.rbegin(), keys.rend() );
+            for ( int i = 0; i < count; ++i) errors += removeKey( keys[ i ] );
             keys.erase( keys.end() - count, keys.end() );
         } else if (order == Random) {
             shuffle( keys.begin(), keys.end(), gen32 );
@@ -1308,10 +1377,53 @@ protected:
     map<vector<uint16_t>*,vector<uint16_t>*,Uint16ArrayCompare> content;
     map<vector<uint16_t>*,vector<uint16_t>*,Uint16ArrayCompare> commitedContent;
 private:
-    uint32_t removeKey( vector<uint16_t>* key, bool usePair ) {
+    vector<uint16_t>* generateUniqueKey() const {
+        auto key = new vector<uint16_t>;
+        generateUint16Array( *key );
+        while (content.count( key ) == 1) generateUint16Array( *key );
+        return( key );
+    };
+    vector<vector<uint16_t>*>* generateUniqueKeys( uint32_t count ) {
+        auto keys = new vector<vector<uint16_t>*>();
+        set<vector<uint16_t>*,Uint16ArrayCompare> keySet;
+        for ( int i = 0; i < count; ++i) {
+            auto key = new vector<uint16_t>;
+            generateUint16Array( *key );
+            while ((keySet.count( key ) == 1) || (content.count( key ) == 1)) generateUint16Array( *key );
+            keys->push_back( key );
+            keySet.insert( key );
+        }
+        return keys;
+    }
+    vector<uint16_t>* generateValue() const {
+        auto value = new vector<uint16_t>;
+        generateUint16Array( *value );
+        return( value );
+    };
+    uint32_t insertKey( vector<uint16_t>* key, bool* usePair ) {
+        uint32_t errors = 0;
+        auto value = generateValue();
+        bool inserted = false;
+        if (*usePair) {
+            pair<const uint16_t*, PageSize> keyPair = { key->data(), key->size() };
+            pair<const uint16_t*, PageSize> valuePair = { value->data(), value->size() };
+            inserted = tree->insert( keyPair, valuePair );
+        } else {
+            inserted = tree->insert( key->data(), key->size(), value->data(), value->size() );
+        }
+        if (!inserted) {
+            log << "Insert on non-existing key "; logUint16Array( log, key->data(), key->size() ); log << " returned false!\n";
+            errors += 1;
+        } else {
+            keys.push_back( key );
+            content[ key ] = value;
+        }
+        return errors;
+    }
+    uint32_t removeKey( vector<uint16_t>* key, bool* usePair ) {
         uint32_t errors = 0;
         bool removed = false;
-        if (usePair) {
+        if (*usePair) {
             pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( key->size() ) };
             removed = tree->remove( keyPair );
         } else {
@@ -1323,19 +1435,9 @@ private:
         } else {
             content.erase( key );
         }
+        *usePair = !(*usePair);
         return errors;
     }
-    vector<uint16_t>* generateUniqueKey() const {
-        auto key = new vector<uint16_t>;
-        generateUint16Array( *key );
-        while (content.count( key ) == 1) generateUint16Array( *key );
-        return( key );
-    };
-    vector<uint16_t>* generateValue() const {
-        auto value = new vector<uint16_t>;
-        generateUint16Array( *value );
-        return( value );
-    };
 public:
     Uint16ArrayUint16ArrayTreeTester() = delete;
     Uint16ArrayUint16ArrayTreeTester( const string dir, const string file, ostream& logStream ) :
@@ -1459,31 +1561,22 @@ public:
         if (statsEnabled) tree->enableStatistics( &stats );
         return errors;
     }
-    uint32_t insert( int count ) {
-        uint32_t errors = TreeTester<uint16_t[],uint16_t[]>::insert( count );
+    uint32_t insert( int count, KeyOrder order ) {
+        uint32_t errors = TreeTester<uint16_t[],uint16_t[]>::insert( count, order );
         bool usePair = false;
         bool inserted = false;
-        for( int i = 0; i < count; ++i) {
-            vector<uint16_t>* key = generateUniqueKey();
-            vector<uint16_t>* value = generateValue();
-            if (usePair) {
-                pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( key->size() ) };
-                pair<const uint16_t*, PageSize> valuePair = { value->data(), PageSize( value->size() ) };
-                inserted = tree->insert( keyPair, valuePair );
-            } else {
-                inserted = tree->insert( key->data(), PageSize( key->size() ), value->data(), PageSize( value->size() ) );
-            }
-            if (!inserted) {
-                log << "Insert on non-existing key ";
-                logUint16Array( log, key->data(), key->size() );
-                log << " returned false!\n";
-                errors += 1;
-            } else {
-                keys.push_back( key );
-                content[ key ] = value;
-            }
-            usePair = !usePair;
+        auto insertKeys = generateUniqueKeys( count );
+        if (order == Forward) {
+            sort( insertKeys->begin(), insertKeys->end() );
+            for ( auto key : *insertKeys ) { errors += insertKey( key, &usePair ); }
+        } else if (order == Reverse) {
+            sort( insertKeys->rbegin(), insertKeys->rend() );
+            for ( auto key : *insertKeys ) { errors += insertKey( key, &usePair ); }
+        } else if (order == Random) {
+            shuffle( insertKeys->begin(), insertKeys->end(), gen32 );
+            for ( auto key : *insertKeys ) { errors += insertKey( key, &usePair ); }
         }
+        delete insertKeys;
         for( auto entry : content ) {
             bool inserted = false;
             if (usePair) {
@@ -1557,31 +1650,22 @@ public:
         return errors;
     }
 
-    uint32_t remove( int count, RemoveOrder order ) {
+    uint32_t remove( int count, KeyOrder order ) {
         uint32_t errors = TreeTester<uint16_t[],uint16_t[]>::remove( count, order );
         size_t range = keys.size();
         if (range < count) count = range;
         bool usePair = false;
         if (order == Forward) {
             sort( keys.begin(), keys.end(), compare );
-            for ( int i = 0; i < count; ++i) {
-                errors += removeKey( keys[ i ], usePair );
-                usePair = !usePair;
-            }
+            for ( int i = 0; i < count; ++i) { errors += removeKey( keys[ i ], &usePair ); }
             keys.erase( keys.begin(), keys.begin() + count );
         } else if (order == Reverse) {
-            sort( keys.begin(), keys.end(), compare );
-            for ( int i = 0; i < count; ++i) {
-                errors += removeKey( keys[ range - i - 1 ], usePair );
-                usePair = !usePair;
-            }
+            sort( keys.rbegin(), keys.rend(), compare );
+            for ( int i = 0; i < count; ++i) { errors += removeKey( keys[ i ], &usePair ); }
             keys.erase( keys.end() - count, keys.end() );
         } else if (order == Random) {
             shuffle( keys.begin(), keys.end(), gen32 );
-            for ( int i = 0; i < count; ++i) {
-                errors += removeKey( keys[ i ], usePair );
-                usePair = !usePair;
-            }
+            for ( int i = 0; i < count; ++i) { errors += removeKey( keys[ i ], &usePair ); }
             keys.erase( keys.begin(), (keys.begin() + count) );
         }
         for (int i = 0; i < ProbeCount; ++i) {
@@ -1691,37 +1775,89 @@ uint32_t doTest( TreeTester<K,V>& tester, size_t count1, size_t count2, ofstream
     uint32_t errors = 0;
     try {
         tester.createPool();
+        // Insertion in forward order
         tester.createTree();
         errors += tester.validate();
         errors += tester.commit();
         errors += tester.validate();
-        errors += tester.insert( count1 );
+        errors += tester.insert( count1, TreeTester<K,V>::Forward );
         errors += tester.validate();
         errors += tester.remove( count2, TreeTester<K,V>::Forward );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
-        errors += tester.insert( count1 );
+        errors += tester.insert( count1, TreeTester<K,V>::Forward );
         errors += tester.validate();
         errors += tester.remove( count2, TreeTester<K,V>::Reverse );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
-        errors += tester.insert( count1 );
+        errors += tester.insert( count1, TreeTester<K,V>::Forward );
         errors += tester.validate();
         errors += tester.remove( count2, TreeTester<K,V>::Random );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
+        // Insertion in reverse order
         tester.createTree();
-        errors += tester.validate();
-        errors += tester.insert( count1 / 10 );
         errors += tester.validate();
         errors += tester.commit();
         errors += tester.validate();
-        errors += tester.insert( count1 - (count1 / 10) );
+        errors += tester.insert( count1, TreeTester<K,V>::Reverse );
+        errors += tester.validate();
+        errors += tester.remove( count2, TreeTester<K,V>::Forward );
+        errors += tester.validate();
+        tester.logTree();
+        tester.destroyTree();
+        tester.createTree();
+        errors += tester.insert( count1, TreeTester<K,V>::Reverse );
+        errors += tester.validate();
+        errors += tester.remove( count2, TreeTester<K,V>::Reverse );
+        errors += tester.validate();
+        tester.logTree();
+        tester.destroyTree();
+        tester.createTree();
+        errors += tester.insert( count1, TreeTester<K,V>::Reverse );
+        errors += tester.validate();
+        errors += tester.remove( count2, TreeTester<K,V>::Random );
+        errors += tester.validate();
+        tester.logTree();
+        tester.destroyTree();
+        // Insertion in random order
+        tester.createTree();
+        errors += tester.validate();
+        errors += tester.commit();
+        errors += tester.validate();
+        errors += tester.insert( count1, TreeTester<K,V>::Random );
+        errors += tester.validate();
+        errors += tester.remove( count2, TreeTester<K,V>::Forward );
+        errors += tester.validate();
+        tester.logTree();
+        tester.destroyTree();
+        tester.createTree();
+        errors += tester.insert( count1, TreeTester<K,V>::Random );
+        errors += tester.validate();
+        errors += tester.remove( count2, TreeTester<K,V>::Reverse );
+        errors += tester.validate();
+        tester.logTree();
+        tester.destroyTree();
+        tester.createTree();
+        errors += tester.insert( count1, TreeTester<K,V>::Random );
+        errors += tester.validate();
+        errors += tester.remove( count2, TreeTester<K,V>::Random );
+        errors += tester.validate();
+        tester.logTree();
+        tester.destroyTree();
+        // Commit and recover test
+        tester.createTree();
+        errors += tester.validate();
+        errors += tester.insert( count1 / 10, TreeTester<K,V>::Random );
+        errors += tester.validate();
+        errors += tester.commit();
+        errors += tester.validate();
+        errors += tester.insert( count1 - (count1 / 10), TreeTester<K,V>::Random );
         errors += tester.validate();
         errors += tester.commit();
         errors += tester.validate();
@@ -1735,7 +1871,7 @@ uint32_t doTest( TreeTester<K,V>& tester, size_t count1, size_t count2, ofstream
         errors += tester.validate();
         errors += tester.replace( count1 / 2 );
         errors += tester.validate();
-        errors += tester.insert( count1 / 2 );
+        errors += tester.insert( count1 / 2, TreeTester<K,V>::Random );
         errors += tester.validate();
         errors += tester.assign();
         errors += tester.validate();

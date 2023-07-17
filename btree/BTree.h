@@ -767,7 +767,7 @@ namespace BTree {
             auto node = page<VT>( trail );
             auto copyNode = updatePage<VT>( trail );
             auto right = allocatePage<VT>( node->header );
-            node->shiftRight( *right, optimalCut<K,VT>( node ), copyNode );
+            node->shiftRight( *right, optimalCut<K,VT>( node ), copyNode, right );
             PageIndex splitKeyIndex = (copyNode->header.count - 1);
             setSplit<VT>( *right, *copyNode, splitKeyIndex );
             insertSplitKey<K,VT>( trail.pop(), *copyNode, splitKeyIndex, right->header.page );
@@ -902,22 +902,22 @@ namespace BTree {
         // Append split with value in src and key in ancestor at index to src.
         // Append scalar value with scalar key
         template< class VT, std::enable_if_t<(S<K>&&S<VT>),bool> = true >
-        inline void appendSplit( Page<K,VT,false,false>& dst, const Page<K,PageLink,false,false>& ancestor, PageIndex index, const Page<K,VT,false,false>& src, Page<K,VT,false,false>* copy = nullptr ) {
+        inline void appendSplit( Page<K,VT,false,false>& dst, const Page<K,PageLink,false,false>& ancestor, PageIndex index, const Page<K,VT,false,false>& src, Page<K,VT,false,false>* copy ) {
             dst.insert( dst.header.count, ancestor.key( index ), src.split(), copy );
         }
         // Append array value with scalar key
         template< class VT, std::enable_if_t<(S<K>&&A<VT>),bool> = true >
-        inline void appendSplit( Page<K,B<VT>,false,true>& dst, const Page<K,PageLink,false,false>& ancestor, PageIndex index, const Page<K,B<VT>,false,true>& src, Page<K,B<VT>,false,true>* copy = nullptr ) {
+        inline void appendSplit( Page<K,B<VT>,false,true>& dst, const Page<K,PageLink,false,false>& ancestor, PageIndex index, const Page<K,B<VT>,false,true>& src, Page<K,B<VT>,false,true>* copy ) {
             dst.insert( dst.header.count, ancestor.key( index ), src.split(), src.splitSize(), copy );
         }
         // Append scalar value with array key
         template< class VT, std::enable_if_t<(A<K>&&S<VT>),bool> = true >
-        inline void appendSplit( Page<B<K>,VT,true,false>& dst, const Page<B<K>,PageLink,true,false>& ancestor, PageIndex index, const Page<B<K>,VT,true,false>& src, Page<B<K>,VT,true,false>* copy = nullptr ) {
+        inline void appendSplit( Page<B<K>,VT,true,false>& dst, const Page<B<K>,PageLink,true,false>& ancestor, PageIndex index, const Page<B<K>,VT,true,false>& src, Page<B<K>,VT,true,false>* copy ) {
             dst.insert( dst.header.count, ancestor.key( index ), ancestor.keySize( index ), src.split(), copy );
         }
         // Append array value with array key
         template< class VT, std::enable_if_t<(A<K>&&A<VT>),bool> = true >
-        inline void appendSplit( Page<B<K>,B<VT>,true,true>& dst, const Page<B<K>,PageLink,true,false>& ancestor, PageIndex index, const Page<B<K>,B<VT>,true,true>& src, Page<B<K>,B<VT>,true,true>* copy = nullptr ) {
+        inline void appendSplit( Page<B<K>,B<VT>,true,true>& dst, const Page<B<K>,PageLink,true,false>& ancestor, PageIndex index, const Page<B<K>,B<VT>,true,true>& src, Page<B<K>,B<VT>,true,true>* copy ) {
             dst.insert( dst.header.count, ancestor.key( index ), ancestor.keySize( index ), src.split(), src.splitSize(), copy );
         }
 
@@ -1001,7 +1001,7 @@ namespace BTree {
                 // Promote key 0 in parent to split key in ancestor
                 auto keyPark = allocateNode( parent->header.depth, false );
                 auto parentCopy = updatePage<PageLink>( srcTrail );
-                appendSplit<PageLink>( *keyPark, *parent, 0, *parent );
+                appendSplit<PageLink>( *keyPark, *parent, 0, *parent, keyPark );
                 parent->split( parent->value( 0 ), parentCopy );
                 parentCopy->remove( 0 );
                 // Re-access ancestor as it may have changed due to copy-on-update of parent
@@ -1010,7 +1010,6 @@ namespace BTree {
                 PageLink ancestorLink = ancestor->value( index );
                 ancestor->remove( index );
                 srcTrail.deletedIndex();
-                // ToDo: Ensure that new key actually fits in parent, otherwise grow
                 insertSplitKey<KT,PageLink>( srcTrail, *keyPark, 0, ancestorLink );
                 recoverUpdatedPage( parent->header, parentCopy->header );
                 if (stats) stats->pageFrees += 1;

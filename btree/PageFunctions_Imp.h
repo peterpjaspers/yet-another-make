@@ -214,7 +214,6 @@ namespace BTree {
             copy<V>(dst.values(), v, vn);
         }
     }
-    // ToDo: Optimize page insertion; i.e., only copy when &page != &dst
     template <class K, class V>
     void PageFunctions::pageInsert(
         const Page<K, V, false, false>& page,
