@@ -123,3 +123,186 @@ base. YAM uses this to reduce the overhead of updating dependants:
 	    }
 Note: the number of node re-executions in many typical development scenarios 
 will be small, thus limiting the effect of above optimization. 
+
+
+12 juli 2023
+Discussion with Phil after having read Buck2, DICE and Bazel documentation.
+Phil is charmed by the Buck2/DICE approach and proposes a different threading
+design:
+- a node can be executed in any thread T:
+    - node prerequisites execution: future = asycn(lambda) patterns
+      Synchronize: result = future.get()
+    - node self-execution in T
+
+Rationale: the previous design no longer scales when the main thread is
+100% loaded. Distributing (parallelizing) the main thread work over multiple
+threads will improve scalability.
+
++----Deadlock
+The async operation queues the lambda to a thread pool.
+Deadlock may occur when the number of threads in the pool is limited:
+	- nodes with prerequisites will block on preqrequisite completion
+	- deadlock occurs when the size of path from root node to leaves 
+	  (the file ndoes) is larger than the threadpool size.
+This can be avoided by adding threads to the pool when the length of a
+prerequisite path exceeds the pool size.
+
++----Scalability
+Previous design:
+The work done in the main thread is the work that would otherwise require
+MT-safe access to individual nodes and to the NodeSet (the map in which all
+nodes are registered).
+The work done in  main and pool thread when starting execution of a node:
+		main thread									threadpool
+- return if not dirty
+- start prerequisites execution
+- handle preqrequisite completion callbacks
+- queue self-execution to threadpool when 
+  all prerequisites completed
+											- self-execution (threadpool)
+												- FileNode: retrieve last-write-time + recompute aspect hashes
+												- CommandNode:
+													- execute script + track file-accesses
+													- find nodes associated with accessed files
+													- verify input/output nodes
+													- execute (rehash) outputfile nodes
+- handle self-execution completion
+	- update dependants of input nodes
+	- commit output node results
+- start postrequisites execution
+- handle postrequisite completion callbacks
+    - completion callback to all dependants and postParents
+	- notify subscribers of completion (not used)
+
+The multi-phase build (1-mirror repo, 2-process buildfiles, 3-execute commands)
+ensures that in phase 3 no additions/removals to the NodeSet occur. This
+allows commands to query the NodeSet (without locking overhead) to determine
+the set of input/output nodes of the command in threadpool context.
+
+New design:
+	- declaration of (super)set of input source files/directories required
+	  Rationale: render repo mirroring obsolete
+	  File/directory nodes are created lazily, i.e. on first execution of command
+	  noded that depends on these files/dirs. Take care: multiple commands may
+	  depend on same files/dirs.
+	- parallel execution of build phases.
+	  See MIRO board for parallel buildfile and command execution.
+	- postrequisites not only for directory nodes but also for command nodes
+	  I.e. command node execution may create more nodes.
+	  This can be used in langages where source code imports modules/files 
+	  that have to be compiled before use. Alternatives:
+	  - parse source code (recursively) in build file and create commands
+	    This is least disruptive for YAM design
+	  - parse source code (non-recursive) in command execution and create
+	    command nodes for direct dependencies. These dependencies can again
+		do same thing. This requires an API to enable command script to create
+		command nodes at runtime.
+	    For parallel buildfile and command execution first all the commands owned
+	    by changed buildfiles are suspended. This must be generalized to suspending 
+	    nodes created by dirty nodes. When a dirty node creator is executed it
+	    updates its created nodes and then resumes them.
+	    Once a node is resumed it continues execution (when it was requested to do so).	  
+	- all node execution in threadpool
+	  This requires MT-safe access to nodes and NodeSet.
+
+	  Buildstate storage is bound to single thread due to streaming btree.
+	  TODO: investigate how to store buildstate.
+	  TODO: investigate how to retrieve subgraphs from persistent buildstate.
+
+
+
+	  
+The work done in  main and pool thread when starting execution of a node:
+
+		main thread								thread pool
+
+Future f = async node->start()
+                                            - lock
+                                            - if (!dirty) {unlock; return state;}
+											- if (state == executing) ??
+											- state = executing
+											- unlock
+											- list<Future>[] preqfs = prerequisites.each(async start())
+											- preqfs.each(get)
+											- self-execution
+												- FileNode: retrieve last-write-time + recompute aspect hashes
+												- CommandNode:
+													- execute script + track file-accesses
+													- lock NodeSet { find nodes associated with accessed files }
+													- verify input/output nodes
+													- list<Future>[] outfs = outputnodes.each(async start())
+												    - update dependants of input nodes. lock add/removeDependant
+											- list<Future>[] postreqfs = postrequisites.each(async start())
+											- postreqfs.each(get)
+											- lock
+											- state = ok
+										    - completion callback to all dependants and postParents
+											- notify subscribers of completion (not used)
+- result = f.get()
+
+
+Nodes A and B both have node C as prerequisite, hence both A and B need to execute C.
+Nodes A and B execute in different threads. 
+C must execute in different thread than A and B.
+Overhead must be minimal in case C is already done executing, i.e. state is Ok|Failed|Canceled.
+Execution of C must only be started when C is dirty.
+
+class Node {
+    void execute() {
+	    std::lock lock(_mtx);
+		if (state == dirty) { 
+            std::vector<std::future> preqFutures;
+		    for (auto prereq : prerequisites() 
+			    prereq->lock([]() { 
+				    if (!_context->cancel() && prereq->state() == Dirty && !prereq->queued()) {
+					    prereq->queued(true);
+					    preqFutures.push_back(async prereq->execute(cancel));
+					}
+				});
+			}
+            for (auto f in preqFutures) f.get();
+		    if (!_context->cancel() && pendingSelfExecution) state = selfExecute();
+		    else state = _context->cancel() ? Cancelled : Ok;
+	    }
+		return state;
+	}
+	
+    std::atomic<std::shared_ptr<IMonitoredProcess>> _scriptExecutor;
+
+	void selfExecute() {
+        auto executor = std::make_shared<MonitoredProcess>(
+            cmdExe,
+            std::string("/c ") + scriptFilePath.string(),
+            env);
+        _scriptExecutor = executor;
+        MonitoredProcessResult result = executor->wait();
+        _scriptExecutor.store(nullptr);
+	}
+
+	void cancel() {
+        std::shared_ptr<IMonitoredProcess> executor = _scriptExecutor.load();
+        if (executor != nullptr) executor->terminate();
+	}
+}
+
+class Builder {
+	std::vector<Node*> _buildScope;
+
+	void build() {
+		std::vector<std::future> futures;
+		for (auto node : _buildScope) {
+			node->lock([]() { 
+				if (!_context->cancel() && node->state() == Dirty !prereq->queued()) {
+					prereq->queued(true);
+				    futures.push_back(async node->execute(cancel));
+		        }
+			})
+		}
+		for (auto f : futures) f.get();
+	}
+
+	void cancelBuild() {
+		_context->cancel(true);
+		for (auto node : _buildScope) node->cancel();
+	}
+}
