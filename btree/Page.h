@@ -25,10 +25,8 @@ namespace BTree {
         PageHeader header;
         Page() = delete;
         Page( const PageDepth depth ) {
-            static const char* signature( "Page<K,V,KA,KV>::Page( const PageDepth depth )" );
             header.depth = depth;
-            header.count = 0;
-            initialize<KA,VA>();
+            clear();
         }
         inline bool empty() const { return ((header.count == 0) && (header.split == 0)); }
         friend class PageFunctions;
@@ -202,8 +200,14 @@ namespace BTree {
             return false;
         }
 
+        // Empties the page, removing all key-value entries and split value.
+        void clear() {
+            header.count = 0;
+            header.split = 0;
+            initialize<KA,VA>();
+        }
         // Return number of entries in this page.
-        PageIndex size() const { return header.count; }
+        inline PageIndex size() const { return header.count; }
 
         // Return reference to scalar key at index.
         template <bool AK = KA, std::enable_if_t<(!AK),bool> = true>
@@ -300,9 +304,9 @@ namespace BTree {
         void removeSplit( Page<K,V,KA,VA>* copy ) const {
             static const char* signature( "void Page<K,V,KA,VA>::removeSplit( Page<K,V,KA,VA>* copy ) const" );
             if (header.split == 0) throw std::string( signature ) + " - No split defined";
-            PageFunctions::pageRemoveSplit( *this, copy );
+            PageFunctions::pageRemoveSplit( *this, *copy );
         }
-        inline void removeSplit() { removeSplit( *this ); }
+        inline void removeSplit() { removeSplit( this ); }
 
         // Insert an scalar key - scalar value entry at an index
         template <bool AK = KA, bool AV = VA, std::enable_if_t<(!AK&&!AV), bool> = true>
@@ -381,7 +385,7 @@ namespace BTree {
         }
         template <bool AV = VA, std::enable_if_t<(AV),bool> = true>
         inline void replace( PageIndex index, const V* value, const PageSize valueSize ) {
-            replace( index, value, valueSize, *this );
+            replace( index, value, valueSize, this );
         }
         // Replace a key-value entry at an index
         // Replace a scalar key scalar value entry
@@ -419,7 +423,7 @@ namespace BTree {
         }
         template <bool AK = KA, bool AV = VA, std::enable_if_t<(!AK&&AV), bool> = true>
         inline void replace( PageIndex index, const K& key, const V* value, const PageSize valueSize ) {
-            replace( index, key, value, valueSize, *this );
+            replace( index, key, value, valueSize, this );
         }
         // Replace an array key array value entry
         template <bool AK = KA, bool AV = VA, std::enable_if_t<(AK&&AV), bool> = true>
@@ -436,7 +440,7 @@ namespace BTree {
         }
         template <bool AK = KA, bool AV = VA, std::enable_if_t<(AK&&AV), bool> = true>
         inline void replace( PageIndex index, const K* key, const PageSize keySize, const V* value, const PageSize valueSize ) {
-            replace( index, key, keySize, value, valueSize, * this );
+            replace( index, key, keySize, value, valueSize, this );
         }
 
         // Remove the key - value entry at an index

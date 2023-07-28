@@ -1939,7 +1939,7 @@ int main(int argc, char* argv[]) {
     if (0 < errorCount) {
         log << "Total of " << errorCount << " errors detected!";
     } else {
-        log << "No errors detected.\n";
+        log << "No errors detected.";
     }
     log.close();
     exit( errorCount );

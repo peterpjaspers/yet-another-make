@@ -1,6 +1,7 @@
 #ifndef PAGE_POOL_IMP_H
 #define PAGE_POOL_IMP_H
 
+#include <new>
 #include "PagePool.h"
 
 namespace BTree {

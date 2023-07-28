@@ -2,7 +2,6 @@
 #define PAGE_POOL_H
 
 #include <vector>
-#include <new>
 #include "Types.h"
 #include "Page.h"
 

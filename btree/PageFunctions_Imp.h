@@ -315,7 +315,7 @@ namespace BTree {
         V* sv = page.splitValue();
         dst.header.count = (page.header.count + 1);
         dst.header.split = page.header.split;
-        // New value data array address only valid after cumulative size update (alignement?)
+        // New value data array address only valid after cumulative size update
         uint8_t* adrv = (reinterpret_cast<uint8_t *>(v) + (keySize * sizeof(K)) + (2 * sizeof(PageSize)));
         V* nv = reinterpret_cast<V* >(reinterpret_cast<uint8_t *>(&dst) + (adrv - reinterpret_cast<uint8_t *>(const_cast<Page<K, V, true, true>*>(&page))));
         copy<V>(&nv[vn1 + valueSize], &v[vn1], (vn2 - vn1));
@@ -543,9 +543,7 @@ namespace BTree {
         const V* value,
         const PageSize valueSize
     ) {
-        V* sv = page.splitValue();
         K* k = page.keys();
-        PageSize* ks = page.keyIndeces();
         PageSize kn1 = page.keyIndex(index);
         PageSize kn2 = page.keyIndex(page.header.count);
         PageSize kSize = page.keySize(index);
@@ -553,10 +551,9 @@ namespace BTree {
         PageIndex vn1 = page.valueIndex(index);
         PageIndex vn2 = page.valueIndex(page.header.count);
         PageSize vSize = page.valueSize(index);
-        // New value data array address only valid after cumulative size update (alignement?)
-        uint8_t* adrv = (reinterpret_cast<uint8_t *>(v) + (keySize * sizeof(K)) + (2 * sizeof(PageSize)));
-        V* nv = reinterpret_cast<V* >(reinterpret_cast<uint8_t *>(&dst) + (adrv - reinterpret_cast<uint8_t *>(const_cast<Page<K, V, true, true>*>(&page))));
         if (&page != &dst) {
+            V* sv = page.splitValue();
+            PageSize* ks = page.keyIndeces();
             PageSize* vs = page.valueIndeces();
             dst.header.count = page.header.count;
             dst.header.split = page.header.split;
@@ -564,21 +561,27 @@ namespace BTree {
             copy<PageSize>(dst.keyIndeces(), ks, dst.header.count);
             copy<PageSize>(dst.valueIndeces(), vs, dst.header.count);
             copy<K>(dst.keys(), k, kn1);
-            copy<V>(nv, v, vn1);
         }
-        copy<K>(&dst.keys()[kn1 + keySize], &k[kn1 + kSize], (kn2 - (kn1 + kSize)));
         if (kSize != keySize) {
             for (int o = index; o < dst.header.count; o++) {
                 dst.keyIndeces()[o] = ((dst.keyIndeces()[o] + keySize) - kSize);
             }
         }
-        copy<V>(&dst.keys()[kn1], key, keySize);
-        copy<V>(nv[vn1 + valueSize], &v[vn1 + vSize], (vn2 - (vn1 + vSize)));
         if (vSize != valueSize) {
             for (int o = index; o < dst.header.count; o++) {
                 dst.valueIndeces()[o] = ((dst.valueIndeces()[o] + valueSize) - vSize);
             }
         }
+        if (keySize <= kSize) {
+            copy<K>(&dst.keys()[kn1 + keySize], &k[kn1 + kSize], (kn2 - (kn1 + kSize)));
+            copy<V>(dst.values(), v, vn1);
+            copy<V>(&dst.values()[vn1 + valueSize], &v[vn1 + vSize], (vn2 - (vn1 + vSize)));
+        } else {
+            copy<V>(&dst.values()[vn1 + valueSize], &v[vn1 + vSize], (vn2 - (vn1 + vSize)));
+            copy<V>(dst.values(), v, vn1);
+            copy<K>(&dst.keys()[kn1 + keySize], &k[kn1 + kSize], (kn2 - (kn1 + kSize)));
+        }
+        copy<V>(&dst.keys()[kn1], key, keySize);
         copy<V>(&dst.values()[vn1], value, valueSize);
     }
     template <class K, class V>
