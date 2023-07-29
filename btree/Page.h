@@ -377,6 +377,7 @@ namespace BTree {
         template <bool AV = VA, std::enable_if_t<(AV),bool> = true>
         void replace( PageIndex index, const V* value, const PageSize valueSize, Page<K,V,KA,true>* copy ) const {
             static const char* signature( "void Page<K,V,KA,true>::replace( PageIndex index, const V* value, const PageSize valueSize, Page<K,V,KA,true>* copy ) const" );
+            if (valueSize == 0) throw std::string( signature ) + " - Invalid value size";
             if (header.count < index) throw std::string( signature ) + " - Invalid index";
             if ((this->valueSize(index) < valueSize) && (header.capacity < (filling() + ((valueSize - this->valueSize(index)) * sizeof(V))))) {
                 throw std::string( signature ) + " - Overflow";
@@ -454,7 +455,7 @@ namespace BTree {
         // Shift page content from indexed entry up to last entry to lower entries in another page
         void shiftRight( Page<K,V,KA,VA>& right, PageIndex index, Page<K,V,KA,VA>* copy, Page<K,V,KA,VA>* copyRight ) const {
             static const char* signature( "void Page<K,V,KA,VA>::shiftRight( Page<K,V,KA,VA>& right, PageIndex index, Page<K,V,KA,VA>* copy, Page<K,V,KA,VA>* copyRight ) const" );
-            if (header.count < index) throw std::string( signature ) + " - Invalid index or empty page";
+            if (header.count < index) throw std::string( signature ) + " - Invalid index";
             if (right.header.capacity < (right.filling() + (indexedFilling( header.count ) - indexedFilling( index )))) throw std::string( signature ) + " - Overflow";
             PageFunctions::pageShiftRight( *this, right, *copy, *copyRight, index );
         }
@@ -464,7 +465,7 @@ namespace BTree {
         // Shift page content from first entry up to indexed entry up to higher entries in another page
         void shiftLeft( Page& left, PageIndex index, Page* copy, Page* copyLeft ) const {
             static const char* signature( "void Page<K,V,KA,VA>::shiftLeft( Page<K,V,KA,VA>& left, PageIndex index, Page<K,V,KA,VA>* copy, Page<K,V,KA,VA>* copyLeft ) const" );
-            if (header.count < index) throw std::string( signature ) + " - Invalid index or empty page";
+            if (header.count < index) throw std::string( signature ) + " - Invalid index";
             if (left.header.capacity < (left.filling() + indexedFilling( index ))) throw std::string( signature ) + " - Overflow";
             PageFunctions::pageShiftLeft( *this, left, *copy, *copyLeft, index );
         }

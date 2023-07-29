@@ -38,18 +38,19 @@ Page<K,V,AK,AV>* allocatePage() {
 }
 
 template< class T >
-T generateValue() { return( gen64() % (uint64_t(1) << (sizeof( T ) * 8) ) ); }
+T generateRandomValue() { return( gen64() % (uint64_t(1) << (sizeof( T ) * 8) ) ); }
+uint32_t generateRandomLength( uint32_t min, uint32_t max ) {
+    if (min < max) return (min + (gen32() % (max - min)));
+    return min;
+}
 
 template< class T >
 vector<T> generate( uint32_t min, uint32_t max ) {
     vector<T> value;
-    uint32_t n = 1;
-    value.push_back( generateValue<T>() );
-    while (n < min) { value.push_back( generateValue<T>() ); ++n; }
-    if (min < max) {
-        uint32_t N = min + (gen32() % (max - min));
-        while (n < N) { value.push_back( generateValue<T>() ); ++n; }
-    }
+    uint32_t n = 0;
+    while (n < min) { value.push_back( generateRandomValue<T>() ); ++n; }
+    uint32_t N = generateRandomLength( min, max );
+    while (n < N) { value.push_back( generateRandomValue<T>() ); ++n; }
     return value;
 }
 
@@ -284,8 +285,10 @@ private:
     ostream& log;
     vector<K> generateKey() const { return generate<K>( (AK ? MinArray : 1), (AK ? MaxArray : 1) ); }
     vector<V> generateValue() const { return generate<V>( (AV ? MinArray : 1), (AV ? MaxArray : 1) ); }
-    vector<K> generateMaxKey() const { return generate<K>( (AK ? MaxArray : 1), (AK ? MaxArray : 1) ); }
-    vector<V> generateMaxValue() const { return generate<V>( (AV ? MaxArray : 1), (AV ? MaxArray : 1) ); }
+    vector<K> generateLargeKey() const { return generate<K>( (AK ? (2 * MaxArray) : 1), (AK ? (2 * MaxArray) : 1) ); }
+    vector<V> generateLargeValue() const { return generate<V>( (AV ? (2 * MaxArray) : 1), (AV ? (2 * MaxArray) : 1) ); }
+    vector<K> generateInvalidKey() const { return generate<K>( (AK ? 0 : 1), (AK ? 0 : 1) ); }
+    vector<V> generateInvalidValue() const { return generate<V>( (AV ? 0 : 1), (AV ? 0 : 1) ); }
     uint32_t validateContent( const Page<K,V,AK,AV>& page, const class PageContent<K,V>& content ) const {
         uint32_t errors = 0;
         if (content.splitDefined() != page.splitDefined()) {
@@ -346,8 +349,8 @@ public:
         log << "Filling tests ...\n";
         auto page = allocatePage<K,V,AK,AV>();
         class PageContent<K,V> content;
-        auto key = generateMaxKey();
-        auto value = generateMaxValue();
+        auto key = generateLargeKey();
+        auto value = generateLargeValue();
         if (!pageEntryFit<K,V,AK,AV>( *page, key, value )) {
             log << "Entry fit error : Expected true, actual false!\n";
             errors += 1;
@@ -684,6 +687,163 @@ public:
         }
         return errors;
     }
+    uint32_t exceptions() {
+        uint32_t errors = 0;
+        log << "Exception tests ...\n";
+        auto page = allocatePage<K,V,AK,AV>();
+        auto copy = allocatePage<K,V,AK,AV>();
+        auto right = allocatePage<K,V,AK,AV>();
+        auto copyRight = allocatePage<K,V,AK,AV>();
+        auto left = allocatePage<K,V,AK,AV>();
+        auto copyLeft = allocatePage<K,V,AK,AV>();
+        class PageContent<K,V> content;
+        fillPage( *page, (PageCapacity / 2), content );
+        log << "Validating \"No split defined\" exception ...\n";
+        page->removeSplit();
+        content.removeSplit();
+        try {
+            auto split = page->split();
+            log << "Expected \"No split defined\" exception!\n";
+            errors += 1;
+        }
+        catch (...) {}
+        log << "Validating \"Invalid key\" exceptions ...\n";
+        if (AK) {
+            try {
+                auto key = generateInvalidKey();
+                auto value = generateValue();
+                PageIndex index = (gen32() % (content.size() + 1));
+                pageInsert<K,V,AK,AV>( *page, index, key, value );                
+                log << "Expected \"Invalid key\" exception!\n";
+                errors += 1;
+            }
+            catch (...) {}
+            try {
+                auto key = generateInvalidKey();
+                auto value = generateValue();
+                PageIndex index = (gen32() % (content.size() + 1));
+                pageReplace<K,V,AK,AV>( *page, index, key, value );                
+                log << "Expected \"Invalid key\" exception!\n";
+                errors += 1;
+            }
+            catch (...) {}
+        }
+        log << "Validating \"Invalid value\" exceptions ...\n";
+        if (AV) {
+            try {
+                auto key = generateKey();
+                auto value = generateInvalidValue();
+                PageIndex index = (gen32() % (content.size() + 1));
+                pageInsert<K,V,AK,AV>( *page, index, key, value );                
+                log << "Expected \"Invalid value\" exception!\n";
+                errors += 1;
+            }
+            catch (...) {}
+            try {
+                auto value = generateInvalidValue();
+                PageIndex index = (gen32() % (content.size() + 1));
+                pageReplace<K,V,AK,AV>( *page, index, value );                
+                log << "Expected \"Invalid value\" exception!\n";
+                errors += 1;
+            }
+            catch (...) {}
+        }
+        log << "Validating \"Invalid index\" exceptions ...\n";
+        try {
+            auto key = generateKey();
+            auto value = generateValue();
+            pageInsert<K,V,AK,AV>( *page, (content.size() + 1), key, value );                
+            log << "Expected \"Invalid index\" exception!\n";
+            errors += 1;
+        }
+        catch (...) {}
+        try {
+            auto value = generateValue();
+            pageReplace<K,V,AK,AV>( *page, (content.size() + 1), value );                
+            log << "Expected \"Invalid index\" exception!\n";
+            errors += 1;
+        }
+        catch (...) {}
+        try {
+            auto key = generateKey();
+            auto value = generateValue();
+            pageReplace<K,V,AK,AV>( *page, (content.size() + 1), key, value );                
+            log << "Expected \"Invalid index\" exception!\n";
+            errors += 1;
+        }
+        catch (...) {}
+        try {
+            page->remove( (content.size() + 1) );                
+            log << "Expected \"Invalid index\" exception!\n";
+            errors += 1;
+        }
+        catch (...) {}
+        try {
+            page->shiftRight( *right, (content.size() + 1) );                
+            log << "Expected \"Invalid index\" exception!\n";
+            errors += 1;
+        }
+        catch (...) {}
+        try {
+            page->shiftLeft( *left, (content.size() + 1) );                
+            log << "Expected \"Invalid index\" exception!\n";
+            errors += 1;
+        }
+        catch (...) {}
+        log << "Validating \"Overflow\" exceptions ...\n";
+        fillPage( *page, PageCapacity, content );
+        fillPage( *right, PageCapacity, content );
+        fillPage( *left, PageCapacity, content );
+        if (AK || AV) {
+            try {
+                auto key = generateLargeKey();
+                auto value = generateLargeValue();
+                PageIndex index = (gen32() % (content.size() + 1));
+                pageInsert<K,V,AK,AV>( *page, index, key, value );                
+                log << "Expected \"Overflow\" exception!\n";
+                errors += 1;
+            }
+            catch (...) {}
+            try {
+                auto key = generateLargeKey();
+                auto value = generateLargeValue();
+                PageIndex index = (gen32() % (content.size() + 1));
+                pageReplace<K,V,AK,AV>( *page, index, key, value );                
+                log << "Expected \"Overflow\" exception!\n";
+                errors += 1;
+            }
+            catch (...) {}
+        }
+        if (AV) {
+            try {
+                auto value = generateLargeValue();
+                PageIndex index = (gen32() % (content.size() + 1));
+                pageReplace<K,V,AK,AV>( *page, index, value );                
+                log << "Expected \"Overflow\" exception!\n";
+                errors += 1;
+            }
+            catch (...) {}
+        }   
+        try {
+            page->shiftRight( *right, (content.size() / 2) );                
+            log << "Expected \"Overflow\" exception!\n";
+            errors += 1;
+        }
+        catch (...) {}
+        try {
+            page->shiftLeft( *left, (content.size() / 2) );                
+            log << "Expected \"Overflow\" exception!\n";
+            errors += 1;
+        }
+        catch (...) {}
+        delete page;
+        delete copy;
+        delete right;
+        delete copyRight;
+        delete left;
+        delete copyLeft;
+        return errors;
+    }
 };
 
 template< class K, class V, bool AK, bool AV >
@@ -698,6 +858,7 @@ uint32_t doTest( ofstream& log ) {
         errors += tester.remove();
         errors += tester.shiftRight();
         errors += tester.shiftLeft();
+        errors += tester.exceptions();
     }
     catch ( string message ) {
         log << "Exception : " << message << "!\n";
