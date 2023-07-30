@@ -244,31 +244,32 @@ Future f = async node->start()
 Nodes A and B both have node C as prerequisite, hence both A and B need to execute C.
 Nodes A and B execute in different threads. 
 C must execute in different thread than A and B.
-Overhead must be minimal in case C is already done executing, i.e. state is Ok|Failed|Canceled.
-Execution of C must only be started when C is dirty.
+Overhead must be minimal in case C is already queued for executing or already executed.
 
 class Node {
     void execute() {
-	    std::lock lock(_mtx);
-		if (state == dirty) { 
+        std::lock lock(_mtx);
+        if (state == dirty) { 
             std::vector<std::future> preqFutures;
-		    for (auto prereq : prerequisites() 
-			    prereq->lock([]() { 
-				    if (!_context->cancel() && prereq->state() == Dirty && !prereq->queued()) {
-					    prereq->queued(true);
-					    preqFutures.push_back(async prereq->execute(cancel));
-					}
+            std::vector<Node*> queued;
+            for (auto prereq : prerequisites() 
+                prereq->lock([]() { 
+                    if (!_context->cancel() && prereq->state() == Dirty && !prereq->queued()) {
+                        prereq->queued(true);
+						queued.push_back(prereq);
+                        preqFutures.push_back(async prereq->execute(cancel));
+				    }
 				});
-			}
+            }
             for (auto f in preqFutures) f.get();
-		    if (!_context->cancel() && pendingSelfExecution) state = selfExecute();
-		    else state = _context->cancel() ? Cancelled : Ok;
-	    }
+            for (auto prereq : queued) prereq->lock([]() { prereq->queued(false); } });
+            if (!_context->cancel() && pendingSelfExecution) state = selfExecute();
+            else state = _context->cancel() ? Cancelled : Ok;
+        }
 		return state;
 	}
 	
     std::atomic<std::shared_ptr<IMonitoredProcess>> _scriptExecutor;
-
 	void selfExecute() {
         auto executor = std::make_shared<MonitoredProcess>(
             cmdExe,
@@ -277,32 +278,35 @@ class Node {
         _scriptExecutor = executor;
         MonitoredProcessResult result = executor->wait();
         _scriptExecutor.store(nullptr);
-	}
+    }
 
 	void cancel() {
+        for (auto prereq : prerequisites()) prereq->cancel();
         std::shared_ptr<IMonitoredProcess> executor = _scriptExecutor.load();
         if (executor != nullptr) executor->terminate();
 	}
 }
 
 class Builder {
-	std::vector<Node*> _buildScope;
+    std::vector<Node*> _buildScope;
 
-	void build() {
-		std::vector<std::future> futures;
-		for (auto node : _buildScope) {
-			node->lock([]() { 
-				if (!_context->cancel() && node->state() == Dirty !prereq->queued()) {
-					prereq->queued(true);
-				    futures.push_back(async node->execute(cancel));
-		        }
-			})
-		}
-		for (auto f : futures) f.get();
+    void build() {
+        std::vector<Node*> queued;
+        std::vector<std::future> futures;
+        for (auto node : _buildScope) {
+            node->lock([]() { 
+                if (!_context->cancel() && node->state() == Dirty !prereq->queued()) {
+                    prereq->queued(true);
+                    futures.push_back(async node->execute(cancel));
+                }
+            })
+        }
+        for (auto f : futures) f.get();
+        for (auto prereq : queued) prereq->lock([]() { prereq->queued(false); } });
 	}
 
-	void cancelBuild() {
-		_context->cancel(true);
-		for (auto node : _buildScope) node->cancel();
-	}
+    void cancelBuild() {
+        _context->cancel(true);
+        for (auto node : _buildScope) node->cancel();
+    }
 }
