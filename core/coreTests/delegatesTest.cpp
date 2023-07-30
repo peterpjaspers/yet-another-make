@@ -2,6 +2,9 @@
 
 #include "../Delegates.h"
 
+#include <chrono>
+#include <iostream>
+
 namespace
 {
     int x = 5;
@@ -93,5 +96,71 @@ namespace
         d.Broadcast(x, y);
         EXPECT_EQ(-1, r1);
         EXPECT_EQ(-1, r2);
+    }
+
+    // On dual core i5-4210M CPU @ 2.60 GHz
+    // 16 GB RAM, Windows 10, release build:
+    //    subscribe ns = 108
+    //    broadcast ns = 19
+    //    unsubscribe ns = 40
+    //    total ns = 169
+    //    callback ns = 0
+    TEST(Delegate, MultiCastOverhead) {
+        const std::size_t count = 100000;
+
+        std::vector<MulticastDelegate<int, int>> delegates;
+        for (std::size_t i = 0; i < count; ++i) {
+            delegates.push_back(MulticastDelegate<int, int>());
+        }
+        int r1 = 0;
+        auto callback = [&r1](int x, int y) {
+            r1 += x + y;
+        };
+
+        auto start = std::chrono::high_resolution_clock::now();
+        std::vector<DelegateHandle> handles;
+        for (std::size_t i = 0; i < count; ++i) {
+            auto& d = delegates[i];
+            auto h = d += callback;
+            handles.push_back(h);
+        }
+        auto subscribe = std::chrono::high_resolution_clock::now();
+
+        for (std::size_t i = 0; i < count; ++i) {
+            delegates[i].Broadcast(1, 1);
+        }
+        auto broadcast = std::chrono::high_resolution_clock::now();
+
+        EXPECT_EQ(2*count, r1);
+        for (std::size_t i = 0; i < count; ++i) {
+            delegates[i] -= handles[i];
+        }
+        auto unsubscribe = std::chrono::high_resolution_clock::now();
+
+        auto subscribeNs = std::chrono::duration_cast<std::chrono::nanoseconds>(subscribe - start);
+        auto broadcastNs = std::chrono::duration_cast<std::chrono::nanoseconds>( broadcast - subscribe);
+        auto unsubscribeNs = std::chrono::duration_cast<std::chrono::nanoseconds>(unsubscribe - broadcast);
+        auto totalNs = std::chrono::duration_cast<std::chrono::nanoseconds>(unsubscribe - start);
+
+        std::cout
+            << "subscribe ns=" << subscribeNs.count()/count
+            << std::endl
+            << "broadcast ns=" << broadcastNs.count() / count
+            << std::endl
+            << "unsubscribe ns=" << unsubscribeNs.count() / count
+            << std::endl
+            << "total ns=" << totalNs.count()/count
+            << std::endl;
+
+
+        auto startcb = std::chrono::high_resolution_clock::now();
+        for (std::size_t i = 0; i < count; ++i) {
+            callback(1, 1);
+        }
+        auto endcb = std::chrono::high_resolution_clock::now();
+        auto cbNs = std::chrono::duration_cast<std::chrono::nanoseconds>(endcb - startcb);
+        std::cout
+            << "callback ns=" << cbNs.count()/count
+            << std::endl;
     }
 }
