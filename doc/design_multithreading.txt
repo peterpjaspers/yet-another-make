@@ -32,7 +32,7 @@ Both threading design options impact the scalability of YAM because they limit
 the amount of parallellizable code, see Amdahl's law.
 
 - Scalability analysis
-Performance on  Intel(R) Core(TM) i5-4210M CPU@ 2.60GHz, mWindows 10, 16 GB
+Performance on  Intel(R) Core(TM) i5-4210M CPU@ 2.60GHz, Windows 10, 16 GB
 std::unordered_set<std::shared_ptr<Node>>:
 	- Add: 600 ns
 	- Find: 320 ns
@@ -54,9 +54,8 @@ are declared in advance (as is done in Bazel). In that case hashing the files
 can become part of stage 3 (via Node preRequisites execution). Note that
 re-reading/re-hashing directories must still be done in stage 1.
 A hybrid form can be used: in build file specify the include directories on
-which an object file is allowed to depend. But register in object file cmd
-node only the actually used include files.
-To be discussed with Phil.
+which an object file is allowed to depend but register in the compilation
+command node only the actually used include files.
 
 Stage 2 and 3 can be executed in parallel, see MIRO board.
 YAM has choosen sequential execution of stage 2 and 3 because:
@@ -147,44 +146,26 @@ Deadlock may occur when the number of threads in the pool is limited:
 This can be avoided by adding threads to the pool when the length of a
 prerequisite path exceeds the pool size.
 
++----Many threads needed => excessive resource usage
+
 +----Scalability
 Previous design:
 The work done in the main thread is the work that would otherwise require
 MT-safe access to individual nodes and to the NodeSet (the map in which all
 nodes are registered).
-The work done in  main and pool thread when starting execution of a node:
-		main thread									threadpool
-- return if not dirty
-- start prerequisites execution
-- handle preqrequisite completion callbacks
-- queue self-execution to threadpool when 
-  all prerequisites completed
-											- self-execution (threadpool)
-												- FileNode: retrieve last-write-time + recompute aspect hashes
-												- CommandNode:
-													- execute script + track file-accesses
-													- find nodes associated with accessed files
-													- verify input/output nodes
-													- execute (rehash) outputfile nodes
-- handle self-execution completion
-	- update dependants of input nodes
-	- commit output node results
-- start postrequisites execution
-- handle postrequisite completion callbacks
-    - completion callback to all dependants and postParents
-	- notify subscribers of completion (not used)
 
 The multi-phase build (1-mirror repo, 2-process buildfiles, 3-execute commands)
 ensures that in phase 3 no additions/removals to the NodeSet occur. This
 allows commands to query the NodeSet (without locking overhead) to determine
-the set of input/output nodes of the command in threadpool context.
+the set of input/output nodes of the command in threadpool context, thus 
+reducing the time spent in not-parallized code, thus increasing scalability.
 
-New design:
+New design proposal:
 	- declaration of (super)set of input source files/directories required
 	  Rationale: render repo mirroring obsolete
 	  File/directory nodes are created lazily, i.e. on first execution of command
 	  noded that depends on these files/dirs. Take care: multiple commands may
-	  depend on same files/dirs.
+	  depend on same files/dirs
 	- parallel execution of build phases.
 	  See MIRO board for parallel buildfile and command execution.
 	- postrequisites not only for directory nodes but also for command nodes
@@ -202,44 +183,20 @@ New design:
 	    nodes created by dirty nodes. When a dirty node creator is executed it
 	    updates its created nodes and then resumes them.
 	    Once a node is resumed it continues execution (when it was requested to do so).	  
+		After discussion with Phil dd 19-Jul-2023 we accepted first alternative.
 	- all node execution in threadpool
 	  This requires MT-safe access to nodes and NodeSet.
 
 	  Buildstate storage is bound to single thread due to streaming btree.
 	  TODO: investigate how to store buildstate.
 	  TODO: investigate how to retrieve subgraphs from persistent buildstate.
-
-
-
-	  
-The work done in  main and pool thread when starting execution of a node:
-
-		main thread								thread pool
-
-Future f = async node->start()
-                                            - lock
-                                            - if (!dirty) {unlock; return state;}
-											- if (state == executing) ??
-											- state = executing
-											- unlock
-											- list<Future>[] preqfs = prerequisites.each(async start())
-											- preqfs.each(get)
-											- self-execution
-												- FileNode: retrieve last-write-time + recompute aspect hashes
-												- CommandNode:
-													- execute script + track file-accesses
-													- lock NodeSet { find nodes associated with accessed files }
-													- verify input/output nodes
-													- list<Future>[] outfs = outputnodes.each(async start())
-												    - update dependants of input nodes. lock add/removeDependant
-											- list<Future>[] postreqfs = postrequisites.each(async start())
-											- postreqfs.each(get)
-											- lock
-											- state = ok
-										    - completion callback to all dependants and postParents
-											- notify subscribers of completion (not used)
-- result = f.get()
-
+	  TODO: only parse modified buildfiles related to build scope, build scope
+	  being the set of output files to build.
+	  I.e. do not do more than what the user asked for. This requires being able
+	  to relate an output file directly to buildfile. This can only be done by
+	  using strict conventions. E.g. A\B\C\buildfile.yam defines output files in
+	  A\B\C\yamout
+  
 
 Nodes A and B both have node C as prerequisite, hence both A and B need to execute C.
 Nodes A and B execute in different threads. 
@@ -305,8 +262,59 @@ class Builder {
         for (auto prereq : queued) prereq->lock([]() { prereq->queued(false); } });
 	}
 
-    void cancelBuild() {
-        _context->cancel(true);
-        for (auto node : _buildScope) node->cancel();
-    }
+	void cancelBuild() {
+		_context->cancel(true);
+		for (auto node : _buildScope) node->cancel();
+	}
 }
+
+The above code has serious disadvantages:
+- no control on the number of threads used by yam
+- deadlock when number of threads is too small
+  (all threads in threadpool used by nodes waiting for prerequisites).
+
+The deadlock can only be avoided by:
+- increasing threadpool size
+  This can be counter-productive for scalability: too many context switches
+- only queue nodes to threadpool that are ready to self-execute
+  This can be achieved as in current design. An alternative is to first
+  sort the nodes, e.g. see https://stackoverflow.com/questions/63354899/parallel-execution-of-directed-acyclic-graph-of-tasks
+  In this solution the thread that completes a prerequisite of a node will
+  perform the completeness-check:
+      - decrement count of in-progress prerequisites
+	  - test count for 0
+	  - if 0: post selfExecute to threadpool
+  This approach spares posting the (very cheap) completeness-check to the main thread.
+  Because posting is a serializing action this approach will increase scalability.
+  It is dubious however whether this will result in a significant improvement
+  because the other serializing actions take-up much more time:
+	- finding nodes associated with the found file dependencies
+	  In current implementation this is done in threadpool context. 
+	  But when parallelizing buildfile processing with command execution
+	  then new nodes can be created during command execution and adding
+	  and finding nodes must be moved into critical sections.
+	- updating the dependants of the input and command nodes.
+	  This must be done in critical section because many commands
+	  can depend on the same node. E.g. the dependents of an include file
+	  node are all the compilation commands that read that include file.
+
+Note that this advantage can also be achieved in the current design by executing the 
+handlePre/PostRequisiteCompletion callbacks in threadpool context.
+In current implementation this requires the node to be locked due to use of unordered_sets
+Node::_executingPre/Postrequisites. This can be avoided by only maintaining 
+_nrOfExecutingPre/Postrequisites in std::atomic<unsigned int>.
+
+NB: the callbacks are currently made as last statements in notifyCompletion which 
+executes in main thread. This routine updates multiple member fields and also the 
+node state. Is it possible to start() node execution in thread A (main) and 
+notifyCompletion() from thread B (threadpool) ?
+Yes, this is possible but requires critical sections as illustrated by this example:
+	nodes A and B share same prerequiste C.
+	node A is started and starts C. Before/during start of node B node C completes 
+	and calls-back on A and B from threadpool context. Current code is not MT-safe
+	and outcome is undefined. 
+
+The current implementation fixes this race-condition by doing the callbacks
+in mainthread. In the example this means that callback from C to B is done
+once main thread is idle, which is after B has started.
+
