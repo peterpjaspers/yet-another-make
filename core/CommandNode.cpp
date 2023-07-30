@@ -375,12 +375,25 @@ namespace YAM
     }
 
     void CommandNode::setInputs(ExecutionResult const* result) {
+        // An input GeneratedFileNode is not a prerequisite of the CommandNode.
+        // A command node therefore does not register itself as dependant of an
+        // input GeneratedFileNode. Instead the command node registers itself as
+        // dependent of the producer of the input GeneratedFileNode. This prevents
+        // spurious callbacks to Node::handlePrerequisiteCompletion(Node* node)
+        // from input GeneratedFileNodes to the command node.
+        // Note: Dirty propagation in case of tampering with generated files
+        // remains intact because a GeneratedFileNode propagates to its 
+        // producer (who again propagates to its dependants, i.e to nodes that
+        // read output files of the producer).
+        // 
         for (auto const& pair : result->_removedInputs) {
-            pair.second->removeDependant(this);
+            auto const& genFile = dynamic_pointer_cast<GeneratedFileNode>(pair.second);
+            if (genFile == nullptr) pair.second->removeDependant(this);
             _inputs.erase(pair.first);
         }
         for (auto const& pair : result->_addedInputs) {
-            pair.second->addDependant(this);
+            auto const& genFile = dynamic_pointer_cast<GeneratedFileNode>(pair.second);
+            if (genFile == nullptr) pair.second->addDependant(this);
             _inputs.insert(pair);
         }
         modified(true);
@@ -633,7 +646,10 @@ namespace YAM
         Node::prepareDeserialize();
         for (auto const& i : _inputProducers) i->removeDependant(this);
         for (auto const& i : _outputs) i->removeDependant(this);
-        for (auto const& p : _inputs) p.second->removeDependant(this);
+        for (auto const& p : _inputs) {
+            auto const& genFile = dynamic_pointer_cast<GeneratedFileNode>(p.second);
+            if (genFile == nullptr) p.second->removeDependant(this);
+        }
         _inputProducers.clear();
         _outputs.clear();
         _inputs.clear();
@@ -646,6 +662,9 @@ namespace YAM
             i->addDependant(this);
             i->producer(this);
         }
-        for (auto const& p : _inputs) p.second->addDependant(this);
+        for (auto const& p : _inputs) {
+            auto const& genFile = dynamic_pointer_cast<GeneratedFileNode>(p.second);
+            if (genFile == nullptr) p.second->addDependant(this);
+        }
     }
 }

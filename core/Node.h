@@ -398,15 +398,22 @@ namespace YAM
         ExecutionState _executionState;
         bool _suspended;
         bool _modified;
+
         // prerequisite nodes, captured at start-resume time.
         std::vector<std::shared_ptr<Node>> _prerequisites;
+        unsigned int _nExecutingPrerequisites;
+#ifdef _DEBUG
         // nodes in _prerequisites that are executing  
         std::unordered_set<Node*> _executingPrerequisites;
+#endif
 
         // postrequisite nodes, captured at completion of self-execution.
         std::vector<std::shared_ptr<Node>> _postrequisites;
+        unsigned int _nExecutingPostrequisites;
+#ifdef _DEBUG
         // nodes in _postrequisites that are executing  
         std::unordered_set<Node*> _executingPostrequisites;
+#endif
 
         MulticastDelegate<Node*> _completor;
     };

@@ -10,21 +10,25 @@ namespace YAM
 {
     Node::Node()
         : _context(nullptr)
+        , _canceling(false)
         , _state(Node::State::Dirty)
         , _executionState(ExecutionState::Idle)
         , _suspended(false)
         , _modified(false)
-        , _canceling(false)
+        , _nExecutingPrerequisites(0)
+        , _nExecutingPostrequisites(0)
     {}
 
     Node::Node(ExecutionContext* context, std::filesystem::path const& name)
         : _context(context)
         , _name(name)
+        , _canceling(false)
         , _state(Node::State::Dirty)
         , _executionState(ExecutionState::Idle)
         , _suspended(false)
         , _modified(true)
-        , _canceling(false)
+        , _nExecutingPrerequisites(0)
+        , _nExecutingPostrequisites(0)
     {} 
 
     Node::~Node() {
@@ -110,10 +114,9 @@ namespace YAM
 
     void Node::startPrerequisites() {
         _executionState = ExecutionState::Prerequisites;
-        _prerequisites.clear();
         getPrerequisites(_prerequisites);
-        for (std::shared_ptr<Node> p : _prerequisites) startPrerequisite(p.get());
-        handlePrerequisitesCompletion();
+        for (auto const& p : _prerequisites) startPrerequisite(p.get());
+        if (_nExecutingPrerequisites == 0) handlePrerequisitesCompletion();
     }
 
     void Node::startPrerequisite(Node* prerequisite) {
@@ -123,15 +126,21 @@ namespace YAM
         switch (prerequisite->state()) {
         case Node::State::Dirty:
         {
+            _nExecutingPrerequisites += 1;
+#ifdef _DEBUG
             _executingPrerequisites.insert(prerequisite);
+#endif
             prerequisite->start();
             break;
         }
         case Node::State::Executing:
         {
+            _nExecutingPrerequisites += 1;
+#ifdef _DEBUG
             // Multiply referenced node, already started by another
             // executor. Wait for it to complete.
             _executingPrerequisites.insert(prerequisite);
+#endif
             break;
         }
         case Node::State::Ok: break;
@@ -143,13 +152,22 @@ namespace YAM
         }
     }
 
-    void Node::handlePrerequisiteCompletion(Node* prerequisite) {
-        // When a prerequisite completes it calls this function for all if
-        // its dependants. There may be parents that are not part of the build 
-        // scope. So ignore the callback when this node is in Idle state.
-        //
+    void Node::handlePrerequisiteCompletion(Node* node) {
+        // When a node completes it calls this function for ALL if its 
+        // dependants. There may be dependants that are not part of the build 
+        // scope and are not executing.
         if (_executionState == ExecutionState::Prerequisites) {
-            auto preqState = prerequisite->state();
+#ifdef _DEBUG
+            if (0 == _executingPrerequisites.erase(node)) {
+                throw std::exception("callback from unknown prerequisite");
+            }
+#endif
+            if (0 == _nExecutingPrerequisites) {
+                throw std::exception("Invalid _nExecutingPrerequisites");
+            }
+            _nExecutingPrerequisites -= 1;
+
+            auto preqState = node->state();
             bool preqCompleted =
                 preqState == Node::State::Ok
                 || preqState == Node::State::Failed
@@ -158,78 +176,35 @@ namespace YAM
             if (!preqCompleted) {
                 throw std::runtime_error("Completed prerequisite has invalid Node::State");
             }
-            if (1 == _executingPrerequisites.erase(prerequisite)) {
-                bool stopBuild = (preqState != Node::State::Ok); // todo: && !_node->logBook()->keepWorking();
-                if (stopBuild) {
-                    // At this point in the build process:
-                    //  - all busy recursive executors are waiting for prerequisite
-                    //    or self-executors to complete
-                    //  - busy self-executors have posted operations to the thread
-                    //    pool or are already executing operations in thread pool
-                    //    context and are awaiting completion of these operations.
-                    //    Note: a thread pool operation notifies its completion
-                    //    by posting a completion operation to the main thread.
-                    //    Thread pool and completion operations are member
-                    //    functions of the self-executor.
-                    //
-                    // Stopping the build requires:
-                    // 1) to suspend the thread pool
-                    //    This speeds-up the cancelation process by not
-                    //    starting posted operations that can not yet detect
-                    //    that they must stop processing (see step 2 and 4).
-                    // 2) to request all busy recursive and self-executors to
-                    //    cancel the build, i.e. to take measures to stop
-                    //    execution as soon as possible. I.e. for a recursive
-                    //    executor to not start the self-executor.
-                    //    E.g. a command node self-executor posts an operation
-                    //    that runs a shell process to execute the command
-                    //    script. This operation blocks until the shell exits. 
-                    //    To expedite cancelation the command node executor sets
-                    //    a cancel flag, kills the shell and awaits completion
-                    //    notification. Also see step 4.
-                    // 3) to resume the thread pool
-                    // 4) an operation running in thread pool to (frequently)
-                    //    check the cancel flag and to stop processing if it is
-                    //    set. E.g. in step 2 a shell process is killed causing
-                    //    the thread pool operation to unblock. The operation
-                    //    checks the cancel flag, and if set, stops further
-                    //    processing and posts a completion operation with status
-                    //    canceled to the main thread.
-                    //
-                    cancel();
-                    // TODO: how to notify all other executors that build must be stopped ?
-                    //mainDispatcher().post((_node->LogBook.RaiseStopRequested));
-                }
-                handlePrerequisitesCompletion();
+            bool stopBuild = (preqState != Node::State::Ok); // todo: && !_node->logBook()->keepWorking();
+            if (stopBuild) {
+                cancel();
             }
+            if (_nExecutingPrerequisites == 0) handlePrerequisitesCompletion();
         }
     }
 
     void Node::handlePrerequisitesCompletion() {
-        bool allCompleted = _executingPrerequisites.size() == 0;
-        if (allCompleted) {
-            if (_canceling) {
-                postCompletion(State::Canceled);
-            }
-            else if (!allPrerequisitesAreOk()) {
-                postCompletion(State::Failed);
-            }
-            else if (pendingStartSelf()) {
-                _executionState = ExecutionState::Self;
-                startSelf();
-            }
-            else {
-                postCompletion(State::Ok);
-            }
+        if (_canceling) {
+            postCompletion(State::Canceled);
+        }
+        else if (!allPrerequisitesAreOk()) {
+            postCompletion(State::Failed);
+        }
+        else if (pendingStartSelf()) {
+            _executionState = ExecutionState::Self;
+            startSelf();
+        }
+        else {
+            postCompletion(State::Ok);
         }
     }
 
     bool Node::allPrerequisitesAreOk() const {
-        bool allOk = true;
-        for (std::size_t i = 0; i < _prerequisites.size() && allOk; ++i) {
-            allOk = _prerequisites[i]->state() == Node::State::Ok;
+        for (auto const& prereq : _prerequisites) {
+            if (prereq->state() != Node::State::Ok) return false;
         }
-        return allOk;
+        return true;
     }
 
     void Node::startSelf() {
@@ -243,7 +218,7 @@ namespace YAM
         _postrequisites.clear();
         getPostrequisites(_postrequisites);
         for (std::shared_ptr<Node> p : _postrequisites) startPostrequisite(p.get());
-        handlePostrequisitesCompletion();
+        if (_nExecutingPostrequisites == 0) handlePostrequisitesCompletion();
     }
 
     void Node::startPostrequisite(Node* postrequisite) {
@@ -253,15 +228,21 @@ namespace YAM
         switch (postrequisite->state()) {
         case Node::State::Dirty:
         {
+            _nExecutingPostrequisites += 1;
+#ifdef _DEBUG
             _executingPostrequisites.insert(postrequisite);
+#endif
             postrequisite->start();
             break;
         }
         case Node::State::Executing:
         {
+            _nExecutingPostrequisites += 1;
+#ifdef _DEBUG
             // Multiply referenced node, already started by another
             // executor. Wait for it to complete.
             _executingPostrequisites.insert(postrequisite);
+#endif
             break;
         }
         case Node::State::Ok: break;
@@ -279,6 +260,15 @@ namespace YAM
         // scope. So ignore the callback when this node is in Idle state.
         //
         if (_executionState == ExecutionState::Postrequisites) {
+#ifdef _DEBUG
+            if (0 == _executingPostrequisites.erase(postrequisite)) {
+                throw std::exception("Unknown postrequisite");
+            }
+#endif
+            if (0 == _nExecutingPostrequisites) {
+                throw std::exception("Invalid _nExecutingPostrequisites");
+            }
+            _nExecutingPostrequisites -= 1;
 
             auto preqState = postrequisite->state();
             bool preqCompleted =
@@ -289,39 +279,29 @@ namespace YAM
             if (!preqCompleted) {
                 throw std::runtime_error("Completed postrequisite has invalid Node::State");
             }
-            if (1 == _executingPostrequisites.erase(postrequisite)) {
-                bool stopBuild = (preqState != Node::State::Ok); // todo: && !_node->logBook()->keepWorking();
-
-                if (stopBuild) {
-                    // See handlePreRequisiteisCompletion(Node*)
-                    cancel();
-                    // TODO: how to notify all other executors that build must be stopped ?
-                    //mainDispatcher().post((_node->LogBook.RaiseStopRequested));
-                }
-                handlePostrequisitesCompletion();
+            bool stopBuild = (preqState != Node::State::Ok);
+            if (stopBuild) {
+                cancel();
             }
+            if (_nExecutingPostrequisites == 0) handlePostrequisitesCompletion();
         }
     }
 
     void Node::handlePostrequisitesCompletion() {
-        bool allCompleted = _executingPostrequisites.size() == 0;
-        if (allCompleted) {
-            if (_canceling) {
-                postCompletion(State::Canceled);
-            } else if (!allPostrequisitesAreOk()) {
-                postCompletion(State::Failed);
-            } else {
-                postCompletion(State::Ok);
-            }
+        if (_canceling) {
+            postCompletion(State::Canceled);
+        } else if (!allPostrequisitesAreOk()) {
+            postCompletion(State::Failed);
+        } else {
+            postCompletion(State::Ok);
         }
     }
 
     bool Node::allPostrequisitesAreOk() const {
-        bool allOk = true;
-        for (std::size_t i = 0; i < _postrequisites.size() && allOk; ++i) {
-            allOk = _postrequisites[i]->state() == Node::State::Ok;
+        for (auto const& postreq : _postrequisites) {
+            if (postreq->state() != Node::State::Ok) return false;
         }
-        return allOk;
+        return true;
     }
 
     void Node::postSelfCompletion(std::shared_ptr<SelfExecutionResult> result) {
@@ -352,9 +332,13 @@ namespace YAM
         _executionState = ExecutionState::Idle;
         _canceling = false;
         _prerequisites.clear();
-        _executingPrerequisites.clear();
         _postrequisites.clear();
+        _nExecutingPrerequisites = 0;
+        _nExecutingPostrequisites = 0;
+#ifdef _DEBUG
+        _executingPrerequisites.clear();
         _executingPostrequisites.clear();
+#endif
 
         setState(newState);
 
@@ -378,7 +362,13 @@ namespace YAM
                 postCompletion(State::Canceled);
                 break;
             case ExecutionState::Prerequisites:
-                for (auto preq : _executingPrerequisites) {
+                for (auto preq : _prerequisites) {
+                    preq->cancel();
+                }
+                break;
+
+            case ExecutionState::Postrequisites:
+                for (auto preq : _postrequisites) {
                     preq->cancel();
                 }
                 break;
