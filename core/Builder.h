@@ -26,10 +26,12 @@ namespace YAM
         void start(std::shared_ptr<BuildRequest> request);
 
         // Return whether a build is running.
-        bool running() const;
+        bool running();
 
         // Stop a running build.
         // Completion will be notified as described in start().
+        // Stopping a build that is not running or that has already
+        // completed is a no-op.
         void stop();
 
         // Return delegate to which clients can add callbacks that will be
@@ -40,7 +42,6 @@ namespace YAM
         void _init(std::filesystem::path directory);
         void _start();
         void _clean(std::shared_ptr<BuildRequest> request);
-        void _stop();
         void _handleSourcesCompletion(Node* n);
         void _handleBuildFilesCompletion(Node* n);
         void _handleCommandsCompletion(Node* n);

@@ -37,5 +37,9 @@ namespace YAM
     void Thread::join() {
         _thread.join();
     }
+
+    bool Thread::isThisThread() const {
+        return _thread.get_id() == std::this_thread::get_id();
+    }
 }
 

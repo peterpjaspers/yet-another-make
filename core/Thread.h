@@ -19,6 +19,9 @@ namespace YAM
         bool joinable();
         void join();
 
+        // Return whether call is made in this thread.
+        bool isThisThread() const;
+
     private:
         Dispatcher* _dispatcher;
         std::string _name;

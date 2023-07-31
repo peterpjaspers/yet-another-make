@@ -53,6 +53,10 @@ namespace YAM
         return _mainThreadQueue;
     }
 
+    void ExecutionContext::assertMainThread() {
+        if (!_mainThread.isThisThread()) throw std::exception("not called in main thread");
+    }
+
     ExecutionStatistics& ExecutionContext::statistics() {
         return _statistics;
     }

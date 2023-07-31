@@ -177,18 +177,36 @@ namespace
             return sptr == nullptr ? nullptr : sptr.get();
         }
 
-        std::shared_ptr<BuildResult> executeRequest(std::shared_ptr<BuildRequest> request) {
-            Dispatcher dispatcher;
-            std::atomic<std::shared_ptr<BuildResult>> result;
-            builder.completor().AddLambda(
-                [&result, &dispatcher](std::shared_ptr<BuildResult> r) {
+        void startExecuteRequest(
+            std::shared_ptr<BuildRequest> &request,
+            std::atomic<std::shared_ptr<BuildResult>>& result,
+            Dispatcher& requestDispatcher
+        ) {
+            auto d = Delegate<void>::CreateLambda([this, &request, &result, &requestDispatcher]() {
+                DispatcherFrame frame;
+                builder.completor().AddLambda([&result, &frame](std::shared_ptr<BuildResult> r) 
+                {
                     result = r;
-                    dispatcher.stop();
+                    frame.stop();
                 });
-            builder.start(request);
-            dispatcher.run();
-            builder.completor().RemoveAll();
+                builder.start(request);
+                context->mainThreadQueue().run(&frame);
+                builder.completor().RemoveAll();
+                requestDispatcher.stop();
+            });
+            context->mainThreadQueue().push(std::move(d));
+        }
+
+        std::shared_ptr<BuildResult> executeRequest(std::shared_ptr<BuildRequest> request) {
+            std::atomic<std::shared_ptr<BuildResult>> result;
+            Dispatcher requestDispatcher;
+            startExecuteRequest(request, result, requestDispatcher);
+            requestDispatcher.run();
             return result;
+        }
+
+        void stopBuild() {
+            context->mainThreadQueue().push(Delegate<void>::CreateLambda([this]() {builder.stop(); }));
         }
 
         std::shared_ptr<BuildResult> initializeYam() {
@@ -513,20 +531,14 @@ namespace
         auto request = std::make_shared< BuildRequest>(BuildRequest::RequestType::Build);
         request->directory(driver.repo.dir);
         std::atomic<std::shared_ptr<BuildResult>> result;
-        Dispatcher dispatcher;
-        driver.builder.completor().AddLambda(
-            [&result, &dispatcher](std::shared_ptr<BuildResult> r) {
-                result = r;
-                dispatcher.stop();
-            });
-        driver.builder.start(request);
+        Dispatcher requestDispatcher;
+        driver.startExecuteRequest(request, result, requestDispatcher);
         // wait a bit to get the ping commands running...
         std::this_thread::sleep_for(std::chrono::seconds(1));
-        // ... then request build to stop (cancel)...
-        driver.builder.stop();
-        // ... and wait for build completion
-        dispatcher.run();
-        driver.builder.completor().RemoveAll();
+        // ...then request build to stop...
+        driver.stopBuild();
+        // ...and wait for build completion
+        requestDispatcher.run();
 
         EXPECT_EQ(Node::State::Canceled, driver.ccPiet->state());
         EXPECT_EQ(Node::State::Canceled, driver.ccJan->state());

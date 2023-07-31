@@ -29,6 +29,9 @@ namespace YAM
         Dispatcher& threadPoolQueue();
         Dispatcher& mainThreadQueue();
 
+        // Throw an exception when called in other thread than mainThread.
+        void assertMainThread();
+
         ExecutionStatistics& statistics();
 
         // Add repository, return whether it was added, i..e had a unique name.

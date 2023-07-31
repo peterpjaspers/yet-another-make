@@ -6,6 +6,12 @@
 
 #include <iostream>
 
+#ifdef _DEBUG
+#define ASSERT_MAIN_THREAD(contextPtr) (contextPtr)->assertMainThread()
+#else
+#define ASSERT_MAIN_THREAD(contextPtr)
+#endif
+
 namespace YAM
 {
     Node::Node()
@@ -86,6 +92,7 @@ namespace YAM
     }
 
     void Node::start() {
+        ASSERT_MAIN_THREAD(_context);
         if (busy()) throw std::runtime_error("Attempt to start while busy");
         if (state() != Node::State::Dirty) throw std::runtime_error("Attempt to start while not dirty");
         _context->statistics().registerStarted(this);
@@ -348,6 +355,7 @@ namespace YAM
     }
 
     bool Node::busy() const {
+        ASSERT_MAIN_THREAD(_context);
         return _state == State::Executing;
     }
 

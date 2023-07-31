@@ -41,6 +41,7 @@ namespace YAM
 
     private:
         void run();
+        void postRequest(std::shared_ptr<IStreamable> request);
         void handleRequest(std::shared_ptr<IStreamable> request);
         void handleBuildCompletion(std::shared_ptr<BuildResult> result);
         void send(std::shared_ptr<IStreamable> msg);
@@ -50,8 +51,7 @@ namespace YAM
         boost::asio::ip::tcp::endpoint _service;
         boost::asio::ip::tcp::acceptor _acceptor;
         Builder _builder;
-        std::atomic<bool> _shutdown;
-        std::thread _thread;
+        std::thread _serviceThread;
         std::mutex _connectMutex;
         std::mutex _logMutex;
         std::shared_ptr<TcpStream> _client;

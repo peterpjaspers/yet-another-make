@@ -11,8 +11,7 @@ namespace YAM
     BuildService::BuildService()
         : _service(boost::asio::ip::tcp::v4(), 0)
         , _acceptor(_context, _service)
-        , _shutdown(false)
-        , _thread(&BuildService::run, this)
+        , _serviceThread(&BuildService::run, this)
     {}
 
     boost::asio::ip::port_type BuildService::port() const {
@@ -20,11 +19,12 @@ namespace YAM
     }
 
     void BuildService::join() {
-        _thread.join();
+        _serviceThread.join();
     }
 
     void BuildService::run() {
-        while (!_shutdown) {
+        bool shutdown = false;
+        while (!shutdown) {
             boost::asio::ip::tcp::socket socket(_context);
             try {
                 _acceptor.accept(socket);
@@ -34,9 +34,14 @@ namespace YAM
                     _protocol = std::make_shared<BuildServiceProtocol>(_client, _client, false);
                 }
                 std::shared_ptr<IStreamable> request = _protocol->receive();
-                while (!_shutdown && request != nullptr) {
-                    handleRequest(request);
-                    if (!_shutdown) request = _protocol->receive();
+                shutdown = dynamic_pointer_cast<ShutdownRequest>(request) != nullptr;
+                while (!shutdown && request != nullptr) {
+                    postRequest(request);
+                    request = _protocol->receive();
+                    shutdown = dynamic_pointer_cast<ShutdownRequest>(request) != nullptr;
+                }
+                if (shutdown) {
+                    send(std::make_shared<BuildResult>(true));
                 }
             } catch (std::exception& e) {
             } catch (EndOfStreamException e) {
@@ -52,28 +57,29 @@ namespace YAM
         send(ptr);
     }
 
+    void BuildService::postRequest(std::shared_ptr<IStreamable> request) {
+        auto delegate = Delegate<void>::CreateLambda([this, request]() { handleRequest(request); });
+        _builder.context()->mainThreadQueue().push(std::move(delegate));
+    }
+
+    // Called in main thread
     void BuildService::handleRequest(std::shared_ptr<IStreamable> request) {
         auto buildRequest = dynamic_pointer_cast<BuildRequest>(request);
         auto stopRequest = dynamic_pointer_cast<StopBuildRequest>(request);
-        auto shutdownRequest = dynamic_pointer_cast<ShutdownRequest>(request);
         _builder.context()->logBook(shared_from_this());
         if (buildRequest != nullptr) {
             if (!_builder.running()) {
                 _builder.completor().AddRaw(this, &BuildService::handleBuildCompletion);
                 _builder.start(buildRequest);
             }
-        } else if (stopRequest != nullptr || shutdownRequest != nullptr) {
-            _shutdown = shutdownRequest != nullptr;
-            if (_builder.running()) {
-                _builder.stop();
-            } else {
-                send(std::make_shared<BuildResult>(true));
-            }
+        } else if (stopRequest != nullptr) {
+            if (_builder.running()) _builder.stop();
         } else {
-            if (_builder.running()) _builder.stop(); // unknown request type
+            // unknown request type
         }
     }
 
+    // Called in main thread
     void BuildService::handleBuildCompletion(std::shared_ptr<BuildResult> result) {
         _builder.completor().RemoveObject(this);
         send(result);

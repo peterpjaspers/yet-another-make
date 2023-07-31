@@ -13,6 +13,12 @@
 #include <iostream>
 #include <map>
 
+#ifdef _DEBUG
+#define ASSERT_MAIN_THREAD(context) (context).assertMainThread()
+#else
+#define ASSERT_MAIN_THREAD(context)
+#endif
+
 namespace
 {
     using namespace YAM;
@@ -61,6 +67,7 @@ namespace
 
 namespace YAM
 {
+    // Called in any thread
     Builder::Builder()
         : _dirtySources(std::make_shared<CommandNode>(&_context, "__dirtySources__"))
         , _dirtyBuildFiles(std::make_shared<CommandNode>(&_context, "__dirtyBuildFiles__"))
@@ -75,13 +82,17 @@ namespace YAM
         _dirtyCommands->setState(Node::State::Ok);
     }
 
+    // Called in any thread
     ExecutionContext* Builder::context() {
         return &_context;
     }
 
+    // Called in main thread
     void Builder::start(std::shared_ptr<BuildRequest> request) {
-        if (running()) throw std::exception("cannot start a build while one is running");
+        ASSERT_MAIN_THREAD(_context);
+        if (running()) throw std::exception("request handling already in progress");
         _context.statistics().reset();
+        _context.buildRequest(request);
         _result = std::make_shared<BuildResult>();
         if (request->requestType() == BuildRequest::Init) {
             _init(request->directory());
@@ -91,12 +102,14 @@ namespace YAM
             _notifyCompletion();
         } else if (request->requestType() == BuildRequest::Build) {
             _init(request->directory());
-            _context.buildRequest(request);
-            _context.mainThreadQueue().push(Delegate<void>::CreateLambda(([this]() { _start(); })));
+            //_context.mainThreadQueue().push(Delegate<void>::CreateLambda(([this]() { _start(); })));
+            _start();
         } else {
             throw std::exception("unknown build request type");
         }
     }
+
+    // Called in any thread
     void Builder::_init(std::filesystem::path directory) {
         std::filesystem::path yamDir = DotYamDirectory::initialize(directory, _context.logBook().get());
         _result->succeeded(!yamDir.empty());
@@ -119,6 +132,7 @@ namespace YAM
         }
     }
 
+    // Called in main thread
     void Builder::_clean(std::shared_ptr<BuildRequest> request) {
         uint32_t nFailures = 0;
         auto cleanNode = Delegate<void, std::shared_ptr<Node> const&>::CreateLambda(
@@ -132,6 +146,7 @@ namespace YAM
         _result->succeeded(nFailures==0);
     }
 
+    // Called in main thread
     void Builder::_start() {
         std::vector<std::shared_ptr<Node>> dirtyDirsAndFiles;
         for (auto const& pair : _context.repositories()) {
@@ -150,6 +165,7 @@ namespace YAM
         }
     }
 
+    // Called in main thread
     void Builder::_handleSourcesCompletion(Node* n) {
         if (n != _dirtySources.get()) throw std::exception("unexpected node");
         if (_dirtySources->state() != Node::State::Ok) {
@@ -174,6 +190,7 @@ namespace YAM
         }
     }
 
+    // Called in main thread
     void Builder::_handleBuildFilesCompletion(Node* n) {
         if (n != _dirtyBuildFiles.get()) throw std::exception("unexpected node");
         if (_dirtyBuildFiles->state() != Node::State::Ok) {
@@ -193,6 +210,7 @@ namespace YAM
         }
     }
 
+    // Called in main thread
     void Builder::_handleCommandsCompletion(Node* n) {
         if (n != _dirtyCommands.get()) throw std::exception("unexpected node");
 
@@ -207,6 +225,7 @@ namespace YAM
         _notifyCompletion();
     }
 
+    // Called in main thread
     void Builder::_notifyCompletion() {
         auto result = _result;
         _result = nullptr;
@@ -214,18 +233,20 @@ namespace YAM
         _completor.Broadcast(result);
     }
 
-    bool Builder::running() const {
+    bool Builder::running() {
+        ASSERT_MAIN_THREAD(_context);
         return _context.buildRequest() != nullptr;
     }
 
     void Builder::stop() {
-        if (!running()) throw std::exception("cannot cancel a build while no one is running");
+        ASSERT_MAIN_THREAD(_context);
         _dirtySources->cancel();
         _dirtyBuildFiles->cancel();
         _dirtyCommands->cancel();
     }
 
     MulticastDelegate<std::shared_ptr<BuildResult>>& Builder::completor() {
+        ASSERT_MAIN_THREAD(_context);
         return _completor;
     }
 }
