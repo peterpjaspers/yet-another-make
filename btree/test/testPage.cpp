@@ -10,10 +10,7 @@
 using namespace std;
 using namespace BTree;
 
-// ToDo: Test all exceptions thrown by Page (invalid index, invalid key size, invalid value size, overflow, no split defined)
-
-//const int PageCapacity = 4096;
-const int PageCapacity = 8192;
+const int PageCapacity = 4096;
 const int MinArray = 2; // Value must be greater than 1 as vector of length 1 is assumed to be a scalar
 const int MaxArray = 23;
 
@@ -698,7 +695,7 @@ public:
         auto copyLeft = allocatePage<K,V,AK,AV>();
         class PageContent<K,V> content;
         fillPage( *page, (PageCapacity / 2), content );
-        log << "Validating \"No split defined\" exception ...\n";
+        log << "Validating \"No split defined\" exception (in-place) ...\n";
         page->removeSplit();
         content.removeSplit();
         try {
@@ -707,7 +704,20 @@ public:
             errors += 1;
         }
         catch (...) {}
-        log << "Validating \"Invalid key\" exceptions ...\n";
+        try {
+            page->removeSplit();
+            log << "Expected \"No split defined\" exception!\n";
+            errors += 1;
+        }
+        catch (...) {}
+        log << "Validating \"No split defined\" exception (copy-on-update) ...\n";
+        try {
+            page->removeSplit( copy );
+            log << "Expected \"No split defined\" exception!\n";
+            errors += 1;
+        }
+        catch (...) {}
+        log << "Validating \"Invalid key\" exceptions (in-place) ...\n";
         if (AK) {
             try {
                 auto key = generateInvalidKey();
@@ -728,7 +738,28 @@ public:
             }
             catch (...) {}
         }
-        log << "Validating \"Invalid value\" exceptions ...\n";
+        log << "Validating \"Invalid key\" exceptions (copy-on-update) ...\n";
+        if (AK) {
+            try {
+                auto key = generateInvalidKey();
+                auto value = generateValue();
+                PageIndex index = (gen32() % (content.size() + 1));
+                pageInsert<K,V,AK,AV>( *page, index, key, value, *copy );                
+                log << "Expected \"Invalid key\" exception!\n";
+                errors += 1;
+            }
+            catch (...) {}
+            try {
+                auto key = generateInvalidKey();
+                auto value = generateValue();
+                PageIndex index = (gen32() % (content.size() + 1));
+                pageReplace<K,V,AK,AV>( *page, index, key, value, *copy );                
+                log << "Expected \"Invalid key\" exception!\n";
+                errors += 1;
+            }
+            catch (...) {}
+        }
+        log << "Validating \"Invalid value\" exceptions (in-place) ...\n";
         if (AV) {
             try {
                 auto key = generateKey();
@@ -748,7 +779,27 @@ public:
             }
             catch (...) {}
         }
-        log << "Validating \"Invalid index\" exceptions ...\n";
+        log << "Validating \"Invalid value\" exceptions (copy-on-update) ...\n";
+        if (AV) {
+            try {
+                auto key = generateKey();
+                auto value = generateInvalidValue();
+                PageIndex index = (gen32() % (content.size() + 1));
+                pageInsert<K,V,AK,AV>( *page, index, key, value, *copy );                
+                log << "Expected \"Invalid value\" exception!\n";
+                errors += 1;
+            }
+            catch (...) {}
+            try {
+                auto value = generateInvalidValue();
+                PageIndex index = (gen32() % (content.size() + 1));
+                pageReplace<K,V,AK,AV>( *page, index, value, *copy );                
+                log << "Expected \"Invalid value\" exception!\n";
+                errors += 1;
+            }
+            catch (...) {}
+        }
+        log << "Validating \"Invalid index\" exceptions (in-place) ...\n";
         try {
             auto key = generateKey();
             auto value = generateValue();
@@ -773,7 +824,7 @@ public:
         }
         catch (...) {}
         try {
-            page->remove( (content.size() + 1) );                
+            page->remove( (content.size() + 1), copy );                
             log << "Expected \"Invalid index\" exception!\n";
             errors += 1;
         }
@@ -790,7 +841,49 @@ public:
             errors += 1;
         }
         catch (...) {}
-        log << "Validating \"Overflow\" exceptions ...\n";
+        log << "Validating \"Invalid index\" exceptions (copy-on-update) ...\n";
+        try {
+            auto key = generateKey();
+            auto value = generateValue();
+            pageInsert<K,V,AK,AV>( *page, (content.size() + 1), key, value, *copy );                
+            log << "Expected \"Invalid index\" exception!\n";
+            errors += 1;
+        }
+        catch (...) {}
+        try {
+            auto value = generateValue();
+            pageReplace<K,V,AK,AV>( *page, (content.size() + 1), value, *copy );                
+            log << "Expected \"Invalid index\" exception!\n";
+            errors += 1;
+        }
+        catch (...) {}
+        try {
+            auto key = generateKey();
+            auto value = generateValue();
+            pageReplace<K,V,AK,AV>( *page, (content.size() + 1), key, value, *copy );                
+            log << "Expected \"Invalid index\" exception!\n";
+            errors += 1;
+        }
+        catch (...) {}
+        try {
+            page->remove( (content.size() + 1), copy );                
+            log << "Expected \"Invalid index\" exception!\n";
+            errors += 1;
+        }
+        catch (...) {}
+        try {
+            page->shiftRight( *right, (content.size() + 1), copy, copyRight );                
+            log << "Expected \"Invalid index\" exception!\n";
+            errors += 1;
+        }
+        catch (...) {}
+        try {
+            page->shiftLeft( *left, (content.size() + 1), copy, copyLeft );                
+            log << "Expected \"Invalid index\" exception!\n";
+            errors += 1;
+        }
+        catch (...) {}
+        log << "Validating \"Overflow\" exceptions (in-place) ...\n";
         fillPage( *page, PageCapacity, content );
         fillPage( *right, PageCapacity, content );
         fillPage( *left, PageCapacity, content );
@@ -832,6 +925,52 @@ public:
         catch (...) {}
         try {
             page->shiftLeft( *left, (content.size() / 2) );                
+            log << "Expected \"Overflow\" exception!\n";
+            errors += 1;
+        }
+        catch (...) {}
+        log << "Validating \"Overflow\" exceptions (copy-on-update) ... \n";
+        fillPage( *page, PageCapacity, content );
+        fillPage( *right, PageCapacity, content );
+        fillPage( *left, PageCapacity, content );
+        if (AK || AV) {
+            try {
+                auto key = generateLargeKey();
+                auto value = generateLargeValue();
+                PageIndex index = (gen32() % (content.size() + 1));
+                pageInsert<K,V,AK,AV>( *page, index, key, value, *copy );                
+                log << "Expected \"Overflow\" exception!\n";
+                errors += 1;
+            }
+            catch (...) {}
+            try {
+                auto key = generateLargeKey();
+                auto value = generateLargeValue();
+                PageIndex index = (gen32() % (content.size() + 1));
+                pageReplace<K,V,AK,AV>( *page, index, key, value, *copy );                
+                log << "Expected \"Overflow\" exception!\n";
+                errors += 1;
+            }
+            catch (...) {}
+        }
+        if (AV) {
+            try {
+                auto value = generateLargeValue();
+                PageIndex index = (gen32() % (content.size() + 1));
+                pageReplace<K,V,AK,AV>( *page, index, value, *copy );                
+                log << "Expected \"Overflow\" exception!\n";
+                errors += 1;
+            }
+            catch (...) {}
+        }   
+        try {
+            page->shiftRight( *right, (content.size() / 2), copy, copyRight );                
+            log << "Expected \"Overflow\" exception!\n";
+            errors += 1;
+        }
+        catch (...) {}
+        try {
+            page->shiftLeft( *left, (content.size() / 2), copy, copyLeft );                
             log << "Expected \"Overflow\" exception!\n";
             errors += 1;
         }
