@@ -71,8 +71,10 @@ int main(int argc, char* argv[]) {
             log << "\nIterating from begin to end...\n";
             size_t count = 0;
             for (auto iterator : tree) count += 1;
-            log << "B-Tree contains " << count << " entries\n";
-            if (count != ValueCount) errorCount += 1;
+            if (count != ValueCount) {
+                log << "Mismatched iteration count : Expected " << ValueCount << ", actual " << count << "!\n";
+                errorCount += 1;
+            }
         }
         log << tree;
     }
@@ -128,8 +130,10 @@ int main(int argc, char* argv[]) {
             log << "\nIterating from begin to end...\n";
             size_t count = 0;
             for (auto iterator : tree) count += 1;
-            log << "B-Tree contains " << count << " entries\n";
-            if (count != ValueCount) errorCount += 1;
+            if (count != ValueCount) {
+                log << "Mismatched iteration count : Expected " << ValueCount << ", actual " << count << "!\n";
+                errorCount += 1;
+            }
         }
     }
     catch ( string message ) {
@@ -185,8 +189,10 @@ int main(int argc, char* argv[]) {
             log << "\nIterating from begin to end...\n";
             size_t count = 0;
             for (auto iterator : tree) count += 1;
-            log << "B-Tree contains " << count << " entries\n";
-            if (count != ValueCount) errorCount += 1;
+            if (count != ValueCount) {
+                log << "Mismatched iteration count : Expected " << ValueCount << ", actual " << count << "!\n";
+                errorCount += 1;
+            }
         }
     }
     catch ( string message ) {
@@ -243,8 +249,10 @@ int main(int argc, char* argv[]) {
             log << "\nIterating from begin to end...\n";
             size_t count = 0;
             for (auto iterator : tree) count += 1;
-            log << "B-Tree contains " << count << " entries\n";
-            if (count != ValueCount) errorCount += 1;
+            if (count != ValueCount) {
+                log << "Mismatched iteration count : Expected " << ValueCount << ", actual " << count << "!\n";
+                errorCount += 1;
+            }
         }
     }
     catch ( string message ) {
@@ -255,8 +263,11 @@ int main(int argc, char* argv[]) {
         log << "Exception!\n";
         errorCount += 1;
     }
-    if (0 < errorCount) log << errorCount << " errors detected!";
-    log << "Done...\n";
+    if (0 < errorCount) {
+        log << "\n\nTotal of " << errorCount << " errors detected!\n";
+    } else {
+        log << "\n\nNo errors detected.\n";
+    }
     log.close();
     exit( errorCount );
 };

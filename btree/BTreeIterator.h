@@ -7,27 +7,33 @@ namespace BTree {
     
     // B-directional iterator on B-Trees.
     //
+    // Template arguments:
+    //
+    //  K   class of key objects
+    //  V   class of vlaue objects
+    //  T   class of key-value pair pointed to by iterator
+    //
     // In addition to standard bi-directional iterator operations, it provides
     // key() and value() to retrieve the key and value at particular iterator position.
     //
     template< class K, class V, class T >
-    class BTreeIterator : public std::iterator< std::bidirectional_iterator_tag, T, size_t, T*, T& > {
-    private:
+    class TreeIterator : public std::iterator< std::bidirectional_iterator_tag, T, size_t, T*, T& > {
+    protected:
         Trail trail;
     public:
-        BTreeIterator() = delete;
-        BTreeIterator( const TreeBase& tree ) : trail( tree ) {}
-        BTreeIterator( const BTreeIterator& iterator ) : trail( iterator.trail ) {}
-        inline BTreeIterator& begin() { trail.begin<B<K>,A<K>>(); return *this; }
-        inline BTreeIterator& end() { trail.end<B<K>,A<K>>(); return *this; }
-        inline BTreeIterator& at( const Trail& position ) { trail = position; return *this; }
-        inline BTreeIterator& operator++() { trail.next<B<K>,A<K>>(); return *this; }
-        inline BTreeIterator operator++(int) { BTreeIterator tmp( *this ); ++(*this); return tmp; }
-        inline BTreeIterator& operator--() { trail.previous<B<K>,A<K>>(); return *this; }
-        inline BTreeIterator operator--(int) { BTreeIterator tmp( *this ); --(*this); return tmp; }
-        inline bool operator==(BTreeIterator it) const { return( trail == it.trail ); }
-        inline bool operator!=(BTreeIterator it) const { return( trail != it.trail ); }
-        inline BTreeIterator& operator=(BTreeIterator& it) { trail = it.trail; return *this; }
+        TreeIterator() = delete;
+        TreeIterator( const TreeBase& tree ) : trail( tree ) {}
+        TreeIterator( const TreeIterator& iterator ) : trail( iterator.trail ) {}
+        inline TreeIterator& begin() { trail.begin<B<K>,A<K>>(); return *this; }
+        inline TreeIterator& end() { trail.end<B<K>,A<K>>(); return *this; }
+        inline TreeIterator& at( const Trail& position ) { trail = position; return *this; }
+        inline TreeIterator& operator++() { trail.next<B<K>,A<K>>(); return *this; }
+        inline TreeIterator operator++(int) { TreeIterator tmp( *this ); ++(*this); return tmp; }
+        inline TreeIterator& operator--() { trail.previous<B<K>,A<K>>(); return *this; }
+        inline TreeIterator operator--(int) { TreeIterator tmp( *this ); --(*this); return tmp; }
+        inline bool operator==(TreeIterator it) const { return( trail == it.trail ); }
+        inline bool operator!=(TreeIterator it) const { return( trail != it.trail ); }
+        inline TreeIterator& operator=(TreeIterator& it) { trail = it.trail; return *this; }
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&S<VT>),bool> = true >
         std::pair< const B<KT>&, const VT& > operator*() const {
             return{  key<KT>(), value<VT>() };
@@ -44,6 +50,8 @@ namespace BTree {
         std::pair< std::pair< const B<KT>*, PageSize >, std::pair< const B<VT>*, PageSize > > operator*() const {
             return{ key<KT>(), value<VT>() };
         }
+        // Return the B-Tree being iterated.
+        const TreeBase& tree() const { return trail.sourceTree(); }
         template< class KT = K, std::enable_if_t<(S<KT>),bool> = true >
         const B<KT>& key() const {
             if (trail.atSplit()) {
@@ -54,7 +62,7 @@ namespace BTree {
             const auto page = trail.page<B<KT>,B<V>,false,A<V>>();
             return page->key( trail.index() );
         }
-        // Retrieve key at current itertor position.
+        // Retrieve key at current iterator position.
         template< class KT = K, std::enable_if_t<(A<KT>),bool> = true >
         std::pair< const B<KT>*, PageSize > key() const {
             if (trail.atSplit()) {
@@ -65,7 +73,7 @@ namespace BTree {
             const auto page = trail.page<B<KT>,B<V>,true,A<V>>();
             return{ page->key( trail.index() ), page->keySize( trail.index() ) };
         }
-        // Retrieve value at current itertor position.
+        // Retrieve value at current iterator position.
         template< class VT = V, std::enable_if_t<(S<VT>),bool> = true >
         const B<VT>& value() const {
             const auto page = trail.page<B<K>,B<VT>,A<K>,false>();

@@ -64,6 +64,7 @@ namespace BTree {
         }
         friend bool operator==(const Trail& a, const Trail& b);
         friend bool operator!=(const Trail& a, const Trail& b);
+        const TreeBase& sourceTree() const { return tree; }
         inline Trail& push(const PageHeader *header) {
             static const char* signature("Trail& Trail::push( const PageHeader* header )");
             if (height == MaxHeight) throw std::string( signature ) + " - trail overflow.";

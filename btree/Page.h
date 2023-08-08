@@ -159,6 +159,21 @@ namespace BTree {
         // Return required page content storage for entire page content.
         inline PageSize filling() const { return filling<KA,VA>( header.count ); };
 
+        // Return size of adminstration overhead
+        template< bool AK = KA, bool AV = VA, std::enable_if_t<(!AK&&!AV),bool> = true >
+        inline PageSize overhead() const { return( sizeof(PageHeader) ); }
+        template< bool AK = KA, bool AV = VA, std::enable_if_t<(!AK&&AV),bool> = true >
+        inline PageSize overhead() const { return( sizeof(PageHeader) + (header.count * sizeof( PageIndex )) ); }
+        template< bool AK = KA, bool AV = VA, std::enable_if_t<(AK&&!AV),bool> = true >
+        inline PageSize overhead() const { return( sizeof(PageHeader) + (header.count * sizeof( PageIndex )) ); }
+        template< bool AK = KA, bool AV = VA, std::enable_if_t<(AK&&AV),bool> = true >
+        inline PageSize overhead() const { return( sizeof(PageHeader) + (header.count * (2 * sizeof( PageIndex ))) );}
+
+        // Return size of actual payload (i.e., filling without overhead)
+        template< bool AK = KA, bool AV = VA >
+        inline PageSize payload() const { return( filling() - overhead<AK,AV>() ); }
+        
+
         // Return number of bytes required to store a single key-value entry.
         template< bool AK = KA, bool AV = VA, std::enable_if_t<(!AK&&!AV),bool> = true >
         inline PageSize entryFilling() const {

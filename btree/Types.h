@@ -66,18 +66,6 @@ namespace BTree {
     template< class K, class V, bool AK, bool AV > class Page;
     template< class K, class V > class Tree;
 
-    typedef std::uint16_t StreamBlockSize;
-    typedef std::uint64_t StreamIndex;
-    typedef std::uint16_t StreamSequence;
-    struct StreamKey {
-        uint64_t index : 48;
-        uint64_t sequence : 16;
-        StreamKey() : index( UINT64_MAX >> 16 ), sequence( UINT16_MAX ) {};
-        StreamKey( StreamIndex i, StreamSequence s ) : index( i ), sequence( s ) {};
-        StreamKey( const StreamKey& range ) : index( range.index ), sequence( range.sequence ) {};
-    };
-    std::ostream & operator<<( std::ostream & stream, StreamKey const & range );
-
     // Fixed size element type of (variable length, unbounded) array template argument.
     // Evaluates to type of first dimension element if template argument is an array.
     // Evaluates to type of template argument otherwise.

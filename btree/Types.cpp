@@ -16,11 +16,7 @@ namespace BTree {
         stream << string;
         return stream;
     };
-    std::ostream & operator<<( std::ostream & stream, StreamKey const & range ) {
-        stream << "[ " << range.index << " : " << range.sequence << " ]";
-        return stream;
-    };
-    
+
     BTreeStatistics::BTreeStatistics() { clear(); }
     BTreeStatistics* BTreeStatistics::clear() {
         insertions = 0;

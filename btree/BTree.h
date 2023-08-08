@@ -16,7 +16,7 @@
 
 namespace BTree {
 
-    template< class KT, class VT, class RT > class BTreeIterator;
+    template< class K, class V, class T > class TreeIterator;
 
     static const float LowPageThreshold = 0.4;
     static const float HighPageThreshold = 0.9;
@@ -44,7 +44,7 @@ namespace BTree {
             int (*array)( const B<K>*, PageSize, const B<K>*, PageSize );
         } compare;
         template< class KT, class VT, class RT >
-        friend class BTreeIterator;
+        friend class TreeIterator;
         template< class KT, class VT >
         friend std::ostream & operator<<( std::ostream & o, const Tree<KT,VT>& tree );
     public:
@@ -336,77 +336,77 @@ namespace BTree {
 
         // Return iterator to begin of B-Tree
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&S<VT>),bool> = true >
-        BTreeIterator<KT,VT, std::pair<const KT&, const VT&> > begin() const {
-            auto iterator = new BTreeIterator<KT,VT, std::pair<const KT&, const VT&> >( *this );
+        TreeIterator<KT,VT, std::pair<const KT&, const VT&> > begin() const {
+            auto iterator = new TreeIterator<KT,VT, std::pair<const KT&, const VT&> >( *this );
             return iterator->begin();
         }
         template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&S<VT>),bool> = true >
-        BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, const VT&> > begin() const {
-            auto iterator = new BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, const VT&> >( *this );
+        TreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, const VT&> > begin() const {
+            auto iterator = new TreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, const VT&> >( *this );
             return iterator->begin();
         }
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&A<VT>),bool> = true >
-        BTreeIterator<KT,VT, std::pair<const KT&, std::pair<const B<VT>*,PageSize>> > begin() const {
-            auto iterator = new BTreeIterator<KT,VT, std::pair<const KT&, std::pair<const B<VT>*,PageSize>> >( *this );
+        TreeIterator<KT,VT, std::pair<const KT&, std::pair<const B<VT>*,PageSize>> > begin() const {
+            auto iterator = new TreeIterator<KT,VT, std::pair<const KT&, std::pair<const B<VT>*,PageSize>> >( *this );
             return iterator->begin();
         }
         template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&A<VT>),bool> = true >
-        BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, std::pair<const B<VT>*,PageSize>> > begin() const {
-            auto iterator = new BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, std::pair<const B<VT>*,PageSize>> >( *this );
+        TreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, std::pair<const B<VT>*,PageSize>> > begin() const {
+            auto iterator = new TreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, std::pair<const B<VT>*,PageSize>> >( *this );
             return iterator->begin();
         }
         // Return iterator to end of B-Tree
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&S<VT>),bool> = true >
-        BTreeIterator<KT,VT, std::pair<const KT&, const VT&> > end() const {
-            auto iterator = new BTreeIterator<KT,VT, std::pair<const KT&, const VT&> >( *this );
+        TreeIterator<KT,VT, std::pair<const KT&, const VT&> > end() const {
+            auto iterator = new TreeIterator<KT,VT, std::pair<const KT&, const VT&> >( *this );
             return iterator->end();
         }
         template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&S<VT>),bool> = true >
-        BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, const VT&> > end() const {
-            auto iterator = new BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, const VT&> >( *this );
+        TreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, const VT&> > end() const {
+            auto iterator = new TreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, const VT&> >( *this );
             return iterator->end();
         }
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&A<VT>),bool> = true >
-        BTreeIterator<KT,VT, std::pair<const KT&, std::pair<const B<VT>*,PageSize>> > end() const {
-            auto iterator = new BTreeIterator<KT,VT, std::pair<const KT&, std::pair<const B<VT>*,PageSize>> >( *this );
+        TreeIterator<KT,VT, std::pair<const KT&, std::pair<const B<VT>*,PageSize>> > end() const {
+            auto iterator = new TreeIterator<KT,VT, std::pair<const KT&, std::pair<const B<VT>*,PageSize>> >( *this );
             return iterator->end();
         }
         template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&A<VT>),bool> = true >
-        BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, std::pair<const B<VT>*,PageSize>> > end() const {
-            auto iterator = new BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, std::pair<const B<VT>*,PageSize>> >( *this );
+        TreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, std::pair<const B<VT>*,PageSize>> > end() const {
+            auto iterator = new TreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, std::pair<const B<VT>*,PageSize>> >( *this );
             return iterator->end();
         }
         // Return iterator to location of key in B-Tree.
         // If key cannot be found, returns end.
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&S<VT>),bool> = true >
-        BTreeIterator<KT,VT, std::pair<const KT&, const VT&> > at( const KT& key ) const {
+        TreeIterator<KT,VT, std::pair<const KT&, const VT&> > at( const KT& key ) const {
             Trail trail( *this );
             bool found = find<KT>( key, trail );
-            auto iterator = new BTreeIterator<KT,VT, std::pair<const KT&, const VT&> >( *this );
+            auto iterator = new TreeIterator<KT,VT, std::pair<const KT&, const VT&> >( *this );
             if (found) return iterator->at( trail );
             return iterator->end();
         }
         template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&S<VT>),bool> = true >
-        BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, const VT&> > at( const B<KT>* key, PageSize keySize ) const {
+        TreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, const VT&> > at( const B<KT>* key, PageSize keySize ) const {
             Trail trail( *this );
             bool found = find<KT>( key, keySize, trail );
-            auto iterator = new BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, const VT&> >( *this );
+            auto iterator = new TreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, const VT&> >( *this );
             if (found) return iterator->at( trail );
             return iterator->end();
         }
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&A<VT>),bool> = true >
-        BTreeIterator<KT,VT, std::pair<const KT&, std::pair<const B<VT>*,PageSize>> > at( const KT& key ) const {
+        TreeIterator<KT,VT, std::pair<const KT&, std::pair<const B<VT>*,PageSize>> > at( const KT& key ) const {
             Trail trail( *this );
             bool found = find<KT>( key, trail );
-            auto iterator = new BTreeIterator<KT,VT, std::pair<const KT&, std::pair<const B<VT>*,PageSize>> >( *this );
+            auto iterator = new TreeIterator<KT,VT, std::pair<const KT&, std::pair<const B<VT>*,PageSize>> >( *this );
             if (found) return iterator->at( trail );
             return iterator->end();
         }
         template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&A<VT>),bool> = true >
-        BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, std::pair<const B<VT>*,PageSize>> > at( const B<KT>* key, PageSize keySize ) const {
+        TreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, std::pair<const B<VT>*,PageSize>> > at( const B<KT>* key, PageSize keySize ) const {
             Trail trail( *this );
             bool found = find<KT>( key, keySize, trail );
-            auto iterator = new BTreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, std::pair<const B<VT>*,PageSize>> >( *this );
+            auto iterator = new TreeIterator<KT,VT, std::pair<std::pair<const B<KT>*,PageSize>, std::pair<const B<VT>*,PageSize>> >( *this );
             if (found) return iterator->at( trail );
             return iterator->end();
         }
@@ -654,6 +654,9 @@ namespace BTree {
         bool find( const Page<B<KT>,B<VT>,true,A<VT>>* page, Trail& trail ) const {
             return find<KT>( page->key( 0 ), page->keySize( 0 ), trail, page->header.depth );
         }
+
+    private:
+    
         // Insert a key-link in a Node Page.
         // Recursively grow tree as required, this can fail if maximum tree depth is exceeded.
         template< class KT, std::enable_if_t<(S<KT>),bool> = true >
