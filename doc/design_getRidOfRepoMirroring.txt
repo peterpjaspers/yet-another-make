@@ -1,0 +1,206 @@
+How to get rid of the first of mirroring the source file repository?
+
+Disadvantages of this phase:
+    - reduces scalability because it needs to complete before the other phases
+      can start.
+    - the very first build will spend time proportional to size of repo in
+      mirroring the repo before it starts executing commands. Psychologically
+      not nice: the user wants to see his source files being compiled asap.
+
+Remember: mirroring was introduced to prevent an incorrect build. 
+Example: 
+    - a command node compiles a cpp file
+    - on completion YAM will for each file read by the compilation
+      retrieve the file's last-write-time and compute its hash.
+The last-write-time and hash of the input files are used in the next build to
+determine whether the compilation need to be re-executed:
+    - if new last-write-time != old last-write-time: re-compute hash
+    - if hash != old hash: re-execute compilation
+
+Now imagine that the user modified the cpp file in the (small) interval between
+completion of the compilation and YAM retrieving the input file's 
+last-write-time. This modification requires re-execution of the compilation
+at the next build. However, at the next build YAM does not re-execute the 
+compilation because it sees no change in the file's last-write-time.
+Editing source files during a build is not uncommon. And although the likelihood
+of above scenario is small we want it to be zero. And the only way to make
+it zero is to retrieve last-write-time (lwt) and compute hash BEFORE execution
+of the command.
+
+Possible solutions:
+    1. Mirror the entire repo before starting command execution.
+    2. Execute the command and when seeing that new input files were used
+       create file nodes for the new files, retrieve their lwt and compute their
+       hashes and re-execute the command.
+    3. Declare the input files of the command: the input files are 
+       prerequisites, i.e. are executed before the command.
+    4. Declare the superset of input files of the command but only 
+       re-execute the command when actually used input files were modified.
+    5. When tracing the files accessed by the command script:
+        a. On first open for read of file F: rd_lwt.insert(F, F.lwt)
+        b. On first close of file F that was opened for write: wr_lwt.insert(F, F.lwt)
+           On subsequent close of file F that was opened for write: wr_lwt[F] = F.lwt
+
+We want to get rid of option 1. Option 2 is not very attractive because it will
+cause a lot of unncessary re-compilations. Option 3 is also not very attractive
+because, in the case of C++, it requires the user to specify all recursively 
+included header files.
+Option 4 is mid-way between 1 and 3. The user can specify the superset of 
+input files relatively easy using globs, e.g. libX/include/*.h.
+Option 5 seems very attractive.
+
++------------Detailing option 5 
+After completion of the command script rd_lwt[F] contains lwt of F before the
+script read any data from F. wr_lwt[F] is the lwt after the script wrote the
+last data to F. At next build the command re-executes when lwt[F] != F.lwt.
+
+After completion of the command a file node f must be created and 
+initialized as follows: 
+    1. lwt = lwt[F] 
+    2. aspect hashes = compute aspect hashes of F
+    3. if F.lwt != lwt[F] aspect hashes = random
+       In this case the user modified the file after it was read/written by
+       the command script. By setting random hashes we ensure that at next
+       build the file be re-hashed (because lwt of F has changed).
+       Question: warn the user that a new build must be started?
+
+Multiple parallel executing commands may read the same input files.
+How to prevent multiple creations of file node f and multiple computations of
+the aspect hashes? 
+Note: F may have been detected as input in previous build. In that case 
+nothing need to be done because F, as a prerequisite of command, was already
+executed (i.e. its hashes recomputed) before start of command script.
+The following code only applies when F is a new input of command.
+
+Attempt 1:
+    {
+        lock(buildstate)
+        f = buildstate.findNode(F)
+        if (f == null) {
+            f = new FileNode(F)
+            buildstate.add(f)
+         }
+    }
+    lock(f)
+    if (f.lwt != lwt[F]) {
+        f.lwt = lwt[F]
+        f.hashes = computeHashes(F)
+        if (f.lwt != F.lwt) f.hashes = rand
+    }
+computeHashes is too time-consuming to keep buildstate locked, therefore
+only lock f.
+Node f is added to build state while not in OK state.
+computeHashes(F) is called only once.
+Other threads needing f may block on lock(f).
+After an initial build all files are first-time-detected. Because a header 
+file is often included by multiple cpp files such blocking may occur more than
+occasional. The set of input files typically does not change a lot from
+compilation to compilation. So after initial build blocking becomes less likely.
+A complication is locking the buildstate and locking f. This is in conflict
+with our previous choice to only access buildstate and nodes from mainthread.
+
+mrmake solved this by having a shadow administration for managing files
+and file hashes. This administration is cleared for each build.
+
+Attempt 2, mrmake approach
+    FileCacheEntry* f;
+    {
+        lock(fileCache)
+        f = fileCache.find(F)
+        if (f == null) {
+            f = new FileCacheEntry(F)
+            fileCache.add(f)
+        }
+    }
+    lock(f)
+    if (f.lwt != lwt[F]) {
+        f.lwt = lwt[F]
+        f.hashes = computeHashes(F)
+        if (f.lwt != F.lwt) f.hashes = rand
+    } else {
+        // another command/thread already computed f.
+    }
+    return f
+
+Note that computeHashes(F) is executed once. Other commands may get blocked
+on lock(f), as described in attempt 1.
+mrmake posts all found FileCacheEntries to the main thread. In main thread it
+creates and adds file nodes to buildstate and then computes executionHash.
+Note: executionHash can also be computed in threadpool using a mix of
+FileNode and FileCachEntry to access the file hashes.
+A (big) disadvantage of this approach is that the new input files are all
+hashed in 1 thread. Possible solutions:
+    a- Use a second threadpool to (only) do hashing of new file.
+       Disadvantage: command threadpool thread remains still blocks for duration
+       of hashing all new input files.
+       Disadvantage: more threads -> more resources
+    b- Generalize the prereq-self-postreq build execution to a multi-phase 
+       execution. A command node uses this as follows:
+       Phase 1: execute prerequisites
+       Phase 2: self-execute -> list of new input files
+       Phase 3: find/create nodes for the new input files (in main thread) and
+                execute the output files and the new input files.
+       Phase 4: compute execution hash from hashes of out/input files and 
+                script.
+
+Option b seems to be a nice solution:
+    - it removes the need for locking file nodes
+    - it adheres to the rule to do all buildstate access in main thread
+    - it does not have the disadvantages of option a
+    - it also parallelizes the hashing of the output files
+
+Note that on first build the threadpool queue will get filled with many
+compilation requests. These requests queue execution requests for the newly
+found input files, which are all many on first build. These new input files 
+will stay queued until #compilations-#threads compilations have completed.
+This implies that linking cannot start until almost all compilations have
+completed. This goes against the intuition that expensive commands must be
+executed with priority. Also the user will not see compilation progress
+for prolonged time and then, as more and more input files are already hashes,
+a very fast succession of compile completions.
+Question: should we display hashing progress?
+Question: or should we prioritize file node execution over compilation?
+And if so: how to do that? We cannot simply use execution time as prio.
+Question: or should we prioritize file node execution over all other requests?
+This is easy to implement: simply give file node execution max prio.
+
+
++------------Detailing option 4
+The command node must be extended with a new member field: _allowedSourceInputs.
+The simplest way is to make this a set of SourceFileNode. This however will
+greatly increase storage size of the command node. A more efficient solution
+is to support SourceGlobNode, SourceDirectoryNode, SourceFileListNode and 
+SourceFileNode as allowed source inputs.
+
+SourceDirectoryNode was designed to mirror the entire repo directory tree.
+In option 4 only a subset of the directories in the repo tree will be
+mirrored. This has large impact on the implementation of SourceDirectoryNode.
+
+Imagine the user defined a glob to select input files: repoRoot/libx/include/*.h
+1. glob iterates on dir entries of repoRoot/libx/include
+2. For each entry: match it against the glob
+3. If match: add to glob postrequisites
+4. Use hash of matching path names to compute the glob hash. 
+5. Re-execute glob when content of repoRoot/libx/include changes:
+    Create a non-recursive SourceDirectoryNode to implement step 1. 
+    Each dir entry is mirrored as FileNode or SourceDirectoryNode.
+    A not-recursive directory node does not have postrequisites.
+    The directory node is a prerequisite of the glob.
+   
+User now adds a recursive glob: repoRoot/libx/include/**/*.h
+1. glob iterates on dir entries, recursively, of repoRoot/libx/include
+2. For each entry: match it against the glob
+3. If match: add to glob postrequisites
+4. Use hash of matching path names to compute the glob hash. 
+5. Re-execute glob when content of repoRoot/libx/include tree changes:
+    Update the existing non-recursive SourceDirectoryNode to be recursive or
+    create one if there is no exisiting one.
+    Each dir entry is mirrored as FileNode or SourceDirectoryNode.
+    These nodes are postrequisites of the recursive SourceDirectoryNode.
+    All directories in the dir tree are glob prerequisites.
+    Use all directory hashes to compute the glob hash. 
+    E.g. repoRoot/libx/include/**/private/*.h must also re-execute when
+    repoRoot/libx/include/xyz (that did not contain a private dir) changes.
+
+
+
