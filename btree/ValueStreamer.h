@@ -40,24 +40,25 @@ namespace BTree {
         virtual ValueStreamer<K>& open( const K& streamKey ) = 0;
         virtual bool isOpen() const = 0;
         virtual void close() = 0;
+        virtual const K& key() = 0;
     };
 
     template< class K >
     class ValueReader : public ValueStreamer<K> {
     private:
         const Tree<StreamKey<K>,uint8_t[]>& tree;
-        StreamKey<K> key;
+        StreamKey<K> streamKey;
         std::pair<const uint8_t*, PageSize> buffer;
         uint16_t position;
         void readBlock() {
             if ( buffer.second <= position ) {
-                buffer = tree.retrieve( key );
-                key.sequence += 1;
+                buffer = tree.retrieve( streamKey );
+                streamKey.sequence += 1;
                 position = 0;
             }
         }
         uint8_t getByte() {
-            static const char* signature( "uint8_t ValueReader::getByte()" );
+            static const char* signature( "uint8_t ValueReader<K>::getByte()" );
             readBlock();
             if ( buffer.first == nullptr ) throw std::string( signature ) + " - Streaming beyond end of stream";
             return buffer.first[ position++ ];
@@ -83,34 +84,38 @@ namespace BTree {
         void stream( int64_t& value ) { return( getValue<int64_t>( value ) ); }
         void stream( uint64_t& value ) { return( getValue<uint64_t>( value ) ); }
         bool eos() { readBlock(); return( buffer.first == nullptr ); }
-        ValueReader<K>& open( const K& streamKey ) {
-            static const char* signature = "ValueReader& ValueReader::open( const StreamKey<K>& streamKey )";
+        ValueReader<K>& open( const K& key ) {
+            static const char* signature = "ValueReader& ValueReader<K>::open( const StreamKey<K>& key )";
             if (isOpen()) throw std::string( signature ) + " - Opening while reader open";
-            key = StreamKey<K>( streamKey, 0 );
+            streamKey = StreamKey<K>( key, 0 );
+            readBlock();
             return *this;
         }
         bool isOpen() const { return( position != UINT16_MAX ); }
         void close() {
-            static const char* signature = "void ValueReader::close()";
+            static const char* signature = "void ValueReader<K>::close()";
             if (!isOpen()) throw std::string( signature ) + " - Closing closed reader";
             position = UINT16_MAX;
-            
+        }
+        const K& key() {
+            static const char* signature = "const K& ValueReader<K>::key()";
+            if (!isOpen()) throw std::string( signature ) + "' : Accesing key on closed stream";
+            return streamKey.key;
         }
     }; // class ValueReader
 
     template< class K >
     class ValueWriter : public ValueStreamer<K> {
-    private:
         Tree<StreamKey<K>,uint8_t[]>& tree;
-        StreamKey<K> key;
+        StreamKey<K> streamKey;
         std::vector<uint8_t> buffer;
         uint16_t position;
         void writeBlock() {
-            static const char* signature( "void ValueWriter::writeBlock()" );
+            static const char* signature( "void ValueWriter<K>writeBlock()" );
             if (0 < position) {
-                if (key.sequence == UINT16_MAX) throw std::string( signature ) + " - Exceding maximum block count";
-                tree.insert( key, &buffer[ 0 ], position );
-                key.sequence += 1;
+                if (streamKey.sequence == UINT16_MAX) throw std::string( signature ) + " - Exceding maximum block count";
+                tree.insert( streamKey, &buffer[ 0 ], position );
+                streamKey.sequence += 1;
                 position = 0;
             }
         }
@@ -139,19 +144,24 @@ namespace BTree {
         void stream( int64_t& value ) { return( putValue<int64_t>( value ) ); }
         void stream( uint64_t& value ) { return( putValue<uint64_t>( value ) ); }
         bool eos() { return( false ); }
-        ValueWriter<K>& open( const K& streamKey ) {
-            static const char* signature = "ValueWriter& ValueWriter::open( const StreamKey<K>& streamKey )";
+        ValueWriter<K>& open( const K& key ) {
+            static const char* signature = "ValueWriter& ValueWriter<K>open( const StreamKey<K>& key )";
             if (isOpen()) throw std::string( signature ) + " - Opening while writer open";
-            key = StreamKey<K>( streamKey, 0 );
+            streamKey = StreamKey<K>( key, 0 );
             position = 0;
             return *this;
         }
         bool isOpen() const { return( position != UINT16_MAX ); }
         void close() {
-            static const char* signature = "void ValueWriter::close()";
+            static const char* signature = "void ValueWriter<K>close()";
             if (!isOpen()) throw std::string( signature ) + " - Closing closed writer";
             writeBlock();
             position = UINT16_MAX;
+        }
+        const K& key() {
+            static const char* signature = "const K& ValueWriter<K>::key()";
+            if (!isOpen()) throw std::string( signature ) + " : Accesing key on closed stream";
+            return streamKey.key;
         }
     }; // class ValueWriter
 

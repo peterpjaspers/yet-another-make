@@ -1,4 +1,5 @@
-#include "String2StreamBTree.h"
+#include "StreamingBTree.h"
+#include "StreamingBTreeIterator.h"
 #include "PersistentPagePool.h"
 #include <iostream>
 #include <fstream>
@@ -12,19 +13,18 @@ const int ObjectCount = 10;
 
 // ToDo: Generate multiple keys with multiple objects per key...
 
-class Object {
+struct Object {
     bool b;
     float f;
     double d;
     uint8_t u8;
     int8_t i8;
-    uint8_t u16;
-    int8_t i16;
-    uint8_t u32;
-    int8_t i32;
-    uint8_t u64;
-    int8_t i64;
-public:
+    uint16_t u16;
+    int16_t i16;
+    uint32_t u32;
+    int32_t i32;
+    uint64_t u64;
+    int64_t i64;
     Object() = delete;
     Object( uint64_t x ) {
         b = ((x & 1) == 0) ? true : false;
@@ -38,19 +38,6 @@ public:
         i32 = ((x & (static_cast<uint64_t>( 1 ) << 32)) - (static_cast<uint64_t>( 1 ) << 31));
         u64 = x;
         i64 = (x - (static_cast<uint64_t>( 1 ) << 63));
-    }
-    void stream( ValueStreamer& s ) {
-        s.stream( b );
-        s.stream( f );
-        s.stream( d );
-        s.stream( u8 );
-        s.stream( i8 );
-        s.stream( u16 );
-        s.stream( i16 );
-        s.stream( u32 );
-        s.stream( i32 );
-        s.stream( u64 );
-        s.stream( i64 );
     }
     friend bool operator== ( const Object& a, const Object& b );
 };
@@ -71,6 +58,21 @@ bool operator== ( const Object& a, const Object& b ) {
 }
 bool operator!= ( const Object& a, const Object& b ) { return( (a == b) ? false : true ); }
 
+template< class K >
+void streamObject( ValueStreamer<K>& s, Object& o ) {
+    s.stream( o.b );
+    s.stream( o.f );
+    s.stream( o.d );
+    s.stream( o.u8 );
+    s.stream( o.i8 );
+    s.stream( o.u16 );
+    s.stream( o.i16 );
+    s.stream( o.u32 );
+    s.stream( o.i32 );
+    s.stream( o.u64 );
+    s.stream( o.i64 );
+}
+
 PagePool* createPagePool( bool persistent, string path, PageSize pageSize ) {
     if ( persistent ) {
         // Determine stored page size (if any)...
@@ -81,42 +83,63 @@ PagePool* createPagePool( bool persistent, string path, PageSize pageSize ) {
     }
 }
 
+const uint32_t KeyCount = 3;
+uint32_t keys[ KeyCount ] = { 47, 37, 137 };
+
 int main(int argc, char* argv[]) {
     system( "RMDIR /S /Q testStreamingBTree" );
     system( "MKDIR testStreamingBTree" );
-    ofstream stream;
-    stream.open( "testStreamingBTree\\testStreamingBTree.txt" );
+    ofstream log;
+    log.open( "testStreamingBTree\\log.txt" );
     try {
-        BTree::String2StreamTree tree(
-            *createPagePool( true, "testStreamingBTree\\String2IndexBTree.bt", BTreePageSize ),
-            *createPagePool( true, "testStreamingBTree\\Index2StreamBTree.bt", BTreePageSize ),
+        BTree::StreamingTree<uint32_t> tree(
+            *createPagePool( true, "testStreamingBTree\\StreamingBTree.bt", BTreePageSize ),
             ValueBlockSize
         );
-        stream << "Writing " << ObjectCount << " objects...\n";
-        string key = "An object";
-        ValueWriter& writer = tree.insert( key );
-        for ( uint16_t i = 0; i < ObjectCount; i++ ) {
-            Object o( i );
-            o.stream( writer );
+        log << "Writing " << KeyCount << " sets of " << ObjectCount << " objects...\n";
+        for (int i = 0; i < KeyCount; ++i) {
+            log << "Writing " << ObjectCount << " objects at key " << keys[ i ] << ".\n";
+            ValueWriter<uint32_t>& writer = tree.insert( keys[ i ] );
+            for ( uint16_t c = 0; c < ObjectCount; c++ ) {
+                Object o( keys[ i ] + c );
+                streamObject<uint32_t>( writer, o );
+            }
+            writer.close();
         }
-        writer.close();
         tree.commit();
-        if (ObjectCount <= 10) stream << tree;
-        stream << "Reading " << ObjectCount << " objects...\n";
-        ValueReader& reader = tree.retrieve( key );
-        for ( uint16_t i = 0; i < ObjectCount; i++ ) {
-            Object o( 0 ), r( i );
-            o.stream( reader );
-            if ( o != r ) stream << "Value mismatch at " << i << ".\n";
+        log << hex << tree;
+        log << "Reading " << KeyCount << " sets of " << ObjectCount << " objects...\n";
+        for (int i = 0; i < KeyCount; ++i) {
+            log << "Reading " << ObjectCount << " objects at key " << keys[ i ] << ".\n";
+            ValueReader<uint32_t>& reader = tree.retrieve( keys[ i ] );
+            for ( uint16_t c = 0; c < ObjectCount; c++ ) {
+                Object o( 0 ), r( keys[ i ] + c );
+                streamObject<uint32_t>( reader, o );
+                if ( o != r ) log << "Value mismatch at key " << keys[ i ] << ", object " << c << ".\n";
+            }
+            reader.close();
         }
-        reader.close();
+        log << "Iterator tests...\n";
+        int count = 0;
+        for ( ValueReader<uint32_t>& reader : tree ) {
+            uint32_t key = reader.key();
+            log << "Reading " << ObjectCount << " objects at key " << key << ".\n";
+            for ( uint16_t c = 0; c < ObjectCount; c++ ) {
+                Object o( 0 ), r( key + c );
+                streamObject<uint32_t>( reader, o );
+                if ( o != r ) log << "Value mismatch at key " << key << ", object " << c << ".\n";
+            }
+            reader.close();
+            count += 1;
+        }
+        if ( count != KeyCount ) log << "Iterator count mismatch : Expected " << KeyCount << ", actual " << count << "!\n";
     }
     catch ( string message ) {
-        stream << message << "\n";
+        log << message << "\n";
     }
     catch (...) {
-        stream << "Exception!\n";
+        log << "Exception!\n";
     }
-    stream << "Done...\n";
-    stream.close();
+    log << "Done...\n";
+    log.close();
 };

@@ -4,6 +4,8 @@
 #include "BTree.h"
 #include "ValueStreamer.h"
 
+// ToDo: Derive block size from page capacity as balance between optimal page filling and stream overhead
+
 namespace BTree {
 
     template< class K > class StreamingTreeIterator;
@@ -20,8 +22,8 @@ namespace BTree {
     template< class K >
     class StreamingTree : public Tree<StreamKey<K>,uint8_t[]> {
     private:
-        ValueReader<K> reader;
-        ValueWriter<K> writer;
+        mutable ValueReader<K> reader;
+        mutable ValueWriter<K> writer;
         StreamBlockSize blockSize;
         template< class KT >
         friend std::ostream & operator<<( std::ostream & o, const StreamingTree<KT>& tree );
@@ -39,7 +41,6 @@ namespace BTree {
         // Normal B-Tree modifiers and access disabled for StreamingTree...
         bool insert( const K& key, const uint8_t* value ) = delete;
         bool replace( const K& key, const uint8_t* value ) = delete;
-        std::pair<const uint8_t*, PageSize> retrieve( const K& key ) const = delete;
         StreamingTreeIterator<K> begin() const {
             auto it = new StreamingTreeIterator<K>( *this );
             it->begin();
@@ -68,14 +69,26 @@ namespace BTree {
         // Insert a streamed object.
         // Returns writer streamer to stream the object.
         ValueWriter<K>& insert( const K& key ) {
+            static const char* signature = "ValueWriter<K>& StreamingTree<K>::insert( const K& key )";
+            if (reader.isOpen() && (reader.key() == key)) {
+                throw std::string( signature ) + " : Accessing writer stream on open reader stream";
+            }
             StreamKey<K> streamKey( key, 0 );
             if ( Tree<StreamKey<K>,uint8_t[]>::exists( streamKey ) ) removeBlocks( key );
             return writer.open( key );
         }
         // Retrieve a streamed object.
-        // Returns reader streamer to stream the object.
-        ValueReader<K>& retrieve( const K& key ) {
-            return reader.open( key );
+        // Returns value reader streamer to stream the object.
+        ValueReader<K>& retrieve( const K& key ) const {
+            static const char* signature = "ValueReader<K>& StreamingTree<K>::retrieve( const K& key )";
+            if (writer.isOpen() && (writer.key() == key)) {
+                throw std::string( signature ) + " : Accessing reader stream on open writer stream";
+            }
+            if (reader.isOpen()) {
+                throw std::string( signature ) + " : Accessing open reader stream";
+            }
+            reader.open( key );
+            return reader;
         }
         // Remove a streamed object.
         bool remove( const K& key ) {
