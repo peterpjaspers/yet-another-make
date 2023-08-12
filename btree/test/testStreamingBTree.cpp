@@ -92,10 +92,7 @@ int main(int argc, char* argv[]) {
     ofstream log;
     log.open( "testStreamingBTree\\log.txt" );
     try {
-        BTree::StreamingTree<uint32_t> tree(
-            *createPagePool( true, "testStreamingBTree\\StreamingBTree.bt", BTreePageSize ),
-            ValueBlockSize
-        );
+        BTree::StreamingTree<uint32_t> tree( *createPagePool( true, "testStreamingBTree\\StreamingBTree.bt", BTreePageSize ) );
         log << "Writing " << KeyCount << " sets of " << ObjectCount << " objects...\n";
         for (int i = 0; i < KeyCount; ++i) {
             log << "Writing " << ObjectCount << " objects at key " << keys[ i ] << ".\n";
@@ -121,7 +118,7 @@ int main(int argc, char* argv[]) {
         }
         log << "Iterator tests...\n";
         int count = 0;
-        for ( ValueReader<uint32_t>& reader : tree ) {
+        for ( auto& reader : tree ) {
             uint32_t key = reader.key();
             log << "Reading " << ObjectCount << " objects at key " << key << ".\n";
             for ( uint16_t c = 0; c < ObjectCount; c++ ) {

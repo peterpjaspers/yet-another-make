@@ -4,8 +4,6 @@
 #include "BTree.h"
 #include "ValueStreamer.h"
 
-// ToDo: Derive block size from page capacity as balance between optimal page filling and stream overhead
-
 namespace BTree {
 
     template< class K > class StreamingTreeIterator;
@@ -24,19 +22,14 @@ namespace BTree {
     private:
         mutable ValueReader<K> reader;
         mutable ValueWriter<K> writer;
-        StreamBlockSize blockSize;
         template< class KT >
         friend std::ostream & operator<<( std::ostream & o, const StreamingTree<KT>& tree );
     public:
-        StreamingTree( PagePool& pool, StreamBlockSize block, UpdateMode mode = Auto ) :
+        StreamingTree( PagePool& pool, UpdateMode mode = Auto ) :
             Tree<StreamKey<K>,uint8_t[]>( pool, compareStreamKey<K>, mode ),
             reader( *this ),
-            writer( *this, block ),
-            blockSize( block )
-        {
-            static const char* signature( "StreamingTree( PagePool& indexPool, PagePool& valuePool, StreamBlockSize block, UpdateMode mode )" );
-            if ( (pool.pageCapacity() / 8) < block ) throw std::string( signature ) + " - Invalid block size";
-        };
+            writer( *this, Page<StreamKey<K>,uint8_t,false,true>::optimalBlockSize( pool.pageCapacity() ) )
+        {};
 
         // Normal B-Tree modifiers and access disabled for StreamingTree...
         bool insert( const K& key, const uint8_t* value ) = delete;
@@ -108,7 +101,7 @@ namespace BTree {
         }
     protected:
         void stream( std::ostream & o ) const {
-            o << "Streaming BTree [ " << blockSize << " ]\n";
+            o << "Streaming BTree\n";
             Tree<StreamKey<K>,uint8_t[]>::stream( o );
         }
     }; // template< class K > class StreamingTree
