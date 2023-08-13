@@ -54,7 +54,7 @@ namespace BTree {
         template< class K, class V, std::enable_if_t<(S<K>),bool> = true >
         Tree<K,V>* plant( TreeIndex index, typename Tree<K,V>::ScalarKeyCompare compareKey = defaultCompareScalar<K> ) {
             static const char* signature = "Tree<K,V>* Forest::plant( TreeIndex, typename Tree<K,V>::ScalarKeyCompare )";
-            if (exists( index )) throw std::string( signature ) + " - TreeIndex already in use";
+            if (contains( index )) throw std::string( signature ) + " - TreeIndex already in use";
             Tree<K,V>* tree = new Tree<K,V>( pool, compareKey, mode, nullptr );
             trees[ index ] = tree;
             Tree<TreeIndex,PageLink>::insert( index, tree->root->page );
@@ -63,7 +63,7 @@ namespace BTree {
         template< class K, class V, std::enable_if_t<(A<K>),bool> = true >
         Tree<K,V>* plant( TreeIndex index, typename Tree<K,V>::ArrayKeyCompare compareKey = defaultCompareArray<B<K>> ) {
             static const char* signature = "Tree<K,V>* Forest::plant( TreeIndex, typename Tree<K,V>::ArrayKeyCompare )";
-            if (exists( index )) throw std::string( signature ) + " - TreeIndex already in use";
+            if (contains( index )) throw std::string( signature ) + " - TreeIndex already in use";
             Tree<K,V>* tree = new Tree<K,V>( pool, compareKey, mode, nullptr );
             trees[ index ] = tree;
             Tree<TreeIndex,PageLink>::insert( index, tree->root->page );
@@ -77,7 +77,7 @@ namespace BTree {
         template< class K, class V >
         Tree<K,V>* plant( TreeIndex index, const Tree<K,V>& source ) {
             static const char* signature = "std::pair< Tree<K,V>*, TreeIndex > Forest::plant( TreeIndex, const Tree<K,V>& )";
-            if (exists( index )) throw std::string( signature ) + " - TreeIndex already in use";
+            if (contains( index )) throw std::string( signature ) + " - TreeIndex already in use";
             Tree<K,V>* tree = new Tree<K,V>( pool, source.keyCompare(), mode, nullptr );
             tree->assign( source );
             trees[ index ] = tree;
@@ -91,7 +91,7 @@ namespace BTree {
         Tree<K,V>* access( TreeIndex index, typename Tree<K,V>::ScalarKeyCompare compareKey = defaultCompareScalar<B<K>> ) {
             static const char* signature = "Tree<K,V>* Forest::access( TreeIndex, typename Tree<K,V>::ScalarKeyCompare compareKey )";
             if (0 < trees.count( index )) return reinterpret_cast<Tree<K,V>*>( const_cast<TreeBase*>( trees[ index ] ) );
-            if (!exists( index )) throw std::string( signature ) + " - Tree not in Forest";
+            if (!contains( index )) throw std::string( signature ) + " - Tree not in Forest";
             PageLink link = retrieve( index );
             PageHeader* rootPage = pool.reference( link );
             Tree<K,V>* tree = new Tree<K,V>( pool, compareKey, mode, rootPage );
@@ -102,7 +102,7 @@ namespace BTree {
         Tree<K,V>* access( TreeIndex index, typename Tree<K,V>::ArrayKeyCompare compareKey = defaultCompareArray<B<K>> ) {
             static const char* signature = "Tree<K,V>* Forest::access( TreeIndex, typename Tree<K,V>::ArrayKeyCompare compareKey )";
             if (0 < trees.count( index )) return reinterpret_cast<Tree<K,V>*>( const_cast<TreeBase*>( trees[ index ] ) );
-            if (!exists( index )) throw std::string( signature ) + " - Tree not in Forest";
+            if (!contains( index )) throw std::string( signature ) + " - Tree not in Forest";
             PageLink link = retrieve( index );
             PageHeader* rootPage = pool.reference( link );
             Tree<K,V>* tree = new Tree<K,V>( pool, compareKey, mode, rootPage );
@@ -127,7 +127,7 @@ namespace BTree {
     private:
         using Tree< TreeIndex, PageLink >::insert;
         using Tree< TreeIndex, PageLink >::replace;
-        using Tree< TreeIndex, PageLink >::remove;
+        using Tree< TreeIndex, PageLink >::erase;
         // Generate a unique TreeIndex for a user
         TreeIndex uniqueIndex() { return ((1 << 31) + trees.size()); }
     }; // class Forest

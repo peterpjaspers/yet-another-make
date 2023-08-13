@@ -40,8 +40,8 @@ namespace BTree {
         inline StreamingTreeIterator& end() {
             TreeIterator<StreamKey<K>,uint8_t[],std::pair<const StreamKey<K>&,std::pair<const uint8_t*,PageSize>>>::end(); return *this;
         }
-        inline StreamingTreeIterator& at( const Trail& position ) {
-            TreeIterator<StreamKey<K>,uint8_t[],std::pair<const StreamKey<K>&,std::pair<const uint8_t*,PageSize>>>::at( position ); return *this;
+        inline StreamingTreeIterator& find( const Trail& position ) {
+            TreeIterator<StreamKey<K>,uint8_t[],std::pair<const StreamKey<K>&,std::pair<const uint8_t*,PageSize>>>::find( position ); return *this;
         }
         inline StreamingTreeIterator& operator++() {
             auto currentKey = key();

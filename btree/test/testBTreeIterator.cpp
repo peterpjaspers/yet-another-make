@@ -37,12 +37,12 @@ int main(int argc, char* argv[]) {
     try {
         PagePool pagePool( BTreePageSize );
         BTree::Tree<uint32_t,uint32_t> tree( pagePool );
-        log << "\n\nGenerating B-Tree<uint32_t,uint32_t> with " << ValueCount << " entries...\n";
+        log << "Generating B-Tree<uint32_t,uint32_t> with " << ValueCount << " entries...\n";
         gen32.seed( 13 );
         uint32_t findKey;
         for ( int i = 0; i < ValueCount; i++ ) {
             uint32_t key = generateUint32();
-            while (tree.exists( key )) key = generateUint32();
+            while (tree.contains( key )) key = generateUint32();
             uint32_t value = generateUint32();
             if (i == (ValueCount / 3)) findKey = key;
             tree.insert( key, value );
@@ -60,7 +60,7 @@ int main(int argc, char* argv[]) {
         }
         {
             log << "\nIterating forward from " << findKey << " ...\n";
-            auto iterator = tree.at( findKey );
+            auto iterator = tree.find( findKey );
             for (int i = 0; i < 20; i++) {
                 auto entry = *iterator;
                 log << "Value at " << findKey << " [ " << i << " ] = " << entry.first << " -> " << entry.second << "\n" << flush;
@@ -76,7 +76,6 @@ int main(int argc, char* argv[]) {
                 errorCount += 1;
             }
         }
-        log << tree;
     }
     catch ( string message ) {
         log << message << "\n";
@@ -94,7 +93,7 @@ int main(int argc, char* argv[]) {
         string findKey;
         for ( int i = 0; i < ValueCount; i++ ) {
             string key = generateString();
-            while (tree.exists( key.c_str(), key.size() )) key = generateString();
+            while (tree.contains( key.c_str(), key.size() )) key = generateString();
             uint32_t value = generateUint32();
             if (i == (ValueCount / 3)) findKey = key;
             tree.insert( key.c_str(), key.size(), value );
@@ -120,7 +119,7 @@ int main(int argc, char* argv[]) {
         }
         {
             log << "\nIterating forward from " << findKey << " ...\n";
-            auto iterator = tree.at( findKey.c_str(), findKey.size() );
+            auto iterator = tree.find( findKey.c_str(), findKey.size() );
             for (int i = 0; i < 20; i++) {
                 auto entry = *iterator++;
                 log << "Value at " << findKey << " [ " << i << " ] = " << string( entry.first.first, entry.first.second ) << " -> " << entry.second << "\n" << flush;
@@ -153,7 +152,7 @@ int main(int argc, char* argv[]) {
         uint32_t findKey;
         for ( int i = 0; i < ValueCount; i++ ) {
             uint32_t key = generateUint32();
-            while (tree.exists( key )) key = generateUint32();
+            while (tree.contains( key )) key = generateUint32();
             values[ i ] = generateString();
             if (i == (ValueCount / 3)) findKey = key;
             tree.insert( key, values[ i ].c_str(), values[ i ].size() );
@@ -179,7 +178,7 @@ int main(int argc, char* argv[]) {
         }
         {
             log << "\nIterating forward from " << findKey << " ...\n";
-            auto iterator = tree.at( findKey );
+            auto iterator = tree.find( findKey );
             for (int i = 0; i < 20; i++) {
                 auto entry = *iterator++;
                 log << "Value at " << findKey << " [ " << i << " ] = " << entry.first << " -> " << string( entry.second.first, entry.second.second ) << "\n" << flush;
@@ -213,7 +212,7 @@ int main(int argc, char* argv[]) {
         string findKey;
         for ( int i = 0; i < ValueCount; i++ ) {
             keys[ i ] = generateString();
-            while (tree.exists( keys[ i ].c_str(), keys[ i ].size() )) keys[ i ] = generateString();
+            while (tree.contains( keys[ i ].c_str(), keys[ i ].size() )) keys[ i ] = generateString();
             values[ i ] = generateString();
             if (i == (ValueCount / 3)) findKey = keys[ i ];
             tree.insert( keys[ i ].c_str(), keys[ i ].size(), values[ i ].c_str(), values[ i ].size() );
@@ -239,7 +238,7 @@ int main(int argc, char* argv[]) {
         }
         {
             log << "\nIterating forward from " << findKey << " ...\n";
-            auto iterator = tree.at( findKey.c_str(), findKey.size() );
+            auto iterator = tree.find( findKey.c_str(), findKey.size() );
             for (int i = 0; i < 20; i++) {
                 auto entry = *iterator++;
                 log << "Value at " << findKey << " [ " << i << " ] = " << string( entry.first.first, entry.first.second ) << " -> " << string( entry.second.first, entry.second.second ) << "\n" << flush;

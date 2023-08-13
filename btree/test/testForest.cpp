@@ -52,25 +52,25 @@ TreeIndex uint16Arrayuint16ArrayIndex;
 void addEntry( Tree<uint32_t,uint32_t>* tree ) {
     uint32_t key = generateUint32();
     uint32_t value = generateUint32();
-    while (tree->exists( key )) key = generateUint32();
+    while (tree->contains( key )) key = generateUint32();
     tree->insert( key, value );
 }
 void addEntry( Tree<uint32_t,uint16_t[]>* tree ) {
     uint32_t key = generateUint32();
     vector<uint16_t> value = generateUint16Array();
-    while (tree->exists( key )) key = generateUint32();
+    while (tree->contains( key )) key = generateUint32();
     tree->insert( key, value.data(), value.size() );
 }
 void addEntry( Tree<uint16_t[],uint32_t>* tree ) {
     vector<uint16_t> key = generateUint16Array();
     uint32_t value = generateUint32();
-    while (tree->exists( key.data(), key.size() )) key = generateUint16Array();
+    while (tree->contains( key.data(), key.size() )) key = generateUint16Array();
     tree->insert( key.data(), key.size(), value );
 }
 void addEntry( Tree<uint16_t[],uint16_t[]>* tree ) {
     vector<uint16_t> key = generateUint16Array();
     vector<uint16_t> value = generateUint16Array();
-    while (tree->exists( key.data(), key.size() )) key = generateUint16Array();
+    while (tree->contains( key.data(), key.size() )) key = generateUint16Array();
     tree->insert( key.data(), key.size(), value.data(), value.size() );
 }
 void populateTrees( int count ) {
@@ -176,13 +176,16 @@ int main(int argc, char* argv[]) {
         errorCount += validateTrees( log, ValueCount );
     }
     catch ( string message ) {
-        log << message << "\n";
+        log << message << "!\n";
     }
     catch (...) {
         log << "Exception!\n";
     }
-    if (0 < errorCount) log << errorCount << " errors detected!";
-    log << "Done...\n";
+    if (0 < errorCount) {
+        log << "\n\n" << errorCount << " errors detected.";
+    } else {
+        log << "\n\nNo errors detected.\n";
+    }
     log.close();
     exit( errorCount );
 };

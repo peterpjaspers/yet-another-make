@@ -91,6 +91,7 @@ int main(int argc, char* argv[]) {
     system( "MKDIR testStreamingBTree" );
     ofstream log;
     log.open( "testStreamingBTree\\log.txt" );
+    uint32_t errors = 0;
     try {
         BTree::StreamingTree<uint32_t> tree( *createPagePool( true, "testStreamingBTree\\StreamingBTree.bt", BTreePageSize ) );
         log << "Writing " << KeyCount << " sets of " << ObjectCount << " objects...\n";
@@ -112,7 +113,10 @@ int main(int argc, char* argv[]) {
             for ( uint16_t c = 0; c < ObjectCount; c++ ) {
                 Object o( 0 ), r( keys[ i ] + c );
                 streamObject<uint32_t>( reader, o );
-                if ( o != r ) log << "Value mismatch at key " << keys[ i ] << ", object " << c << ".\n";
+                if ( o != r ) {
+                    log << "Value mismatch at key " << keys[ i ] << ", object " << c << ".\n";
+                    errors += 1;
+                }
             }
             reader.close();
         }
@@ -124,19 +128,32 @@ int main(int argc, char* argv[]) {
             for ( uint16_t c = 0; c < ObjectCount; c++ ) {
                 Object o( 0 ), r( key + c );
                 streamObject<uint32_t>( reader, o );
-                if ( o != r ) log << "Value mismatch at key " << key << ", object " << c << ".\n";
+                if ( o != r ) {
+                    log << "Value mismatch at key " << key << ", object " << c << ".\n";
+                    errors += 1;
+                }
             }
             reader.close();
             count += 1;
         }
-        if ( count != KeyCount ) log << "Iterator count mismatch : Expected " << KeyCount << ", actual " << count << "!\n";
+        if ( count != KeyCount ) {
+            log << "Iterator count mismatch : Expected " << KeyCount << ", actual " << count << "!\n";
+            errors += 1;
+        }
     }
     catch ( string message ) {
-        log << message << "\n";
+        log << message << "!\n";
+        errors += 1;
     }
     catch (...) {
         log << "Exception!\n";
+        errors += 1;
     }
-    log << "Done...\n";
+    if (0 < errors) {
+        log << "\n" << errors << " errors detected.\n";
+    } else {
+        log << "\n" << "No errors detected.\n";
+    }
     log.close();
+    exit( errors );
 };

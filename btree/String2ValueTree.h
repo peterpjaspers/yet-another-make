@@ -13,9 +13,8 @@ namespace BTree {
         inline String2ValueTree(
             PagePool& pagePool,
             int (*compareKey)( const char*, PageIndex, const char*, PageIndex ) = defaultCompareArray<char>,
-            UpdateMode updateMode = UpdateMode::Auto,
-            const VT& defaultValue = VT()
-        ) : Tree< char[], VT >::Tree( pagePool, compareKey, updateMode, defaultValue )
+            UpdateMode updateMode = UpdateMode::Auto
+        ) : Tree< char[], VT >::Tree( pagePool, compareKey, updateMode )
         {}
         template< class VT = V, std::enable_if_t<A<VT>,bool> = true >
         inline String2ValueTree(
@@ -49,8 +48,8 @@ namespace BTree {
             return Tree< char[], VT >::retrieve( key.c_str(), key.size() );
         }
         template< class VT = V >
-        inline void remove( std::string key ) {
-            Tree< char[], VT >::remove( key.c_str(), key.size() );
+        inline void erase( std::string key ) {
+            Tree< char[], VT >::erase( key.c_str(), key.size() );
         }
         template< class VT = V >
         inline void commit() { Tree< char[], VT >::commit(); }

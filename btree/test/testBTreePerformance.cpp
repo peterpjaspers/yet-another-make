@@ -168,11 +168,11 @@ void treeRetrieve( const Tree<K,V>& tree, const vector<B<K>>& key ) {
 }
 template< class K, class V, std::enable_if_t<(!A<K>),bool> = true >
 void treeRemove( Tree<K,V>& tree, const vector<B<K>>& key ) {
-    tree.remove( key[ 0 ] );
+    tree.erase( key[ 0 ] );
 }
 template< class K, class V, std::enable_if_t<(A<K>),bool> = true >
 void treeRemove( Tree<K,V>& tree, const vector<B<K>>& key ) {
-    tree.remove( key.data(), key.size() );
+    tree.erase( key.data(), key.size() );
 }
 
 template< class K, class V >
@@ -211,7 +211,7 @@ class PerformanceTest {
         chrono::duration<double> elapsed = (t1 - t0);
         return ((elapsed.count() / iterations) * 1000000);
     };
-    double remove( uint32_t iterations, vector<vector<B<K>>>& keys ) {
+    double erase( uint32_t iterations, vector<vector<B<K>>>& keys ) {
         shuffle( keys.begin(), keys.end(), gen32 );
         auto t0 = chrono::steady_clock::now();;
         for ( uint32_t i = 0; i < iterations; i++ ) treeRemove<K,V>( *tree, keys[ i ] );
@@ -233,10 +233,34 @@ public:
         tree( new BTree::Tree<K,V>( *pool ) ),
         log( stream )
     {
+        tree->enableStatistics();
     };
     ~PerformanceTest() {
         delete tree;
         delete pool;
+    }
+    void logStatistics( bool clear ) const {
+        BTreeStatistics stats;
+        if (tree->statistics( stats )) {
+            log << "B-Tree statistics\n"
+                << "    Insertions        " << stats.insertions << "\n"
+                << "    Retrievals        " << stats.retrievals << "\n"
+                << "    Replacements      " << stats.replacements << "\n"
+                << "    Removals          " << stats.removals << "\n"
+                << "    Finds             " << stats.finds << "\n"
+                << "    Grows             " << stats.grows << "\n"
+                << "    Page allocations  " << stats.pageAllocations << "\n"
+                << "    Page frees        " << stats.pageFrees << "\n"
+                << "    Merge attempts    " << stats.mergeAttempts << "\n"
+                << "    Page merges       " << stats.pageMerges << "\n"
+                << "    Root updates      " << stats.rootUpdates << "\n"
+                << "    Split updates     " << stats.splitUpdates << "\n"
+                << "    Commits           " << stats.commits << "\n"
+                << "    Recovers          " << stats.recovers << "\n"
+                << "    Page writes       " << stats.pageWrites << "\n"
+                << "    Page reads        " << stats.pageReads << "\n";
+            if (clear) tree->clearStatistics();
+        }
     }
     void measureUsage() const {
         PageUsage usage = pageUsage<K,V>( *pool );
@@ -248,7 +272,6 @@ public:
         log.precision( 3 );
         log << "Payload    : " << ((100.0 * usage.payload) / (usage.pageCapacity * (usage.pages - usage.freePages))) << " %\n";
     }
-
     void measurePerformance( uint32_t iterations ) {
         vector<vector<B<K>>> keys = generateUniqueKeys<B<K>>( iterations, (A<K> ? MinArray : 1), (A<K> ? MaxArray : 1) );
         vector<vector<B<V>>> values = generateValues<B<V>>( iterations, (A<V> ? MinArray : 1), (A<V> ? MaxArray : 1) );
@@ -257,25 +280,31 @@ public:
         double overhead = calibration.first;
         log.precision( 3 );
         log << "Calibration time " << overhead << " usec with " << iterations << " iterations (" << calibration.second << ").\n";
+        tree->clearStatistics();
         auto entryInsert = insert( iterations, keys, values );
         log.precision( 3 );
         log << "Random insert " << (entryInsert - overhead) << " usec.\n";
         measureUsage();
+        logStatistics( true );
         auto elapsedCommit = commit();
         log.precision( 3 );
         log << "Commit " << elapsedCommit << " sec.\n";
+        logStatistics( true );
         auto entryReplace = replace( iterations, keys, replaceValues );
         log.precision( 3 );
         log << "Random replace " << (entryReplace - overhead) << " usec.\n";
         measureUsage();
+        logStatistics( true );
         auto entryRetrieve = retrieve( iterations, keys );
         log.precision( 3 );
         log << "Random retrieve " << (entryRetrieve - overhead) << " usec.\n";
         measureUsage();
-        auto entryRemove = remove( iterations, keys );
+        logStatistics( true );
+        auto entryRemove = erase( iterations, keys );
         log.precision( 3 );
-        log << "Random remove " << (entryRemove - overhead) << " usec.\n";
+        log << "Random erase " << (entryRemove - overhead) << " usec.\n";
         measureUsage();
+        logStatistics( true );
         log.flush();
     }
 };
@@ -283,6 +312,7 @@ public:
 int main(int argc, char* argv[]) {
     system( "RMDIR /S /Q testBTreePerformance" );
     system( "MKDIR testBTreePerformance" );
+    int errors = 0;
     ofstream log;
     log.open( "testBTreePerformance\\log.txt" );
     log << "32-bit integer key to 32-bit integer value performance ...\n";
@@ -296,10 +326,12 @@ int main(int argc, char* argv[]) {
         }
     }
     catch ( string message ) {
-        log << message << "\n";
+        log << message << "!\n";
+        errors += 1;
     }
     catch (...) {
         log << "Exception!\n";
+        errors += 1;
     }
     log << "\n32-bit integer key to 16-bit integer array[ " << MinArray << " - " << MaxArray << " ] value performance ...\n";
     log.flush();
@@ -312,10 +344,12 @@ int main(int argc, char* argv[]) {
         }
     }
     catch ( string message ) {
-        log << message << "\n";
+        log << message << "!\n";
+        errors += 1;
     }
     catch (...) {
         log << "Exception!\n";
+        errors += 1;
     }
     log << "\n16-bit integer array[ " << MinArray << " - " << MaxArray << " ] key to 32-bit integer value performance ...\n";
     log.flush();
@@ -328,10 +362,12 @@ int main(int argc, char* argv[]) {
         }
     }
     catch ( string message ) {
-        log << message << "\n";
+        log << message << "!\n";
+        errors += 1;
     }
     catch (...) {
         log << "Exception!\n";
+        errors += 1;
     }
     log << "\n16-bit integer array[ " << MinArray << " - " << MaxArray << " ] key to 16-bit integer array[ " << MinArray << " - " << MaxArray << " ] value performance ...\n";
     log.flush();
@@ -344,11 +380,19 @@ int main(int argc, char* argv[]) {
         }
     }
     catch ( string message ) {
-        log << message << "\n";
+        log << message << "!\n";
+        errors += 1;
     }
     catch (...) {
         log << "Exception!\n";
+        errors += 1;
+    }
+    if (0 < errors) {
+        log << errors << " errors detected!";
+    } else {
+        log << "No errors detected.";
     }
     log.flush();
     log.close();
+    exit( errors );
 };

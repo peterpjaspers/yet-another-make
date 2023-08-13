@@ -26,7 +26,7 @@ namespace BTree {
         TreeIterator( const TreeIterator& iterator ) : trail( iterator.trail ) {}
         inline TreeIterator& begin() { trail.begin<B<K>,A<K>>(); return *this; }
         inline TreeIterator& end() { trail.end<B<K>,A<K>>(); return *this; }
-        inline TreeIterator& at( const Trail& position ) { trail = position; return *this; }
+        inline TreeIterator& position( const Trail& pos ) { trail = pos; return *this; }
         inline TreeIterator& operator++() { trail.next<B<K>,A<K>>(); return *this; }
         inline TreeIterator operator++(int) { TreeIterator tmp( *this ); ++(*this); return tmp; }
         inline TreeIterator& operator--() { trail.previous<B<K>,A<K>>(); return *this; }

@@ -50,12 +50,12 @@ namespace BTree {
             return std::string( result.first, result.second );
         }
         template< class KT = K >
-        inline typename std::enable_if<S<KT>,void>::type remove( const K& key ) {
-            Tree< KT, char[] >::remove( key );
+        inline typename std::enable_if<S<KT>,void>::type erase( const K& key ) {
+            Tree< KT, char[] >::erase( key );
         }
         template< class KT = K >
-        inline typename std::enable_if<A<KT>,void>::type remove( const K* key, PageSize keySize ) {
-            Tree< KT, char[] >::remove( key, keySize );
+        inline typename std::enable_if<A<KT>,void>::type erase( const K* key, PageSize keySize ) {
+            Tree< KT, char[] >::erase( key, keySize );
         }
         inline void commit() { Tree< K, char[] >::commit(); }
         inline void recover() { Tree< K, char[] >::recover(); }

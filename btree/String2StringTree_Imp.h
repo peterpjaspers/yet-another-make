@@ -21,8 +21,8 @@ namespace BTree {
         std::pair<const char*, PageIndex> result = Tree<char[],char[]>::retrieve( key.c_str(), key.size() );
         return std::string( result.first, result.second );
     }
-    inline void String2StringTree::remove( std::string key ) {
-        Tree<char[],char[]>::remove( key.c_str(), key.size() );
+    inline void String2StringTree::erase( std::string key ) {
+        Tree<char[],char[]>::erase( key.c_str(), key.size() );
     }
     inline void String2StringTree::commit() { Tree<char[],char[]>::commit(); }
     inline void String2StringTree::recover() { Tree<char[],char[]>::recover(); }

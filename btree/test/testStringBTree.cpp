@@ -69,8 +69,9 @@ int main(int argc, char* argv[]) {
     ofstream stream;
     system( "RMDIR /S /Q testStringBTree" );
     system( "MKDIR testStringBTree" );
+    int errors = 0;
     // String2String test
-    stream.open( "testStringBTree\\logString2String.txt" );
+    stream.open( "testStringBTree\\log.txt" );
     try {
         map<string,string> entries;
         vector<string> keys;
@@ -84,34 +85,39 @@ int main(int argc, char* argv[]) {
             keys.push_back( key );
             string value = generateString();
             entries[ key ] = value;
-            if (!tree.insert( key, value )) stream << "Key " << key << " already present!\n";
+            if (!tree.insert( key, value )) {
+                stream << "Key " << key << " already present!\n";
+                errors += 1;
+            }
         }
         stream << "Modifying " << ValueCount << " strings with string keys...\n";
         for ( auto key : keys ) {
             string value = generateString();
             entries[ key ] = value;
-            if (!tree.replace( key, value )) stream << "Key " << key << " not present!\n";
+            if (!tree.replace( key, value )) {
+                stream << "Key " << key << " not present!\n";
+                errors += 1;
+            }
         }
         stream << "Reading " << ValueCount << " strings with string keys...\n";
         for ( auto key : keys ) {
             string value = tree.retrieve( key );
             if ( value != entries[ key ] ) {
-                stream << "Value mismatch for key " << key << " : expected " << entries[ key ] << ", retrieved " << value << ".\n";
+                stream << "Value mismatch for key " << key << " : expected " << entries[ key ] << ", retrieved " << value << "!\n";
+                errors += 1;
             }
         }
         tree.commit();
         stream << tree;
     }
     catch ( string message ) {
-        stream << message << "\n";
+        stream << message << "!\n";
     }
     catch (...) {
         stream << "Exception!\n";
     }
     stream << "Done...\n";
-    stream.close();
     // String2Value test - scalar value
-    stream.open( "testStringBTree\\logString2Uint32.txt" );
     try {
         map<string,uint32_t> entries;
         vector<string> keys;
@@ -125,34 +131,39 @@ int main(int argc, char* argv[]) {
             keys.push_back( key );
             uint32_t value = generateUint32();
             entries[ key ] = value;
-            if (!tree.insert( key, value )) stream << "Key " << key << " already present!\n";
+            if (!tree.insert( key, value )) {
+                stream << "Key " << key << " already present!\n";
+                errors += 1;
+            }
         }
         stream << "Modifying " << ValueCount << " 32-bit unsigned integers with string keys...\n";
         for ( auto key : keys ) {
             uint32_t value = generateUint32();
             entries[ key ] = value;
-            if (!tree.replace( key, value )) stream << "Key " << key << " not present!\n";
+            if (!tree.replace( key, value )) {
+                stream << "Key " << key << " not present!\n";
+                errors += 1;
+            }
         }
         stream << "Reading " << ValueCount << " 32-bit unsigned integers with string keys...\n";
         for ( auto key : keys ) {
             uint32_t value = tree.retrieve( key );
             if ( value != entries[ key ] ) {
-                stream << "Value mismatch for key " << key << " : expected " << entries[ key ] << ", retrieved " << value << ".\n";
+                stream << "Value mismatch for key " << key << " : expected " << entries[ key ] << ", retrieved " << value << "!\n";
+                errors += 1;
             }
         }
         tree.commit();
         stream << tree;
     }
     catch ( string message ) {
-        stream << message << "\n";
+        stream << message << "!\n";
     }
     catch (...) {
         stream << "Exception!\n";
     }
     stream << "Done...\n";
-    stream.close();
     // String2Value test - array value
-    stream.open( "testStringBTree\\logString2Uint16Array.txt" );
     try {
         vector<string> keys;
         map<string,vector<uint16_t>> entries;
@@ -166,13 +177,19 @@ int main(int argc, char* argv[]) {
             keys.push_back( key );
             auto value = generateUint16Array();
             entries[ key ] = value;
-            if(!tree.insert( key, value.data(), value.size() )) stream << "Key " << key << " already present!\n";
+            if(!tree.insert( key, value.data(), value.size() )) {
+                stream << "Key " << key << " already present!\n";
+                errors += 1;
+            }
         }
         stream << "Modifying " << ValueCount << " 16-bit unsigned integer arrays with string keys...\n";
         for ( auto key : keys ) {
             auto value = generateUint16Array();
             entries[ key ] = value;
-            if (!tree.replace( key, value.data(), value.size() )) stream << "Key " << key << " not present!\n";
+            if (!tree.replace( key, value.data(), value.size() )) {
+                stream << "Key " << key << " not present!\n";
+                errors += 1;
+            }
         }
         stream << "Reading " << ValueCount << " 16-bit unsigned integer arrays with string keys...\n";
         for ( auto key : keys ) {
@@ -183,22 +200,21 @@ int main(int argc, char* argv[]) {
                 streamUint16Array( stream, reference );
                 stream << ", retrieved ";
                 streamUint16Array( stream, retrieved.first, retrieved.second );
-                stream << ".\n";
+                stream << "!\n";
+                errors += 1;
             }
         }
         tree.commit();
         stream << tree;
     }
     catch ( string message ) {
-        stream << message << "\n";
+        stream << message << "!\n";
     }
     catch (...) {
         stream << "Exception!\n";
     }
     stream << "Done...\n";
-    stream.close();
     // Value2String test - scalar keys
-    stream.open( "testStringBTree\\logUint322String.txt" );
     try {
         vector<uint32_t> keys;
         map<uint32_t,string> entries;
@@ -212,13 +228,19 @@ int main(int argc, char* argv[]) {
             keys.push_back( key );
             auto value = generateString();
             entries[ key ] = value;
-            if (!tree.insert( key, value )) stream << "Key " << key << " already present!\n";
+            if (!tree.insert( key, value )) {
+                stream << "Key " << key << " already present!\n";
+                errors += 1;
+            }
         }
         stream << "Modifying " << ValueCount << " strings with 32-bit unsigned int keys...\n";
         for ( auto key : keys ) {
             auto value = generateString();
             entries[ key ] = value;
-            if (!tree.replace( key, value )) stream << "Key " << key << " not present!\n";
+            if (!tree.replace( key, value )) {
+                stream << "Key " << key << " not present!\n";
+                errors += 1;
+            }
         }
         stream << "Reading " << ValueCount << " strings with 32-bit unsigned int keys...\n";
         for ( auto key : keys ) {
@@ -226,21 +248,20 @@ int main(int argc, char* argv[]) {
             string value = tree.retrieve( key );
             if ( value != reference ) {
                 stream << "Value mismatch for " << key << " : expected " << reference << ", retrieved " << value << ".\n";
+                errors += 1;
             }
         }
         tree.commit();
         stream << tree;
     }
     catch ( string message ) {
-        stream << message << "\n";
+        stream << message << "!\n";
     }
     catch (...) {
         stream << "Exception!\n";
     }
     stream << "Done...\n";
-    stream.close();
     // Value2String test - array keys
-    stream.open( "testStringBTree\\logUint16Array2String.txt" );
     try {
         vector<vector<uint16_t>> keys;
         map<vector<uint16_t>,string> entries;
@@ -255,6 +276,7 @@ int main(int argc, char* argv[]) {
             entries[ key ] = value;
             if (!tree.insert( key.data(), key.size(), value )) {
                 stream << "Key "; streamUint16Array( stream, key ); stream << " already present!\n";
+                errors += 1;
             }
         }
         stream << "Modifying " << ValueCount << " strings with 16-bit unsigned int array keys...\n";
@@ -262,6 +284,7 @@ int main(int argc, char* argv[]) {
             string value = generateString();
             if (!tree.replace( key.data(), key.size(), value )) {
                 stream << "Key "; streamUint16Array( stream, key ); stream << " not present!\n";
+                errors += 1;
             }
         }
         stream << "Reading " << ValueCount << " strings with 16-bit unsigned int array keys...\n";
@@ -270,17 +293,22 @@ int main(int argc, char* argv[]) {
             string value = tree.retrieve( key.data(), key.size() );
             if ( value != reference ) {
                 stream << "Value mismatch : expected " << reference << ", retrieved " << value << ".\n";
+                errors += 1;
             }
         }
         tree.commit();
         stream << tree;
     }
     catch ( string message ) {
-        stream << message << "\n";
+        stream << message << "!\n";
     }
     catch (...) {
         stream << "Exception!\n";
     }
-    stream << "Done...\n";
+    if (0 < errors) {
+        stream << "\n\n" << errors << " errors detected.";
+    } else {
+        stream << "\n\nNo errors detected.\n";
+    }
     stream.close();
 };

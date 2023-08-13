@@ -422,7 +422,7 @@ public:
         log << "Replacing " << count << " keys...\n" << flush;
         return 0;
     }
-    virtual uint32_t remove( int count, KeyOrder order ) {
+    virtual uint32_t erase( int count, KeyOrder order ) {
         log << "Removing " << count << " keys in " << order2String(order) << " order...\n" << flush;
         return 0;
     }
@@ -530,7 +530,7 @@ private:
     }
     uint32_t removeKey( uint32_t key ) {
         uint32_t errors = 0;
-        bool removed = tree->remove( key );
+        bool removed = tree->erase( key );
         if (!removed) {
             log << "Remove with existing key " << key << " returned false!\n";
             errors += 1;
@@ -571,9 +571,14 @@ public:
                     log << "Key " << entry->first << " : Expected " << entry->second << ", retrieved " << retrieved << "!\n";
                     errors += 1;
                 }
-                bool found = tree->exists( entry->first );
+                bool found = tree->contains( entry->first );
                 if (!found) {
-                    log << "Exists with existing key " << entry->first << " returned false!\n";
+                    log << "Contains with existing key " << entry->first << " returned false!\n";
+                    errors += 1;
+                }
+                PageSize count = tree->count( entry->first );
+                if (count != 1) {
+                    log << "Count with existing key " << entry->first << " returned " << count << "!\n";
                     errors += 1;
                 }
             }
@@ -590,9 +595,14 @@ public:
                         // Exception expected, ignore
                     }
                 }
-                bool found = tree->exists( key );
+                bool found = tree->contains( key );
                 if (found) {
-                    log << "Exists with non-existing key " << key << " returned true!\n";
+                    log << "Contains with non-existing key " << key << " returned true!\n";
+                    errors += 1;
+                }
+                PageSize count = tree->count( key );
+                if (count != 0) {
+                    log << "Count with non-existing key " << key << " returned " << count << "!\n";
                     errors += 1;
                 }
             }
@@ -648,8 +658,8 @@ public:
         if (0 < errors) log << "Detected " << errors << " relpace errors.\n";
         return errors;
     }
-    uint32_t remove( int count, KeyOrder order ) {
-        uint32_t errors = TreeTester<uint32_t,uint32_t>::remove( count, order );
+    uint32_t erase( int count, KeyOrder order ) {
+        uint32_t errors = TreeTester<uint32_t,uint32_t>::erase( count, order );
         size_t range = keys.size();
         if (range < count) count = range;
         if (order == Forward) {
@@ -667,12 +677,12 @@ public:
         }
         for (int i = 0; i < ProbeCount; ++i) {
             uint32_t key = generateUniqueKey();
-            if (tree->remove( key )) {
+            if (tree->erase( key )) {
                 log << "Remove with non-existing key " << key << " returned true!\n";
                 errors += 1;
             }
         }
-        if (0 < errors) log << "Detected " << errors << " remove errors.\n";
+        if (0 < errors) log << "Detected " << errors << " erase errors.\n";
         return errors;
 }
     uint32_t commit() {
@@ -766,9 +776,9 @@ private:
         bool removed = false;
         if (*usePair) {
             pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( key->size() ) };
-            removed = tree->remove( keyPair );
+            removed = tree->erase( keyPair );
         } else {
-            removed = tree->remove( key->data(), PageSize( key->size() ));
+            removed = tree->erase( key->data(), PageSize( key->size() ));
         }
         if (!removed) {
             log << "Remove with existing key "; logUint16Array( log, key->data(), key->size() ); log << " returned false!\n";
@@ -839,14 +849,27 @@ public:
                 bool found = false;
                 if (usePair) {
                     pair<const uint16_t*, PageSize> keyPair = { entry->first->data(), entry->first->size() };
-                    found = tree->exists( keyPair );
+                    found = tree->contains( keyPair );
                 } else {
-                    found = tree->exists( entry->first->data(), entry->first->size() );
+                    found = tree->contains( entry->first->data(), entry->first->size() );
                 }
                 if (!found) {
-                    log << "Exists with existing key ";
+                    log << "Contains with existing key ";
                     logUint16Array( log, entry->first->data(), entry->first->size() );
                     log << " returned false!\n";
+                    errors += 1;
+                }
+                PageSize count = 0;
+                if (usePair) {
+                    pair<const uint16_t*, PageSize> keyPair = { entry->first->data(), entry->first->size() };
+                    count = tree->count( keyPair );
+                } else {
+                    count = tree->count( entry->first->data(), entry->first->size() );
+                }
+                if (count != 1) {
+                    log << "Count with existing key ";
+                    logUint16Array( log, entry->first->data(), entry->first->size() );
+                    log << " returned " << count << "!\n";
                     errors += 1;
                 }
                 usePair = !usePair;
@@ -876,14 +899,27 @@ public:
                 bool found = false;
                 if (usePair) {
                     pair<const uint16_t*, PageSize> keyPair = { key->data(), key->size() };
-                    found = tree->exists( keyPair );
+                    found = tree->contains( keyPair );
                 } else {
-                    found = tree->exists( key->data(), key->size() );
+                    found = tree->contains( key->data(), key->size() );
                 }
                 if (found) {
-                    log << "Exists with non-existing key ";
+                    log << "Contains with non-existing key ";
                     logUint16Array( log, key->data(), key->size() );
                     log << " returned true!\n";
+                    errors += 1;
+                }
+                PageSize count = 0;
+                if (usePair) {
+                    pair<const uint16_t*, PageSize> keyPair = { key->data(), key->size() };
+                    count = tree->count( keyPair );
+                } else {
+                    count = tree->count( key->data(), key->size() );
+                }
+                if (count != 0) {
+                    log << "Count with non-existing key ";
+                    logUint16Array( log, key->data(), key->size() );
+                    log << " returned " << count << "!\n";
                     errors += 1;
                 }
                 delete key;
@@ -973,8 +1009,8 @@ public:
         if (0 < errors) log << "Detected " << errors << " replace errors.\n";
         return errors;
     }
-    uint32_t remove( int count, KeyOrder order ) {
-        uint32_t errors = TreeTester<uint16_t[],uint32_t>::remove( count, order );
+    uint32_t erase( int count, KeyOrder order ) {
+        uint32_t errors = TreeTester<uint16_t[],uint32_t>::erase( count, order );
         size_t range = keys.size();
         if (range < count) count = range;
         bool usePair = false;
@@ -996,9 +1032,9 @@ public:
             bool removed = false;
             if (usePair) {
                 pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( key->size() ) };
-                removed = tree->remove( keyPair );
+                removed = tree->erase( keyPair );
             } else {
-                removed = tree->remove( key->data(), PageSize( key->size() ));
+                removed = tree->erase( key->data(), PageSize( key->size() ));
             }
             if (removed) {
                 log << "Remove with non-existing key ";
@@ -1009,7 +1045,7 @@ public:
             delete key;
             usePair = !usePair;
         }
-        if (0 < errors) log << "Detected " << errors << " remove errors.\n";
+        if (0 < errors) log << "Detected " << errors << " erase errors.\n";
         return errors;
     }
     uint32_t commit() {
@@ -1115,7 +1151,7 @@ private:
     }
     uint32_t removeKey( uint32_t key ) {
         uint32_t errors = 0;
-        bool removed = tree->remove( key );
+        bool removed = tree->erase( key );
         if (!removed) {
             log << "Remove with existing key " << key << " returned false!\n";
             errors += 1;
@@ -1179,9 +1215,14 @@ public:
                     log << "Exception (...)!\n";
                     errors += 1;
                 }
-                bool found = tree->exists( entry->first );
+                bool found = tree->contains( entry->first );
                 if (!found) {
-                    log << "Exists with existing key " << entry->first << " return false!\n";
+                    log << "Contains with existing key " << entry->first << " return false!\n";
+                    errors += 1;
+                }
+                PageSize count = tree->count( entry->first );
+                if (count != 1) {
+                    log << "Count with existing key " << entry->first << " returned " << count << "!\n";
                     errors += 1;
                 }
             }
@@ -1200,9 +1241,14 @@ public:
                         // Exception expected, ignore
                     }
                 }
-                bool found = tree->exists( key );
+                bool found = tree->contains( key );
                 if (found) {
-                    log << "Exists with non-existing key " << key << " returned true!\n";
+                    log << "Contains with non-existing key " << key << " returned true!\n";
+                    errors += 1;
+                }
+                PageSize count = tree->count( key );
+                if (count != 0) {
+                    log << "Count with non-existing key " << key << " returned " << count << "!\n";
                     errors += 1;
                 }
             }
@@ -1288,8 +1334,8 @@ public:
         return errors;
     }
 
-    uint32_t remove( int count, KeyOrder order ) {
-        uint32_t errors = TreeTester<uint32_t,uint16_t[]>::remove( count, order );
+    uint32_t erase( int count, KeyOrder order ) {
+        uint32_t errors = TreeTester<uint32_t,uint16_t[]>::erase( count, order );
         size_t range = keys.size();
         if (range < count) count = range;
         if (order == Forward) {
@@ -1307,13 +1353,13 @@ public:
         }
         for (int i = 0; i < ProbeCount; ++i) {
             uint32_t key = generateUniqueKey();
-            bool removed = tree->remove( key );
+            bool removed = tree->erase( key );
             if (removed) {
                 log << "Remove with non-existing key " << key << " returned true!\n";
                 errors += 1;
             }
         }
-        if (0 < errors) log << "Detected " << errors << " remove errors!\n";
+        if (0 < errors) log << "Detected " << errors << " erase errors!\n";
         return errors;
     }
     uint32_t commit() {
@@ -1425,9 +1471,9 @@ private:
         bool removed = false;
         if (*usePair) {
             pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( key->size() ) };
-            removed = tree->remove( keyPair );
+            removed = tree->erase( keyPair );
         } else {
-            removed = tree->remove( key->data(), PageSize( key->size() ));
+            removed = tree->erase( key->data(), PageSize( key->size() ));
         }
         if (!removed) {
             log << "Remove with existing key "; logUint16Array( log, key->data(), key->size() ); log << " returned false!\n";
@@ -1506,14 +1552,27 @@ public:
                 bool found = false;
                 if (usePair) {
                     pair<const uint16_t*, PageSize> keyPair = { entry->first->data(), entry->first->size() };
-                    found = tree->exists( keyPair );
+                    found = tree->contains( keyPair );
                 } else {
-                    found = tree->exists( entry->first->data(), entry->first->size() );
+                    found = tree->contains( entry->first->data(), entry->first->size() );
                 }
                 if (!found) {
-                    log << "Exists with existing key ";
+                    log << "Contains with existing key ";
                     logUint16Array( log, entry->first->data(), entry->first->size() );
                     log << " returned false!\n";
+                    errors += 1;
+                }
+                PageSize count = 0;
+                if (usePair) {
+                    pair<const uint16_t*, PageSize> keyPair = { entry->first->data(), entry->first->size() };
+                    count = tree->count( keyPair );
+                } else {
+                    count = tree->count( entry->first->data(), entry->first->size() );
+                }
+                if (count != 1) {
+                    log << "Count with existing key ";
+                    logUint16Array( log, entry->first->data(), entry->first->size() );
+                    log << " returned " << count << "!\n";
                     errors += 1;
                 }
                 usePair = !usePair;
@@ -1544,14 +1603,27 @@ public:
                 bool found = false;
                 if (usePair) {
                     pair<const uint16_t*, PageSize> keyPair = { key->data(), key->size() };
-                    found = tree->exists( keyPair );
+                    found = tree->contains( keyPair );
                 } else {
-                    found = tree->exists( key->data(), key->size() );
+                    found = tree->contains( key->data(), key->size() );
                 }
                 if (found) {
-                    log << "Exists with non-existing key ";
+                    log << "Contains with non-existing key ";
                     logUint16Array( log, key->data(), key->size() );
                     log << " returned true!\n";
+                    errors += 1;
+                }
+                PageSize count = 0;
+                if (usePair) {
+                    pair<const uint16_t*, PageSize> keyPair = { key->data(), key->size() };
+                    count = tree->count( keyPair );
+                } else {
+                    count = tree->count( key->data(), key->size() );
+                }
+                if (count != 0) {
+                    log << "Count with non-existing key ";
+                    logUint16Array( log, key->data(), key->size() );
+                    log << " returned " << count << "!\n";
                     errors += 1;
                 }
                 delete key;
@@ -1650,8 +1722,8 @@ public:
         return errors;
     }
 
-    uint32_t remove( int count, KeyOrder order ) {
-        uint32_t errors = TreeTester<uint16_t[],uint16_t[]>::remove( count, order );
+    uint32_t erase( int count, KeyOrder order ) {
+        uint32_t errors = TreeTester<uint16_t[],uint16_t[]>::erase( count, order );
         size_t range = keys.size();
         if (range < count) count = range;
         bool usePair = false;
@@ -1673,9 +1745,9 @@ public:
             bool removed = false;
             if (usePair) {
                 pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( key->size() ) };
-                removed = tree->remove( keyPair );
+                removed = tree->erase( keyPair );
             } else {
-                removed = tree->remove( key->data(), PageSize( key->size() ));
+                removed = tree->erase( key->data(), PageSize( key->size() ));
             }
             if (removed) {
                 log << "Remove with non-existing key ";
@@ -1686,7 +1758,7 @@ public:
             delete key;
             usePair = !usePair;
         }
-        if (0 < errors) log << "Detected " << errors << " remove errors!\n";
+        if (0 < errors) log << "Detected " << errors << " erase errors!\n";
         return errors;
     }
     uint32_t commit() {
@@ -1782,21 +1854,21 @@ uint32_t doTest( TreeTester<K,V>& tester, size_t count1, size_t count2, ofstream
         errors += tester.validate();
         errors += tester.insert( count1, TreeTester<K,V>::Forward );
         errors += tester.validate();
-        errors += tester.remove( count2, TreeTester<K,V>::Forward );
+        errors += tester.erase( count2, TreeTester<K,V>::Forward );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
         errors += tester.insert( count1, TreeTester<K,V>::Forward );
         errors += tester.validate();
-        errors += tester.remove( count2, TreeTester<K,V>::Reverse );
+        errors += tester.erase( count2, TreeTester<K,V>::Reverse );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
         errors += tester.insert( count1, TreeTester<K,V>::Forward );
         errors += tester.validate();
-        errors += tester.remove( count2, TreeTester<K,V>::Random );
+        errors += tester.erase( count2, TreeTester<K,V>::Random );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
@@ -1807,21 +1879,21 @@ uint32_t doTest( TreeTester<K,V>& tester, size_t count1, size_t count2, ofstream
         errors += tester.validate();
         errors += tester.insert( count1, TreeTester<K,V>::Reverse );
         errors += tester.validate();
-        errors += tester.remove( count2, TreeTester<K,V>::Forward );
+        errors += tester.erase( count2, TreeTester<K,V>::Forward );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
         errors += tester.insert( count1, TreeTester<K,V>::Reverse );
         errors += tester.validate();
-        errors += tester.remove( count2, TreeTester<K,V>::Reverse );
+        errors += tester.erase( count2, TreeTester<K,V>::Reverse );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
         errors += tester.insert( count1, TreeTester<K,V>::Reverse );
         errors += tester.validate();
-        errors += tester.remove( count2, TreeTester<K,V>::Random );
+        errors += tester.erase( count2, TreeTester<K,V>::Random );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
@@ -1832,21 +1904,21 @@ uint32_t doTest( TreeTester<K,V>& tester, size_t count1, size_t count2, ofstream
         errors += tester.validate();
         errors += tester.insert( count1, TreeTester<K,V>::Random );
         errors += tester.validate();
-        errors += tester.remove( count2, TreeTester<K,V>::Forward );
+        errors += tester.erase( count2, TreeTester<K,V>::Forward );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
         errors += tester.insert( count1, TreeTester<K,V>::Random );
         errors += tester.validate();
-        errors += tester.remove( count2, TreeTester<K,V>::Reverse );
+        errors += tester.erase( count2, TreeTester<K,V>::Reverse );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
         errors += tester.insert( count1, TreeTester<K,V>::Random );
         errors += tester.validate();
-        errors += tester.remove( count2, TreeTester<K,V>::Random );
+        errors += tester.erase( count2, TreeTester<K,V>::Random );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
@@ -1863,11 +1935,11 @@ uint32_t doTest( TreeTester<K,V>& tester, size_t count1, size_t count2, ofstream
         errors += tester.validate();
         errors += tester.replace( count1 / 2 );
         errors += tester.validate();
-        errors += tester.remove( count1 - (count1 / 4), TreeTester<K,V>::Random );
+        errors += tester.erase( count1 - (count1 / 4), TreeTester<K,V>::Random );
         errors += tester.validate();
         errors += tester.recover();
         errors += tester.validate();
-        errors += tester.remove( count1 / 2, TreeTester<K,V>::Random );
+        errors += tester.erase( count1 / 2, TreeTester<K,V>::Random );
         errors += tester.validate();
         errors += tester.replace( count1 / 2 );
         errors += tester.validate();
@@ -1883,7 +1955,7 @@ uint32_t doTest( TreeTester<K,V>& tester, size_t count1, size_t count2, ofstream
         tester.createPool();
         tester.createTree();
         errors += tester.validate();
-        errors += tester.remove( count1 / 4, TreeTester<K,V>::Random );
+        errors += tester.erase( count1 / 4, TreeTester<K,V>::Random );
         errors += tester.validate();
         errors += tester.recover();
         errors += tester.validate();

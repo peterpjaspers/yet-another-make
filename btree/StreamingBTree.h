@@ -44,19 +44,19 @@ namespace BTree {
             it->end();
             return *it;
         };
-        StreamingTreeIterator<K> at( const K& key ) const {
+        StreamingTreeIterator<K> find( const K& key ) const {
             StreamKey<K> streamKey( key, 0 );
             Trail trail( *this );
-            bool found = Tree<StreamKey<K>,uint8_t[]>::find( streamKey, trail );
+            bool found = Tree<StreamKey<K>,uint8_t[]>::lookUp( streamKey, trail );
             auto it = new StreamingTreeIterator<K>( *this );
-            if (found) return it.iterator->at( trail );
+            if (found) return it.iterator->find( trail );
             return it.iterator->end();
         };
         void assign( const Tree<StreamKey<K>,uint8_t[]>& tree ) = delete;
 
-        bool exists( const K& key) const {
+        bool contains( const K& key) const {
             StreamKey<K> streamKey( key, 0 );
-            return Tree<StreamKey<K>,uint8_t[]>::exists( streamKey );
+            return Tree<StreamKey<K>,uint8_t[]>::contains( streamKey );
         }
 
         // Insert a streamed object.
@@ -67,7 +67,7 @@ namespace BTree {
                 throw std::string( signature ) + " : Accessing writer stream on open reader stream";
             }
             StreamKey<K> streamKey( key, 0 );
-            if ( Tree<StreamKey<K>,uint8_t[]>::exists( streamKey ) ) removeBlocks( key );
+            if ( Tree<StreamKey<K>,uint8_t[]>::contains( streamKey ) ) removeBlocks( key );
             return writer.open( key );
         }
         // Retrieve a streamed object.
@@ -84,9 +84,9 @@ namespace BTree {
             return reader;
         }
         // Remove a streamed object.
-        bool remove( const K& key ) {
+        bool erase( const K& key ) {
             StreamKey<K> streamKey( key, 0 );
-            if ( Tree<StreamKey<K>,uint8_t[]>::exists( streamKey ) ) {
+            if ( Tree<StreamKey<K>,uint8_t[]>::contains( streamKey ) ) {
                 removeBlocks( key );
                 return true;
             }
@@ -97,7 +97,7 @@ namespace BTree {
         // Remove all blocks associated with a key...
         void removeBlocks( const K& key ) {
             StreamKey<K> streamKey( key, 0 );
-            while ( Tree<StreamKey<K>,uint8_t[]>::remove( streamKey ) ) streamKey.sequence += 1;
+            while ( Tree<StreamKey<K>,uint8_t[]>::erase( streamKey ) ) streamKey.sequence += 1;
         }
     protected:
         void stream( std::ostream & o ) const {

@@ -460,12 +460,12 @@ namespace BTree {
         }
 
         // Remove the key - value entry at an index
-        void remove( PageIndex index, Page<K,V,KA,VA>* copy ) const {
-            static const char* signature( "void Page<K,V,KA,VA>::remove( PageIndex index, Page<K,V,KA,VA>* copy ) const" );
+        void erase( PageIndex index, Page<K,V,KA,VA>* copy ) const {
+            static const char* signature( "void Page<K,V,KA,VA>::erase( PageIndex index, Page<K,V,KA,VA>* copy ) const" );
             if (header.count <= index) throw std::string( signature ) + " - Invalid index";
             PageFunctions::pageRemove( *this, *copy, index );
         }
-        inline void remove( PageIndex index ) { remove( index, this ); }
+        inline void erase( PageIndex index ) { erase( index, this ); }
 
         // Shift page content from indexed entry up to last entry to lower entries in another page
         void shiftRight( Page<K,V,KA,VA>& right, PageIndex index, Page<K,V,KA,VA>* copy, Page<K,V,KA,VA>* copyRight ) const {

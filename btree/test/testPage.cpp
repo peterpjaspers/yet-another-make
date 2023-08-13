@@ -101,7 +101,7 @@ public:
         keys[ index ] = key;
         values[ index ] = value;
     }
-    void remove( PageIndex index ) {
+    void erase( PageIndex index ) {
         keys.erase( keys.begin() + index );
         values.erase( values.begin() + index );
     }
@@ -506,7 +506,7 @@ public:
         }
         return errors;
     }
-    uint32_t remove() {
+    uint32_t erase() {
         uint32_t errors = 0;
         {
             log << "Remove tests (in-place)...\n";
@@ -517,8 +517,8 @@ public:
             int removeCount = 0;
             while (0 < content.size()) {
                 PageIndex index = (gen32() % content.size());
-                page->remove( index );
-                content.remove( index );
+                page->erase( index );
+                content.erase( index );
                 errors += validateContent( *page, content );
                 removeCount += 1;
             }
@@ -536,9 +536,9 @@ public:
             errors += validateContent( *copy, copyContent );
             int removeCount = 0;
             for (PageSize index = 0; index < content.size(); ++index) {
-                page->remove( index, copy );
+                page->erase( index, copy );
                 copyContent.assign( content );
-                copyContent.remove( index );
+                copyContent.erase( index );
                 errors += validateContent( *page, content );
                 errors += validateContent( *copy, copyContent );
                 removeCount += 1;
@@ -824,7 +824,7 @@ public:
         }
         catch (...) {}
         try {
-            page->remove( (content.size() + 1), copy );                
+            page->erase( (content.size() + 1), copy );                
             log << "Expected \"Invalid index\" exception!\n";
             errors += 1;
         }
@@ -866,7 +866,7 @@ public:
         }
         catch (...) {}
         try {
-            page->remove( (content.size() + 1), copy );                
+            page->erase( (content.size() + 1), copy );                
             log << "Expected \"Invalid index\" exception!\n";
             errors += 1;
         }
@@ -994,7 +994,7 @@ uint32_t doTest( ofstream& log ) {
         errors += tester.split();
         errors += tester.insert();
         errors += tester.replace();
-        errors += tester.remove();
+        errors += tester.erase();
         errors += tester.shiftRight();
         errors += tester.shiftLeft();
         errors += tester.exceptions();
