@@ -130,7 +130,7 @@ namespace YAM
         postSelfCompletion(result);
     }
 
-    void DotIgnoreNode::commitSelfCompletion(SelfExecutionResult const* result) {
+    void DotIgnoreNode::commitSelfCompletion(SelfExecutionResult const& result) {
         // TODO
     }
 

@@ -327,9 +327,10 @@ namespace
         // 5-6 source file nodes repo.dir/src/pietCpp, repo.dir/src/pietH
         // 7-8 source file nodes repo.dir/src/janCpp, repo.dir/src/janH
         // 9-11 generated file nodes pietOut, janOut, pietjanOut
-        // 12-14 commandNodes ccPiet.cpp, ccJan linkPietjan
-        // 15-20 root and src dir each have .ignore, .gitignore and .yamignore
-        EXPECT_EQ(20, driver.stats.nStarted); 
+        // 12-14 generated file nodes pietOut, janOut, pietjanOut as preCommitNodes
+        // 15-17 commandNodes ccPiet, ccJan, linkPietjan
+        // 18-23 root and src dir each have .ignore, .gitignore and .yamignore
+        EXPECT_EQ(23, driver.stats.nStarted); 
         EXPECT_EQ(20, driver.stats.started.size());
         EXPECT_EQ(2, driver.stats.nDirectoryUpdates);
         // 4 source + 3 generated (before cmd exec) + 3 generated (after cmd exec)
@@ -350,7 +351,7 @@ namespace
         EXPECT_TRUE(driver.stats.started.contains(driver.pietjanOut.get()));
 
         // Verify nodes self-executed 
-        EXPECT_EQ(20, driver.stats.nSelfExecuted);
+        EXPECT_EQ(23, driver.stats.nSelfExecuted);
         EXPECT_EQ(20, driver.stats.selfExecuted.size());
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(driver.repo.dir)));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(driver.repo.dir / "src")));
@@ -430,8 +431,8 @@ namespace
         EXPECT_EQ(Node::State::Dirty, driver.ccJan->state());
         EXPECT_EQ(Node::State::Dirty, driver.linkPietJan->state());
         EXPECT_EQ(Node::State::Ok, driver.pietOut->state());
-        EXPECT_EQ(Node::State::Dirty, driver.janOut->state());
-        EXPECT_EQ(Node::State::Dirty, driver.pietjanOut->state());
+        EXPECT_EQ(Node::State::Ok, driver.janOut->state());
+        EXPECT_EQ(Node::State::Ok, driver.pietjanOut->state());
 
         // Incremental build
         std::shared_ptr<BuildResult> result = driver.build();
@@ -481,8 +482,8 @@ namespace
         EXPECT_EQ(Node::State::Dirty, driver.ccJan->state());
         EXPECT_EQ(Node::State::Dirty, driver.linkPietJan->state());
         EXPECT_EQ(Node::State::Ok, driver.pietOut->state());
-        EXPECT_EQ(Node::State::Dirty, driver.janOut->state());
-        EXPECT_EQ(Node::State::Dirty, driver.pietjanOut->state());
+        EXPECT_EQ(Node::State::Ok, driver.janOut->state());
+        EXPECT_EQ(Node::State::Ok, driver.pietjanOut->state());
 
         // Incremental build
         std::shared_ptr<BuildResult> result = driver.build();
@@ -500,20 +501,15 @@ namespace
         EXPECT_TRUE(driver.stats.rehashedFiles.contains(janCppNode.get()));
 
         // 0: __scope__ (from Builder) is started
-        //    prerequisites repo src dir, janCpp, ccJan, linkPietJan, janOut and 
-        //    pietjanOut started
-        // 1: janCpp executed and rehashed, janOut and pietjanOut executed and not
-        //    rehashed (because last-write-time not changed). 
+        //    prerequisites repo src dir, janCpp, ccJan, linkPietJan started
+        // 1: janCpp executed and rehashed 
         // 2: pendingStartSelf of ccJan sees changed hash of janCpp
         // 3: self-execution of ccJan => fails (janCpp not found)
-        EXPECT_EQ(6, driver.stats.selfExecuted.size());
+        EXPECT_EQ(4, driver.stats.selfExecuted.size());
         EXPECT_TRUE(driver.stats.selfExecuted.contains(srcDirNode.get()));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(janCppNode.get()));
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.janOut.get()));
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.ccJan.get()));
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.pietjanOut.get()));
+        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.ccJan.get()));;
     }
-
 
     TEST(Builder, stopBuild) {
         TestDriver driver;

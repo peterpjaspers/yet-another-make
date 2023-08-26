@@ -62,7 +62,7 @@ namespace YAM
 
     protected:
         void selfExecute() override;
-        void commitSelfCompletion(SelfExecutionResult const* result) override;
+        void commitSelfCompletion(SelfExecutionResult const& result) override;
 
     private:
         friend class SourceDirectoryNode;

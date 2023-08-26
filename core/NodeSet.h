@@ -1,17 +1,13 @@
 #pragma once
 
 #include "Delegates.h"
-#include <map>
-#include <vector>
 #include <filesystem>
 #include <memory>
 #include <unordered_map>
-#include <mutex>
 
 namespace YAM
 {
     class Node;
-    class Dispatcher;
 
     // Class to store nodes that have unique names.
     class __declspec(dllexport) NodeSet

@@ -72,29 +72,29 @@ namespace YAMTest
         return computeExecutionHash(_sum->executionHash());
     }
 
-    void AdditionNode::selfExecute(ExecutionResult* result) {
-        result->_sumResult = std::make_shared<NumberNode::ExecutionResult>();
+    void AdditionNode::selfExecute(ExecutionResult& result) {
+        result._sumResult = std::make_shared<NumberNode::ExecutionResult>();
         int sum = 0;
         for (auto op : _operands) {
             auto nr = dynamic_cast<NumberNode*>(op.get())->number();
             sum += nr;
         }
-        _sum->selfExecute(sum, result->_sumResult.get());
-        result->_executionHash = computeExecutionHash(result->_sumResult->_executionHash);
-        result->_newState = Node::State::Ok;
+        _sum->selfExecute(sum, *(result._sumResult.get()));
+        result._executionHash = computeExecutionHash(result._sumResult->_executionHash);
+        result._newState = Node::State::Ok;
     }
 
     void AdditionNode::selfExecute() {
         auto result = std::make_shared<ExecutionResult>();
-        selfExecute(result.get());
+        selfExecute(*(result.get()));
         postSelfCompletion(result);
     }
 
-    void AdditionNode::commitSelfCompletion(SelfExecutionResult const* result) {
-        if (result->_newState == Node::State::Ok) {
-            auto r = reinterpret_cast<ExecutionResult const*>(result);
-            _sum->commitSelfCompletion(r->_sumResult.get());
-            _executionHash = r->_executionHash;
+    void AdditionNode::commitSelfCompletion(SelfExecutionResult const& result) {
+        if (result._newState == Node::State::Ok) {
+            auto const& r = reinterpret_cast<ExecutionResult const&>(result);
+            _sum->commitSelfCompletion(*(r._sumResult.get()));
+            _executionHash = r._executionHash;
         }
 
     }

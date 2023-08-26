@@ -35,7 +35,7 @@ namespace YAMTest
 
         virtual bool pendingStartSelf() const override;
 
-        void selfExecute(ExecutionResult* result);
+        void selfExecute(ExecutionResult& result);
 
         XXH64_hash_t executionHash() const;
         XXH64_hash_t computeExecutionHash() const;
@@ -46,7 +46,7 @@ namespace YAMTest
 
     protected:
         void selfExecute() override;
-        void commitSelfCompletion(SelfExecutionResult const* result) override;
+        void commitSelfCompletion(SelfExecutionResult const& result) override;
 
     private:
         XXH64_hash_t computeExecutionHash(XXH64_hash_t sumHash) const;

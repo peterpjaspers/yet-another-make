@@ -17,7 +17,8 @@ namespace YAM
             Script,               // command script text
             Scope,                // build scope info
             Performance,          // time and memory usage
-            InputFiles,           // input files detected by a command
+            InputFiles,           // input files of a command
+            IgnoredInputFiles,    // ignored input files of a commansd
             SuspectBuildOrdering, // ordering depends on indirect prerequisites
             FileChanges,          // files changed since previous build
             DirectoryChanges,     // directories changed since previous build

@@ -236,20 +236,20 @@ namespace YAM
         postSelfCompletion(result);
     }
 
-    void SourceDirectoryNode::commitSelfCompletion(SelfExecutionResult const* result) {
-        if (result->_newState == Node::State::Ok) {
-            auto r = dynamic_cast<ExecutionResult const*>(result);
-            if (r->_lastWriteTime != _lastWriteTime) {
-                _lastWriteTime = r->_lastWriteTime;
-                _content = r->_content;
-                _executionHash = r->_executionHash;
-                for (auto const& n : r->_added) {
+    void SourceDirectoryNode::commitSelfCompletion(SelfExecutionResult const& result) {
+        if (result._newState == Node::State::Ok) {
+            auto const& r = dynamic_cast<ExecutionResult const&>(result);
+            if (r._lastWriteTime != _lastWriteTime) {
+                _lastWriteTime = r._lastWriteTime;
+                _content = r._content;
+                _executionHash = r._executionHash;
+                for (auto const& n : r._added) {
                     n->addPostParent(this);
                     _context->nodes().add(n);
                     auto const dir = dynamic_pointer_cast<SourceDirectoryNode>(n);
                     if (dir != nullptr) dir->addPrerequisitesToContext();
                 }
-                for (auto const& n : r->_removed) {
+                for (auto const& n : r._removed) {
                     _removeChildRecursively(n);
                 }
                 modified(true);

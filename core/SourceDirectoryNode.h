@@ -79,7 +79,7 @@ namespace YAM
         // Inherited via Node
         bool pendingStartSelf() const override;
         void selfExecute() override;
-        void commitSelfCompletion(SelfExecutionResult const* result) override;
+        void commitSelfCompletion(SelfExecutionResult const& result) override;
 
     private:
         void parent(SourceDirectoryNode* parent);

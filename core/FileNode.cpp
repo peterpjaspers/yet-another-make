@@ -88,8 +88,8 @@ namespace YAM
         }
     }
        
-    void FileNode::commitSelfCompletion(SelfExecutionResult const* result) {
-        if (result->_newState != Node::State::Ok) {
+    void FileNode::commitSelfCompletion(SelfExecutionResult const& result) {
+        if (result._newState != Node::State::Ok) {
             _result._lastWriteTime = std::chrono::utc_clock::time_point::min();
             _result._hashes.clear();
             LogRecord error(
@@ -98,10 +98,10 @@ namespace YAM
             context()->addToLogBook(error);
             return;
         }
-        auto fileResult = dynamic_cast<ExecutionResult const*>(result);
-        bool changed = fileResult->_lastWriteTime != _result._lastWriteTime;
+        auto const& fileResult = dynamic_cast<ExecutionResult const&>(result);
+        bool changed = fileResult._lastWriteTime != _result._lastWriteTime;
         if (changed) {
-            _result = *fileResult;
+            _result = fileResult;
             modified(true);
             context()->statistics().registerRehashedFile(this);
             if (_context->logBook()->mustLogAspect(LogRecord::Aspect::FileChanges)) {

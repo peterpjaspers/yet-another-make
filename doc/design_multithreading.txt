@@ -104,7 +104,7 @@ Time needed will be approximately twice lookup time of input file nodes,
 e.g. 500 us. This reduces scalability considerably: speedup when using 1024 
 cores with input file node lookup in thread pool and updating dependants in
 main thread drops from 1023 to 677.
-In a clean build there will no dependant removals, assume time drops to 
+In a clean build there will be no dependant removals, assume time drops to 
 e.g. 250 ns. Speedup for 1024 cores in that case: 815
 
 The change in set of input files will often be small, certainly in a C++ code
@@ -161,11 +161,9 @@ the set of input/output nodes of the command in threadpool context, thus
 reducing the time spent in not-parallized code, thus increasing scalability.
 
 New design proposal:
-	- declaration of (super)set of input source files/directories required
-	  Rationale: render repo mirroring obsolete
-	  File/directory nodes are created lazily, i.e. on first execution of command
-	  noded that depends on these files/dirs. Take care: multiple commands may
-	  depend on same files/dirs
+	- Get rid of repo mirror, see design_getRidOfRepoMirroring.txt
+	- all node execution in threadpool
+	  This requires MT-safe access to nodes and NodeSet.
 	- parallel execution of build phases.
 	  See MIRO board for parallel buildfile and command execution.
 	- postrequisites not only for directory nodes but also for command nodes
@@ -184,10 +182,8 @@ New design proposal:
 	    updates its created nodes and then resumes them.
 	    Once a node is resumed it continues execution (when it was requested to do so).	  
 		After discussion with Phil dd 19-Jul-2023 we accepted first alternative.
-	- all node execution in threadpool
-	  This requires MT-safe access to nodes and NodeSet.
 
-	  Buildstate storage is bound to single thread due to streaming btree.
+	  Buildstate storage is bound to a single thread due to streaming btree.
 	  TODO: investigate how to store buildstate.
 	  TODO: investigate how to retrieve subgraphs from persistent buildstate.
 	  TODO: only parse modified buildfiles related to build scope, build scope
@@ -284,8 +280,9 @@ The deadlock can only be avoided by:
       - decrement count of in-progress prerequisites
 	  - test count for 0
 	  - if 0: post selfExecute to threadpool
-  This approach spares posting the (very cheap) completeness-check to the main thread.
+  This approach spares posting the (cheap) completeness-check to the main thread.
   Because posting is a serializing action this approach will increase scalability.
+  Hmm: the previous sentence makes no sense: all serialization decreases scalability.
   It is dubious however whether this will result in a significant improvement
   because the other serializing actions take-up much more time:
 	- finding nodes associated with the found file dependencies

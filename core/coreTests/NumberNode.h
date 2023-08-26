@@ -20,7 +20,7 @@ namespace YAMTest
         int number() const;
         void number(int newNumber);
 
-        void selfExecute(int newNumber, ExecutionResult* result);
+        void selfExecute(int newNumber, ExecutionResult& result);
 
         // Inherited from Node
         virtual bool supportsPrerequisites() const override;
@@ -36,7 +36,7 @@ namespace YAMTest
         XXH64_hash_t computeExecutionHash() const;
         XXH64_hash_t computeExecutionHash(int number) const;
 
-        void commitSelfCompletion(SelfExecutionResult const* result) override;
+        void commitSelfCompletion(SelfExecutionResult const& result) override;
 
         // Inherited from IStreamable
         virtual uint32_t typeId() const { return 0; }

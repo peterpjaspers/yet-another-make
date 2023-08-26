@@ -38,7 +38,7 @@ namespace YAM
     // indeed references a file. In general however this need not be the case.
     // E.g. a command node may be given a name like 'name-of-first-output\_cmd'
     //
-    // The Node class supports a 3-stage execution. 3-stage execution is started
+    // The Node class supports a 4-stage execution. 4-stage execution is started
     // by the start() member function. 
     //    stage 1: Execute the prerequisite nodes of the node.
     //             Prerequisite nodes must be executed before stage 2 because
@@ -53,7 +53,11 @@ namespace YAM
     //             E.g. a link command node links C++ object files.
     //             E.g. a directory node retrieves directory entries and
     //             creates for each entry a file or directory node.
-    //    stage 3: Execute the postrequisites of the node.
+    //    stage 3: Execute nodes found or rendered Dirty by self-execution.
+    //             E.g. the output file nodes of a command node
+    //             E.g. newly discovered input files for which no associated 
+    //             file node was yet created.
+    //    stage 4: Execute the postrequisites of the node.
     //             Postrequisited nodes must be executed after stage 2 because
     //             they are created or modified by stage 2.
     //             E.g. the execution of a directory node creates a node tree
@@ -65,7 +69,7 @@ namespace YAM
     //             results in a breadth-first execution of the postrequisites
     //             graph.
     //
-    // Name convention: node execution is synonym for 3-stage execution.
+    // Name convention: node execution is synonym for 4-stage execution.
     //
     // Node class is not MT-safe: unless specified otherwise member functions
     // must be called from ExecutionContext::mainThread(). Derived classes must
@@ -352,17 +356,22 @@ namespace YAM
         // Called when self-execution is busy and cancel() is called.
         virtual void cancelSelf() { return; }
 
-        // Push commitSelfCompletion(result); handleSelfCompletion(result); 
-        // to mainThreadQueue()
+        // Push handleSelfCompletion(result) to mainThreadQueue().
         void postSelfCompletion(std::shared_ptr<SelfExecutionResult> result);
 
+        // Get the nodes that need to be executed before the result can be
+        // committed.
+        virtual void getPreCommitNodes(
+            SelfExecutionResult& result,
+            std::vector<std::shared_ptr<Node>>& preCommitNodes
+         ) {}
+
         // Store the result of self-execution in the node's member variables.
-        virtual void commitSelfCompletion(SelfExecutionResult const* result) { throw "not implemented"; }
+        // Called after the nodes returned by getFiles() completed execution.
+        virtual void commitSelfCompletion(SelfExecutionResult const& result) { throw "not implemented"; }
 
         // Push notifyCompletion(newState) to mainThreadQueue()
         void postCompletion(Node::State newState);
-
-        void notifyCompletion(Node::State newState);
 
     private:
         State _state;
@@ -372,27 +381,38 @@ namespace YAM
         // Node execution members
         //
         void continueStart();
+
+        // Phase 1
         void startPrerequisites();
         void startPrerequisite(Node* prerequisite);
-        void startSelf(); // push selfExecute() to _context->threadPoolQueue().
-
-        void handleSelfCompletion(SelfExecutionResult const* result);
         void handlePrerequisiteCompletion(Node* prerequisite);
         void handlePrerequisitesCompletion();
-        bool allPrerequisitesAreOk() const;
 
+        // Phase 2
+        void startSelf(); // push selfExecute() to _context->threadPoolQueue().
+        void handleSelfCompletion(std::shared_ptr<SelfExecutionResult> result);
+
+        // Phase 3
+        void startPreCommitNodes();
+        void startPreCommitNode(Node* preCommitNode);
+        void handlePreCommitNodeCompletion(Node* preCommitNode);
+        void handlePreCommitNodesCompletion();
+
+        // Phase 4
         void startPostrequisites();
         void startPostrequisite(Node* postrequisite);
         void handlePostrequisiteCompletion(Node* postrequisite);
         void handlePostrequisitesCompletion();
-        bool allPostrequisitesAreOk() const;
+
+        void notifyCompletion(Node::State newState);
 
         enum class ExecutionState
         {
-            Idle,           // waiting for start()
+            Idle,          // waiting for start()
             Suspended,     // started while suspended, waiting for node to be resumed
             Prerequisites, // waiting for prerequisites to finish execution
-            Self,           // waiting for self-execution to finish
+            Self,          // waiting for self-execution to finish
+            PreCommit,     // waiting for pre-commit nodes to finish execution
             Postrequisites // waiting for postrequisites to finish execution
         };
         ExecutionState _executionState;
@@ -405,6 +425,14 @@ namespace YAM
 #ifdef _DEBUG
         // nodes in _prerequisites that are executing  
         std::unordered_set<Node*> _executingPrerequisites;
+#endif
+
+        std::shared_ptr<SelfExecutionResult> _selfExecutionResult;
+        std::vector<std::shared_ptr<Node>> _preCommitNodes;
+        unsigned int _nExecutingPreCommitNodes;
+#ifdef _DEBUG
+        // nodes in _files that are executing  
+        std::unordered_set<Node*> _executingPreCommitNodes;
 #endif
 
         // postrequisite nodes, captured at completion of self-execution.

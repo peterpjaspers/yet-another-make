@@ -31,6 +31,7 @@ namespace YAM
             case Scope: return "Scope";
             case Performance: return "Performance";
             case InputFiles: return "InputFiles";
+            case IgnoredInputFiles: return "Ignored inputFiles";
             case SuspectBuildOrdering: return "SuspectBuildOrdering";
             case FileChanges: return "FileChanges";
             case BuildTimePrediction: return "BuildTimePrediction";

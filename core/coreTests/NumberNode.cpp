@@ -55,23 +55,23 @@ namespace YAMTest
 
     bool NumberNode::pendingStartSelf() const { return _executionHash != computeExecutionHash(); }
 
-    void NumberNode::selfExecute(int newNumber, ExecutionResult* result) {
-        result->_newState = Node::State::Ok;
-        result->_number = newNumber;
-        result->_executionHash = computeExecutionHash(newNumber);
+    void NumberNode::selfExecute(int newNumber, ExecutionResult& result) {
+        result._newState = Node::State::Ok;
+        result._number = newNumber;
+        result._executionHash = computeExecutionHash(newNumber);
     }
 
     void NumberNode::selfExecute() {
         auto result = std::make_shared<ExecutionResult>();
-        selfExecute(_number, result.get());
+        selfExecute(_number, *(result.get()));
         postSelfCompletion(result);
     }
 
-    void NumberNode::commitSelfCompletion(SelfExecutionResult const* result) {
-        if (result->_newState == Node::State::Ok) {
-            auto r = reinterpret_cast<ExecutionResult const*>(result);
-            _number = r->_number;
-            _executionHash = r->_executionHash;
+    void NumberNode::commitSelfCompletion(SelfExecutionResult const& result) {
+        if (result._newState == Node::State::Ok) {
+            auto const& r = reinterpret_cast<ExecutionResult const&>(result);
+            _number = r._number;
+            _executionHash = r._executionHash;
         }
     }
 }

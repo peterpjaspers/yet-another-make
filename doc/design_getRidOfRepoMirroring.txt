@@ -170,7 +170,13 @@ Question: should we display hashing progress?
 Question: and/or should we give file node execution a higher pro than 
 compilation and lower than linking.
 And if so: how to do that? We cannot simply use execution time as prio.
-
+After discussion with Phil:
+    - no priorities (based on mrmake experience where it had marginal effect)
+    - display compile progress after script completion
+    - do not display hashing progress
+      PJ: this may cause long intervals with progress display. Solve a la
+      mrmake: if no progress message for 30 seconds: display threadpool
+      activity.
 
 
 +------------Detailing option 4

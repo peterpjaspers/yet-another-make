@@ -14,7 +14,7 @@ namespace YAM
         std::string stdErr;
         std::set<std::filesystem::path> readFiles;     // read-accessed files
         std::set<std::filesystem::path> writtenFiles;  // write-accessed files
-        std::set<std::filesystem::path> readOnlyFiles; // readFiles-writtenFils
+        std::set<std::filesystem::path> readOnlyFiles; // readFiles except writtenFiles
 
         void toLines(std::string const& str, std::vector<std::string>& lines) {
             auto ss = std::stringstream(str);
