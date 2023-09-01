@@ -395,6 +395,9 @@ namespace
         auto pietCpp = driver.context->nodes().find(driver.repo.pietCpp);
         auto pietH = driver.context->nodes().find(driver.repo.pietH);
         auto janH = driver.context->nodes().find(driver.repo.janH);
+        EXPECT_EQ(Node::State::Ok, pietCpp->state());
+        EXPECT_EQ(Node::State::Ok, pietH->state());
+        EXPECT_EQ(Node::State::Ok, janH->state());
         EXPECT_TRUE(inputs.end() != std::find(inputs.begin(), inputs.end(), pietCpp));
         EXPECT_TRUE(inputs.end() != std::find(inputs.begin(), inputs.end(), pietH));
         EXPECT_TRUE(inputs.end() != std::find(inputs.begin(), inputs.end(), janH));

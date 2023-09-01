@@ -126,7 +126,7 @@ namespace YAM
             std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const& allowedGenInputFiles,
             std::set<std::filesystem::path>const& inputPaths,
             std::vector<std::shared_ptr<FileNode>>& inputNodes,
-            std::vector<std::shared_ptr<Node>>& dirtyInputNodes,
+            std::vector<std::shared_ptr<Node>>& srcInputNodes,
             ILogBook& logBook
         );
 

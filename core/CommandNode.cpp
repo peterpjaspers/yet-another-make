@@ -568,7 +568,7 @@ namespace YAM
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const& allowedGenInputFiles,
         std::set<std::filesystem::path>const& inputPaths,
         std::vector<std::shared_ptr<FileNode>>& inputNodes,
-        std::vector<std::shared_ptr<Node>>& dirtyInputNodes,
+        std::vector<std::shared_ptr<Node>>& srcInputNodes,
         ILogBook& logBook
     ) {
         bool valid = true;
@@ -610,7 +610,7 @@ namespace YAM
                         nodes.add(srcInputFile);
                     }
                     inputNodes.push_back(srcInputFile);
-                    if (srcInputFile->state() == Node::State::Dirty) dirtyInputNodes.push_back(srcInputFile);
+                    srcInputNodes.push_back(srcInputFile);
                 }
             }
         }
