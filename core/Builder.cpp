@@ -6,7 +6,6 @@
 #include "GeneratedFileNode.h"
 #include "SourceDirectoryNode.h"
 #include "SourceFileRepository.h"
-#include "GraphWalker.h"
 #include "DotGitDirectory.h"
 #include "DotYamDirectory.h"
 
@@ -163,7 +162,7 @@ namespace YAM
         if (dirtyDirsAndFiles.empty()) {
             _handleSourcesCompletion(_dirtySources.get());
         } else {
-            _dirtySources->setInputProducers(dirtyDirsAndFiles);
+            _dirtySources->inputProducers(dirtyDirsAndFiles);
             _dirtySources->start();
         }
     }
@@ -175,7 +174,7 @@ namespace YAM
             _dirtyBuildFiles->setState(_dirtySources->state());
             _handleBuildFilesCompletion(_dirtyBuildFiles.get());
         } else {
-            _dirtySources->setInputProducers(std::vector<std::shared_ptr<Node>>());
+            _dirtySources->inputProducers(std::vector<std::shared_ptr<Node>>());
             _dirtySources->setState(Node::State::Ok);
             std::vector<std::shared_ptr<Node>> dirtyBuildFiles;
             // TODO: find dirty build files
@@ -187,7 +186,7 @@ namespace YAM
             if (dirtyBuildFiles.empty()) {
                 _handleBuildFilesCompletion(_dirtyBuildFiles.get());
             } else {
-                _dirtyBuildFiles->setInputProducers(dirtyBuildFiles);
+                _dirtyBuildFiles->inputProducers(dirtyBuildFiles);
                 _dirtyBuildFiles->start();
             }
         }
@@ -200,14 +199,14 @@ namespace YAM
             _dirtyCommands->setState(_dirtyCommands->state());
             _handleCommandsCompletion(_dirtyCommands.get());
         } else {
-            _dirtyCommands->setInputProducers(std::vector<std::shared_ptr<Node>>());
+            _dirtyCommands->inputProducers(std::vector<std::shared_ptr<Node>>());
             _dirtyCommands->setState(Node::State::Ok);
             std::vector<std::shared_ptr<Node>> dirtyCommands;
             appendDirtyCommands(_context.nodes(), dirtyCommands);
             if (dirtyCommands.empty()) {
                 _handleCommandsCompletion(_dirtyCommands.get());
             } else {
-                _dirtyCommands->setInputProducers(dirtyCommands);
+                _dirtyCommands->inputProducers(dirtyCommands);
                 _dirtyCommands->start();
             }
         }
@@ -223,7 +222,7 @@ namespace YAM
         _result->nNodesStarted(_context.statistics().nStarted);
         _result->nRehashedFiles(_context.statistics().nRehashedFiles);
 
-        _dirtyCommands->setInputProducers(std::vector<std::shared_ptr<Node>>());
+        _dirtyCommands->inputProducers(std::vector<std::shared_ptr<Node>>());
         _dirtyCommands->setState(Node::State::Ok);
         _notifyCompletion();
     }

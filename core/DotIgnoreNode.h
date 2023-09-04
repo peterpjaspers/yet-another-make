@@ -33,17 +33,10 @@ namespace YAM
         void addPrerequisitesToContext();
 
         void setState(State newState) override;
-
-        bool supportsPrerequisites() const override;
-        void getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const override;
-
-        bool supportsInputs() const override;
-        void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const override;
-
-        bool pendingStartSelf() const override;
+        void start() override;
 
         // return the hash of the ignore patterns. 
-        XXH64_hash_t hash() const;
+        XXH64_hash_t hash() const { return _hash; }
 
         // Return whether given path is not a source file or a source file that is
         // not allowed to be accessed by the build.
@@ -61,14 +54,15 @@ namespace YAM
         void restore(void* context) override;
 
     protected:
-        void selfExecute() override;
-        void commitSelfCompletion(SelfExecutionResult const& result) override;
 
     private:
         friend class SourceDirectoryNode;
 
         void directory(SourceDirectoryNode* directory);
         XXH64_hash_t computeHash() const;
+        void handleRequisiteCompletion(Node::State state); 
+        void parseDotIgnoreFiles();
+
 
         SourceDirectoryNode* _directory;
 

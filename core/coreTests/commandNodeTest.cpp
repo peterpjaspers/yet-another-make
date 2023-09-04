@@ -91,23 +91,23 @@ namespace
             {
                 std::stringstream script;
                 script << "type " << pietSrc->name().string() << " > " << pietOut->name().string();
-                pietCmd->setOutputs({ pietOut });
-                pietCmd->setScript(script.str());
+                pietCmd->outputs({ pietOut });
+                pietCmd->script(script.str());
             }
             {
                 std::stringstream script;
                 script << "type " << janSrc->name().string() << " > " << janOut->name().string();
-                janCmd->setOutputs({ janOut });
-                janCmd->setScript(script.str());
+                janCmd->outputs({ janOut });
+                janCmd->script(script.str());
             }
             {
                 std::stringstream script;
-                pietjanCmd->setOutputs({ pietjanOut });
-                pietjanCmd->setInputProducers({ pietCmd, janCmd });
+                pietjanCmd->outputs({ pietjanOut });
+                pietjanCmd->inputProducers({ pietCmd, janCmd });
                 script
                     << "type " << pietOut->name().string() << " > " << pietjanOut->name().string()
                     << " & type " << janOut->name().string() << " >> " << pietjanOut->name().string();
-                pietjanCmd->setScript(script.str());
+                pietjanCmd->script(script.str());
             }
 
             context.nodes().add(pietCmd);
@@ -389,7 +389,7 @@ namespace
 
         EXPECT_TRUE(cmds.execute());
 
-        cmds.pietCmd->setScript("exit 1"); // execution fails
+        cmds.pietCmd->script("exit 1"); // execution fails
 
         EXPECT_TRUE(cmds.execute());
         ASSERT_EQ(Node::State::Failed, cmds.pietCmd->state());
@@ -406,7 +406,7 @@ namespace
         // pietjanCmd reads output files of pietCmd and janCmd.
         // Execution fails because janCmd is not in input producers
         // of pietjanCmd
-        cmds.pietjanCmd->setInputProducers({ cmds.pietCmd });
+        cmds.pietjanCmd->inputProducers({ cmds.pietCmd });
         EXPECT_TRUE(cmds.execute());
         EXPECT_EQ(Node::State::Failed, cmds.pietjanCmd->state());
         EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Build order is not guaranteed"));
@@ -420,8 +420,8 @@ namespace
         // pietjanCmd reads output files of pietCmd and janCmd.
         // Execution warns for indirect prerequisites because pietCmd is 
         // an indirect prerequisite(via janCmd) of pietjanCmd.
-        cmds.janCmd->setInputProducers({ cmds.pietCmd });
-        cmds.pietjanCmd->setInputProducers({ cmds.janCmd });
+        cmds.janCmd->inputProducers({ cmds.pietCmd });
+        cmds.pietjanCmd->inputProducers({ cmds.janCmd });
         EXPECT_TRUE(cmds.execute());
         EXPECT_EQ(Node::State::Failed, cmds.pietjanCmd->state());
         EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Build order is not guaranteed"));
@@ -435,7 +435,7 @@ namespace
         // Execution fails because pietCmd writes to source file.
         std::stringstream script;
         script << "echo piet > " << cmds.pietSrc->name().string();
-        cmds.pietCmd->setScript(script.str());
+        cmds.pietCmd->script(script.str());
         EXPECT_TRUE(cmds.execute());
         EXPECT_EQ(Node::State::Failed, cmds.pietCmd->state());
         EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Source file is updated by build"));
@@ -448,7 +448,7 @@ namespace
 
         // Execution fails because pietjanCmd writes to not declared 
         // output file
-        cmds.pietCmd->setOutputs({ });
+        cmds.pietCmd->outputs({ });
         EXPECT_TRUE(cmds.execute());
         EXPECT_EQ(Node::State::Failed, cmds.pietCmd->state());
         EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Mismatch between declared outputs and actual outputs"));
@@ -477,7 +477,7 @@ namespace
         // Execution fails because pietCmd produces same output file as janCmd.
         std::stringstream script;
         script << "type " << cmds.pietSrc->name().string() << " > " << cmds.janOut->name().string();
-        cmds.pietCmd->setScript(script.str());
+        cmds.pietCmd->script(script.str());
         EXPECT_TRUE(cmds.execute());
         EXPECT_EQ(Node::State::Failed, cmds.pietCmd->state());
         EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Output file is produced by 2 commands"));

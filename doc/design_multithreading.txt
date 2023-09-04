@@ -23,9 +23,17 @@ because other nodes in other threads will not access this data during execution
 of that node. This however is not true for a thread that stores nodes to 
 persistent storage. 
 
-There are 2 design options to eliminate concurrent access to shared data:
+There are 3 design options to eliminate concurrent access to shared data:
 	A- access shared data in critical section
-	B- access shared data only from one thread
+	B- access shared data only from main thread
+	C- others than node X only read node X execution results iff:
+	     - read in main thread
+	     - node is X is not Executing
+	   X is allowed to read/modify its execution results in threadpool context.
+	   When X is stored, i.e. when it is streamed, while it is Executing
+	   it must only stream member variables that are not execution
+	   results. Note: this implies that also node state must be streamed.
+	   
 
 YAM implements option B: only access shared data in main thread.
 Both threading design options impact the scalability of YAM because they limit

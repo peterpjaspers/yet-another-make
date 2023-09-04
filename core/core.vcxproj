@@ -143,7 +143,6 @@
     <ClInclude Include="FileRepository.h" />
     <ClInclude Include="FileSystem.h" />
     <ClInclude Include="GlobNode.h" />
-    <ClInclude Include="GraphWalker.h" />
     <ClInclude Include="IConsole.h" />
     <ClInclude Include="IDirectoryWatcher.h" />
     <ClInclude Include="ILogBook.h" />
@@ -216,7 +215,6 @@
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4251;4996</DisableSpecificWarnings>
     </ClCompile>
     <ClCompile Include="GlobNode.cpp" />
-    <ClCompile Include="GraphWalker.cpp" />
     <ClCompile Include="LogRecord.cpp" />
     <ClCompile Include="MemoryLogBook.cpp" />
     <ClCompile Include="FileRepositoryWatcher.cpp" />

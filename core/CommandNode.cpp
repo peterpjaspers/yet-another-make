@@ -27,31 +27,6 @@ namespace
         return std::find(vec.begin(), vec.end(), el) != vec.end();
     }
 
-    void computeInputNodesDifference(
-        CommandNode::InputNodes const& in1,
-        CommandNode::InputNodes const& in2,
-        CommandNode::InputNodes& inBoth,
-        CommandNode::InputNodes& onlyIn1,
-        CommandNode::InputNodes& onlyIn2
-    ) {
-        for (auto const& i1 : in1) {
-            auto const& path = i1.first;
-            auto it = in2.find(path);
-            if (it == in2.end()) {
-                onlyIn1.insert({ path, i1.second });
-            } else {
-                inBoth.insert({ path, i1.second });
-            }
-        }
-        for (auto const& i2 : in2) {
-            auto const& path = i2.first;
-            auto it = inBoth.find(path);
-            if (it == inBoth.end()) {
-                onlyIn2.insert({ path, i2.second });
-            }
-        }
-    }
-
     void computePathSetsDifference(
         std::set<std::filesystem::path> const& in1,
         std::set<std::filesystem::path> const& in2,
@@ -80,8 +55,8 @@ namespace
         for (auto const& p : producers) {
             std::vector<std::shared_ptr<Node>> pOutputs;
             p->getOutputs(pOutputs);
-            for (auto const& o : pOutputs) {
-                auto const& genFile = dynamic_pointer_cast<GeneratedFileNode>(o);
+            for (auto const& n : pOutputs) {
+                auto genFile = dynamic_pointer_cast<GeneratedFileNode>(n);
                 if (genFile != nullptr) {
                     outputFiles.insert(std::pair{ genFile->name(), genFile });
                 }
@@ -120,24 +95,6 @@ namespace
         logBook.add(record);
     }
 
-    void logInputNotReadAllowed(
-        CommandNode* cmd,
-        std::string const& repoName,
-        std::filesystem::path const& inputFile,
-        ILogBook& logBook
-    ) {
-        std::stringstream ss;
-        ss
-            << "Input file not allowed to be read." << std::endl
-            << "Fix: adjust exclude patterns of the repository," << std::endl
-            << "or change command script to not depend on the input file." << std::endl
-            << "Command: " << cmd->name().string() << std::endl
-            << "Repository name: " << repoName << std::endl
-            << "Input file: " << inputFile.string() << std::endl;
-        LogRecord record(LogRecord::Error, ss.str());
-        logBook.add(record);
-    }
-
     void logWriteAccessedSourceFile(
         CommandNode* cmd,
         SourceFileNode* outputFile,
@@ -168,34 +125,6 @@ namespace
         logBook.add(record);
     }
 
-    void logNumberOfIllegalInputFiles(
-        CommandNode* cmd, 
-        unsigned int nIllegals,
-        ILogBook& logBook
-    ) {
-        char buf[32];
-        std::stringstream ss;
-        ss 
-            << itoa(nIllegals, buf, 10) << " illegal input files were detected during execution of command." << std::endl
-            << "Command: " << cmd->name().string() << std::endl;
-        LogRecord record(LogRecord::Error, ss.str());
-        logBook.add(record);
-    }
-
-    void logNumberOfIllegalOutputFiles(
-        CommandNode* cmd, 
-        std::size_t nIllegals,
-        ILogBook& logBook
-    ) {
-        char buf[32];
-        std::stringstream ss;
-        ss
-            << itoa(static_cast<int>(nIllegals), buf, 10) << " illegal output files were detected during execution of command." << std::endl
-            << "Command: " << cmd->name().string() << std::endl;
-        LogRecord record(LogRecord::Error, ss.str());
-        logBook.add(record);
-    }
-
     void logAlreadyProducedByOtherCommand(
         CommandNode* cmd,
         GeneratedFileNode* outputFile,
@@ -214,7 +143,7 @@ namespace
 
     void logUnexpectedOutputs(
         CommandNode* cmd,
-        std::vector<std::shared_ptr<GeneratedFileNode>> const& expected,
+        std::vector<std::shared_ptr<GeneratedFileNode>> const& declared,
         std::vector<std::shared_ptr<GeneratedFileNode>> const& actual,
         ILogBook& logBook
     ) {
@@ -224,39 +153,9 @@ namespace
             << "Fix: declare outputs and/or modify scripts and/or modify output file names." << std::endl
             << "Command : " << cmd->name().string() << std::endl
             << "Declared outputs: " << std::endl;
-        for (auto const& n : expected) ss << "    " << n->name().string() << std::endl;
+        for (auto const& n : declared) ss << "    " << n->name().string() << std::endl;
          ss << "Actual outputs  : " << std::endl;
         for (auto const& n : actual) ss << "    " << n->name().string() << std::endl;
-        LogRecord record(LogRecord::Error, ss.str());
-        logBook.add(record);
-    }    
-    
-    void logNotWrittenOutputs(
-        CommandNode* cmd,
-        std::set<std::filesystem::path> const& notWritten,
-        ILogBook& logBook
-    ) {
-        std::stringstream ss;
-        ss
-            << "Not all declared output files were written." << std::endl
-            << "Command : " << cmd->name().string() << std::endl
-            << "Not written outputs: " << std::endl;
-        for (auto const& n : notWritten) ss << "    " << n.string() << std::endl;
-        LogRecord record(LogRecord::Error, ss.str());
-        logBook.add(record);
-    }
-
-    void logNotDeclaredOutputs(
-        CommandNode* cmd,
-        std::set<std::filesystem::path> const& notDeclared,
-        ILogBook& logBook
-    ) {
-        std::stringstream ss;
-        ss
-            << "Not all written files were declared as output files." << std::endl
-            << "Command : " << cmd->name().string() << std::endl
-            << "Not declared outputs: " << std::endl;
-        for (auto const& n : notDeclared) ss << "    " << n.string() << std::endl;
         LogRecord record(LogRecord::Error, ss.str());
         logBook.add(record);
     }
@@ -314,11 +213,16 @@ namespace YAM
     {}
 
     CommandNode::~CommandNode() {
-        setOutputs(std::vector<std::shared_ptr<GeneratedFileNode>>());
-        setInputProducers(std::vector<std::shared_ptr<Node>>());
+        // Clearing these collections is needed to stop observing their
+        // elements by this command node. 
+        outputs(std::vector<std::shared_ptr<GeneratedFileNode>>());
+        inputProducers(std::vector<std::shared_ptr<Node>>());
+        ExecutionResult clear;
+        for (auto const& pair : _inputs) clear._removedInputPaths.insert(pair.first);
+        setInputs(clear);
     }
 
-    void CommandNode::setInputAspectsName(std::string const& newName) {
+    void CommandNode::inputAspectsName(std::string const& newName) {
         if (_inputAspectsName != newName) {
             _inputAspectsName = newName;
             modified(true);
@@ -326,17 +230,17 @@ namespace YAM
         }
     }
 
-    void CommandNode::setOutputs(std::vector<std::shared_ptr<GeneratedFileNode>> const & newOutputs) {
+    void CommandNode::outputs(std::vector<std::shared_ptr<GeneratedFileNode>> const & newOutputs) {
         if (_outputs != newOutputs) {
-            for (auto i : _outputs) i->removeDependant(this);
+            for (auto i : _outputs) i->removeObserver(this);
             _outputs = newOutputs;
-            for (auto i : _outputs) i->addDependant(this);
+            for (auto i : _outputs) i->addObserver(this);
             modified(true);
             setState(State::Dirty);
         }
     }
 
-    void CommandNode::setScript(std::string const& newScript) {
+    void CommandNode::script(std::string const& newScript) {
         if (newScript != _script) {
             _script = newScript;
             modified(true);
@@ -344,41 +248,30 @@ namespace YAM
         }
     }
 
-    void CommandNode::setInputProducers(std::vector<std::shared_ptr<Node>> const& newInputProducers) {
+    void CommandNode::inputProducers(std::vector<std::shared_ptr<Node>> const& newInputProducers) {
         if (_inputProducers != newInputProducers) {
-            for (auto i : _inputProducers) i->removeDependant(this);
+            for (auto i : _inputProducers) i->removeObserver(this);
             _inputProducers = newInputProducers;
-            for (auto i : _inputProducers) i->addDependant(this);
+            for (auto i : _inputProducers) i->addObserver(this);
             _executionHash = rand();
             modified(true);
             setState(State::Dirty);
         }
     }
 
-    void CommandNode::getInputProducers(std::vector<std::shared_ptr<Node>>& producers) const {
-        producers.insert(producers.end(), _inputProducers.begin(), _inputProducers.end());
-    }
-
-    bool CommandNode::supportsPrerequisites() const { return true; }
-    void CommandNode::getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const {
-        prerequisites.insert(prerequisites.end(), _inputProducers.begin(), _inputProducers.end());
-        getSourceInputs(prerequisites);
-        getOutputs(prerequisites);
-    }
-
-    bool CommandNode::supportsOutputs() const { return true; }
     void CommandNode::getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const {
-        outputs.insert(outputs.end(), _outputs.begin(), _outputs.end());
+        for (auto const& n : _outputs) outputs.push_back(dynamic_pointer_cast<Node>(n));
     }
 
-    bool CommandNode::supportsInputs() const { return true; }
     void CommandNode::getInputs(std::vector<std::shared_ptr<Node>>& inputs) const {
-        for (auto const& pair : _inputs) inputs.push_back(pair.second);
+        for (auto const& pair : _inputs) inputs.push_back(dynamic_pointer_cast<Node>(pair.second));
     }
 
-    bool CommandNode::pendingStartSelf() const {
-        bool pending = _executionHash != computeExecutionHash();
-        return pending;
+    // Propagate Dirty state of input producers, outputs or sourcefile inputs
+    // to this node. 
+    void CommandNode::handleDirtyOf(Node* observedNode) {
+        if (observedNode->state() != Node::State::Dirty) throw std::exception("observed node not dirty");
+        setState(Node::State::Dirty);
     }
 
     XXH64_hash_t CommandNode::computeExecutionHash() const {
@@ -396,20 +289,20 @@ namespace YAM
         return hash;
     }
 
-    void CommandNode::getSourceInputs(std::vector<std::shared_ptr<Node>> & sourceInputs) const {
+    void CommandNode::getSourceInputs(std::vector<Node*>& sourceInputs) const {
         for (auto const& pair : _inputs) {
             auto const& node = pair.second;
             auto file = dynamic_pointer_cast<SourceFileNode>(node);
-            if (file != nullptr) sourceInputs.push_back(file);
+            if (file != nullptr) sourceInputs.push_back(file.get());
         }
     }
 
     void CommandNode::setInputs(ExecutionResult const& result) {
         // An input GeneratedFileNode is not a prerequisite of the CommandNode.
-        // A command node therefore does not register itself as dependant of an
+        // A command node therefore does not register itself as observer of an
         // input GeneratedFileNode. Instead the command node registers itself as
-        // dependent of the producer of the input GeneratedFileNode. This prevents
-        // spurious callbacks to Node::handlePrerequisiteCompletion(Node* node)
+        // observer of the producer of the input GeneratedFileNode. This prevents
+        // spurious callbacks to Node::handleCompletionOf(Node* genFileNode)
         // from input GeneratedFileNodes to the command node.
         // Note: Dirty propagation in case of tampering with generated files
         // remains intact because a GeneratedFileNode propagates to its 
@@ -420,12 +313,12 @@ namespace YAM
             auto it = _inputs.find(path);
             if (it == _inputs.end()) throw std::exception("no such input");
             auto const& genFile = dynamic_pointer_cast<GeneratedFileNode>(it->second);
-            if (genFile == nullptr) it->second->removeDependant(this);
+            if (genFile == nullptr) it->second->removeObserver(this);
             _inputs.erase(it);
         }
         for (auto const& node : result._addedInputNodes) {
             auto const& genFile = dynamic_pointer_cast<GeneratedFileNode>(node);
-            if (genFile == nullptr) node->addDependant(this);
+            if (genFile == nullptr) node->addObserver(this);
             auto result = _inputs.insert({ node->name(), node });
             if (!result.second) throw std::exception("attempt to add duplicate input");
         }
@@ -468,9 +361,6 @@ namespace YAM
                 outputNodes.push_back(fileNode);
             }
         }
-        if (illegals > 1) {
-            logNumberOfIllegalOutputFiles(this, illegals, logBook);
-        }
         return illegals == 0;
     }
 
@@ -501,14 +391,140 @@ namespace YAM
         return valid;
     }
 
-    void CommandNode::cancelSelf() {
-        std::shared_ptr<IMonitoredProcess> executor = _scriptExecutor.load();
-        if (executor != nullptr) {
-            executor->terminate();
+    void CommandNode::cancel() {
+        Node::cancel();
+        if (canceling()) {
+            std::shared_ptr<IMonitoredProcess> executor = _scriptExecutor.load();
+            if (executor != nullptr) {
+                executor->terminate();
+            }
         }
     }
 
-    MonitoredProcessResult CommandNode::executeScript(MemoryLogBook& logBook) {
+    void CommandNode::start() {
+        Node::start();
+        std::vector<Node*> requisites;
+        for (auto const& p : _inputProducers) requisites.push_back(p.get());
+        getSourceInputs(requisites);
+        for (auto const& n : _outputs) requisites.push_back(n.get());
+        auto callback = Delegate<void, Node::State>::CreateLambda(
+            [this](Node::State state) { handleRequisitesCompletion(state); }
+        );
+        startNodes(requisites, std::move(callback));
+    }
+
+    void CommandNode::handleRequisitesCompletion(Node::State state) {
+        if (state != Node::State::Ok) {
+            Node::notifyCompletion(state);
+        } else if (canceling()) {
+            Node::notifyCompletion(Node::State::Canceled);
+        } else if (_executionHash != computeExecutionHash()) {
+            auto d = Delegate<void>::CreateLambda(
+                [this]() { executeScript(); }
+            );
+            context()->threadPoolQueue().push(std::move(d));
+        } else {
+            Node::notifyCompletion(state);
+        }
+    }
+
+    void CommandNode::executeScript() {
+        auto result = std::make_shared<ExecutionResult>();
+        if (canceling()) {
+            result->_newState = Node::State::Canceled;
+        } else {
+            MonitoredProcessResult scriptResult = executeMonitoredScript(result->_log);
+            if (scriptResult.exitCode != 0) {
+                result->_newState = canceling() ? Node::State::Canceled : Node::State::Failed;
+            } else {
+                std::set<std::filesystem::path> inputPaths;
+                for (auto const& pair : _inputs) inputPaths.insert(pair.first);
+                computePathSetsDifference(
+                    inputPaths, scriptResult.readOnlyFiles,
+                    result->_keptInputPaths,
+                    result->_removedInputPaths,
+                    result->_addedInputPaths);
+                result->_outputPaths = scriptResult.writtenFiles;
+                result->_newState = Node::State::Ok;
+            }
+        }
+        auto d = Delegate<void>::CreateLambda(
+            [this, result]() { handleExecuteScriptCompletion(*result); }
+        );
+        context()->mainThreadQueue().push(std::move(d));
+    }
+
+    void CommandNode::handleExecuteScriptCompletion(ExecutionResult& result) {
+        if (result._newState != Node::State::Ok) {
+            notifyCompletion(result._newState);
+        } else if (canceling()) {
+            notifyCompletion(Node::State::Canceled);
+        } else {
+            std::vector<std::shared_ptr<GeneratedFileNode>> outputNodes;
+            bool validOutputs = findOutputNodes(result._outputPaths, outputNodes, result._log);
+            validOutputs = validOutputs && verifyOutputNodes(outputNodes, result._log);
+            if (!validOutputs) {
+                result._newState = Node::State::Failed;
+            } else {
+                std::vector< std::shared_ptr<Node>> outputsAndNewInputs;
+                // output nodes have been updated by command script, hence their
+                // hashes need to be re-computed.
+                for (auto& n : _outputs) {
+                    // temporarily stop observing n to avoid Dirty state to
+                    // propagate to this command (see handleDirtyOf()).
+                    n->removeObserver(this);
+                    n->setState(Node::State::Dirty);
+                    n->addObserver(this);
+                    outputsAndNewInputs.push_back(n);
+                }
+                std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> allowedGenInputFiles;
+                getOutputFileNodes(_inputProducers, allowedGenInputFiles);
+                std::vector<std::shared_ptr<FileNode>> notUsed1;
+                std::vector<std::shared_ptr<Node>> notUsed2;
+                // Kept inputs must be validated because of possible change in file
+                // repository configuration.
+                bool validKeptInputs = findInputNodes(
+                    allowedGenInputFiles,
+                    result._keptInputPaths,
+                    notUsed1,
+                    notUsed2,
+                    result._log);
+                bool validNewInputs = findInputNodes(
+                    allowedGenInputFiles,
+                    result._addedInputPaths,
+                    result._addedInputNodes,
+                    outputsAndNewInputs,
+                    result._log);
+                result._log.forwardTo(*(context()->logBook()));
+                if (validKeptInputs && validNewInputs) {
+                    setInputs(result);
+                    std::vector<Node*> rawNodes;
+                    for (auto const& n : outputsAndNewInputs) rawNodes.push_back(n.get());
+                    auto callback = Delegate<void, Node::State>::CreateLambda(
+                        [this](Node::State s) { handleOutputAndNewInputFilesCompletion(s); }
+                    );
+                    startNodes(rawNodes, std::move(callback));
+                } else {
+                    result._newState = Node::State::Failed;
+                    notifyCompletion(result._newState);
+                }
+            }
+        }
+    }
+
+    void CommandNode::handleOutputAndNewInputFilesCompletion(Node::State state) {
+        if (state == Node::State::Ok) {
+            _executionHash = computeExecutionHash();
+            modified(true);
+        } else {
+            ExecutionResult r;
+            for (auto const& pair : _inputs) r._removedInputPaths.insert(pair.first);
+            setInputs(r);
+        }
+        notifyCompletion(state);
+    }
+
+    MonitoredProcessResult CommandNode::executeMonitoredScript(MemoryLogBook& logBook) {
         if (_script.empty()) return MonitoredProcessResult();
 
         std::filesystem::path tmpDir = FileSystem::createUniqueDirectory();
@@ -535,33 +551,10 @@ namespace YAM
                 logDirRemovalError(this, tmpDir, ec, logBook);
             }
             result.readOnlyFiles.erase(scriptFilePath);
-        } else if (!_canceling) {
+        } else if (canceling()) {
             logScriptFailure(this, result, tmpDir, logBook);
         }
         return result;
-    }
-
-    void CommandNode::selfExecute() {
-        auto result = std::make_shared<ExecutionResult>();
-        if (_canceling) {
-            result->_newState = Node::State::Canceled;
-        } else {
-            MonitoredProcessResult scriptResult = executeScript(result->_log);
-            if (scriptResult.exitCode != 0) {
-                result->_newState = _canceling ? Node::State::Canceled : Node::State::Failed;
-            } else {
-                std::set<std::filesystem::path> inputPaths;
-                for (auto const& pair : _inputs) inputPaths.insert(pair.first);
-                computePathSetsDifference(
-                    inputPaths, scriptResult.readOnlyFiles,
-                    result->_keptInputPaths,
-                    result->_removedInputPaths,
-                    result->_addedInputPaths);
-                result->_outputPaths = scriptResult.writtenFiles; 
-                result->_newState = Node::State::Ok;
-            }
-        }
-        postSelfCompletion(result);
     }
 
     bool CommandNode::findInputNodes(
@@ -585,9 +578,8 @@ namespace YAM
                     valid = false;
                     logBuildOrderNotGuaranteed(this, generatedInputFile.get(), logBook);
                 } else {
-                    // _inputProducers must have moved the generated inputs
-                    // to Ok, Failed or Canceled state during prerequisite
-                    // execution.
+                    // _inputProducers must have moved the generated inputs to Ok,
+                    // Failed or Canceled state during requisite execution.
                     auto state = generatedInputFile->state();
                     if (
                         state != Node::State::Ok
@@ -617,62 +609,6 @@ namespace YAM
         return valid;
     }
 
-    void CommandNode::getPreCommitNodes(
-        SelfExecutionResult& result,
-        std::vector<std::shared_ptr<Node>>& preCommitNodes
-    ) {
-        if (result._newState == Node::State::Ok) {
-            auto& cmdResult = dynamic_cast<ExecutionResult&>(result);
-            // output nodes have been updated by command script, hence their
-            // hashes need to be re-computed.
-            for (auto& n : _outputs) {
-                // bypass GeneratedFileNode override of setState to avoid
-                // n to propagate Dirty state to this command node.
-                n->Node::setState(Node::State::Dirty); 
-                preCommitNodes.push_back(n);
-            }
-            std::vector<std::shared_ptr<GeneratedFileNode>> outputNodes;
-            bool validOutputs = findOutputNodes(cmdResult._outputPaths, outputNodes, cmdResult._log);
-            validOutputs = validOutputs && verifyOutputNodes(outputNodes, cmdResult._log);
-
-            std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> allowedGenInputFiles;
-            getOutputFileNodes(_inputProducers, allowedGenInputFiles);
-            std::vector<std::shared_ptr<FileNode>> notUsed1;
-            std::vector<std::shared_ptr<Node>> notUsed2;
-            bool validKeptInputs = findInputNodes(
-                allowedGenInputFiles,
-                cmdResult._keptInputPaths,
-                notUsed1,
-                notUsed2,
-                cmdResult._log);
-            bool validNewInputs = findInputNodes(
-                allowedGenInputFiles,
-                cmdResult._addedInputPaths,
-                cmdResult._addedInputNodes,
-                preCommitNodes,
-                cmdResult._log);
-            bool valid = validOutputs && validKeptInputs && validNewInputs;
-            if (valid) {
-                setInputs(cmdResult);
-            } else {
-                result._newState = Node::State::Failed;
-            }
-        }
-    }
-
-    void CommandNode::commitSelfCompletion(SelfExecutionResult const& result) {
-        if (result._newState == Node::State::Ok) {
-            auto const& cmdResult = dynamic_cast<ExecutionResult const&>(result);
-            _executionHash = computeExecutionHash();
-            modified(true);
-        } else {
-            ExecutionResult r;
-            for (auto const& pair : _inputs) r._removedInputPaths.insert(pair.first);
-            setInputs(r);
-        }
-        result._log.forwardTo(*(context()->logBook()));
-    }
-
     void CommandNode::setStreamableType(uint32_t type) {
         streamableTypeId = type;
     }
@@ -699,11 +635,11 @@ namespace YAM
 
     void CommandNode::prepareDeserialize() {
         Node::prepareDeserialize();
-        for (auto const& i : _inputProducers) i->removeDependant(this);
-        for (auto const& i : _outputs) i->removeDependant(this);
+        for (auto const& i : _inputProducers) i->removeObserver(this);
+        for (auto const& i : _outputs) i->removeObserver(this);
         for (auto const& p : _inputs) {
             auto const& genFile = dynamic_pointer_cast<GeneratedFileNode>(p.second);
-            if (genFile == nullptr) p.second->removeDependant(this);
+            if (genFile == nullptr) p.second->removeObserver(this);
         }
         _inputProducers.clear();
         _outputs.clear();
@@ -712,14 +648,14 @@ namespace YAM
 
     void CommandNode::restore(void* context) {
         Node::restore(context);
-        for (auto const& i : _inputProducers) i->addDependant(this);
+        for (auto const& i : _inputProducers) i->addObserver(this);
         for (auto const& i : _outputs) {
-            i->addDependant(this);
+            i->addObserver(this);
             i->producer(this);
         }
         for (auto const& p : _inputs) {
             auto const& genFile = dynamic_pointer_cast<GeneratedFileNode>(p.second);
-            if (genFile == nullptr) p.second->addDependant(this);
+            if (genFile == nullptr) p.second->addObserver(this);
         }
     }
 }

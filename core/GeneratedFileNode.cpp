@@ -14,29 +14,20 @@ namespace YAM
         Node* producer)
         : FileNode(context, name)
         , _producer(producer) 
-    { 
-    }
-
-    void GeneratedFileNode::setState(State newState) {
-        if (state() != newState) {
-            Node::setState(newState);
-            if (state() == Node::State::Dirty) {
-                _producer->setState(Node::State::Dirty);
-            }
-        }
-    }
+    {}
 
     Node* GeneratedFileNode::producer() const {
         return _producer;
     }
 
     bool GeneratedFileNode::deleteFile() {
+        std::error_code ok;
         std::error_code ec;
         bool deleted = std::filesystem::remove(name(), ec);
         if (deleted) {
             setState(Node::State::Dirty);
         }
-        return !ec;
+        return ec != ok;
     }
 
     void GeneratedFileNode::setStreamableType(uint32_t type) {

@@ -5,7 +5,6 @@
 #include "../SourceFileNode.h"
 #include "../ExecutionContext.h"
 #include "../RegexSet.h"
-#include "../GraphWalker.h"
 #include "../FileSystem.h"
 #include "../Dispatcher.h"
 #include "../DispatcherFrame.h"
@@ -24,9 +23,28 @@ namespace
 
     auto isDirtyNode = Delegate<bool, Node*>::CreateLambda([](Node* n) { return n->state() == Node::State::Dirty; });
 
+    void findDirtyNodes(
+        SourceDirectoryNode* dirNode, 
+        std::vector<Node*>& dirtyNodes, 
+        std::unordered_set<Node*>& visitedNodes
+    ) {
+        auto const& content = dirNode->getContent();
+        for (auto const& pair : content) {
+            if (!visitedNodes.insert(pair.second.get()).second) return; // node was already visited
+            if (pair.second->state() == Node::State::Dirty) {
+                dirtyNodes.push_back(pair.second.get());
+            }
+            auto childDir = dynamic_cast<SourceDirectoryNode*>(pair.second.get());
+            if (childDir != nullptr) {
+                findDirtyNodes(childDir, dirtyNodes, visitedNodes);
+            }
+        }
+    }
     std::vector<Node*> getDirtyNodes(SourceDirectoryNode* dirNode) {
-        GraphWalker walker(dirNode, GraphWalker::Postrequisites, isDirtyNode);
-        return walker.included();
+        std::vector<Node*> dirtyNodes;
+        std::unordered_set<Node*> visitedNodes;
+        findDirtyNodes(dirNode, dirtyNodes, visitedNodes);
+        return dirtyNodes;
     }
 
     TEST(SourceFileRepository, update_threeDeepDirectoryTree) {

@@ -91,54 +91,24 @@ namespace YAM
     class __declspec(dllexport) FileNode : public Node
     {
     public:
-        struct ExecutionResult : public Node::SelfExecutionResult {
-            // File last-write-time
-            std::chrono::utc_clock::time_point _lastWriteTime;
-            // file aspect name => file aspect hash
-            std::map<std::string, XXH64_hash_t> _hashes;
-
-            // Pre: _success
-            // Return the hash of given file aspectName.
-            // Throw exception when aspectName is unknown.
-            XXH64_hash_t hashOf(std::string const& aspectName) {
-                auto it = _hashes.find(aspectName);
-                if (it == _hashes.end()) throw std::runtime_error("no such aspect");
-                return it->second;
-            }
-        };
 
         FileNode() {} // needed for deserialization
 
-        // name is the absolute path name of the file
-        // Construction allowed in any thread
+        // name is the absolute path name of the file associated with this node.
         FileNode(ExecutionContext* context, std::filesystem::path const& name);
 
-        // Inherited via Node
-        bool supportsPrerequisites() const override;
-        void getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const override;
-
-        bool supportsOutputs() const override;
-        void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const override;
-
-        bool supportsInputs() const override;
-        void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const override;
-
-        // Pre: state() == State::Ok
-        ExecutionResult const& result() const;
+        void start() override;
 
         // Pre: state() == State::Ok
         // Return the cached last-write-time of the file.
-        std::chrono::time_point<std::chrono::utc_clock> const& lastWriteTime();
+        std::chrono::time_point<std::chrono::utc_clock> const& lastWriteTime() {
+            return _lastWriteTime;
+        }
 
         // Pre: state() == State::Ok
         // Return the cached hash of given aspect.
         // Throw exception when aspect is unknown.
         XXH64_hash_t hashOf(std::string const& aspectName);
-
-        // Retrieve last-write-time and compute hashes of all file aspects
-        // applicable for this file. Store time and hashes in given 'result'.
-        // Can be called from any thread.
-        void selfExecute(ExecutionResult* result) const;
 
         // Return the file repository that contains this file.
         std::shared_ptr<FileRepository> fileRepository() const;
@@ -154,16 +124,17 @@ namespace YAM
         uint32_t typeId() const override;
         void stream(IStreamer* streamer) override;
 
-    protected:
-        // Inherited via Node
-        bool pendingStartSelf() const override;
-        void selfExecute() override;
-        void commitSelfCompletion(SelfExecutionResult const& result) override;
-
     private:
-        std::chrono::time_point<std::chrono::utc_clock> retrieveLastWriteTime() const;
-                
-        ExecutionResult _result; 
+        std::chrono::time_point<std::chrono::utc_clock> retrieveLastWriteTime(std::error_code& ec) const;
+        void execute();
+        void finish(
+            bool success, 
+            std::chrono::time_point<std::chrono::utc_clock> const& newLastWriteTime,
+            std::map<std::string, XXH64_hash_t> const& newHashes);
+
+        std::chrono::utc_clock::time_point _lastWriteTime;
+        // file aspect name => file aspect hash
+        std::map<std::string, XXH64_hash_t> _hashes;
     };
 }
 

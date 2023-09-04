@@ -1,6 +1,6 @@
 
 #include "../NodeSet.h"
-#include "NumberNode.h"
+#include "../Node.h"
 #include "../ExecutionContext.h"
 
 #include "gtest/gtest.h"
@@ -9,12 +9,19 @@
 namespace
 {
     using namespace YAM;
-    using namespace YAMTest;
+
+    class TestNode : public Node {
+    public:
+        TestNode(ExecutionContext* context, std::filesystem::path const& name)
+            : Node(context, name)
+        {}
+        uint32_t typeId() const { return 0; }
+    };
 
     ExecutionContext* context = nullptr;
-    std::shared_ptr<Node> n1 = std::make_shared<NumberNode>(context, "aap/noot");
-    std::shared_ptr<Node> n1dup = std::make_shared<NumberNode>(context, "aap/noot");
-    std::shared_ptr<Node> n2 = std::make_shared<NumberNode>(context, "aap/noot/mies");
+    std::shared_ptr<Node> n1 = std::make_shared<TestNode>(context, "aap/noot");
+    std::shared_ptr<Node> n1dup = std::make_shared<TestNode>(context, "aap/noot");
+    std::shared_ptr<Node> n2 = std::make_shared<TestNode>(context, "aap/noot/mies");
 
     TEST(NodeSet, Add) {
         NodeSet set;

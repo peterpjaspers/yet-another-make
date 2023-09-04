@@ -141,9 +141,6 @@
     <ClInclude Include="DotIgnoreNode.h">
       <Filter>Header Files\Node</Filter>
     </ClInclude>
-    <ClInclude Include="GraphWalker.h">
-      <Filter>Header Files\Node</Filter>
-    </ClInclude>
     <ClInclude Include="ILogBook.h">
       <Filter>Header Files\LogBook</Filter>
     </ClInclude>
@@ -339,9 +336,6 @@
       <Filter>Source Files\Node</Filter>
     </ClCompile>
     <ClCompile Include="GlobNode.cpp">
-      <Filter>Source Files\Node</Filter>
-    </ClCompile>
-    <ClCompile Include="GraphWalker.cpp">
       <Filter>Source Files\Node</Filter>
     </ClCompile>
     <ClCompile Include="LogRecord.cpp">

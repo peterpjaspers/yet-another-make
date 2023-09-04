@@ -1,5 +1,4 @@
-#include "AdditionNode.h"
-#include "NumberNode.h"
+#include "../FileNode.h"
 #include "../ExecutionContext.h"
 #include "../FileRepository.h"
 
@@ -11,7 +10,6 @@
 namespace
 {
     using namespace YAM;
-    using namespace YAMTest;
 
     class ContextSetup
     {
@@ -21,9 +19,9 @@ namespace
         ExecutionContext context;
 
         ContextSetup() {
-            nodes.push_back(std::make_shared<NumberNode>(&context, "n1"));
-            nodes.push_back(std::make_shared<NumberNode>(&context, "n2"));
-            nodes.push_back(std::make_shared<NumberNode>(&context, "n3"));
+            nodes.push_back(std::make_shared<FileNode>(&context, "n1"));
+            nodes.push_back(std::make_shared<FileNode>(&context, "n2"));
+            nodes.push_back(std::make_shared<FileNode>(&context, "n3"));
             repos.push_back(std::make_shared<FileRepository>("repo1", "repo1"));
             repos.push_back(std::make_shared<FileRepository>("repo2", "repo2"));
             repos.push_back(std::make_shared<FileRepository>("repo3", "repo3"));

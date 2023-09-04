@@ -15,8 +15,6 @@ namespace YAM
             std::filesystem::path const& name, 
             Node* producer);
 
-        virtual void setState(State newState) override;
-
         Node* producer() const;
         bool deleteFile();
 

@@ -39,7 +39,6 @@
     <IntDir>$(ProjectDir)$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <ItemGroup>
-    <ClCompile Include="AdditionNode.cpp" />
     <ClCompile Include="boostProcessTest.cpp" />
     <ClCompile Include="buildClientServiceTest.cpp" />
     <ClCompile Include="builderTest.cpp" />
@@ -65,9 +64,7 @@
     <ClCompile Include="memoryStreamTest.cpp" />
     <ClCompile Include="monitoredProcessWin32Test.cpp" />
     <ClCompile Include="msBuildTrackerOutputReaderTest.cpp" />
-    <ClCompile Include="nodeExecutionTest.cpp" />
     <ClCompile Include="nodeSetTest.cpp" />
-    <ClCompile Include="NumberNode.cpp" />
     <ClCompile Include="persistentBuildStateTest.cpp" />
     <ClCompile Include="regexSetTest.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
@@ -89,10 +86,8 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="AdditionNode.h" />
     <ClInclude Include="DirectoryTree.h" />
     <ClInclude Include="executeNode.h" />
-    <ClInclude Include="NumberNode.h" />
   </ItemGroup>
   <ItemDefinitionGroup />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

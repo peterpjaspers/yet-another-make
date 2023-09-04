@@ -131,8 +131,8 @@ namespace
                     << "type " << repo.pietH.string() << " > " << pietOut->name().string()
                     << " & type " << repo.janH.string() << " >> " << pietOut->name().string()
                     << " & type " << repo.pietCpp.string() << " >> " << pietOut->name().string() << std::endl;
-                ccPiet->setOutputs({ pietOut });
-                ccPiet->setScript(script.str());
+                ccPiet->outputs({ pietOut });
+                ccPiet->script(script.str());
             }
             {
                 std::stringstream script;
@@ -140,17 +140,17 @@ namespace
                     << "type " << repo.janH.string() << " > " << janOut->name().string()
                     << " & type " << repo.janCpp.string() << " >> " << janOut->name().string() << std::endl;
 
-                ccJan->setOutputs({ janOut });
-                ccJan->setScript(script.str());
+                ccJan->outputs({ janOut });
+                ccJan->script(script.str());
             }
             {
                 std::stringstream script;
-                linkPietJan->setOutputs({ pietjanOut });
-                linkPietJan->setInputProducers({ ccPiet, ccJan });
+                linkPietJan->outputs({ pietjanOut });
+                linkPietJan->inputProducers({ ccPiet, ccJan });
                 script
                     << "type " << pietOut->name().string() << " > " << pietjanOut->name().string()
                     << " & type " << janOut->name().string() << " >> " << pietjanOut->name().string() << std::endl;
-                linkPietJan->setScript(script.str());
+                linkPietJan->script(script.str());
             }
 
             context->nodes().add(ccPiet);
@@ -598,12 +598,12 @@ namespace
         // Set-up command scripts to take ~10 seconds execution time as to
         // have sufficient time to stop a build-in-progress
         auto ping = boost::process::search_path("ping");
-        driver.ccPiet->setOutputs({ });
-        driver.ccPiet->setScript(ping.string() + " -n 10 127.0.0.1");
-        driver.ccJan->setOutputs({ });
-        driver.ccJan->setScript(ping.string() + " -n 10 127.0.0.1");
-        driver.linkPietJan->setScript(ping.string() + " -n 10 127.0.0.1");
-        driver.linkPietJan->setOutputs({ });
+        driver.ccPiet->outputs({ });
+        driver.ccPiet->script(ping.string() + " -n 10 127.0.0.1");
+        driver.ccJan->outputs({ });
+        driver.ccJan->script(ping.string() + " -n 10 127.0.0.1");
+        driver.linkPietJan->script(ping.string() + " -n 10 127.0.0.1");
+        driver.linkPietJan->outputs({ });
 
         auto request = std::make_shared< BuildRequest>(BuildRequest::RequestType::Build);
         request->directory(driver.repo.dir);

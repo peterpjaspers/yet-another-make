@@ -28,7 +28,6 @@ namespace
 
 namespace YAM
 {
-
     DotIgnoreNode::DotIgnoreNode() : Node() {}
 
     DotIgnoreNode::DotIgnoreNode(
@@ -46,14 +45,18 @@ namespace YAM
     void DotIgnoreNode::addPrerequisitesToContext() {
         for (auto file : _dotIgnoreFiles) {
             context()->nodes().add(file);
-            file->addDependant(this);
+            file->addObserver(this);
         }
+    }
+
+    void DotIgnoreNode::directory(SourceDirectoryNode* directory) {
+        _directory = directory;
     }
 
     void DotIgnoreNode::clear() {
         for (auto file : _dotIgnoreFiles) {
             context()->nodes().remove(file);
-            file->removeDependant(this);
+            file->removeObserver(this);
         }
         _dotIgnoreFiles.clear();
     }
@@ -61,26 +64,12 @@ namespace YAM
     void DotIgnoreNode::setState(State newState) {
         if (state() != newState) {
             Node::setState(newState);
-            if (state() == Node::State::Dirty) {
+            if (newState == Node::State::Dirty) {
                 // Given de gitignore precedence rules a change in ignore files
                 // in some directory D affects all sub-directories of D.
                 setDirtyRecursively(_directory);
             }
         }
-    }
-
-    bool DotIgnoreNode::supportsPrerequisites() const { return true; }
-    void DotIgnoreNode::getPrerequisites(std::vector<std::shared_ptr<Node>>& prerequisites) const {
-        prerequisites.insert(prerequisites.end(), _dotIgnoreFiles.begin(), _dotIgnoreFiles.end());
-    }
-
-    bool DotIgnoreNode::supportsInputs() const { return true; }
-    void DotIgnoreNode::getInputs(std::vector<std::shared_ptr<Node>>& inputs) const {
-        inputs.insert(inputs.end(), _dotIgnoreFiles.begin(), _dotIgnoreFiles.end());
-    }
-
-    XXH64_hash_t DotIgnoreNode::hash() const {
-        return _hash;
     }
 
     bool DotIgnoreNode::ignore(std::filesystem::path const& path) const {
@@ -99,15 +88,6 @@ namespace YAM
         return ignore;
     }
 
-    void DotIgnoreNode::directory(SourceDirectoryNode* directory) {
-        _directory = directory;
-    }
-
-    bool DotIgnoreNode::pendingStartSelf() const {
-        bool pending = _hash != computeHash();
-        return pending;
-    }
-
     XXH64_hash_t DotIgnoreNode::computeHash() const {
         std::vector<XXH64_hash_t> hashes;
         for (auto const& node : _dotIgnoreFiles) {
@@ -117,21 +97,39 @@ namespace YAM
         return hash;
     }
 
-    void DotIgnoreNode::selfExecute() {
-        auto result = std::make_shared<SelfExecutionResult>();
-        if (_canceling) {
-            result->_newState = Node::State::Canceled;
-        } else {
-            result->_newState = Node::State::Ok;
-            // TODO: parse the dotignore files
-        }
-        modified(true);
-        //postSelfCompletion(newState);
-        postSelfCompletion(result);
+    void DotIgnoreNode::start() {
+        Node::start();
+        std::vector<Node*> requisites;
+        for (auto const& n : _dotIgnoreFiles) requisites.push_back(n.get());
+        auto callback = Delegate<void, Node::State>::CreateLambda(
+            [this](Node::State s) { handleRequisiteCompletion(s); }
+        );
+        Node::startNodes(requisites, std::move(callback));
     }
 
-    void DotIgnoreNode::commitSelfCompletion(SelfExecutionResult const& result) {
-        // TODO
+    void DotIgnoreNode::handleRequisiteCompletion(Node::State state) {
+        if (state != Node::State::Ok) {
+            Node::notifyCompletion(state);
+        } else if (canceling()) {
+            Node::notifyCompletion(Node::State::Canceled);
+        } else if (_hash != computeHash()) {
+            auto d = Delegate<void>::CreateLambda(
+                [this]() { parseDotIgnoreFiles(); }
+            );
+            context()->threadPoolQueue().push(std::move(d));
+        } else {
+            Node::notifyCompletion(state);
+        }
+    }
+
+    void DotIgnoreNode::parseDotIgnoreFiles() {
+        if (canceling()) {
+            postCompletion(Node::State::Canceled);
+        } else {
+            // TODO: parse the dotignore files
+            modified(true);
+            postCompletion(Node::State::Ok);
+        }
     }
 
     void DotIgnoreNode::setStreamableType(uint32_t type) {
@@ -150,16 +148,12 @@ namespace YAM
 
     void DotIgnoreNode::prepareDeserialize() {
         Node::prepareDeserialize();
-        for (auto file : _dotIgnoreFiles) {
-            file->removeDependant(this);
-        }
+        for (auto file : _dotIgnoreFiles) file->removeObserver(this);
         _dotIgnoreFiles.clear();
     }
 
     void DotIgnoreNode::restore(void* context) {
         Node::restore(context);
-        for (auto file : _dotIgnoreFiles) {
-            file->addDependant(this);
-        }
+        for (auto file : _dotIgnoreFiles) file->addObserver(this);
     }
 }
