@@ -6,13 +6,13 @@
 			"label": "Build Page test (debug)",
 			"command": "C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin\\g++.exe",
 			"args": [
-				"-std=c++17",
+				"-std=c++2a",
 				"-g",
+				"-U NDEBUG",
 				"-I${workspaceFolder}",
 				"-IC:\\Program Files\\boost\\boost_1_81_0",
 				"${workspaceFolder}\\test\\testPage.cpp",
 				"${workspaceFolder}\\Types.cpp",
-				"${workspaceFolder}\\PagePool.cpp",
 				"-o",
 				"${workspaceFolder}\\test\\testPage.exe",
 				"-lpsapi"
@@ -31,67 +31,15 @@
 			"label": "Build Page test (optimized)",
 			"command": "C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin\\g++.exe",
 			"args": [
-				"-std=c++17",
+				"-std=c++2a",
 				"-Ofast",
+				"-D NDEBUG",
 				"-I${workspaceFolder}",
 				"-IC:\\Program Files\\boost\\boost_1_81_0",
 				"${workspaceFolder}\\test\\testPage.cpp",
 				"${workspaceFolder}\\Types.cpp",
-				"${workspaceFolder}\\PagePool.cpp",
 				"-o",
 				"${workspaceFolder}\\test\\testPage.exe",
-				"-lpsapi"
-			],
-			"options": {
-				"cwd": "C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin"
-			},
-			"problemMatcher": [
-				"$gcc"
-			],
-			"group": "build",
-			"detail": "compiler: \"C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin\\g++.exe\""
-		},
-		{
-			"type": "cppbuild",
-			"label": "Build BTree test (debug)",
-			"command": "C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin\\g++.exe",
-			"args": [
-				"-std=c++17",
-				"-g",
-				"-I${workspaceFolder}",
-				"-IC:\\Program Files\\boost\\boost_1_81_0",
-				"${workspaceFolder}\\test\\testBTree.cpp",
-				"${workspaceFolder}\\Types.cpp",
-				"${workspaceFolder}\\PagePool.cpp",
-				"${workspaceFolder}\\PersistentPagePool.cpp",
-				"-o",
-				"${workspaceFolder}\\test\\testBTree.exe",
-				"-lpsapi"
-			],
-			"options": {
-				"cwd": "C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin"
-			},
-			"problemMatcher": [
-				"$gcc"
-			],
-			"group": "build",
-			"detail": "compiler: \"C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin\\g++.exe\""
-		},
-		{
-			"type": "cppbuild",
-			"label": "Build BTree test (optimized)",
-			"command": "C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin\\g++.exe",
-			"args": [
-				"-std=c++17",
-				"-Ofast",
-				"-I${workspaceFolder}",
-				"-IC:\\Program Files\\boost\\boost_1_81_0",
-				"${workspaceFolder}\\test\\testBTree.cpp",
-				"${workspaceFolder}\\Types.cpp",
-				"${workspaceFolder}\\PagePool.cpp",
-				"${workspaceFolder}\\PersistentPagePool.cpp",
-				"-o",
-				"${workspaceFolder}\\test\\testBTree.exe",
 				"-lpsapi"
 			],
 			"options": {
@@ -108,8 +56,9 @@
 			"label": "Build Streaming BTree test (debug)",
 			"command": "C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin\\g++.exe",
 			"args": [
-				"-std=c++17",
+				"-std=c++2a",
 				"-g",
+				"-U NDEBUG",
 				"-I${workspaceFolder}",
 				"-IC:\\Program Files\\boost\\boost_1_81_0",
 				"${workspaceFolder}\\test\\testStreamingBTree.cpp",
@@ -134,8 +83,9 @@
 			"label": "Build Streaming BTree test (optimized)",
 			"command": "C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin\\g++.exe",
 			"args": [
-				"-std=c++17",
+				"-std=c++2a",
 				"-Ofast",
+				"-D NDEBUG",
 				"-I${workspaceFolder}",
 				"-IC:\\Program Files\\boost\\boost_1_81_0",
 				"${workspaceFolder}\\test\\testStreamingBTree.cpp",
@@ -160,8 +110,9 @@
 			"label": "Build String BTree test (debug)",
 			"command": "C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin\\g++.exe",
 			"args": [
-				"-std=c++17",
+				"-std=c++2a",
 				"-g",
+				"-U NDEBUG",
 				"-I${workspaceFolder}",
 				"-IC:\\Program Files\\boost\\boost_1_81_0",
 				"${workspaceFolder}\\test\\testStringBTree.cpp",
@@ -186,8 +137,9 @@
 			"label": "Build String BTree test (optimized)",
 			"command": "C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin\\g++.exe",
 			"args": [
-				"-std=c++17",
+				"-std=c++2a",
 				"-Ofast",
+				"-D NDEBUG",
 				"-I${workspaceFolder}",
 				"-IC:\\Program Files\\boost\\boost_1_81_0",
 				"${workspaceFolder}\\test\\testStringBTree.cpp",
@@ -212,8 +164,9 @@
 			"label": "BuiBuild BTree performance test (debug)",
 			"command": "C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin\\g++.exe",
 			"args": [
-				"-std=c++17",
+				"-std=c++2a",
 				"-g",
+				"-U NDEBUG",
 				"-I${workspaceFolder}",
 				"-IC:\\Program Files\\boost\\boost_1_81_0",
 				"${workspaceFolder}\\test\\testBTreePerformance.cpp",
@@ -238,8 +191,9 @@
 			"label": "Build BTree performance test (optimized)",
 			"command": "C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin\\g++.exe",
 			"args": [
-				"-std=c++17",
+				"-std=c++2a",
 				"-Ofast",
+				"-D NDEBUG",
 				"-I${workspaceFolder}",
 				"-IC:\\Program Files\\boost\\boost_1_81_0",
 				"${workspaceFolder}\\test\\testBTreePerformance.cpp",
@@ -264,8 +218,9 @@
 			"label": "Build BTree validity test (debug)",
 			"command": "C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin\\g++.exe",
 			"args": [
-				"-std=c++17",
+				"-std=c++2a",
 				"-g",
+				"-U NDEBUG",
 				"-I${workspaceFolder}",
 				"-IC:\\Program Files\\boost\\boost_1_81_0",
 				"${workspaceFolder}\\test\\testBTreeValidity.cpp",
@@ -290,8 +245,9 @@
 			"label": "Build BTree validity test (optimized)",
 			"command": "C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin\\g++.exe",
 			"args": [
-				"-std=c++17",
+				"-std=c++2a",
 				"-Ofast",
+				"-D NDEBUG",
 				"-I${workspaceFolder}",
 				"-IC:\\Program Files\\boost\\boost_1_81_0",
 				"${workspaceFolder}\\test\\testBTreeValidity.cpp",
@@ -316,8 +272,9 @@
 			"label": "Build BTree iterator test (debug)",
 			"command": "C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin\\g++.exe",
 			"args": [
-				"-std=c++17",
+				"-std=c++2a",
 				"-g",
+				"-U NDEBUG",
 				"-I${workspaceFolder}",
 				"-IC:\\Program Files\\boost\\boost_1_81_0",
 				"${workspaceFolder}\\test\\testBTreeIterator.cpp",
@@ -342,8 +299,9 @@
 			"label": "Build BTree forest test (debug)",
 			"command": "C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin\\g++.exe",
 			"args": [
-				"-std=c++17",
+				"-std=c++2a",
 				"-g",
+				"-U NDEBUG",
 				"-I${workspaceFolder}",
 				"-IC:\\Program Files\\boost\\boost_1_81_0",
 				"${workspaceFolder}\\test\\testForest.cpp",
@@ -368,8 +326,9 @@
 			"label": "C/C++: g++.exe build active file (debug)",
 			"command": "C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin\\g++.exe",
 			"args": [
-				"-std=c++17",
+				"-std=c++2a",
 				"-g",
+				"-U NDEBUG",
 				"${file}",
 				"-o",
 				"${fileDirname}\\${fileBasenameNoExtension}.exe",
@@ -389,8 +348,9 @@
 			"label": "C/C++: g++.exe build active file (optimized)",
 			"command": "C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin\\g++.exe",
 			"args": [
-				"-std=c++17",
+				"-std=c++2a",
 				"-Ofast",
+				"-D NDEBUG",
 				"${file}",
 				"-o",
 				"${fileDirname}\\${fileBasenameNoExtension}.exe",
