@@ -149,8 +149,8 @@ namespace BTree {
         }
         // Determine offset in Trail to a key match; offset to a search key.
         // Returns zero if no match was found.
-        inline PageDepth match() const {
-            for (PageDepth offset = 0; offset < height; offset++) {
+        inline PageDepth match(PageDepth initial = 0) const {
+            for (PageDepth offset = initial; offset < height; offset++) {
                 Position position = stack[height - offset - 1].position;
                 if ((position == OnIndex) || (position == AfterIndex)) return (offset);
             }

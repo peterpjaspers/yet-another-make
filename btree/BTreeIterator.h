@@ -3,6 +3,10 @@
 
 #include "BTree.h"
 
+// ToDo: Provide const TreeIterator (ConstTreeIterator). begin, end and find functions on Tree are const.
+// ToDo: provide assignment (and operator)
+// ToDo: avoid dynamic allocation of iterators in Tree::begin,end & find
+
 namespace BTree {
     
     // B-directional iterator on B-Trees.

@@ -6,6 +6,8 @@
 #include <fstream>
 #include <random>
 #include <algorithm>
+#include <cassert>
+#include <utility>
 //#include <boost/filesystem.hpp>
 
 using namespace BTree;
@@ -34,10 +36,13 @@ const int BTreePageSize = 256;
 const int MinArray = 2;
 const int MaxArray = 14;
 // Enable generating exceptions when accessing non-existing keys.
-// Set to false when debugging to avoid generating intentional exceptions.
 // Set to true for full coverage (presumably when compiled with optimization)
-const bool TryUnexpectedKeys = true;
-// const bool TryUnexpectedKeys = false;
+// Set to false when debugging to avoid generating intentional exceptions.
+#ifdef NDEBUG
+    const bool TryUnexpectedKeys = true;
+#else
+    const bool TryUnexpectedKeys = false;
+#endif
 
 // Number of attempts to detect unexpected B-Tree content
 const int ProbeCount = 100;
@@ -470,6 +475,7 @@ public:
                     << "    Page frees        " << stats.pageFrees << "\n"
                     << "    Merge attempts    " << stats.mergeAttempts << "\n"
                     << "    Page merges       " << stats.pageMerges << "\n"
+                    << "    Page shifts       " << stats.pageShifts << "\n"
                     << "    Root updates      " << stats.rootUpdates << "\n"
                     << "    Split updates     " << stats.splitUpdates << "\n"
                     << "    Commits           " << stats.commits << "\n"
@@ -583,6 +589,7 @@ public:
                 }
             }
             // Ensure that other content is not present
+if (TryUnexpectedKeys) log << "Trying un-expected keys...\n";
             for (int i = 0; i < ProbeCount; ++i) {
                 uint32_t key = generateUniqueKey();
                 if (TryUnexpectedKeys) {
@@ -1843,8 +1850,9 @@ public:
 }; // class Uint16ArrayUint16ArrayTreeTester
 
 template< class K, class V >
-uint32_t doTest( TreeTester<K,V>& tester, size_t count1, size_t count2, ofstream& log ) {
+pair<uint32_t,bool> doTest( TreeTester<K,V>& tester, size_t count1, size_t count2, ofstream& log ) {
     uint32_t errors = 0;
+    bool exception = false;
     try {
         tester.createPool();
         // Insertion in forward order
@@ -1963,13 +1971,15 @@ uint32_t doTest( TreeTester<K,V>& tester, size_t count1, size_t count2, ofstream
     catch ( string message ) {
         log << "Exception : " << message << "!\n";
         errors += 1;
+        exception = true;
     }
     catch (...) {
         log << "Exception (...)!\n";
         errors += 1;
+        exception = true;
     }
     log.flush();
-    return errors;
+    return { errors, exception };
 }
 
 int main(int argc, char* argv[]) {
@@ -1978,12 +1988,13 @@ int main(int argc, char* argv[]) {
     ofstream log;
     log.open( "testBTreeValidity\\logBTreeValidity.txt" );
     uint32_t errorCount = 0;
+    uint32_t exceptionCount = 0;
     size_t count1 = 0;
     size_t count2 = 0;
     if (2 <= argc) count1 = stoi( argv[ 1 ] );
     if (3 <= argc) count2 = stoi( argv[ 2 ] );
     for (int arg = 3; arg < argc; ++arg) {
-        uint32_t errors;
+        pair<uint32_t,bool> errors;
         if (string( "Uint32Uint32" ) == argv[ arg ]) {
             log << "32-bit unsigned integer key to 32-bit unsigned integer B-Tree...\n" << flush;
             Uint32Uint32TreeTester tester( "testBTreeValidity", "Uint32Uint32", log );
@@ -2004,11 +2015,18 @@ int main(int argc, char* argv[]) {
             Uint16ArrayUint16ArrayTreeTester tester( "testBTreeValidity", "Uint16ArrayUint16Array", log );
             errors = doTest( tester, count1, count2, log );
         }
-        if (0 < errors) log << errors << " errors detected!\n";
-        errorCount += errors;
+        if (errors.second) {
+            log << "Exception detected!\n";
+            exceptionCount += 1;
+        } else if (0 < errors.first) {
+            log << errors.first << " errors detected!\n";
+            errorCount += errors.first;
+        }
         log << "\n";
     }
-    if (0 < errorCount) {
+    if (0 < exceptionCount) {
+        log << exceptionCount << " exceptions detected!";
+    } else if (0 < errorCount) {
         log << "Total of " << errorCount << " errors detected!";
     } else {
         log << "No errors detected.";

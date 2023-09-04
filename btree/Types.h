@@ -103,6 +103,7 @@ namespace BTree {
         uint32_t    pageFrees;
         uint32_t    mergeAttempts;
         uint32_t    pageMerges;
+        uint32_t    pageShifts;
         uint32_t    rootUpdates;
         uint32_t    splitUpdates;
         uint32_t    commits;

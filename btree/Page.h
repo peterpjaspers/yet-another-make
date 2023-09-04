@@ -174,23 +174,30 @@ namespace BTree {
         inline PageSize payload() const { return( filling() - overhead<AK,AV>() ); }
         
 
+        // Return number of bytes required to store a key.
+        template< bool AK = KA, std::enable_if_t<(!AK),bool> = true >
+        inline PageSize keyFilling() const { return sizeof(K); }
+        template< bool AK = KA, std::enable_if_t<(AK),bool> = true >
+        inline PageSize keyFilling(const PageSize keySize) const { return (sizeof( PageSize ) + (keySize * sizeof(K))); }
+        // Return number of bytes required to store a value.
+        template< bool AV = VA, std::enable_if_t<(!AV),bool> = true >
+        inline PageSize valueFilling() const { return sizeof(V); }
+        template< bool AV = VA, std::enable_if_t<(AV),bool> = true >
+        inline PageSize valueFilling(const PageSize valueSize) const { return (sizeof( PageSize ) + (valueSize * sizeof(V))); }
+        // Return number of bytes required to store a split value.
+        template< bool AV = VA, std::enable_if_t<(!AV),bool> = true >
+        inline PageSize splitValueFilling() const { return sizeof(V); }
+        template< bool AV = VA, std::enable_if_t<(AV),bool> = true >
+        inline PageSize splitValueFilling(const PageSize valueSize) const { return (valueSize * sizeof(V)); }
         // Return number of bytes required to store a single key-value entry.
         template< bool AK = KA, bool AV = VA, std::enable_if_t<(!AK&&!AV),bool> = true >
-        inline PageSize entryFilling() const {
-            return (sizeof(K) + sizeof(V));
-        }
+        inline PageSize entryFilling() const { return (keyFilling() + valueFilling()); }
         template< bool AK = KA, bool AV = VA, std::enable_if_t<(AK&&!AV),bool> = true >
-        inline PageSize entryFilling(const PageSize keySize) const {
-            return (sizeof(PageSize) + (keySize * sizeof(K)) + sizeof(V));
-        }
+        inline PageSize entryFilling(const PageSize keySize) const { return (keyFilling( keySize ) + valueFilling()); }
         template< bool AK = KA, bool AV = VA, std::enable_if_t<(!AK&&AV),bool> = true >
-        inline PageSize entryFilling(const PageSize valueSize) const {
-            return (sizeof(K) + sizeof(PageSize) + (valueSize * sizeof(V)));
-        }
+        inline PageSize entryFilling(const PageSize valueSize) const { return (keyFilling() + valueFilling( valueSize )); }
         template< bool AK = KA, bool AV = VA, std::enable_if_t<(AK&&AV),bool> = true >
-        inline PageSize entryFilling(const PageSize keySize, const PageSize valueSize) const {
-            return ((2 * sizeof(PageSize)) + (keySize * sizeof(K)) + (valueSize * sizeof(V)));
-        }
+        inline PageSize entryFilling(const PageSize keySize, const PageSize valueSize) const { return (keyFilling( keySize ) + valueFilling( valueSize )); }
 
 
         // Determine if an entry will fit in this page.

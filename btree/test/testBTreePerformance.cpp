@@ -12,6 +12,7 @@ using namespace BTree;
 using namespace std;
 
 // Test program to measure BTree performance.
+// ToDo: Benchmark against std::map performance (both memory usage and speed) with default allocator
 
 const int BTreePageSize = 4096;
 
@@ -253,6 +254,7 @@ public:
                 << "    Page frees        " << stats.pageFrees << "\n"
                 << "    Merge attempts    " << stats.mergeAttempts << "\n"
                 << "    Page merges       " << stats.pageMerges << "\n"
+                << "    Page shifts       " << stats.pageShifts << "\n"
                 << "    Root updates      " << stats.rootUpdates << "\n"
                 << "    Split updates     " << stats.splitUpdates << "\n"
                 << "    Commits           " << stats.commits << "\n"
@@ -388,9 +390,9 @@ int main(int argc, char* argv[]) {
         errors += 1;
     }
     if (0 < errors) {
-        log << errors << " errors detected!";
+        log << "\n\n" << errors << " errors detected!";
     } else {
-        log << "No errors detected.";
+        log << "\n\nNo errors detected.";
     }
     log.flush();
     log.close();

@@ -29,6 +29,7 @@ namespace BTree {
         pageFrees = 0;
         mergeAttempts = 0;
         pageMerges = 0;
+        pageShifts = 0;
         rootUpdates = 0;
         splitUpdates = 0;
         commits = 0;
@@ -48,6 +49,7 @@ namespace BTree {
         pageFrees = stats.pageFrees;
         mergeAttempts = stats.mergeAttempts;
         pageMerges = stats.pageMerges;
+        pageShifts = stats.pageShifts;
         rootUpdates = stats.rootUpdates;
         splitUpdates = stats.splitUpdates;
         commits = stats.commits;
@@ -67,6 +69,7 @@ namespace BTree {
         pageFrees += stats.pageFrees;
         mergeAttempts += stats.mergeAttempts;
         pageMerges += stats.pageMerges;
+        pageShifts += stats.pageShifts;
         rootUpdates += stats.rootUpdates;
         splitUpdates += stats.splitUpdates;
         commits += stats.commits;

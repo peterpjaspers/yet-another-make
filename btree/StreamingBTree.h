@@ -66,6 +66,9 @@ namespace BTree {
             if (reader.isOpen() && (reader.key() == key)) {
                 throw std::string( signature ) + " : Accessing writer stream on open reader stream";
             }
+            if (writer.isOpen()) {
+                throw std::string( signature ) + " : Accessing open writer stream";
+            }
             StreamKey<K> streamKey( key, 0 );
             if ( Tree<StreamKey<K>,uint8_t[]>::contains( streamKey ) ) removeBlocks( key );
             return writer.open( key );
