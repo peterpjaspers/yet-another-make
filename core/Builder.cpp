@@ -102,7 +102,6 @@ namespace YAM
             _notifyCompletion();
         } else if (request->requestType() == BuildRequest::Build) {
             _init(request->directory());
-            //_context.mainThreadQueue().push(Delegate<void>::CreateLambda(([this]() { _start(); })));
             _start();
         } else {
             throw std::exception("unknown build request type");
@@ -174,8 +173,6 @@ namespace YAM
             _dirtyBuildFiles->setState(_dirtySources->state());
             _handleBuildFilesCompletion(_dirtyBuildFiles.get());
         } else {
-            _dirtySources->inputProducers(std::vector<std::shared_ptr<Node>>());
-            _dirtySources->setState(Node::State::Ok);
             std::vector<std::shared_ptr<Node>> dirtyBuildFiles;
             // TODO: find dirty build files
             // TODO: update set of BuildFileParserNodes to be in sync with
@@ -199,8 +196,6 @@ namespace YAM
             _dirtyCommands->setState(_dirtyCommands->state());
             _handleCommandsCompletion(_dirtyCommands.get());
         } else {
-            _dirtyCommands->inputProducers(std::vector<std::shared_ptr<Node>>());
-            _dirtyCommands->setState(Node::State::Ok);
             std::vector<std::shared_ptr<Node>> dirtyCommands;
             appendDirtyCommands(_context.nodes(), dirtyCommands);
             if (dirtyCommands.empty()) {
@@ -222,13 +217,22 @@ namespace YAM
         _result->nNodesStarted(_context.statistics().nStarted);
         _result->nRehashedFiles(_context.statistics().nRehashedFiles);
 
-        _dirtyCommands->inputProducers(std::vector<std::shared_ptr<Node>>());
-        _dirtyCommands->setState(Node::State::Ok);
-        _notifyCompletion();
+        // Delay clearing the inputProducers of the _dirty* nodes to avoid
+        // removing an observer on a node that is notifying.
+        auto d = Delegate<void>::CreateLambda([this]() { _notifyCompletion(); });
+        _context.mainThreadQueue().push(std::move(d));
     }
 
     // Called in main thread
     void Builder::_notifyCompletion() {
+        std::vector<std::shared_ptr<Node>> emptyNodes;
+        _dirtySources->inputProducers(emptyNodes);
+        _dirtyBuildFiles->inputProducers(emptyNodes);
+        _dirtyCommands->inputProducers(emptyNodes);
+        _dirtySources->setState(Node::State::Ok);
+        _dirtyBuildFiles->setState(Node::State::Ok);
+        _dirtyCommands->setState(Node::State::Ok);
+
         auto result = _result;
         _result = nullptr;
         _context.buildRequest(nullptr);

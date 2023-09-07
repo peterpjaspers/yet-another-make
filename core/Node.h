@@ -182,6 +182,7 @@ namespace YAM
 #endif
 
         MulticastDelegate<Node*> _completor;
+        bool _notifyingObservers;
         std::unordered_set<StateObserver*> _observers;
 
         bool _modified;

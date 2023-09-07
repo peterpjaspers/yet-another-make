@@ -36,6 +36,7 @@ namespace YAM
         , _state(Node::State::Dirty)
         , _canceling(false)
         , _nExecutingNodes(0)
+        , _notifyingObservers(false)
         , _modified(false)
     {}
 
@@ -45,6 +46,7 @@ namespace YAM
         , _state(Node::State::Dirty)
         , _canceling(false)
         , _nExecutingNodes(0)
+        , _notifyingObservers(false)
         , _modified(false)
     {} 
 
@@ -58,25 +60,33 @@ namespace YAM
                 _state == Node::State::Ok
                 || _state == Node::State::Failed
                 || _state == Node::State::Canceled;
-            if (wasExecuting && nowCompleted) {
-                for (auto observer : _observers) {
-                    observer->handleCompletionOf(this);
-                }
-            }
+            _notifyingObservers = true;
             if (_state == Node::State::Dirty) {
                 for (auto observer : _observers) {
                     observer->handleDirtyOf(this);
                 }
             }
+            if (wasExecuting && nowCompleted) {
+                for (auto observer : _observers) {
+                    observer->handleCompletionOf(this);
+                }
+            }
+            _notifyingObservers = false;
         }
     }
 
     void Node::addObserver(StateObserver* observer) {
+        if (_notifyingObservers) {
+            throw std::runtime_error("Attempt to add state observer while notifying");;
+        }
         auto p = _observers.insert(observer);
         if (!p.second) throw std::runtime_error("Attempt to add duplicate state observer");
     }
 
     void Node::removeObserver(StateObserver* observer) {
+        if (_notifyingObservers) {
+            throw std::runtime_error("Attempt to remove state observer while notifying");;
+        }
         if (0 == _observers.erase(observer)) throw std::runtime_error("Attempt to remove unknown state observer");
     }
 

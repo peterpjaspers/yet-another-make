@@ -40,6 +40,7 @@ namespace YAM
 
     void FileNode::start() {
         Node::start();
+        context()->statistics().registerSelfExecuted(this);
         auto d = Delegate<void>::CreateLambda([this]() {execute(); });
         context()->threadPoolQueue().push(std::move(d));
     }
@@ -50,7 +51,7 @@ namespace YAM
         std::error_code ok;
         std::error_code ec;
         auto newLastWriteTime = retrieveLastWriteTime(ec);
-        bool success = ec == ok;
+        bool success = true; // ec == ok;
         if (success) {
             changed = newLastWriteTime != _lastWriteTime;
             if (changed) {

@@ -12,7 +12,8 @@ namespace YAM
 
         void add(LogRecord const& record) override;
 
-        std::vector<LogRecord> const& records();
+        std::vector<LogRecord> const& records() const;
+        void clear();
 
         // Log all previously added records to given 'log'.
         void forwardTo(ILogBook& log) const;

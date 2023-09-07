@@ -196,6 +196,7 @@ namespace YAM
         } else if (canceling()) {
             Node::notifyCompletion(Node::State::Canceled);
         } else {
+            context()->statistics().registerSelfExecuted(this);
             auto d = Delegate<void>::CreateLambda(
                 [this]() { retrieveContentIfNeeded(); }
             );

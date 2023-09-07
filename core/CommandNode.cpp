@@ -419,6 +419,7 @@ namespace YAM
         } else if (canceling()) {
             Node::notifyCompletion(Node::State::Canceled);
         } else if (_executionHash != computeExecutionHash()) {
+            context()->statistics().registerSelfExecuted(this);
             auto d = Delegate<void>::CreateLambda(
                 [this]() { executeScript(); }
             );
@@ -456,9 +457,9 @@ namespace YAM
 
     void CommandNode::handleExecuteScriptCompletion(ExecutionResult& result) {
         if (result._newState != Node::State::Ok) {
-            notifyCompletion(result._newState);
         } else if (canceling()) {
-            notifyCompletion(Node::State::Canceled);
+            result._newState = Node::State::Canceled;
+            result._log.clear();
         } else {
             std::vector<std::shared_ptr<GeneratedFileNode>> outputNodes;
             bool validOutputs = findOutputNodes(result._outputPaths, outputNodes, result._log);
@@ -495,7 +496,6 @@ namespace YAM
                     result._addedInputNodes,
                     outputsAndNewInputs,
                     result._log);
-                result._log.forwardTo(*(context()->logBook()));
                 if (validKeptInputs && validNewInputs) {
                     setInputs(result);
                     std::vector<Node*> rawNodes;
@@ -506,9 +506,12 @@ namespace YAM
                     startNodes(rawNodes, std::move(callback));
                 } else {
                     result._newState = Node::State::Failed;
-                    notifyCompletion(result._newState);
                 }
             }
+        }
+        result._log.forwardTo(*(context()->logBook()));
+        if (result._newState != Node::State::Ok) {
+            notifyCompletion(result._newState);
         }
     }
 
@@ -551,7 +554,7 @@ namespace YAM
                 logDirRemovalError(this, tmpDir, ec, logBook);
             }
             result.readOnlyFiles.erase(scriptFilePath);
-        } else if (canceling()) {
+        } else if (!canceling()) {
             logScriptFailure(this, result, tmpDir, logBook);
         }
         return result;

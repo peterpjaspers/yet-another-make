@@ -327,8 +327,8 @@ namespace
         // 3-4 dir nodes repo.dir, repo.dir/src
         // 5-6 source file nodes repo.dir/src/pietCpp, repo.dir/src/pietH
         // 7-8 source file nodes repo.dir/src/janCpp, repo.dir/src/janH
-        // 9-11 generated file nodes pietOut, janOut, pietjanOut
-        // 12-14 generated file nodes pietOut, janOut, pietjanOut as preCommitNodes
+        // 9-11 generated file nodes pietOut, janOut, pietjanOut before script exec
+        // 12-14 generated file nodes pietOut, janOut, pietjanOut after script exec
         // 15-17 commandNodes ccPiet, ccJan, linkPietjan
         // 18-23 root and src dir each have .ignore, .gitignore and .yamignore
         EXPECT_EQ(23, driver.stats.nStarted); 

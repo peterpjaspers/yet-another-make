@@ -2,7 +2,6 @@
 
 #include "Node.h"
 #include "FileAspect.h"
-#include "MemoryLogBook.h"
 #include "../xxHash/xxhash.h"
 
 #include <map>
