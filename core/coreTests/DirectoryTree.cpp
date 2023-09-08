@@ -117,6 +117,7 @@ namespace YAMTest
 
     void DirectoryTree::updateHash() {
         std::vector<XXH64_hash_t> hashes;
+        hashes.push_back(0);
         for (auto const& f : _files)
         {
             if (!_excludes.matches(f.string())) {
@@ -134,7 +135,7 @@ namespace YAMTest
     void verify(DirectoryTree* expected, YAM::SourceDirectoryNode* actual) {
 
         EXPECT_EQ(YAM::Node::State::Ok, actual->state());
-        EXPECT_EQ(expected->getHash(), actual->executionHash());
+        EXPECT_EQ(expected->getHash(), actual->computeExecutionHash(0, actual->getContent()));
 
         std::vector<std::shared_ptr<YAM::FileNode>> fileNodes;
         actual->getFiles(fileNodes);

@@ -124,10 +124,9 @@ namespace YAM
         void stream(IStreamer* streamer) override;
 
     private:
-        std::chrono::time_point<std::chrono::utc_clock> retrieveLastWriteTime(std::error_code& ec) const;
+        std::chrono::time_point<std::chrono::utc_clock> retrieveLastWriteTime() const;
         void execute();
-        void finish(
-            bool success, 
+        void finish( 
             std::chrono::time_point<std::chrono::utc_clock> const& newLastWriteTime,
             std::map<std::string, XXH64_hash_t> const& newHashes);
 

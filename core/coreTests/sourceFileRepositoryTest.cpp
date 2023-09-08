@@ -24,22 +24,23 @@ namespace
     auto isDirtyNode = Delegate<bool, Node*>::CreateLambda([](Node* n) { return n->state() == Node::State::Dirty; });
 
     void findDirtyNodes(
-        SourceDirectoryNode* dirNode, 
+        Node* node, 
         std::vector<Node*>& dirtyNodes, 
         std::unordered_set<Node*>& visitedNodes
     ) {
-        auto const& content = dirNode->getContent();
-        for (auto const& pair : content) {
-            if (!visitedNodes.insert(pair.second.get()).second) return; // node was already visited
-            if (pair.second->state() == Node::State::Dirty) {
-                dirtyNodes.push_back(pair.second.get());
-            }
-            auto childDir = dynamic_cast<SourceDirectoryNode*>(pair.second.get());
-            if (childDir != nullptr) {
-                findDirtyNodes(childDir, dirtyNodes, visitedNodes);
+        if (!visitedNodes.insert(node).second) return; // node was already visited
+        if (node->state() == Node::State::Dirty) {
+            dirtyNodes.push_back(node);
+        }
+        auto dirNode = dynamic_cast<SourceDirectoryNode*>(node);
+        if (dirNode != nullptr) {
+            auto const& content = dirNode->getContent();
+            for (auto const& pair : content) {
+                findDirtyNodes(pair.second.get(), dirtyNodes, visitedNodes);
             }
         }
     }
+
     std::vector<Node*> getDirtyNodes(SourceDirectoryNode* dirNode) {
         std::vector<Node*> dirtyNodes;
         std::unordered_set<Node*> visitedNodes;

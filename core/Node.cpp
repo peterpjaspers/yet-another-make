@@ -37,7 +37,7 @@ namespace YAM
         , _canceling(false)
         , _nExecutingNodes(0)
         , _notifyingObservers(false)
-        , _modified(false)
+        , _modified(false) // because this instance will be deserialized
     {}
 
     Node::Node(ExecutionContext* context, std::filesystem::path const& name)
@@ -47,7 +47,7 @@ namespace YAM
         , _canceling(false)
         , _nExecutingNodes(0)
         , _notifyingObservers(false)
-        , _modified(false)
+        , _modified(true)
     {} 
 
     Node::~Node() {}

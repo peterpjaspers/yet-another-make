@@ -32,7 +32,8 @@ namespace YAM
         return repo->symbolicPathOf(name());
     }
      
-    std::chrono::time_point<std::chrono::utc_clock> FileNode::retrieveLastWriteTime(std::error_code& ec) const {
+    std::chrono::time_point<std::chrono::utc_clock> FileNode::retrieveLastWriteTime() const {
+        std::error_code ec;
         auto lwt = std::filesystem::last_write_time(name(), ec);
         auto lwutc = decltype(lwt)::clock::to_utc(lwt);
         return lwutc;
@@ -46,45 +47,32 @@ namespace YAM
     }
 
     void FileNode::execute() {
-        bool changed = false;
         std::map<std::string, XXH64_hash_t> newHashes;
-        std::error_code ok;
-        std::error_code ec;
-        auto newLastWriteTime = retrieveLastWriteTime(ec);
-        bool success = true; // ec == ok;
-        if (success) {
-            changed = newLastWriteTime != _lastWriteTime;
-            if (changed) {
-                std::vector<FileAspect> aspects = context()->findFileAspects(name());
-                for (auto const& aspect : aspects) {
-                    newHashes[aspect.name()] = aspect.hash(name());
-                }
+        auto newLastWriteTime = retrieveLastWriteTime();
+        if (newLastWriteTime != _lastWriteTime) {
+            std::vector<FileAspect> aspects = context()->findFileAspects(name());
+            for (auto const& aspect : aspects) {
+                newHashes[aspect.name()] = aspect.hash(name());
             }
         }
         auto d = Delegate<void>::CreateLambda(
-            [this, success, newLastWriteTime, newHashes]() {
-                finish(success, newLastWriteTime, newHashes);
+            [this, newLastWriteTime, newHashes]() {
+                finish(newLastWriteTime, newHashes);
             });
         context()->mainThreadQueue().push(std::move(d));
     }
        
     void FileNode::finish(
-            bool success,
             std::chrono::time_point<std::chrono::utc_clock> const& newLastWriteTime,
             std::map<std::string, XXH64_hash_t> const& newHashes
     ) {
-        if (!success) {
-            LogRecord error(
-                LogRecord::Aspect::Error,
-                std::string("Failed to rehash file ").append(name().string()));
-            context()->addToLogBook(error);
-        } else if (newLastWriteTime != _lastWriteTime) {
+        if (newLastWriteTime != _lastWriteTime) {
             _lastWriteTime = newLastWriteTime;
             _hashes = newHashes;
             modified(true);
             context()->statistics().registerRehashedFile(this);
         }
-        Node::notifyCompletion(success ? Node::State::Ok : Node::State::Failed);
+        Node::notifyCompletion(Node::State::Ok);
     }
 
     XXH64_hash_t FileNode::hashOf(std::string const& aspectName) {

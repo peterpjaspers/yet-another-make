@@ -40,6 +40,7 @@ namespace YAM
         void addPrerequisitesToContext();
 
         SourceDirectoryNode* parent() const;
+        std::shared_ptr<DotIgnoreNode> const& dotIgnoreNode() { return _dotIgnoreNode; }
 
         // Query the directory content, vector content is sorted by node name.
         void getFiles(std::vector<std::shared_ptr<FileNode>>& filesInDir);
@@ -57,6 +58,10 @@ namespace YAM
         // Pre: state() == State::Ok
         // Return the execution hash (hash of hash of all dir entry names)
         XXH64_hash_t executionHash() const;
+
+        XXH64_hash_t computeExecutionHash(
+            XXH64_hash_t dotIgnoreNodeHash,
+            std::map<std::filesystem::path, std::shared_ptr<Node>> const& content) const;
 
         // Recursively remove the directory content from context->nodes().
         void clear();
@@ -89,9 +94,9 @@ namespace YAM
 
         void handleRequisitesCompletion(Node::State state);
         void retrieveContentIfNeeded();
-        void handleRetrieveContentCompletion(RetrieveResult const& result);
+        void handleRetrieveContentCompletion(RetrieveResult& result);
 
-        std::chrono::time_point<std::chrono::utc_clock> retrieveLastWriteTime(std::error_code& ec) const;
+        std::chrono::time_point<std::chrono::utc_clock> retrieveLastWriteTime() const;
         std::shared_ptr<Node> getNode(
             std::filesystem::directory_entry const& dirEntry,
             std::unordered_set<std::shared_ptr<Node>>& added,
@@ -101,7 +106,6 @@ namespace YAM
             std::unordered_set<std::shared_ptr<Node>>& added,
             std::unordered_set<std::shared_ptr<Node>>& kept,
             std::unordered_set<std::shared_ptr<Node>>& removed) const;
-        XXH64_hash_t computeExecutionHash(std::map<std::filesystem::path, std::shared_ptr<Node>> const& content) const;
         void _removeChildRecursively(std::shared_ptr<Node> const& child);
 
         SourceDirectoryNode* _parent;

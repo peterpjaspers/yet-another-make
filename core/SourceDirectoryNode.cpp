@@ -91,9 +91,11 @@ namespace YAM
         return _lastWriteTime;
     }
 
-    std::chrono::time_point<std::chrono::utc_clock> SourceDirectoryNode::retrieveLastWriteTime(std::error_code& ec) const {
-        auto lwt = std::filesystem::last_write_time(name(), ec);
-        return decltype(lwt)::clock::to_utc(lwt);
+    std::chrono::time_point<std::chrono::utc_clock> SourceDirectoryNode::retrieveLastWriteTime() const {
+        std::error_code ec;
+        auto flwt = std::filesystem::last_write_time(name(), ec);
+        auto ulwt = decltype(flwt)::clock::to_utc(flwt);
+        return ulwt;
     }
 
     std::shared_ptr<Node> SourceDirectoryNode::getNode(
@@ -164,8 +166,12 @@ namespace YAM
         modified(true);
     }
 
-    XXH64_hash_t SourceDirectoryNode::computeExecutionHash(std::map<std::filesystem::path, std::shared_ptr<Node>> const& content) const {
+    XXH64_hash_t SourceDirectoryNode::computeExecutionHash(
+        XXH64_hash_t dotIgnoreNodeHash,
+        std::map<std::filesystem::path, std::shared_ptr<Node>> const& content
+    ) const {
         std::vector<XXH64_hash_t> hashes;
+        hashes.push_back(dotIgnoreNodeHash);
         for (auto const& pair : content) {
             std::shared_ptr<Node> n = pair.second;
             hashes.push_back(XXH64_string(n->name().string()));
@@ -176,7 +182,7 @@ namespace YAM
     void SourceDirectoryNode::handleDirtyOf(Node* observedNode) {
         if (observedNode == _dotIgnoreNode.get()) {
             if (_dotIgnoreNode->state() != Node::State::Dirty) throw std::exception("Unexpected state of _dotIgnoreNode");
-            _dotIgnoreNode->setState(Node::State::Dirty);
+            setState(Node::State::Dirty);
         }
     }
 
@@ -208,13 +214,14 @@ namespace YAM
         auto result = std::make_shared<RetrieveResult>();
         bool success = true;
         try {
-            std::error_code ok;
-            std::error_code ec;
-            result->_lastWriteTime = retrieveLastWriteTime(ec);
-            success = ec == ok;
-            if (success) {
+            result->_lastWriteTime = retrieveLastWriteTime();
+            result->_executionHash = computeExecutionHash(_dotIgnoreNode->hash(), result->_content);
+            if (
+                result->_lastWriteTime != _lastWriteTime 
+                || result->_executionHash != _executionHash // because _dotIgnoreNode changed
+            ) {
                 retrieveContent(result->_content, result->_added, result->_removed, result->_kept);
-                result->_executionHash = computeExecutionHash(result->_content);
+                result->_executionHash = computeExecutionHash(_dotIgnoreNode->hash(), result->_content);
             }
         } catch (std::filesystem::filesystem_error) {
             success = false;
@@ -226,20 +233,30 @@ namespace YAM
         context()->mainThreadQueue().push(std::move(d));
     }
 
-    void SourceDirectoryNode::handleRetrieveContentCompletion(RetrieveResult const& result) {
+    void SourceDirectoryNode::handleRetrieveContentCompletion(RetrieveResult& result) {
         if (result._newState != Node::State::Ok) {
-            Node::notifyCompletion(result._newState);
+            notifyCompletion(result._newState);
+        } else if (canceling()) {
+            result._newState = Node::State::Canceled;
+            notifyCompletion(result._newState);
         } else {
-            if (result._lastWriteTime != _lastWriteTime) {
+            if (
+                result._lastWriteTime == _lastWriteTime
+                && result._executionHash == _executionHash
+            ) {
+                notifyCompletion(result._newState);
+            } else {
                 _lastWriteTime = result._lastWriteTime;
-                _content = result._content;
                 _executionHash = result._executionHash;
+                _content = result._content;
                 for (auto const& n : result._added) {
                     auto node = context()->nodes().find(n->name());
                     if (node == nullptr) {
-                        n->addObserver(this);
-                        context()->nodes().add(n);
                         node = n;
+                        node->addObserver(this);
+                        context()->nodes().add(node);
+                    } else if (!node->observers().contains(this)) {
+                        node->addObserver(this);
                     }
                     auto dir = dynamic_pointer_cast<SourceDirectoryNode>(node);
                     if (dir != nullptr) dir->addPrerequisitesToContext();
