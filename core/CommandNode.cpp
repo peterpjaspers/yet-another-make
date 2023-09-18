@@ -298,16 +298,18 @@ namespace YAM
     }
 
     void CommandNode::setInputs(ExecutionResult const& result) {
-        // An input GeneratedFileNode is not a prerequisite of the CommandNode.
+        // Note that the producer of an input GeneratedFileNode is a requisite
+        // of the command node, not the GeneratedFileNode itself. 
         // A command node therefore does not register itself as observer of an
-        // input GeneratedFileNode. Instead the command node registers itself as
-        // observer of the producer of the input GeneratedFileNode. This prevents
-        // spurious callbacks to Node::handleCompletionOf(Node* genFileNode)
-        // from input GeneratedFileNodes to the command node.
+        // input GeneratedFileNode. Instead it registers itself as observer of
+        // the producer of the input GeneratedFileNode (in function 
+        // inputProducers(..)). This prevents a spurious callback to 
+        // Node::handleCompletionOf(Node* genFileNode) from the input
+        // GeneratedFileNode to the command node.
         // Note: Dirty propagation in case of tampering with generated files
-        // remains intact because a GeneratedFileNode propagates to its 
-        // producer (who again propagates to its dependants, i.e to nodes that
-        // read output files of the producer).
+        // remains intact because a GeneratedFileNode propagates Dirty to its 
+        // producer (who then notifies its observers, i.e to nodes that read
+        // one or more output files of the producer).
         // 
         for (auto const& path : result._removedInputPaths) {
             auto it = _inputs.find(path);

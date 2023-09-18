@@ -18,7 +18,7 @@ namespace YAM
         //  - Removed A/F and Modified A
         // Renaming a file A/F to B/G can be reported in various ways: 
         //    - Removed file A/F + Added file B/G
-        //  - Renamed file B/G, oldFile A/F 
+        //    - Renamed file B/G, oldFile A/F 
         //    - Removed file A/F + modified directory B
         //
         // Take care: some implementations may report for a given file

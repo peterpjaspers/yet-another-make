@@ -23,6 +23,8 @@ namespace YAM
     //      names of the files and subdirs in the directory.
     // FileRepositories are registered in the execution context of the node.
     //
+    // All functions execute in main thread unless stated otherwise.
+    //
     class __declspec(dllexport) SourceDirectoryNode : public Node
     {
     public:
@@ -93,9 +95,13 @@ namespace YAM
         };
 
         void handleRequisitesCompletion(Node::State state);
-        void retrieveContentIfNeeded();
+        void retrieveContentIfNeeded(); // Executes in a threadpool thread
         void handleRetrieveContentCompletion(RetrieveResult& result);
+        void startChildren();
+        void commitResult(YAM::SourceDirectoryNode::RetrieveResult& result);
+        void _removeChildRecursively(std::shared_ptr<Node> const& child);
 
+        // Next 3 functions execute in a threadpool thread
         std::chrono::time_point<std::chrono::utc_clock> retrieveLastWriteTime() const;
         std::shared_ptr<Node> getNode(
             std::filesystem::directory_entry const& dirEntry,
@@ -106,7 +112,6 @@ namespace YAM
             std::unordered_set<std::shared_ptr<Node>>& added,
             std::unordered_set<std::shared_ptr<Node>>& kept,
             std::unordered_set<std::shared_ptr<Node>>& removed) const;
-        void _removeChildRecursively(std::shared_ptr<Node> const& child);
 
         SourceDirectoryNode* _parent;
         std::shared_ptr<DotIgnoreNode> _dotIgnoreNode;

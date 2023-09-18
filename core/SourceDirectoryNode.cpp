@@ -111,6 +111,11 @@ namespace YAM
                 child = it->second;
                 kept.insert(it->second);
             } else {
+                // A node for this entry may be present in buildstate (contect->nodes()).
+                // getNode() executes in threadpool context, hence buildstate access
+                // at this point is not allowed. Instead optimistically create a new node
+                // and check in main thread (commitResult) whether it already existed in
+                // buildstate.
                 child = createNode(const_cast<SourceDirectoryNode*>(this), dirEntry, context());
                 added.insert(child);
             }
@@ -210,6 +215,7 @@ namespace YAM
         }
     }
 
+    // Executes in a threadpool thread
     void SourceDirectoryNode::retrieveContentIfNeeded() {
         auto result = std::make_shared<RetrieveResult>();
         bool success = true;
@@ -246,38 +252,46 @@ namespace YAM
             ) {
                 notifyCompletion(result._newState);
             } else {
-                _lastWriteTime = result._lastWriteTime;
-                _executionHash = result._executionHash;
-                _content = result._content;
-                for (auto const& n : result._added) {
-                    auto node = context()->nodes().find(n->name());
-                    if (node == nullptr) {
-                        node = n;
-                        node->addObserver(this);
-                        context()->nodes().add(node);
-                    } else if (!node->observers().contains(this)) {
-                        node->addObserver(this);
-                    }
-                    auto dir = dynamic_pointer_cast<SourceDirectoryNode>(node);
-                    if (dir != nullptr) dir->addPrerequisitesToContext();
-                }
-                for (auto const& n : result._removed) {
-                    _removeChildRecursively(n);
-                }
-                modified(true);
-                context()->statistics().registerUpdatedDirectory(this);
-                if (context()->logBook()->mustLogAspect(LogRecord::Aspect::DirectoryChanges)) {
-                    LogRecord progress(LogRecord::Aspect::Progress, std::string("Rehashed directory ").append(name().string()));
-                    context()->addToLogBook(progress);
-                }
-
-                std::vector<Node*> children;
-                for (auto const& pair : _content) children.push_back(pair.second.get());
-                auto callback = Delegate<void, Node::State>::CreateLambda(
-                    [this](Node::State s) { Node::notifyCompletion(s); }
-                );
-                Node::startNodes(children, std::move(callback));
+                commitResult(result);
+                startChildren();
             }
+        }
+    }
+
+    void SourceDirectoryNode::startChildren() {
+        std::vector<Node*> children;
+        for (auto const& pair : _content) children.push_back(pair.second.get());
+        auto callback = Delegate<void, Node::State>::CreateLambda(
+            [this](Node::State s) { Node::notifyCompletion(s); }
+        );
+        Node::startNodes(children, std::move(callback));
+    }
+
+    // Executes in main thread
+    void SourceDirectoryNode::commitResult(YAM::SourceDirectoryNode::RetrieveResult& result) {
+        _lastWriteTime = result._lastWriteTime;
+        _executionHash = result._executionHash;
+        _content = result._content;
+        for (auto const& n : result._added) {
+            // A node with name n->name() may already exist in buildstate.
+            // If so, use that one instead of n.
+            auto node = context()->nodes().find(n->name());
+            if (node == nullptr) {
+                node = n;
+                context()->nodes().add(node);
+            }
+            node->addObserver(this);
+            auto dir = dynamic_pointer_cast<SourceDirectoryNode>(node);
+            if (dir != nullptr) dir->addPrerequisitesToContext();
+        }
+        for (auto const& n : result._removed) {
+            _removeChildRecursively(n);
+        }
+        modified(true);
+        context()->statistics().registerUpdatedDirectory(this);
+        if (context()->logBook()->mustLogAspect(LogRecord::Aspect::DirectoryChanges)) {
+            LogRecord progress(LogRecord::Aspect::Progress, std::string("Rehashed directory ").append(name().string()));
+            context()->addToLogBook(progress);
         }
     }
 
