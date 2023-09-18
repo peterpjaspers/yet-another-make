@@ -18,7 +18,13 @@
     <ClInclude Include="BTree.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Compare.h">
+    <ClInclude Include="BTreeIterator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CompareKey.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Forest.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Page.h">
@@ -27,10 +33,19 @@
     <ClInclude Include="PageFunctions.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="PageFunctions_Imp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="PagePool.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="PagePool_Imp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="PageStreamASCII.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PageStreamASCII_Imp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="PersistentPagePool.h">
@@ -39,10 +54,34 @@
     <ClInclude Include="StreamingBTree.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="StreamingBTreeIterator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="String2StringTree.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="String2StringTree_Imp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="String2ValueTree.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="Trail.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="TreeBase.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TreeBase_Imp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="Types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Value2StringTree.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ValueStreamer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -54,15 +93,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="PersistentPagePool.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="testBTree.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="testPage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="testStreamingBTree.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Types.cpp">
