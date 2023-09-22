@@ -111,12 +111,14 @@ namespace BTree {
         StreamKey<K> streamKey;
         std::vector<uint8_t> buffer;
         uint16_t position;
+        uint32_t size;
         void writeBlock() {
             static const char* signature( "void ValueWriter<K>writeBlock()" );
             if (0 < position) {
                 if (streamKey.sequence == UINT16_MAX) throw std::string( signature ) + " - Exceding maximum block count";
                 tree.insert( streamKey, &buffer[ 0 ], position );
                 streamKey.nextBlock();
+                size += position;
                 position = 0;
             }
         }
@@ -150,6 +152,7 @@ namespace BTree {
             if (isOpen()) throw std::string( signature ) + " - Opening while writer open";
             streamKey = StreamKey<K>( key, 0 );
             position = 0;
+            size = 0;
             return *this;
         }
         bool isOpen() const { return( position != UINT16_MAX ); }
@@ -158,6 +161,7 @@ namespace BTree {
             if (!isOpen()) throw std::string( signature ) + " - Closing closed writer";
             writeBlock();
             position = UINT16_MAX;
+            size = 0;
         }
         const K& key() const {
             static const char* signature = "const K& ValueWriter<K>::key()";

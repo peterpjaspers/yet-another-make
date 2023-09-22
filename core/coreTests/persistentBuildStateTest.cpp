@@ -147,29 +147,25 @@ namespace
     {
     public:
         SetupHelper& setup;
-        ExecutionContext context;
-        PersistentBuildState storage;
         std::shared_ptr<SourceDirectoryNode> repoDirNode;
 
         StorageHelper(SetupHelper& setupHelper)
             : setup(setupHelper)
-            , storage(setup.repoDir / "buildState", &context)
         {
-            context.addRepository(std::make_shared<FileRepository>("repo", setup.repoDir));
         }
 
         std::shared_ptr<SourceDirectoryNode> retrieve() {
-            storage.retrieve();
-            return dynamic_pointer_cast<SourceDirectoryNode>(context.nodes().find(setup.repoDir));
+            setup.persistentState.retrieve();
+            return dynamic_pointer_cast<SourceDirectoryNode>(setup.context.nodes().find(setup.repoDir));
         }
 
         std::size_t store() {
-            return storage.store();
+            return setup.persistentState.store();
         }
 
         bool consumeFileChangeEvent(std::initializer_list<std::filesystem::path> paths) {
-            auto sourceFileRepo = dynamic_pointer_cast<SourceFileRepository>(context.findRepository("repo"));
-            return consumeFileChangeEvents(sourceFileRepo.get(), context.mainThreadQueue(), paths);
+            auto sourceFileRepo = dynamic_pointer_cast<SourceFileRepository>(setup.context.findRepository("repo"));
+            return consumeFileChangeEvents(sourceFileRepo.get(),setup.context.mainThreadQueue(), paths);
         }
 
         XXH64_hash_t addFileAndUpdateFileAndExecuteNode(std::shared_ptr<FileNode> fileNode) {
@@ -180,7 +176,7 @@ namespace
             if (!consumed || Node::State::Dirty != fileNode->state()) throw std::exception("wrong state");
             // ... execute the file to recompute the file hash...
             std::vector<std::shared_ptr<Node>> dirtyNodes;
-            context.getDirtyNodes(dirtyNodes);
+            setup.context.getDirtyNodes(dirtyNodes);
             bool completed = YAMTest::executeNodes(dirtyNodes);
             EXPECT_TRUE(completed);
             // ... and verify that hash has changed
@@ -197,21 +193,21 @@ namespace
         StorageHelper storage(setup);
         auto repoDirNode = storage.retrieve();
         ASSERT_NE(nullptr, repoDirNode);
-        EXPECT_EQ(nNodes, storage.context.nodes().size());
+        EXPECT_EQ(nNodes, setup.context.nodes().size());
 
         // Verify that the rolled-back build state can be executed
         bool completed = YAMTest::executeNode(repoDirNode.get());
         EXPECT_TRUE(completed);
-        EXPECT_EQ(nNodes, storage.context.nodes().size());
+        EXPECT_EQ(nNodes, setup.context.nodes().size());
         storage.store(); // executeNode put all nodes to modified state
 
         // Verify that re-executing a file node sets it modified.
-        auto fileNode = dynamic_pointer_cast<FileNode>(storage.context.nodes().find(setup.repoDir / "File3"));
+        auto fileNode = dynamic_pointer_cast<FileNode>(setup.context.nodes().find(setup.repoDir / "File3"));
         ASSERT_NE(nullptr, fileNode);
         auto updatedHash = storage.addFileAndUpdateFileAndExecuteNode(fileNode);
         EXPECT_TRUE(fileNode->modified());
-        EXPECT_EQ(nNodes+1, storage.context.nodes().size()); // new FileNode for File4
-        auto newFileNode = dynamic_pointer_cast<FileNode>(storage.context.nodes().find(setup.repoDir / "File4"));
+        EXPECT_EQ(nNodes+1, setup.context.nodes().size()); // new FileNode for File4
+        auto newFileNode = dynamic_pointer_cast<FileNode>(setup.context.nodes().find(setup.repoDir / "File4"));
         EXPECT_NE(nullptr, newFileNode);
         EXPECT_TRUE(newFileNode->modified());
 
@@ -219,11 +215,11 @@ namespace
         std::size_t nStored = storage.store(); // store the modified file node.
         EXPECT_EQ(3, nStored); // repo dir, file3, file4
         storage.retrieve(); // replace all nodes in storage.context by ones freshly retrieved from storage
-        fileNode = dynamic_pointer_cast<FileNode>(storage.context.nodes().find(setup.repoDir / "File3"));
+        fileNode = dynamic_pointer_cast<FileNode>(setup.context.nodes().find(setup.repoDir / "File3"));
         ASSERT_NE(nullptr, fileNode);
 
         EXPECT_FALSE(fileNode->modified());
-        newFileNode = dynamic_pointer_cast<FileNode>(storage.context.nodes().find(setup.repoDir / "File4"));
+        newFileNode = dynamic_pointer_cast<FileNode>(setup.context.nodes().find(setup.repoDir / "File4"));
         EXPECT_NE(nullptr, newFileNode);
         EXPECT_FALSE(newFileNode->modified());
 

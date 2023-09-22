@@ -3,6 +3,7 @@
 
 #include "TreeBase.h"
 #include "BTree.h"
+#include "StreamingBTree.h"
 #include <map>
 
 namespace BTree {
@@ -36,7 +37,10 @@ namespace BTree {
             Tree< TreeIndex, PageLink >( pagePool, defaultCompareScalar<TreeIndex>, updateMode )
         {}
         // Destroy Forest and all B-Trees in the Forest.
-        ~Forest() { for ( auto tree : trees ) delete tree.second; }
+        ~Forest() { 
+            for ( auto tree : trees ) 
+                delete tree.second; 
+        }
         // Plant a B-Tree in the Forest with key and value class template arguments and
         // an optional key comparison function. The created B-Tree shares the PagePool
         // and page UpdateMode with all other B-Trees in the Forest
@@ -69,6 +73,7 @@ namespace BTree {
             Tree<TreeIndex,PageLink>::insert( index, tree->root->page );
             return tree;
         }
+      
         template< class K, class V >
         std::pair< Tree<K,V>*, TreeIndex > plant( const Tree<K,V>& source ) {
             TreeIndex index = uniqueIndex();
@@ -84,6 +89,22 @@ namespace BTree {
             Tree<TreeIndex,PageLink>::insert( index, tree->root->page );
             return tree;
         }
+
+        template< class K >
+        std::pair< StreamingTree<K>*, TreeIndex > plantStreamingTree() {
+            TreeIndex index = uniqueIndex();
+            return{ plantStreamingTree<K>(index), index };
+        }
+        template< class K >
+        StreamingTree<K>* plantStreamingTree(TreeIndex index) {
+            static const char* signature = "StreamingTree<K>* Forest::plantStreamingTree( TreeIndex )";
+            if (contains(index)) throw std::string(signature) + " - TreeIndex already in use";
+            StreamingTree<K>* tree = new StreamingTree<K>(pool, mode, nullptr);
+            trees[index] = tree;
+            Tree<TreeIndex, PageLink>::insert(index, tree->root->page);
+            return tree;
+        }
+
         // Access a B-Tree in the Forest via its TreeIndex obtained when the B-Tree was planted.
         // The key and value class template arguments (and optional key compae function) must match
         // those used to plant the B-Tree.
@@ -109,6 +130,18 @@ namespace BTree {
             trees[ index ] = tree;
             return( tree );
         }
+        template< class K >
+        StreamingTree<K>* accessStreamingTree(TreeIndex index) {
+            static const char* signature = "StreamingTree<K* Forest::plantStreamingTree( TreeIndex )";
+            if (0 < trees.count(index)) return reinterpret_cast<StreamingTree<K>*>(const_cast<TreeBase*>(trees[index]));
+            if (!contains(index)) throw std::string(signature) + " - StreamingTree not in Forest";
+            PageLink link = retrieve(index);
+            PageHeader* rootPage = pool.reference(link);
+            StreamingTree<K>* tree = new StreamingTree<K>(pool, mode, rootPage);
+            trees[index] = tree;
+            return(tree);
+        }
+
         // Commit modifications to all B-Trees in the Forest.
         // The commit is atomic for the entire Forest.
         void commit() {

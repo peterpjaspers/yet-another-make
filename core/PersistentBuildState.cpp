@@ -22,7 +22,7 @@ namespace YAM
     class BuildStateTypes
     {
     public:
-        enum TypeId : uint8_t {
+        enum TypeId : BTree::TreeIndex {
             Min = 0,
             CommandNode = 1,
             DotIgnoreNode = 2,
@@ -82,9 +82,45 @@ namespace YAM
             default: throw std::exception("unknown node type");
             }
         }
-    };        
-    
+    };    
     BuildStateTypes buildStateTypes;
+
+    class ValueStreamer : public IValueStreamer {
+    public:
+        ValueStreamer(BTree::ValueReader<PersistentBuildState::Key>& streamer)
+            : _streamer(streamer)
+            , _writing(false)
+        {}
+        ValueStreamer(BTree::ValueWriter<PersistentBuildState::Key>&streamer)
+            : _streamer(streamer)
+            , _writing(true)
+        {}
+
+        // Inherited via IValueStreamer
+        virtual bool writing() const override { return _writing; }
+        virtual void stream(void* bytes, unsigned int nBytes) override {
+            int8_t* values = reinterpret_cast<int8_t*>(bytes);
+            for (unsigned int i = 0; i < nBytes; i++) {
+                _streamer.stream(values[i]);
+            }
+        }
+        virtual void stream(bool& v) override { _streamer.stream(v); }
+        virtual void stream(float& v) override { _streamer.stream(v); }
+        virtual void stream(double& v) override { _streamer.stream(v); }
+        virtual void stream(int8_t& v) override { _streamer.stream(v); }
+        virtual void stream(uint8_t& v) override { _streamer.stream(v); }
+        virtual void stream(int16_t& v) override { _streamer.stream(v); }
+        virtual void stream(uint16_t& v) override { _streamer.stream(v); }
+        virtual void stream(int32_t& v) override { _streamer.stream(v); }
+        virtual void stream(uint32_t& v) override { _streamer.stream(v); }
+        virtual void stream(int64_t& v) override { _streamer.stream(v); }
+        virtual void stream(uint64_t& v) override { _streamer.stream(v); }
+
+    private:
+        BTree::ValueStreamer<PersistentBuildState::Key>& _streamer;
+        bool _writing;
+    };
+
 
     class SharedPersistableWriter : public YAM::ISharedObjectStreamer
     {
@@ -125,42 +161,63 @@ namespace YAM
     public:
         const uint32_t typeBits = 8;
         const uint32_t idBits = 64 - typeBits;
+        const uint32_t maxType = (static_cast <uint32_t>(1) << 8) - 1;
         const uint64_t idMask = (static_cast <uint64_t>(1) << idBits) - 1;
         const uint64_t maxId = idMask;
 
         KeyCode(PersistentBuildState::Key key) 
             : _key(key)
             , _id(key & idMask)
-            , _type(static_cast<uint8_t>(key >> idBits))
-        {}
+            , _type(static_cast<BTree::TreeIndex>(key >> idBits))
+        {
+        }
 
-        KeyCode(uint64_t id, uint8_t type)
+        KeyCode(uint64_t id, uint32_t type)
             : _key((static_cast<uint64_t>(type) << idBits) | id)
             , _id(id)
-            , _type(type) 
+            , _type(static_cast<BTree::TreeIndex>(type))
         {
             if (id > maxId) {
                 throw std::exception("id out of bounds");
+            }
+            if (type > maxType) {
+                throw std::exception("type out of bounds");
             }
         }
 
         PersistentBuildState::Key _key;
         uint64_t _id;
-        uint8_t _type;
+        BTree::TreeIndex _type;
     };
 
     uint8_t getType(Node* node) {
         throw std::exception("TODO");
     }
 
-    std::shared_ptr<Btree::StreamingTree> createTree(
-        std::filesystem::path const& dir, 
-        BuildStateTypes::TypeId id
+    BTree::PersistentPagePool* createPagePool(std::filesystem::path const& path) {
+        std::filesystem::create_directory(path.parent_path());
+        // Determine stored page size (if any)...
+        const BTree::PageSize pageSize = 63*1024;
+        BTree::PageSize storedPageSize = BTree::PersistentPagePool::pageCapacity(path.string());
+        return new BTree::PersistentPagePool(((0 < storedPageSize) ? storedPageSize : pageSize), path.string());
+    }
+
+    BTree::Forest* createForest(
+        BTree::PersistentPagePool& pool, 
+        std::map<BTree::TreeIndex, BTree::StreamingTree<PersistentBuildState::Key>*>& typeToTree
     ) {
-        auto tid = static_cast<int32_t>(id);
-        std::stringstream ss;
-        ss << tid;
-        return std::make_shared< Btree::StreamingTree>(dir / ss.str());
+        auto forest = new BTree::Forest(pool);
+        for (auto tid : buildStateTypes.ids) {
+            auto index = static_cast<BTree::TreeIndex>(tid);
+            BTree::StreamingTree<PersistentBuildState::Key>* tree;
+            if (forest->contains(index)) {
+                tree = forest->accessStreamingTree<PersistentBuildState::Key>(index);
+            } else {
+                tree = forest->plantStreamingTree<PersistentBuildState::Key>(index);
+            }
+            typeToTree.insert({ index, tree });
+        }
+        return forest;
     }
 }
 
@@ -172,12 +229,15 @@ namespace YAM
     )
         : _directory(directory)
         , _context(context)
+        , _pool(createPagePool(directory/"buildstate.bt"))
         , _nextId(1)
     {
-        for (auto tid : buildStateTypes.ids) {
-            auto tree = createTree(_directory, tid);
-            _typeToTree.insert({ tid, tree });
-        }
+        _forest.reset(createForest(*_pool, _typeToTree));
+    }
+
+    PersistentBuildState::~PersistentBuildState() {
+        _forest.reset();
+        _pool.reset();
     }
 
     void PersistentBuildState::retrieve() {
@@ -200,11 +260,16 @@ namespace YAM
     void PersistentBuildState::retrieveAll() {
         // First instantiate all objects to prevent re-entrant retrieval...
         for (auto pair : _typeToTree) {
-            uint8_t type = pair.first;
+            BTree::TreeIndex type = pair.first;
             auto tree = pair.second;
-            auto keys = tree->keys();
-            for (auto key : keys) {
+            auto size = tree->size();
+            for (auto& reader : *tree) {
+                PersistentBuildState::Key key = reader.key();
                 KeyCode code(key);
+                if (code._type != type) {
+                    throw std::exception("type mismatch");
+                }
+                reader.close();
                 if (code._id >= _nextId) _nextId = code._id + 1;
                 std::shared_ptr<IPersistable> object(buildStateTypes.instantiate(code._type, _context));
                 auto pair = _keyToObject.insert({ key, object });
@@ -217,8 +282,10 @@ namespace YAM
         for (auto pair : _typeToTree) {
             uint8_t type = pair.first;
             auto tree = pair.second;
-            auto keys = tree->keys();
-            for (auto key : keys) retrieveKey(key);
+            for (auto& reader : *tree) {
+                PersistentBuildState::Key key = reader.key();
+                retrieveKey(key, reader);
+            }
         }
         for (auto pair : _keyToObject) pair.second->restore(_context);
     }
@@ -226,11 +293,17 @@ namespace YAM
     void PersistentBuildState::retrieveKey(Key key) {
         KeyCode code(key);
         auto tree = _typeToTree[code._type];
-        IValueStreamer* vReader = tree->retrieve(key);
+        auto& btreeVReader = tree->retrieve(key);
+        retrieveKey(key, btreeVReader);
+    }
+
+    void PersistentBuildState::retrieveKey(PersistentBuildState::Key key, BTree::ValueReader<PersistentBuildState::Key>& btreeVReader) {
+        YAM::ValueStreamer vReader(btreeVReader);
         SharedPersistableReader snReader(*this);
-        Streamer reader(vReader, &snReader);
+        Streamer reader(&vReader, &snReader);
         std::shared_ptr<IPersistable> object = _keyToObject[key];
         object.get()->stream(&reader);
+        btreeVReader.close();
     }
 
     std::shared_ptr<IPersistable> PersistentBuildState::retrieve(Key key) {
@@ -266,10 +339,12 @@ namespace YAM
         }
 
         std::size_t nStored = _toInsert.size() + _toReplace.size() + _toRemove.size();
-        if (!commitBtrees()) {
+        try { _forest->commit(); } 
+        catch (std::string msg) {
             rollback(true);
             nStored = -1;
         }
+
         _toInsert.clear();
         _toReplace.clear();
         _toRemove.clear();
@@ -294,11 +369,12 @@ namespace YAM
         Key key = _objectToKey[object.get()];
         KeyCode code(key);
         auto tree = _typeToTree[code._type];
-        IValueStreamer* vWriter = replace ? tree->replace(key) : tree->insert(key);
+        auto& btreeVWriter = tree->insert(key);
+        YAM::ValueStreamer vWriter(btreeVWriter);
         SharedPersistableWriter snWriter(*this);
-        Streamer writer(vWriter, &snWriter);
+        Streamer writer(&vWriter, &snWriter);
         object->stream(&writer);
-        vWriter->close();
+        btreeVWriter.close();
     }
 
     PersistentBuildState::Key PersistentBuildState::store(std::shared_ptr<IPersistable> const& object) {
@@ -317,23 +393,13 @@ namespace YAM
         _objectToKey.erase(object.get());
         KeyCode code(key);
         auto tree = _typeToTree[code._type];
-        tree->remove(code._id);
+        tree->erase(code._id);
     }
 
-    bool PersistentBuildState::commitBtrees() {
-        //_btree->commit();
-        for (auto const& p : _typeToTree) {
-            p.second->commit();
-        }
-        return true;
-    }
-    
-    void PersistentBuildState::rollback(bool recoverBtrees) {
-        if (recoverBtrees) {
-            // recover btree
-        }
+    void PersistentBuildState::rollback(bool recoverForest) {
+        if (recoverForest) _forest->recover();
         for (auto const& object : _toRemove) {
-            if (recoverBtrees) {
+            if (recoverForest) {
                 Key key = _toRemoveKeys[object.get()];
                 _keyToObject.insert({ key, object });
                 _objectToKey.insert({ object.get(), key });
@@ -341,7 +407,7 @@ namespace YAM
             addToBuildState(object);
         }
         for (auto const& object : _toInsert) {
-            if (recoverBtrees) {
+            if (recoverForest) {
                 auto it = _objectToKey.find(object.get());
                 if (it != _objectToKey.end()) {
                     Key key = it->second;

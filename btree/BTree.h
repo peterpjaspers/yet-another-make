@@ -69,7 +69,10 @@ namespace BTree {
             ArrayKeyCompare compareKey = defaultCompareArray<B<KT>>,
             UpdateMode updateMode = UpdateMode::Auto
         ) : Tree<KT,VT>( pagePool, compareKey, updateMode, pagePool.clean() ) {}
-        ~Tree() { pool.recover(); freeAll( *root, true ); }
+        ~Tree() { 
+            pool.recover(); 
+            freeAll( *root, true ); 
+        }
         // Insert a key-value entry in the B-Tree.
         // Returns true if the value was inserted, false if the key was already present.
         // O(log(n)) complexity.

@@ -96,6 +96,19 @@ namespace BTree {
             return false;
         }
 
+    public:
+        // ToDo: Avoid public access to this constuctor only to be used by Forest
+        template< class KT = K >
+        StreamingTree(
+            PagePool& pool,
+            UpdateMode mode,
+            PageHeader* pageRoot
+        ) :
+            Tree<StreamKey<KT>, uint8_t[]>(pool, compareStreamKey<KT>, mode, pageRoot),
+            reader(*this),
+            writer(*this, Page<StreamKey<KT>, uint8_t, false, true>::optimalBlockSize(pool.pageCapacity()))
+        { }
+
     private:
         // Remove all blocks associated with a key...
         void removeBlocks( const K& key ) {
@@ -104,7 +117,7 @@ namespace BTree {
         }
     protected:
         void stream( std::ostream & o ) const {
-            o << "Streaming BTree\n";
+            o << "Streaming StreamingTree\n";
             Tree<StreamKey<K>,uint8_t[]>::stream( o );
         }
     }; // template< class K > class StreamingTree

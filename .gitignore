@@ -401,3 +401,10 @@ FodyWeavers.xsd
 
 # yam
 .yam/
+btree/test/testBtreeIterator
+btree/test/testBtreePerformance
+btree/test/testBtreeValidity
+btree/test/testForest
+btree/test/testPage
+btree/test/testStreamingBtree
+btree/test/testStringBtree
