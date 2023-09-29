@@ -7,7 +7,7 @@
 using namespace BTree;
 using namespace std;
 
-const int BTreePageSize = 4096;
+const int BTreePageSize = 512;
 const int ValueBlockSize = 128;
 const int ObjectCount = 10;
 

@@ -69,7 +69,7 @@ namespace YAM
             throw std::exception("unknown node type");
         }
 
-        IPersistable* instantiate(uint32_t typeId, ExecutionContext* context) {
+        IPersistable* instantiate(uint32_t typeId) {
             auto tid = static_cast<TypeId>(typeId);
             switch (tid) {
             case TypeId::CommandNode: return new YAM::CommandNode();
@@ -190,10 +190,6 @@ namespace YAM
         BTree::TreeIndex _type;
     };
 
-    uint8_t getType(Node* node) {
-        throw std::exception("TODO");
-    }
-
     BTree::PersistentPagePool* createPagePool(std::filesystem::path const& path) {
         std::filesystem::create_directory(path.parent_path());
         // Determine stored page size (if any)...
@@ -271,7 +267,7 @@ namespace YAM
                 }
                 reader.close();
                 if (code._id >= _nextId) _nextId = code._id + 1;
-                std::shared_ptr<IPersistable> object(buildStateTypes.instantiate(code._type, _context));
+                std::shared_ptr<IPersistable> object(buildStateTypes.instantiate(code._type));
                 auto pair = _keyToObject.insert({ key, object });
                 _objectToKey.insert({ object.get(), key });
             }
