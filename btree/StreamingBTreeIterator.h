@@ -23,16 +23,16 @@ namespace BTree {
             trailBegin( tree() ),
             trailEnd( tree() )
         {
-            trailBegin.begin<K,false>();
-            trailEnd.end<K,false>();
+            trailBegin.begin<StreamKey<K>,false>();
+            trailEnd.end<StreamKey<K>,false>();
         }
         StreamingTreeIterator( const StreamingTreeIterator& iterator ) :
             TreeIterator<StreamKey<K>,uint8_t[],std::pair<const StreamKey<K>&,std::pair<const uint8_t*,PageSize>>>( iterator ),
             trailBegin( tree() ),
             trailEnd( tree() )
         {
-            trailBegin.begin<K,false>();
-            trailEnd.end<K,false>();
+            trailBegin.begin<StreamKey<K>,false>();
+            trailEnd.end<StreamKey<K>,false>();
         }
         inline StreamingTreeIterator& begin() {
             TreeIterator<StreamKey<K>,uint8_t[],std::pair<const StreamKey<K>&,std::pair<const uint8_t*,PageSize>>>::begin(); return *this;
