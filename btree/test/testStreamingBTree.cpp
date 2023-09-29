@@ -7,9 +7,10 @@
 using namespace BTree;
 using namespace std;
 
-const int BTreePageSize = 512;
+const int BTreePageSize = 4096;
 const int ValueBlockSize = 128;
 const int ObjectCount = 10;
+const int ArraySize = 1000;
 
 // ToDo: Generate multiple keys with multiple objects per key...
 
@@ -25,6 +26,7 @@ struct Object {
     int32_t i32;
     uint64_t u64;
     int64_t i64;
+    uint8_t u8Array[ArraySize];
     Object() = delete;
     Object( uint64_t x ) {
         b = ((x & 1) == 0) ? true : false;
@@ -38,6 +40,7 @@ struct Object {
         i32 = ((x & (static_cast<uint64_t>( 1 ) << 32)) - (static_cast<uint64_t>( 1 ) << 31));
         u64 = x;
         i64 = (x - (static_cast<uint64_t>( 1 ) << 63));
+        for (int i = 0; i < ArraySize; i++) u8Array[i] = (i * x) % 256;
     }
     friend bool operator== ( const Object& a, const Object& b );
 };
@@ -54,6 +57,7 @@ bool operator== ( const Object& a, const Object& b ) {
     if (a.i32 != b.i32) return false;
     if (a.u64 != b.u64) return false;
     if (a.i64 != b.i64) return false;
+    for (int i = 0; i < ArraySize; i++) if (a.u8Array[i] != b.u8Array[i]) return false;
     return true;
 }
 bool operator!= ( const Object& a, const Object& b ) { return( (a == b) ? false : true ); }
@@ -71,6 +75,7 @@ void streamObject( ValueStreamer<K>& s, Object& o ) {
     s.stream( o.i32 );
     s.stream( o.u64 );
     s.stream( o.i64 );
+    for (int i = 0; i < ArraySize; i++) s.stream(o.u8Array[i]);
 }
 
 PagePool* createPagePool( bool persistent, string path, PageSize pageSize ) {
@@ -105,7 +110,7 @@ int main(int argc, char* argv[]) {
             writer.close();
         }
         tree.commit();
-        log << hex << tree;
+        log << tree; log.flush();
         log << "Reading " << KeyCount << " sets of " << ObjectCount << " objects...\n";
         for (int i = 0; i < KeyCount; ++i) {
             log << "Reading " << ObjectCount << " objects at key " << keys[ i ] << ".\n";

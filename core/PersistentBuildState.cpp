@@ -193,7 +193,7 @@ namespace YAM
     BTree::PersistentPagePool* createPagePool(std::filesystem::path const& path) {
         std::filesystem::create_directory(path.parent_path());
         // Determine stored page size (if any)...
-        const BTree::PageSize pageSize = 63*1024;
+        const BTree::PageSize pageSize = 4*1024;
         BTree::PageSize storedPageSize = BTree::PersistentPagePool::pageCapacity(path.string());
         return new BTree::PersistentPagePool(((0 < storedPageSize) ? storedPageSize : pageSize), path.string());
     }
