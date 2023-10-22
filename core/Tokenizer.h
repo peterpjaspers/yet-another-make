@@ -10,12 +10,14 @@ namespace YAM {
     };
 
     struct __declspec(dllexport) TokenSpec {
-        TokenSpec(std::string const& pattern, std::string const& tokenType)
+        TokenSpec(std::string const& pattern, std::string const& tokenType, std::size_t groupIndex = 0)
             : regex(pattern)
             , type(tokenType)
+            , group(groupIndex)
         {}
         std::regex regex;
         std::string type;
+        std::size_t group;
     };
 
     class __declspec(dllexport) Tokenizer {
@@ -36,7 +38,7 @@ namespace YAM {
         std::size_t column() const { return _column; }
 
     private:
-        bool match(std::regex const& re, const char* str, std::string& match);
+        bool match(TokenSpec const& spec, const char* str, std::string& match);
         bool hasMoreTokens();
         void captureLocation(std::string const& matched);
         void throwUnexpectedToken();

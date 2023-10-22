@@ -30,7 +30,7 @@ namespace YAM {
         }
         auto cstr = _content.c_str() + _cursor;
         for (auto const& spec : _specs) {
-            if (match(spec.regex, cstr, token.value)) {
+            if (match(spec, cstr, token.value)) {
                 token.type = spec.type;
                 if (token.type == "skip") {
                     readNextToken(token);
@@ -45,13 +45,14 @@ namespace YAM {
         return _cursor < _content.length();
     }
 
-    bool Tokenizer::match(std::regex const& re, const char* str, std::string& match) {
+    bool Tokenizer::match(TokenSpec const& spec, const char* str, std::string& match) {
         std::cmatch cm;
-        bool matched = std::regex_search(str, cm, re) && cm.position(0) == 0;
+        bool matched = std::regex_search(str, cm, spec.regex, std::regex_constants::match_continuous);
         if (!matched) return false;
-        match = cm[0].str();
-        captureLocation(match);
-        _cursor += match.length();
+        std::string m0 = cm[0].str();
+        match = cm[spec.group].str();
+        captureLocation(m0);
+        _cursor += m0.length();
         return true;
     }
 
@@ -66,15 +67,11 @@ namespace YAM {
         _tokenStartColumn = _tokenStartOffset - _lineBeginOffset;
 
         // Extract `\n` in the matched token.
-        std::size_t pos = 0;
-        std::cmatch nlMatch;
-        while (pos < matched.length() && std::regex_search(matched.c_str()+pos, nlMatch, nlRe)) {
-            pos += nlMatch.position() + 1;
+        auto begin = std::sregex_iterator(matched.begin(), matched.end(), nlRe);
+        auto end = std::sregex_iterator();
+        for (std::sregex_iterator i = begin; i != end; ++i) {
             _line++;
-            _lineBeginOffset =
-                _tokenStartOffset
-                + static_cast<std::size_t>(nlMatch.position())
-                + 1;
+            _lineBeginOffset = _tokenStartOffset + (*i).position() + 1;
         }
 
         _tokenEndOffset = _cursor + matched.length();
