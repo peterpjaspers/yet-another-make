@@ -43,6 +43,12 @@
     <Filter Include="Source Files\BuildService">
       <UniqueIdentifier>{9d6d618b-9987-41d7-b09d-c4c3eaeb0900}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\BuildFileParser">
+      <UniqueIdentifier>{9cf55302-45d8-4d05-96a1-f099dae4bafb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\BuildFileParser">
+      <UniqueIdentifier>{5dd8690a-6430-48bb-ae69-fc2736b8e358}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Delegates.h">
@@ -255,6 +261,18 @@
     <ClInclude Include="IPersistable.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Parser.h">
+      <Filter>Header Files\BuildFileParser</Filter>
+    </ClInclude>
+    <ClInclude Include="Tokenizer.h">
+      <Filter>Header Files\BuildFileParser</Filter>
+    </ClInclude>
+    <ClInclude Include="SyntaxTree.h">
+      <Filter>Header Files\BuildFileParser</Filter>
+    </ClInclude>
+    <ClInclude Include="Glob.h">
+      <Filter>Header Files\BuildFileParser</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -418,6 +436,18 @@
     </ClCompile>
     <ClCompile Include="PersistentBuildState.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Parser.cpp">
+      <Filter>Source Files\BuildFileParser</Filter>
+    </ClCompile>
+    <ClCompile Include="Tokenizer.cpp">
+      <Filter>Source Files\BuildFileParser</Filter>
+    </ClCompile>
+    <ClCompile Include="SyntaxTree.cpp">
+      <Filter>Source Files\BuildFileParser</Filter>
+    </ClCompile>
+    <ClCompile Include="Glob.cpp">
+      <Filter>Source Files\BuildFileParser</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

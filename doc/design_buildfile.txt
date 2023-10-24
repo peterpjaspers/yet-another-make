@@ -1,0 +1,25 @@
+tup supports 3 different types of build files:
+	- tupfile
+	  Contains tup rules: inputs => cmd => outputs
+    - run script
+	  A tupfile containing 1 statement: run <name of script>
+	  Where script is an executable file that outputs tup rules to stdout.
+	- tupfile.lua
+	  A Lua script using 
+	  Provides subset of Lua library to prevent untracked dependencies.
+	  Note: I gues tup cannot track the lua dependendencies because it 
+	  interprets the Lua file in-tup-process.
+	  tup provides a Lua API to define tup variables, rules and more.
+
+Alternative:
+	- tupfile
+	  An executable file that outputs to stdout rule definitions:
+		rule = inputs, order-only inputs, cmd script, outputs
+	  tup monitors file access during tupfile execution to detect file dependencies.
+	  Although directory access can be monitored not each accessed directy
+	  is a directory dependency. E.g locating an include file may search 
+	  several directories. The tupfile executable must therefore make directory 
+	  dependencies explicit by appending the names of the directories to which it
+	  depends to a file __dirdep__ and by deleting the file when done.
+	  yam will retrieve the dependencies from the file when it intercept the
+	  file deletion request.

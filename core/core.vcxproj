@@ -101,6 +101,8 @@
     <ClInclude Include="BasicOStreamLogBook.h" />
     <ClInclude Include="BuildClient.h" />
     <ClInclude Include="Builder.h" />
+    <ClInclude Include="Glob.h" />
+    <ClInclude Include="Parser.h" />
     <ClInclude Include="BuildRequest.h" />
     <ClInclude Include="BuildResult.h" />
     <ClInclude Include="BuildService.h" />
@@ -163,11 +165,13 @@
     <ClInclude Include="Node.h" />
     <ClInclude Include="SourceFileNode.h" />
     <ClInclude Include="SourceFileRepository.h" />
+    <ClInclude Include="SyntaxTree.h" />
     <ClInclude Include="TcpStream.h" />
     <ClInclude Include="Thread.h" />
     <ClInclude Include="ThreadPool.h" />
     <ClInclude Include="TimePoint.h" />
     <ClInclude Include="BinaryValueStreamer.h" />
+    <ClInclude Include="Tokenizer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BasicOStreamLogBook.cpp" />
@@ -175,6 +179,8 @@
     <ClCompile Include="Builder.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="Glob.cpp" />
+    <ClCompile Include="Parser.cpp" />
     <ClCompile Include="BuildRequest.cpp" />
     <ClCompile Include="BuildResult.cpp" />
     <ClCompile Include="BuildService.cpp">
@@ -241,11 +247,13 @@
     </ClCompile>
     <ClCompile Include="SourceFileNode.cpp" />
     <ClCompile Include="SourceFileRepository.cpp" />
+    <ClCompile Include="SyntaxTree.cpp" />
     <ClCompile Include="TcpStream.cpp" />
     <ClCompile Include="Thread.cpp" />
     <ClCompile Include="ThreadPool.cpp" />
     <ClCompile Include="TimePoint.cpp" />
     <ClCompile Include="BinaryValueStreamer.cpp" />
+    <ClCompile Include="Tokenizer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="IStreamer.inl" />

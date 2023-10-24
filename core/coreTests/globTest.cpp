@@ -7,20 +7,12 @@ namespace {
     void assertMatch(std::string const& globPattern, std::string const& str, bool globstar = true) {
         Glob glob(globPattern, globstar);
         bool match = glob.matches(str);
-        if (match) {
-            EXPECT_TRUE(glob.matches(str));
-        } else {
-            EXPECT_TRUE(glob.matches(str));
-        }
+        EXPECT_TRUE(glob.matches(str));
     }
     void assertNotMatch(std::string const& globPattern, std::string const& str, bool globstar = true) {
         Glob glob(globPattern, globstar);
         bool match = glob.matches(str);
-        if (match) {
-            EXPECT_FALSE(glob.matches(str));
-        } else {
-            EXPECT_FALSE(glob.matches(str));
-        }
+        EXPECT_FALSE(glob.matches(str));
     }
 
     void test(bool globstar) {
@@ -47,10 +39,10 @@ namespace {
 
         // More complex matches
         assertMatch("*.min.js", "http://example.com/jquery.min.js", false);
-        assertMatch("*.min.*", "http://example.com/jquery.min.js", false);
-        assertMatch("*/js/*.js", "http://example.com/js/jquery.min.js", false);
         assertNotMatch("*.min.js", "http://example.com/jquery.min.js", true);
+        assertMatch("*.min.*", "http://example.com/jquery.min.js", false);
         assertNotMatch("*.min.*", "http://example.com/jquery.min.js", true);
+        assertMatch("*/js/*.js", "http://example.com/js/jquery.min.js", false);
         assertNotMatch("*/js/*.js", "http://example.com/js/jquery.min.js", true);
 
         // Test string  "\\\\/$^+?.()=!|{},[].*"  represents  <glob>\\/$^+?.()=!|{},[].*</glob>
