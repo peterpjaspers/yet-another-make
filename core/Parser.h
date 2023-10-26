@@ -27,7 +27,7 @@ namespace YAM
         std::shared_ptr<SyntaxTree::Rule> parseRule();
         std::shared_ptr<SyntaxTree::Inputs> parseInputs();
         std::shared_ptr<SyntaxTree::Input> parseInput();
-        std::shared_ptr<SyntaxTree::Command> parseCommand();
+        std::shared_ptr<SyntaxTree::Script> parseScript();
         std::shared_ptr<SyntaxTree::Outputs> parseOutputs();
         std::shared_ptr<SyntaxTree::Output> parseOutput();
 

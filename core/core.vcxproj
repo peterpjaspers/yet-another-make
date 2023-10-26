@@ -172,6 +172,7 @@
     <ClInclude Include="TimePoint.h" />
     <ClInclude Include="BinaryValueStreamer.h" />
     <ClInclude Include="Tokenizer.h" />
+    <ClInclude Include="tokenSpecs.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BasicOStreamLogBook.cpp" />

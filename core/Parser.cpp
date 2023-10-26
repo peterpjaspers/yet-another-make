@@ -1,6 +1,7 @@
 #include "Parser.h"
 #include "Tokenizer.h"
 #include "SyntaxTree.h"
+#include "tokenSpecs.h" // defines variable tokenSpecs
 #include <sstream>
 #include <regex>
 
@@ -10,21 +11,6 @@ namespace {
     std::string readFile(std::filesystem::path const& path) {
         return std::string("");
     }
-
-    std::vector<TokenSpec> tokenSpecs = {
-        TokenSpec(R"(^\s+)", "skip"), // whitespace
-        TokenSpec(R"(^\/\/.*)", "skip"), // single-line comment
-        TokenSpec(R"(^\/\*[\s\S]*?\*\/)", "skip"), // multi-line comment
-        TokenSpec(R"(^:)", "rule"),
-        TokenSpec(R"(^\\?(?:[\w\.\*\?\[\]-])+(?:\\([\w\.\*\?\[\]-])+)*)", "glob"),
-
-        // TODO: only matches single line commands
-        TokenSpec(R"(^\|>\s+(.*)\s+\|>)", "command", 1),
-
-        // TODO: this multiline command regex works in https://regex101.com/.
-        // But in C++ it results in a hangup in regex_search
-        //TokenSpec(R"(^\|>\s+((?:.*\n?)+)\s+\|>)", "command", 1),
-    };
 }
 
 namespace YAM {
@@ -82,14 +68,14 @@ namespace YAM {
             eat("foreach");
         }
         rule->add(parseInputs());
-        rule->add(parseCommand());
+        rule->add(parseScript());
         rule->add(parseOutputs());
         return rule;
     }
 
     std::shared_ptr<SyntaxTree::Inputs> Parser::parseInputs() {
         auto inputs = std::make_shared<SyntaxTree::Inputs>();
-        while (_lookAhead.type != "command") {
+        while (_lookAhead.type != "script") {
             inputs->add(parseInput());
         }
         return inputs;
@@ -102,10 +88,10 @@ namespace YAM {
         return input;
     }
 
-    std::shared_ptr<SyntaxTree::Command> Parser::parseCommand() {
-        Token token = eat("command");
-        auto cmd = std::make_shared<SyntaxTree::Command>();
-        cmd->command = token.value;
+    std::shared_ptr<SyntaxTree::Script> Parser::parseScript() {
+        Token token = eat("script");
+        auto cmd = std::make_shared<SyntaxTree::Script>();
+        cmd->script = token.value;
         return cmd;
     }
 

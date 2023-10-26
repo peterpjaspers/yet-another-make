@@ -273,6 +273,9 @@
     <ClInclude Include="Glob.h">
       <Filter>Header Files\BuildFileParser</Filter>
     </ClInclude>
+    <ClInclude Include="tokenSpecs.h">
+      <Filter>Header Files\BuildFileParser</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">

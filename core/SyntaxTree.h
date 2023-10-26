@@ -46,9 +46,9 @@ namespace YAM {
             Glob glob;
         };
 
-        class __declspec(dllexport) Command : public Node {
+        class __declspec(dllexport) Script : public Node {
         public:
-            std::string command;
+            std::string script;
         };
 
         class __declspec(dllexport) Outputs : public Node {};

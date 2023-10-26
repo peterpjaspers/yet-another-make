@@ -7,7 +7,12 @@ namespace {
 
     TEST(Parser, simpleRule) {
         const std::string file = R"(
-        : hello.c |> gcc hello.c -o hello |> hello 
+        : 
+            hello.c
+            |>
+                gcc hello.c -o hello
+            |> 
+            hello 
         )";
         Parser parser(file);
 
@@ -23,16 +28,19 @@ namespace {
         ASSERT_NE(nullptr, inputs);
         ASSERT_EQ(1, inputs->children().size());
         auto input = dynamic_pointer_cast<SyntaxTree::Input>(inputs->children()[0]);
-        EXPECT_NE(nullptr, input);
+        ASSERT_NE(nullptr, input);
         EXPECT_FALSE(input->exclude);
         EXPECT_TRUE(input->glob.matches(std::string("hello.c")));
 
-        auto command = dynamic_pointer_cast<SyntaxTree::Command>(rule->children()[1]);
-        EXPECT_NE(nullptr, command);
-        EXPECT_EQ("gcc hello.c -o hello", command->command);
+        auto script = dynamic_pointer_cast<SyntaxTree::Script>(rule->children()[1]);
+        ASSERT_NE(nullptr, script);
+        std::string expectedScript(R"(
+                gcc hello.c -o hello
+            )");
+        EXPECT_EQ(expectedScript, script->script);
 
         auto outputs = dynamic_pointer_cast<SyntaxTree::Outputs>(rule->children()[2]);
-        EXPECT_NE(nullptr, outputs);
+        ASSERT_NE(nullptr, outputs);
         ASSERT_EQ(1, outputs->children().size());
         auto output = dynamic_pointer_cast<SyntaxTree::Output>(outputs->children()[0]);
         EXPECT_NE(nullptr, output);
