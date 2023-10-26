@@ -46,4 +46,32 @@ namespace {
         EXPECT_NE(nullptr, output);
         EXPECT_EQ("hello", output->path);
     }
+
+    TEST(Parser, wrongScriptDelimitersToken) {
+        const std::string file = R"(: hello.c >| gcc hello.c -o hello >| hello)";
+        try
+        {
+            Parser parser(file);
+        } catch (std::runtime_error e)
+        {
+            std::string expected(R"(Unexpected token at line 0, column 10
+)");
+            std::string actual = e.what();
+            EXPECT_EQ(expected, actual);
+        }
+    }
+
+    TEST(Parser, missingScriptDelimiterToken) {
+        const std::string file = R"(: hello.c |> gcc hello.c -o hello hello)";
+        try
+        {
+            Parser parser(file);
+        } catch (std::runtime_error e)
+        {
+            std::string expected(R"(Unexpected token at line 0, column 10
+)");
+            std::string actual = e.what();
+            EXPECT_EQ(expected, actual);
+        }
+    }
 }

@@ -13,6 +13,11 @@ namespace {
     }
 }
 
+// TODO: error reporting is poor due to Tokenizer approach with
+// too complex token. In particular the script token is too coarse
+// causing confusing 'unexpected token errors'.
+// Better errors can be generated when Parser reads |>, then consumes
+// characters until next |>.
 namespace YAM {
 
     Parser::Parser(std::filesystem::path const& buildFilePath)
@@ -44,9 +49,13 @@ namespace YAM {
         std::stringstream ss;
         ss
             << "Unexpected token: " << _lookAhead.type << ", "
-            << "expected token: " << tokenType
+            << "expected token: " << tokenType 
+            << std::endl
+            << "At line " << _tokenizer.tokenStartLine()
+            << ", from column " << _tokenizer.tokenStartColumn()
+            << " to " << _tokenizer.tokenEndColumn()
             << std::endl;
-        throw std::exception(ss.str().c_str());
+        throw std::runtime_error(ss.str());
     }
 
     std::shared_ptr<SyntaxTree::BuildFile> Parser::parseBuildFile() {

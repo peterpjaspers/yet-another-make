@@ -83,5 +83,11 @@ namespace YAM {
     }
 
     void Tokenizer::throwUnexpectedToken() {
+        std::stringstream ss;
+        ss
+            << "Unexpected token at line " << _line
+            << ", column " << _column
+            << std::endl;
+        throw std::runtime_error(ss.str());
     }
 }
