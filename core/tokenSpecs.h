@@ -12,6 +12,6 @@ namespace {
         TokenSpec(R"(^:)", "rule"),
         TokenSpec(R"(^\^)", "not"),
         TokenSpec(R"(^\\?(?:[\w\.\*\?\[\]-])+(?:\\([\w\.\*\?\[\]-])+)*)", "glob"),
-        TokenSpec(R"(^\|>(((?!\|>).|\s)*)\|>)", "script", 1),
+        TokenSpec(R"(^\|>(((?!\|>)\S|\s)*)\|>)", "script", 1),
     };
 }
