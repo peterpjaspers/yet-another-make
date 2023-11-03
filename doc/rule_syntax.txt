@@ -1,0 +1,44 @@
+YamFile syntax is a subset of Tupfile syntax.
+
+YamFile => {Rule}*
+Rule => ':' [foreach] [CmdInputs] [ '|' OrderOnlyInputs ] '|>' Script '|>' [Outputs]
+CmdInputs => Inputs
+Inputs => [Input]*
+Input => Glob | '^'Glob | Path | '^'Path
+OrderOnlyInputs => Inputs
+Script => { String | InputPathFlag | OutputPathFlag}*
+InputPathFlag => '%f' | '%b' | '%B' | '%e' | '%D' | '%d'
+OutputPathFlag => '%o'
+Outputs => {string | InputPathFlag }*
+
+%f CmdInputs when not a foreach rule
+%f current cmd input path in case of foreach rule, e.g. a/b/c/d.e
+%i OrderOnlyInputs
+%b -> d.e
+%B -> d
+%e -> e
+%d -> a/b/c
+%D -> c
+%o -> Outputs
+
+{A}*  => 0, 1 or more times A
+[A]   => optional A
+A|B   => A or B
+
+Example rules:
+# YamFile 1: compile foo.c and bar.c into foo.o and bar.o
+: foo.c |> gcc -c foo.c -o foo.o |> foo.o
+: bar.c |> gcc -c bar.c -o bar.o |> bar.o
+
+# YamFile 2: same as above but using foreach and %-flags
+: foreach foo.c bar.c |> gcc -c %f -o %o |> %B.o
+
+# YamFile 3: compile all .c files into object files
+: foreach *.c |> gcc -c %f -o %o |> %B.o
+
+# YamFile 4: compile all .c files except main.c into object files
+: foreach *.c ^main.c |> gcc -c %f -o %o |> %B.o
+
+
+
+        

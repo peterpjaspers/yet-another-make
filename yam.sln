@@ -23,6 +23,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "doc", "doc", "{37AB3F5E-F8E
 		doc\design_buildfile.txt = doc\design_buildfile.txt
 		doc\design_computeExecutionHash.txt = doc\design_computeExecutionHash.txt
 		doc\design_getRidOfRepoMirroring.txt = doc\design_getRidOfRepoMirroring.txt
+		doc\design_multipleRepositories.txt = doc\design_multipleRepositories.txt
 		doc\design_multithreading.txt = doc\design_multithreading.txt
 		doc\design_overview.md = doc\design_overview.md
 		doc\design_sandboxing.txt = doc\design_sandboxing.txt
