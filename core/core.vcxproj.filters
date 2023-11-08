@@ -270,11 +270,11 @@
     <ClInclude Include="SyntaxTree.h">
       <Filter>Header Files\BuildFileParser</Filter>
     </ClInclude>
-    <ClInclude Include="Glob.h">
-      <Filter>Header Files\BuildFileParser</Filter>
-    </ClInclude>
     <ClInclude Include="tokenSpecs.h">
       <Filter>Header Files\BuildFileParser</Filter>
+    </ClInclude>
+    <ClInclude Include="Glob.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -450,7 +450,7 @@
       <Filter>Source Files\BuildFileParser</Filter>
     </ClCompile>
     <ClCompile Include="Glob.cpp">
-      <Filter>Source Files\BuildFileParser</Filter>
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
