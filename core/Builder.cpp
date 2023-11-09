@@ -118,13 +118,6 @@ namespace YAM
                 auto repo = std::make_shared<SourceFileRepository>(
                     repoPath.filename().string(),
                     repoPath,
-                    RegexSet({
-                        RegexSet::matchDirectory("generated"),
-                        RegexSet::matchDirectory(".yam"),
-                        RegexSet::matchDirectory(".git"),
-                        RegexSet::matchDirectory("x64"),
-                        RegexSet::matchDirectory(".vs")
-                        }),
                     &_context);
                 _context.addRepository(repo);
             }
@@ -150,7 +143,7 @@ namespace YAM
         std::vector<std::shared_ptr<Node>> dirtyDirsAndFiles;
         if (_repoMirroringEnabled) {
             for (auto const& pair : _context.repositories()) {
-                auto repo = dynamic_pointer_cast<SourceFileRepository>(pair.second);
+                auto repo = pair.second;
                 if (repo != nullptr) {
                     auto dirNode = repo->directoryNode();
                     repo->consumeChanges();

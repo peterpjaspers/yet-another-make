@@ -1,7 +1,7 @@
 #include "gtest/gtest.h"
 #include "executeNode.h"
 #include "DirectoryTree.h"
-#include "../FileRepository.h"
+#include "../SourceFileRepository.h"
 #include "../SourceDirectoryNode.h"
 #include "../FileNode.h"
 #include "../ExecutionContext.h"
@@ -22,10 +22,9 @@ namespace
 
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
-        context.addRepository(std::make_shared<FileRepository>("repo", rootDir));
-        auto dirNode = std::make_shared<SourceDirectoryNode>(&context, rootDir, nullptr);
-        context.nodes().add(dirNode);
-        dirNode->addPrerequisitesToContext();
+        auto repo = std::make_shared<SourceFileRepository>("repo", rootDir, &context);
+        context.addRepository(repo);
+        auto dirNode = repo->directoryNode();
         EXPECT_EQ(Node::State::Dirty, dirNode->state());
 
         bool completed = YAMTest::executeNode(dirNode.get());
@@ -40,10 +39,9 @@ namespace
 
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
-        context.addRepository(std::make_shared<FileRepository>("repo", rootDir));
-        auto dirNode = std::make_shared<SourceDirectoryNode>(&context, rootDir, nullptr);
-        context.nodes().add(dirNode);
-        dirNode->addPrerequisitesToContext();
+        auto repo = std::make_shared<SourceFileRepository>("repo", rootDir, &context);
+        context.addRepository(repo);
+        auto dirNode = repo->directoryNode();
         bool completed = YAMTest::executeNode(dirNode.get());
         EXPECT_TRUE(completed);
 

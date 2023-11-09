@@ -15,13 +15,10 @@ namespace YAM
     class DotIgnoreNode;
 
     // A SourceDirectoryNode keeps track of the source files in a directory:
-    //    - creates a SourceFileNode for each file in the directory that is
-    //      readAllowed by the FileRepository that contains that file.
-    //      - creates a SourceDirectoryNode for each subdir in the directory that
-    //      is readAllowed by the FileRepository that contains that subdir.
+    //    - creates a SourceFileNode for each file in the directory.
+    //    - creates a SourceDirectoryNode for each subdir in the directory.
     //    - maintains the directory hash. This hash is computed from the
     //      names of the files and subdirs in the directory.
-    // FileRepositories are registered in the execution context of the node.
     //
     // All functions execute in main thread unless stated otherwise.
     //

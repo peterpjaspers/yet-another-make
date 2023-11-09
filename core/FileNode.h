@@ -8,7 +8,7 @@
 
 namespace YAM
 {
-    class FileRepository;
+    class SourceFileRepository;
 
     // A file node computes hashes of aspects of its associated file. The lis
     // of aspects applicable to the file is retrieved from the node's execution
@@ -110,7 +110,7 @@ namespace YAM
         XXH64_hash_t hashOf(std::string const& aspectName);
 
         // Return the file repository that contains this file.
-        std::shared_ptr<FileRepository> fileRepository() const;
+        std::shared_ptr<SourceFileRepository> fileRepository() const;
 
         // Return fileRepository()->relativePathOf(name()).
         std::filesystem::path relativePath() const;

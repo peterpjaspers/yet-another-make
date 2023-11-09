@@ -1,7 +1,7 @@
 #pragma once
 
 #include "RegexSet.h"
-#include "FileRepository.h"
+#include "IPersistable.h"
 
 #include <memory>
 #include <filesystem>
@@ -78,7 +78,7 @@ namespace YAM
     // it is hard to distinguish between modifications resulting from command
     // execution and from the user tampering with the output files.
     //
-    class __declspec(dllexport) SourceFileRepository : public FileRepository
+    class __declspec(dllexport) SourceFileRepository : public IPersistable
     {
     public:
         SourceFileRepository(); // needed for deserialization
@@ -95,12 +95,29 @@ namespace YAM
         SourceFileRepository(
             std::string const& repoName,
             std::filesystem::path const& directory,
-            // TODO: do not pass exclude patterns here.
-            // Instead let each SourceDirectoryNode retrieve exclude patterns from 
-            // .yamignore, or if absent, from .gitignore.
-            RegexSet const& _excludePatterns,
             ExecutionContext* context);
-        
+
+        virtual ~SourceFileRepository() {}
+
+        std::string const& name() const;
+        std::filesystem::path const& directory() const;
+
+        // Return whether 'absPath' is a path in the repo directory tree, 
+        // E.g. if repo directory = /a/b/ and path = /a/b/c/e then repo
+        // lexically contains path. This is also true when /a/b/c/e does not
+        // exist in the file system.         //
+        bool lexicallyContains(std::filesystem::path const& absPath) const;
+
+        // Return 'absPath' relative to repo directory.
+        // Return empty path when !contains(absPath).
+        // Pre: 'absPath' must be without . and .. path components.
+        std::filesystem::path relativePathOf(std::filesystem::path const& absPath) const;
+
+        // Return given 'absPath' as <repoName>/<path relative to repo directory>.
+        // Return empty path when !contains(absPath).
+        // Pre: 'absPath' must be without . and .. path components.
+        std::filesystem::path symbolicPathOf(std::filesystem::path const& absPath) const;
+
         std::shared_ptr<SourceDirectoryNode> directoryNode() const;
         RegexSet const& excludePatterns() const;
 
@@ -120,15 +137,21 @@ namespace YAM
         // by YAM.
         void clear();
 
+        // Inherited from IPersistable
+        void modified(bool newValue) override;
+        bool modified() const override;
+
         static void setStreamableType(uint32_t type);
         // Inherited from IStreamer (via IPersistable)
         uint32_t typeId() const override;
         void stream(IStreamer* streamer) override;
         // Inherited from IPersistable
+        void prepareDeserialize() override {}
         void restore(void* context) override;
 
     private:
-        RegexSet _excludePatterns;
+        std::string _name;
+        std::filesystem::path _directory;
         ExecutionContext* _context;
         std::shared_ptr<FileRepositoryWatcher> _watcher;
         std::shared_ptr<SourceDirectoryNode> _directoryNode;

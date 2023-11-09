@@ -62,7 +62,6 @@
     <ClCompile Include="fileAspectTest.cpp" />
     <ClCompile Include="fileNodeTest.cpp" />
     <ClCompile Include="directoryWatcherWin32Test.cpp" />
-    <ClCompile Include="fileRepositoryTest.cpp" />
     <ClCompile Include="globTest.cpp" />
     <ClCompile Include="memoryStreamTest.cpp" />
     <ClCompile Include="monitoredProcessWin32Test.cpp" />

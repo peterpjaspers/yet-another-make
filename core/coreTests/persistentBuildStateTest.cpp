@@ -21,14 +21,12 @@ namespace
     using namespace YAM;
     using namespace YAMTest;
 
-    // repoDir bevat .yam dir, subdirs 1,2,3 en files 1,2,3
-    // Elke subdir bevat 39 files en 12 mappen.
-    // Inclusief repoDir zelf: 41 mappen, 120 files.
+    // repoDir contains .yam dir, buildstate dir, subdirs 1,2,3 and files 1,2,3
+    // Each subdir contains 39 files and 12 directories.
+    // Including repoDir and .yam dir: 42 dirs, 120 files.
     // Nodes: per directory 4 nodes (dir node, dotignore .yamignore and
-    // .gitignore). Per file 1 node, per file repository 1 file.
-    // Totaal: 41*4 + 120 + 1 = 285
-    const std::size_t nNodes = 284;
-    const std::size_t nObjects = nNodes+1;
+    // .gitignore). Per file 1 node. Total nodes: 42*4 + 120 = 288
+    const std::size_t nNodes = 288; // in context->nodes()
 
     // Wait for file change event to be received for given paths.
     // When event is received then consume the changes.
@@ -86,7 +84,6 @@ namespace
             , sourceFileRepo(std::make_shared<SourceFileRepository>(
                 "repo",
                 repoDir,
-                RegexSet({ "buildState" }),
                 &context))
             , repoDirNode(sourceFileRepo->directoryNode())
         {
@@ -95,7 +92,6 @@ namespace
             bool completed = YAMTest::executeNode(repoDirNode.get());
             EXPECT_TRUE(completed);
             EXPECT_EQ(nNodes, context.nodes().size());
-            std::filesystem::create_directory(repoDir / "buildState");
             persistentState.store();
         }
 
@@ -164,8 +160,8 @@ namespace
         }
 
         bool consumeFileChangeEvent(std::initializer_list<std::filesystem::path> paths) {
-            auto sourceFileRepo = dynamic_pointer_cast<SourceFileRepository>(setup.context.findRepository("repo"));
-            return consumeFileChangeEvents(sourceFileRepo.get(),setup.context.mainThreadQueue(), paths);
+            auto fileRepo = setup.context.findRepository("repo");
+            return consumeFileChangeEvents(fileRepo.get(),setup.context.mainThreadQueue(), paths);
         }
 
         XXH64_hash_t addFileAndUpdateFileAndExecuteNode(std::shared_ptr<FileNode> fileNode) {
@@ -251,7 +247,7 @@ namespace
 
         std::map<std::filesystem::path, std::shared_ptr<Node>> dirContentBeforeClear =  
             setup.repoDirNode->getContent();
-        EXPECT_EQ(7, dirContentBeforeClear.size());
+        EXPECT_EQ(8, dirContentBeforeClear.size());
         setup.sourceFileRepo->clear(); // will remove all nodes
         EXPECT_EQ(0, setup.context.nodes().size());
         EXPECT_EQ(0, setup.repoDirNode->getContent().size());
@@ -269,7 +265,9 @@ namespace
         EXPECT_EQ(nNodes, setup.context.nodes().size());
 
         std::filesystem::path addedFile = setup.addNode();
-        EXPECT_EQ(nNodes + 1, setup.context.nodes().size());
+        // +2 because besides a node for the added file also a
+        // node for buildstate\buildstate.bt file has been created.
+        EXPECT_EQ(nNodes + 2, setup.context.nodes().size());
 
         setup.persistentState.rollback();
 

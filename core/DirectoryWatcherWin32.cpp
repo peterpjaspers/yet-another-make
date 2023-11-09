@@ -119,7 +119,7 @@ namespace YAM
             FILE_NOTIFY_CHANGE_DIR_NAME |
             FILE_NOTIFY_CHANGE_LAST_WRITE,
             NULL, &_overlapped, NULL);
-        assert(success);
+        if (!success) throw std::exception("ReadDirectoryChangesW failed");
     }
 
     void DirectoryWatcherWin32::run() {

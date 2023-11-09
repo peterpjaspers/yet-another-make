@@ -8,7 +8,7 @@
 #include "../MultiwayLogBook.h"
 #include "../MemoryLogBook.h"
 #include "../BasicOStreamLogBook.h"
-#include "../FileRepository.h"
+#include "../SourceFileRepository.h"
 
 #include "gtest/gtest.h"
 #include <boost/process.hpp>
@@ -65,19 +65,20 @@ namespace
             , janSrc(std::make_shared<SourceFileNode>(&context, np(repoDir / "janSrc.txt")))
             , stats(context.statistics())
         {
-            std::filesystem::create_directories(repoDir);
             std::filesystem::create_directories(np(repoDir / "generated"));
             logBook->add(memLogBook);
             logBook->add(stdoutLogBook);
             context.logBook(logBook);
             context.addRepository(
-                std::make_shared<FileRepository>(
+                std::make_shared<SourceFileRepository>(
                     "windows",
-                    std::filesystem::path("c:\\windows")));
+                    std::filesystem::path("c:\\windows"),
+                    &context));
             context.addRepository(
-                std::make_shared<FileRepository>(
+                std::make_shared<SourceFileRepository>(
                     "repo",
-                    repoDir));
+                    repoDir,
+                    &context));
             stats.registerNodes = true;
             //context.threadPool().size(1); // to ease debugging
 
@@ -134,6 +135,7 @@ namespace
         }
 
         void clean() {
+            context.removeRepository("repo");
             std::filesystem::remove_all(repoDir);
         }
 

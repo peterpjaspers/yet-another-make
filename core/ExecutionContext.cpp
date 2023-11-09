@@ -61,7 +61,7 @@ namespace YAM
         return _statistics;
     }
 
-    bool ExecutionContext::addRepository(std::shared_ptr<FileRepository> repo)
+    bool ExecutionContext::addRepository(std::shared_ptr<SourceFileRepository> repo)
     {
         bool duplicateName = nullptr != findRepository(repo->name());
         if (!duplicateName) {
@@ -74,21 +74,21 @@ namespace YAM
         auto it = _repositories.find(repoName);
         bool found = it != _repositories.end();
         if (found) {
-            auto srcRepo = dynamic_pointer_cast<SourceFileRepository>(it->second);
-            if (srcRepo != nullptr) srcRepo->clear();
+            auto srcRepo = it->second;
+            srcRepo->clear();
             _repositories.erase(it);
         }
         return found;
     }
 
-    std::shared_ptr<FileRepository> ExecutionContext::findRepository(std::string const& repoName) const {
+    std::shared_ptr<SourceFileRepository> ExecutionContext::findRepository(std::string const& repoName) const {
         auto it = _repositories.find(repoName);
         bool found = it != _repositories.end();
         if (found) return it->second;
         return nullptr;
     }
 
-    std::shared_ptr<FileRepository> ExecutionContext::findRepositoryContaining(std::filesystem::path const& path) const {
+    std::shared_ptr<SourceFileRepository> ExecutionContext::findRepositoryContaining(std::filesystem::path const& path) const {
         for (auto pair : _repositories) {
             auto repo = pair.second;
             if (repo->lexicallyContains(path)) return repo;
@@ -96,7 +96,7 @@ namespace YAM
         return nullptr;
     }
 
-    std::map<std::string, std::shared_ptr<FileRepository>> const& ExecutionContext::repositories() const {
+    std::map<std::string, std::shared_ptr<SourceFileRepository>> const& ExecutionContext::repositories() const {
         return _repositories;
     }
 

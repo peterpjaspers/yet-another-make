@@ -79,7 +79,6 @@ namespace
         auto repo = std::make_shared<SourceFileRepository>(
             std::string("repo"), 
             repoDir,
-            RegexSet(),
             &context);
         context.addRepository(repo);
 

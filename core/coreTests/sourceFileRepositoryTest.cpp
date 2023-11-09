@@ -18,6 +18,52 @@
 
 namespace
 {
+    using namespace YAM;
+
+    class RepoProps {
+    public:
+        RepoProps()
+            : name("testRepo")
+            , dir(R"(C:\aap\noot\mies)")
+        {
+            std::filesystem::remove_all(dir);
+            std::filesystem::create_directories(dir);
+        }
+        ~RepoProps() {
+            std::filesystem::remove_all(dir);
+        }
+        std::string name;
+        std::filesystem::path dir;
+    };
+    RepoProps repoProps;
+    ExecutionContext context;
+    SourceFileRepository repo(repoProps.name, repoProps.dir, &context);
+
+    TEST(SourceFileRepository, construct) {
+        EXPECT_EQ(repoProps.name, repo.name());
+        EXPECT_EQ(repoProps.dir, repo.directory());
+    }
+    TEST(SourceFileRepository, contains) {
+        EXPECT_TRUE(repo.lexicallyContains(R"(C:\aap\noot\mies\file.cpp)"));
+        EXPECT_FALSE(repo.lexicallyContains(R"(C:\aap\noot\file.cpp)"));
+        EXPECT_FALSE(repo.lexicallyContains(R"(\aap\noot\mies\file.cpp)"));
+        EXPECT_FALSE(repo.lexicallyContains(R"(aap\noot\mies\file.cpp)"));
+    }
+    TEST(SourceFileRepository, relativePath) {
+        EXPECT_EQ(std::filesystem::path(R"(file.cpp)"), repo.relativePathOf(R"(C:\aap\noot\mies\file.cpp)"));
+        EXPECT_EQ(std::filesystem::path(), repo.relativePathOf(R"(C:\aap\noot\file.cpp)"));
+        EXPECT_EQ(std::filesystem::path(), repo.relativePathOf(R"(\aap\noot\file.cpp)"));
+        EXPECT_EQ(std::filesystem::path(), repo.relativePathOf(R"(aap\noot\mies\file.cpp)"));
+    }
+    TEST(SourceFileRepository, symbolicPath) {
+        EXPECT_EQ(std::filesystem::path(R"(testRepo\file.cpp)"), repo.symbolicPathOf(R"(C:\aap\noot\mies\file.cpp)"));
+        EXPECT_EQ(std::filesystem::path(), repo.symbolicPathOf(R"(C:\aap\noot\file.cpp)"));
+        EXPECT_EQ(std::filesystem::path(), repo.symbolicPathOf(R"(\aap\noot\file.cpp)"));
+        EXPECT_EQ(std::filesystem::path(), repo.symbolicPathOf(R"(aap\noot\mies\file.cpp)"));
+    }
+}
+namespace
+{
     using namespace YAMTest;
     using namespace YAM;
 
@@ -59,7 +105,6 @@ namespace
         auto repo = std::make_shared<SourceFileRepository>(
             std::string("testRepo"), 
             rootDir,
-            excludes,
             &context);
         context.addRepository(repo);
         SourceDirectoryNode* dirNode = repo->directoryNode().get();

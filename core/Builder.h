@@ -15,7 +15,7 @@ namespace YAM
     class __declspec(dllexport) Builder
     {
     public:
-        Builder(bool enableRepoMirroring = false);
+        Builder(bool enableRepoMirroring = true);
 
         void enableRepoMirroring(bool enable)  {
             _repoMirroringEnabled = enable;

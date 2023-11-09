@@ -142,7 +142,6 @@
     <ClInclude Include="FileAspect.h" />
     <ClInclude Include="DirectoryWatcher.h" />
     <ClInclude Include="DirectoryWatcherWin32.h" />
-    <ClInclude Include="FileRepository.h" />
     <ClInclude Include="FileSystem.h" />
     <ClInclude Include="GlobNode.h" />
     <ClInclude Include="IConsole.h" />
@@ -216,7 +215,6 @@
     <ClCompile Include="FileAspect.cpp" />
     <ClCompile Include="DirectoryWatcher.cpp" />
     <ClCompile Include="DirectoryWatcherWin32.cpp" />
-    <ClCompile Include="FileRepository.cpp" />
     <ClCompile Include="FileSystem.cpp">
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4251;4996</DisableSpecificWarnings>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4251;4996</DisableSpecificWarnings>

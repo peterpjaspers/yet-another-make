@@ -1,7 +1,6 @@
 #pragma once
 
 #include "RegexSet.h"
-#include "FileRepository.h"
 #include "CollapsedFileChanges.h"
 
 #include <memory>

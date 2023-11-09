@@ -1,7 +1,6 @@
 #include "SourceDirectoryNode.h"
 #include "SourceFileNode.h"
 #include "ExecutionContext.h"
-#include "FileRepository.h"
 #include "DotIgnoreNode.h"
 #include "IStreamer.h"
 
@@ -271,7 +270,10 @@ namespace YAM
     void SourceDirectoryNode::commitResult(YAM::SourceDirectoryNode::RetrieveResult& result) {
         _lastWriteTime = result._lastWriteTime;
         _executionHash = result._executionHash;
-        _content = result._content;
+        _content.clear();
+        for (auto const& node : result._kept) {
+            _content.insert({ node->name(), node });
+        }
         for (auto const& n : result._added) {
             // A node with name n->name() may already exist in buildstate.
             // If so, use that one instead of n.
@@ -281,6 +283,7 @@ namespace YAM
                 context()->nodes().add(node);
             }
             node->addObserver(this);
+            _content.insert({ node->name(), node });
             auto dir = dynamic_pointer_cast<SourceDirectoryNode>(node);
             if (dir != nullptr) dir->addPrerequisitesToContext();
         }

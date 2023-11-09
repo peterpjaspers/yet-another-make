@@ -102,9 +102,6 @@
     <ClInclude Include="dbgMemLeaks.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="FileRepository.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="FileRepositoryWatcher.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -318,9 +315,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Builder.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="FileRepository.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="FileRepositoryWatcher.cpp">

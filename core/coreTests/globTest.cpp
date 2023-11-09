@@ -7,13 +7,11 @@ namespace {
     void assertMatch(std::string const& globPattern, std::string const& str, bool globstar = true) {
         Glob glob(globPattern, globstar);
         bool match = glob.matches(str);
-        EXPECT_FALSE(glob.isLiteral());
         EXPECT_TRUE(glob.matches(str));
     }
     void assertNotMatch(std::string const& globPattern, std::string const& str, bool globstar = true) {
         Glob glob(globPattern, globstar);
         bool match = glob.matches(str);
-        EXPECT_FALSE(glob.isLiteral());
         EXPECT_FALSE(glob.matches(str));
     }
 

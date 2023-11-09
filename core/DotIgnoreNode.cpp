@@ -73,19 +73,7 @@ namespace YAM
     }
 
     bool DotIgnoreNode::ignore(std::filesystem::path const& path) const {
-        auto fileName = path.filename();
-        bool ignore = fileName == ".gitignore" || fileName == ".yamignore";
-        if (!ignore) {
-            auto repo = context()->findRepositoryContaining(path);
-            ignore = repo == nullptr;
-            if (repo != nullptr) {
-                auto srcRepo = dynamic_pointer_cast<SourceFileRepository>(repo);
-                if (srcRepo != nullptr) {
-                    ignore = srcRepo->excludePatterns().matches(path.string());
-                }
-            }
-        }
-        return ignore;
+        return false;
     }
 
     XXH64_hash_t DotIgnoreNode::computeHash() const {

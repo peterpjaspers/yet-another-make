@@ -9,7 +9,6 @@
 #include "ISharedObjectStreamer.h"
 #include "ExecutionContext.h"
 #include "NodeSet.h"
-#include "FileRepository.h"
 #include "SourceFileRepository.h"
 
 #include <memory>
@@ -29,9 +28,8 @@ namespace YAM
             GeneratedFileNode = 3,
             SourceDirectoryNode = 4,
             SourceFileNode = 5,
-            FileRepository = 6,
-            SourceFileRepository = 7,
-            Max = 8
+            SourceFileRepository = 6,
+            Max = 7
         };
         std::vector<TypeId> ids;
 
@@ -41,7 +39,6 @@ namespace YAM
             YAM::GeneratedFileNode::setStreamableType(static_cast<uint32_t>(GeneratedFileNode));
             YAM::SourceDirectoryNode::setStreamableType(static_cast<uint32_t>(SourceDirectoryNode));
             YAM::SourceFileNode::setStreamableType(static_cast<uint32_t>(SourceFileNode));
-            YAM::FileRepository::setStreamableType(static_cast<uint32_t>(FileRepository));
             YAM::SourceFileRepository::setStreamableType(static_cast<uint32_t>(SourceFileRepository));
 
             ids.push_back(CommandNode);
@@ -49,18 +46,17 @@ namespace YAM
             ids.push_back(GeneratedFileNode);
             ids.push_back(SourceDirectoryNode);
             ids.push_back(SourceFileNode);
-            ids.push_back(FileRepository);
             ids.push_back(SourceFileRepository);
         }
 
         bool isNode(IPersistable* object) {
             auto tid = object->typeId();
-            return ((TypeId::Min < tid) && (tid < TypeId::FileRepository));
+            return ((TypeId::Min < tid) && (tid < TypeId::SourceFileRepository));
         }
 
         bool isFileRepo(IPersistable* object) {
             auto tid = object->typeId();
-            return ((TypeId::FileRepository <= tid) && (tid < TypeId::Max));
+            return TypeId::SourceFileRepository == tid;
         }
 
         uint32_t getTypeId(IPersistable* object) {
@@ -77,7 +73,6 @@ namespace YAM
             case TypeId::GeneratedFileNode: return new YAM::GeneratedFileNode();
             case TypeId::SourceDirectoryNode: return new YAM::SourceDirectoryNode();
             case TypeId::SourceFileNode: return new YAM::SourceFileNode();
-            case TypeId::FileRepository: return new YAM::FileRepository();
             case TypeId::SourceFileRepository: return new YAM::SourceFileRepository();
             default: throw std::exception("unknown node type");
             }
@@ -442,7 +437,7 @@ namespace YAM
 
     void PersistentBuildState::addToBuildState(std::shared_ptr<IPersistable> const& object) {
         auto node = dynamic_pointer_cast<Node>(object);
-        auto repo = dynamic_pointer_cast<FileRepository>(object);
+        auto repo = dynamic_pointer_cast<SourceFileRepository>(object);
         if (node != nullptr) {
             _context->nodes().add(node);
         } else if (repo != nullptr) {
@@ -454,7 +449,7 @@ namespace YAM
 
     void PersistentBuildState::removeFromBuildState(std::shared_ptr<IPersistable> const& object) {
         auto node = dynamic_pointer_cast<Node>(object);
-        auto repo = dynamic_pointer_cast<FileRepository>(object);
+        auto repo = dynamic_pointer_cast<SourceFileRepository>(object);
         if (node != nullptr) {
             _context->nodes().remove(node);
         } else if (repo != nullptr) {
