@@ -3,7 +3,7 @@
 #include "DirectoryTree.h"
 #include "../FileRepository.h"
 #include "../DirectoryNode.h"
-#include "../FileNode.h"
+#include "../SourceFileNode.h"
 #include "../ExecutionContext.h"
 #include "../../xxhash/xxhash.h"
 
@@ -48,10 +48,10 @@ namespace
         // Update file system
         DirectoryTree* testTree_S1 = testTree.getSubDirs()[1];
         DirectoryTree* testTree_S1_S2 = testTree_S1->getSubDirs()[2];
-        testTree.addFile();// adds 4-th file
-        testTree_S1->addFile();// adds 4-th file
-        testTree_S1_S2->addDirectory(); // adds 1 dir with 3 files and 3 subdirs
-        testTree_S1_S2->addFile(); // adds 4-th file
+        testTree.addFile();// adds file4
+        testTree_S1->addFile();// adds sub2\file4
+        testTree_S1_S2->addDirectory(); // adds sub3\sub4 with 3 files and 3 subdirs
+        testTree_S1_S2->addFile(); // adds sub4\file4
 
         // Find nodes affected by file system changes...
         std::vector<std::shared_ptr<DirectoryNode>> subDirNodes;
@@ -74,31 +74,24 @@ namespace
 
         verify(&testTree, dirNode.get());
 
-        // 13 nStarted and nSelfExecuted include the .ignore, .gitignore and
-        // .yamignore of the added dir in testTree_S1_S2 
-        EXPECT_EQ(13, context.statistics().nStarted);
-        // 10 because DirectoryNode::pendingStartSelf always returns true.
-        // But only 4 dir nodes will see a modified directory. Only those 4
-        // update their content.
-        EXPECT_EQ(13, context.statistics().nSelfExecuted);
-        // 8 nRehashedFiles include .gitignore and .yamignore of the added dir
-        // in testTree_S1_S2 
-        EXPECT_EQ(8, context.statistics().nRehashedFiles);
+        // Start are dir nodes testTree, sub2, sub3, sub4 and the 3 .ignore nodes
+        // of sub4. 
+        EXPECT_EQ(7, context.statistics().nStarted);
+        EXPECT_EQ(7, context.statistics().nSelfExecuted);
+
+        // 2 sub4\.gitignore and sub4\.yamignore
+        EXPECT_EQ(2, context.statistics().nRehashedFiles);
+        EXPECT_EQ(2, context.statistics().rehashedFiles.size());
+        dirNode_S1_S2->getSubDirs(subDirNodes);
+        auto dirNode_S1_S2_S3 = subDirNodes[subDirNodes.size() - 1];
+        auto gitignore = dynamic_pointer_cast<SourceFileNode>(context.nodes().find(dirNode_S1_S2_S3->name() / ".gitignore"));
+        auto yamignore = dynamic_pointer_cast<SourceFileNode>(context.nodes().find(dirNode_S1_S2_S3->name() / ".yamignore"));
+        EXPECT_TRUE(context.statistics().rehashedFiles.contains(gitignore.get()));
+        EXPECT_TRUE(context.statistics().rehashedFiles.contains(yamignore.get()));
+
         EXPECT_EQ(4, context.statistics().nDirectoryUpdates);
         EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode.get()));
         EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode_S1.get()));
         EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode_S1_S2.get()));
-        std::vector<std::shared_ptr<FileNode>> files;
-        dirNode->getFiles(files);
-        EXPECT_TRUE(context.statistics().rehashedFiles.contains(files[files.size() - 1].get()));
-
-        dirNode_S1->getFiles(files);
-        EXPECT_TRUE(context.statistics().rehashedFiles.contains(files[files.size() - 1].get()));
-
-        dirNode_S1_S2->getSubDirs(subDirNodes);
-        auto dirNode_S1_S2_S3 = subDirNodes[subDirNodes.size() - 1];
-        EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode_S1_S2_S3.get()));
-        dirNode_S1_S2_S3->getFiles(files);
-        for (auto f : files) EXPECT_TRUE(context.statistics().rehashedFiles.contains(f.get()));
     }
 }

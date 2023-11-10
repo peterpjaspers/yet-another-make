@@ -91,6 +91,10 @@ namespace
             context.addRepository(sourceFileRepo);
             bool completed = YAMTest::executeNode(repoDirNode.get());
             EXPECT_TRUE(completed);
+            // Also execute the file nodes which are still dirty
+            std::vector<std::shared_ptr<Node>> dirtyNodes;
+            context.getDirtyNodes(dirtyNodes);
+            completed = YAMTest::executeNodes(dirtyNodes);
             EXPECT_EQ(nNodes, context.nodes().size());
             persistentState.store();
         }
@@ -119,6 +123,7 @@ namespace
         std::tuple<std::filesystem::path, XXH64_hash_t> modifyNode() {
             std::filesystem::path file3(repoDir / "File3");
             auto node = dynamic_pointer_cast<FileNode>(context.nodes().find(file3));
+            YAMTest::executeNode(node.get());
             XXH64_hash_t oldHash = node->hashOf(FileAspect::entireFileAspect().name());
             updateFile(file3);
             consumeFileChangeEvent({ file3 });
@@ -165,15 +170,21 @@ namespace
         }
 
         XXH64_hash_t addFileAndUpdateFileAndExecuteNode(std::shared_ptr<FileNode> fileNode) {
+            bool completed = YAMTest::executeNode(fileNode.get());
+            EXPECT_TRUE(completed);
             auto hash = fileNode->hashOf(FileAspect::entireFileAspect().name());
             setup.testTree.addFile(); // add File4
             setup.updateFile(fileNode->name());
             bool consumed = consumeFileChangeEvent({ fileNode->name(), setup.repoDir / "File4" });
             if (!consumed || Node::State::Dirty != fileNode->state()) throw std::exception("wrong state");
-            // ... execute the file to recompute the file hash...
+            // First execution detects new file without hashing it...
             std::vector<std::shared_ptr<Node>> dirtyNodes;
             setup.context.getDirtyNodes(dirtyNodes);
-            bool completed = YAMTest::executeNodes(dirtyNodes);
+            completed = YAMTest::executeNodes(dirtyNodes);
+            EXPECT_TRUE(completed);
+            // Subsequently execute the file to recompute the file hash...
+            setup.context.getDirtyNodes(dirtyNodes);
+            completed = YAMTest::executeNodes(dirtyNodes);
             EXPECT_TRUE(completed);
             // ... and verify that hash has changed
             auto updatedHash = fileNode->hashOf(FileAspect::entireFileAspect().name());
@@ -289,6 +300,7 @@ namespace
 
         EXPECT_EQ(nNodes, setup.context.nodes().size());
         auto node = dynamic_pointer_cast<FileNode>(setup.context.nodes().find(modifiedFile));
+        YAMTest::executeNode(node.get());
         XXH64_hash_t hash = node->hashOf(FileAspect::entireFileAspect().name());
         EXPECT_EQ(hashBeforeModify, hash);
         // Verify that the rolled-back build state can be executed

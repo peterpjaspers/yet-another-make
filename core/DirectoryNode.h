@@ -20,6 +20,14 @@ namespace YAM
     //    - maintains the directory hash. This hash is computed from the
     //      names of the files and subdirs in the directory.
     //
+    // When executing a DirectoryNode it will:
+    //      - synchronize its content with the filesystem state
+    //      - execute all dirty sub DirectoryNodes
+    // The DirectoryNode will  NOT execute its file nodes.
+    // Rationale: executing (rehashing) file nodes is expensive and therefore
+    // only done on demand during the execution of nodes that depend on these
+    // file nodes.
+    // 
     // All functions execute in main thread unless stated otherwise.
     //
     class __declspec(dllexport) DirectoryNode : public Node
@@ -94,7 +102,7 @@ namespace YAM
         void handleRequisitesCompletion(Node::State state);
         void retrieveContentIfNeeded(); // Executes in a threadpool thread
         void handleRetrieveContentCompletion(RetrieveResult& result);
-        void startChildren();
+        void startSubDirs();
         void commitResult(YAM::DirectoryNode::RetrieveResult& result);
         void _removeChildRecursively(std::shared_ptr<Node> const& child);
 

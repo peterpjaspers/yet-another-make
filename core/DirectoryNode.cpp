@@ -252,14 +252,19 @@ namespace YAM
                 notifyCompletion(result._newState);
             } else {
                 commitResult(result);
-                startChildren();
+                startSubDirs();
             }
         }
     }
 
-    void DirectoryNode::startChildren() {
+    void DirectoryNode::startSubDirs() {
         std::vector<Node*> children;
-        for (auto const& pair : _content) children.push_back(pair.second.get());
+        for (auto it = _content.begin(); it != _content.end(); ++it) {
+            auto sdir = dynamic_pointer_cast<DirectoryNode>(it->second);
+            if (sdir != nullptr) {
+                children.push_back(sdir.get());
+            }
+        }
         auto callback = Delegate<void, Node::State>::CreateLambda(
             [this](Node::State s) { Node::notifyCompletion(s); }
         );

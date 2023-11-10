@@ -116,6 +116,8 @@ namespace
         bool completed = YAMTest::executeNodes(dirtyNodes);
         EXPECT_TRUE(completed);
         verify(&testTree, dirNode);
+        dirtyNodes = getDirtyNodes(dirNode);
+        ASSERT_EQ(120, dirtyNodes.size()); // All file nodes are dirty
 
         std::vector<std::shared_ptr<DirectoryNode>> subDirNodes;
         dirNode->getSubDirs(subDirNodes);
@@ -123,7 +125,7 @@ namespace
         dirNode_S1->getSubDirs(subDirNodes);
         std::shared_ptr<DirectoryNode> dirNode_S1_S2 = subDirNodes[2];
 
-        // Update file system
+        // Update file system. Note: 6 files are added and 4 dirs
         DirectoryTree* testTree_S1 = testTree.getSubDirs()[1];
         DirectoryTree* testTree_S1_S2 = testTree_S1->getSubDirs()[2];
         testTree.addFile();// adds 4-th file
@@ -152,42 +154,55 @@ namespace
             context.mainThreadQueue().push(fillDirtyNodes);
             // dispatcher.run() will block until main thread executed fillDirtyNodes.
             dispatcher.run();
-            done = dirtyNodes.size() == 3;
+            done = dirtyNodes.size() == 123;
             if (!done) std::this_thread::sleep_for(retryInterval);
         } while (nRetries < maxRetries && !done);
-        ASSERT_EQ(3, dirtyNodes.size());
+        ASSERT_EQ(123, dirtyNodes.size()); // all file nodes + 3 dir nodes
 
         context.statistics().reset();
         context.statistics().registerNodes = true;
+        // This execution detects the 4 new dirs and 6 new files and
+        // creates 4 dir nodes and 6 file nodes.
+        // The dir nodes are executed, the file nodes are not.
         completed = YAMTest::executeNodes(dirtyNodes);
         EXPECT_TRUE(completed);
         verify(&testTree, dirNode);
+        dirtyNodes = getDirtyNodes(dirNode);
+        ASSERT_EQ(6, dirtyNodes.size()); // the 6 added file nodes
 
-        // 13 nStarted and nSelfExecuted include the .ignore, .gitignore and
-        // .yamignore of the added dir in testTree_S1_S2 
-        EXPECT_EQ(13, context.statistics().nStarted);
-        // 10 because DirectoryNode::pendingStartSelf always returns true.
-        // But only 4 dir nodes will see a modified directory. Only those 4
-        // update their content.
-        EXPECT_EQ(13, context.statistics().nSelfExecuted);
-        // 8 nRehashedFiles include .gitignore and .yamignore of the added dir
-        // in testTree_S1_S2 
-        EXPECT_EQ(8, context.statistics().nRehashedFiles);
+        std::vector<const Node*> fileNodes;
+        std::vector<const Node*> dirNodes;
+        std::vector<const Node*> otherNodes;
+        for (auto n : context.statistics().started) {
+            if (dynamic_cast<const FileNode*>(n)) fileNodes.push_back(n);
+            else if (dynamic_cast<const DirectoryNode*>(n)) dirNodes.push_back(n);
+            else otherNodes.push_back(n);
+        }
+        // 120 file nodes + subDir4\.yamignore + subDir4\.gitignore + subDir4\dotIgnore
+        // + rootDir + subDir2 + subDir2\subDir3 | subDir2\subDir3\subDir4
+        // 
+        EXPECT_EQ(127, context.statistics().nStarted);
+        EXPECT_EQ(127, context.statistics().nSelfExecuted);
+        // 120 file nodes + subDir4\.yamignore + subDir4\.gitignore
+        EXPECT_EQ(122, context.statistics().nRehashedFiles);
+        // rootDir + subDir2 + subDir2\subDir3 | subDir2\subDir3\subDir4
         EXPECT_EQ(4, context.statistics().nDirectoryUpdates);
         EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode));
         EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode_S1.get()));
         EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode_S1_S2.get()));
+
+        // The new file4 files are newly detected and therefore not executed (hashed)
         std::vector<std::shared_ptr<FileNode>> files;
         dirNode->getFiles(files);
-        EXPECT_TRUE(context.statistics().rehashedFiles.contains(files[files.size() - 1].get()));
+        EXPECT_FALSE(context.statistics().rehashedFiles.contains(files[files.size() - 1].get()));
 
         dirNode_S1->getFiles(files);
-        EXPECT_TRUE(context.statistics().rehashedFiles.contains(files[files.size() - 1].get()));
+        EXPECT_FALSE(context.statistics().rehashedFiles.contains(files[files.size() - 1].get()));
 
         dirNode_S1_S2->getSubDirs(subDirNodes);
         auto dirNode_S1_S2_S3 = subDirNodes[subDirNodes.size() - 1];
         EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode_S1_S2_S3.get()));
         dirNode_S1_S2_S3->getFiles(files);
-        for (auto f : files) EXPECT_TRUE(context.statistics().rehashedFiles.contains(f.get()));
+        for (auto f : files) EXPECT_FALSE(context.statistics().rehashedFiles.contains(f.get()));
     }
 }
