@@ -14,23 +14,23 @@ namespace YAM
     class FileNode;
     class DotIgnoreNode;
 
-    // A SourceDirectoryNode keeps track of the source files in a directory:
+    // A DirectoryNode caches the content of a directory:
     //    - creates a SourceFileNode for each file in the directory.
-    //    - creates a SourceDirectoryNode for each subdir in the directory.
+    //    - creates a DirectoryNode for each subdir in the directory.
     //    - maintains the directory hash. This hash is computed from the
     //      names of the files and subdirs in the directory.
     //
     // All functions execute in main thread unless stated otherwise.
     //
-    class __declspec(dllexport) SourceDirectoryNode : public Node
+    class __declspec(dllexport) DirectoryNode : public Node
     {
     public:
-        SourceDirectoryNode() {} // needed for deserialization
+        DirectoryNode() {} // needed for deserialization
 
-        SourceDirectoryNode(
+        DirectoryNode(
             ExecutionContext* context, 
             std::filesystem::path const& dirName,
-            SourceDirectoryNode* parent);
+            DirectoryNode* parent);
 
         void start() override;
 
@@ -38,12 +38,12 @@ namespace YAM
         // to the execution context.
         void addPrerequisitesToContext();
 
-        SourceDirectoryNode* parent() const;
+        DirectoryNode* parent() const;
         std::shared_ptr<DotIgnoreNode> const& dotIgnoreNode() { return _dotIgnoreNode; }
 
         // Query the directory content, vector content is sorted by node name.
         void getFiles(std::vector<std::shared_ptr<FileNode>>& filesInDir);
-        void getSubDirs(std::vector<std::shared_ptr<SourceDirectoryNode>>& subDirsInDir);
+        void getSubDirs(std::vector<std::shared_ptr<DirectoryNode>>& subDirsInDir);
 
         void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const override;
         void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const override;
@@ -77,7 +77,7 @@ namespace YAM
         void handleDirtyOf(Node* observedNode) override;
 
     private:
-        void parent(SourceDirectoryNode* parent);
+        void parent(DirectoryNode* parent);
 
         struct RetrieveResult {
             Node::State _newState;
@@ -95,7 +95,7 @@ namespace YAM
         void retrieveContentIfNeeded(); // Executes in a threadpool thread
         void handleRetrieveContentCompletion(RetrieveResult& result);
         void startChildren();
-        void commitResult(YAM::SourceDirectoryNode::RetrieveResult& result);
+        void commitResult(YAM::DirectoryNode::RetrieveResult& result);
         void _removeChildRecursively(std::shared_ptr<Node> const& child);
 
         // Next 3 functions execute in a threadpool thread
@@ -110,7 +110,7 @@ namespace YAM
             std::unordered_set<std::shared_ptr<Node>>& kept,
             std::unordered_set<std::shared_ptr<Node>>& removed) const;
 
-        SourceDirectoryNode* _parent;
+        DirectoryNode* _parent;
         std::shared_ptr<DotIgnoreNode> _dotIgnoreNode;
         std::chrono::time_point<std::chrono::utc_clock> _lastWriteTime;
         std::map<std::filesystem::path, std::shared_ptr<Node>> _content;

@@ -46,7 +46,7 @@ namespace YAM
         }
     }
 
-    void ExecutionStatistics::registerUpdatedDirectory(SourceDirectoryNode const* node) {
+    void ExecutionStatistics::registerUpdatedDirectory(DirectoryNode const* node) {
         nDirectoryUpdates++;
         if (registerNodes) {
             std::lock_guard<std::mutex> lock(mutex);

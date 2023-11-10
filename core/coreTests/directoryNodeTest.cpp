@@ -1,8 +1,8 @@
 #include "gtest/gtest.h"
 #include "executeNode.h"
 #include "DirectoryTree.h"
-#include "../SourceFileRepository.h"
-#include "../SourceDirectoryNode.h"
+#include "../FileRepository.h"
+#include "../DirectoryNode.h"
 #include "../FileNode.h"
 #include "../ExecutionContext.h"
 #include "../../xxhash/xxhash.h"
@@ -15,14 +15,14 @@ namespace
     using namespace YAMTest;
 
     std::chrono::seconds timeout(10);
-    TEST(SourceDirectoryNode, construct_twoDeepDirectoryTree) {
+    TEST(DirectoryNode, construct_twoDeepDirectoryTree) {
         std::string tmpDir(std::tmpnam(nullptr));
         std::filesystem::path rootDir(std::string(tmpDir + "_dirNodeTest"));
         DirectoryTree testTree(rootDir, 2, RegexSet());
 
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
-        auto repo = std::make_shared<SourceFileRepository>("repo", rootDir, &context);
+        auto repo = std::make_shared<FileRepository>("repo", rootDir, &context);
         context.addRepository(repo);
         auto dirNode = repo->directoryNode();
         EXPECT_EQ(Node::State::Dirty, dirNode->state());
@@ -32,14 +32,14 @@ namespace
         verify(&testTree, dirNode.get());
     }
 
-    TEST(SourceDirectoryNode, update_threeDeepDirectoryTree) {
+    TEST(DirectoryNode, update_threeDeepDirectoryTree) {
         std::string tmpDir(std::tmpnam(nullptr));
         std::filesystem::path rootDir(std::string(tmpDir + "_dirNodeTest"));
         DirectoryTree testTree(rootDir, 3, RegexSet());
 
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
-        auto repo = std::make_shared<SourceFileRepository>("repo", rootDir, &context);
+        auto repo = std::make_shared<FileRepository>("repo", rootDir, &context);
         context.addRepository(repo);
         auto dirNode = repo->directoryNode();
         bool completed = YAMTest::executeNode(dirNode.get());
@@ -54,11 +54,11 @@ namespace
         testTree_S1_S2->addFile(); // adds 4-th file
 
         // Find nodes affected by file system changes...
-        std::vector<std::shared_ptr<SourceDirectoryNode>> subDirNodes;
+        std::vector<std::shared_ptr<DirectoryNode>> subDirNodes;
         dirNode->getSubDirs(subDirNodes);
-        std::shared_ptr<SourceDirectoryNode> dirNode_S1 = subDirNodes[1];
+        std::shared_ptr<DirectoryNode> dirNode_S1 = subDirNodes[1];
         dirNode_S1->getSubDirs(subDirNodes);
-        std::shared_ptr<SourceDirectoryNode> dirNode_S1_S2 = subDirNodes[2];
+        std::shared_ptr<DirectoryNode> dirNode_S1_S2 = subDirNodes[2];
 
         // ...and mark these nodes dirty
         dirNode->setState(Node::State::Dirty);
@@ -77,7 +77,7 @@ namespace
         // 13 nStarted and nSelfExecuted include the .ignore, .gitignore and
         // .yamignore of the added dir in testTree_S1_S2 
         EXPECT_EQ(13, context.statistics().nStarted);
-        // 10 because SourceDirectoryNode::pendingStartSelf always returns true.
+        // 10 because DirectoryNode::pendingStartSelf always returns true.
         // But only 4 dir nodes will see a modified directory. Only those 4
         // update their content.
         EXPECT_EQ(13, context.statistics().nSelfExecuted);

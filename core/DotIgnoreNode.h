@@ -6,7 +6,7 @@
 
 namespace YAM
 {
-    class SourceDirectoryNode;
+    class DirectoryNode;
     class SourceFileNode;
 
     // A DotIgnoreNode parses a .gitignore and/or .yamignore file in a
@@ -17,7 +17,7 @@ namespace YAM
     // YAM uses the patterns in these files to distinguish source files from
     // generated files (mandatory) and to exclude source files (optionally) 
     // that are not (allowed to be) used by the build from being mirrored by
-    // SourceDirectoryNode.
+    // DirectoryNode.
     //
     class __declspec(dllexport) DotIgnoreNode : public Node
     {
@@ -26,7 +26,7 @@ namespace YAM
         DotIgnoreNode(
             ExecutionContext* context,
             std::filesystem::path const& name,
-            SourceDirectoryNode *directory);
+            DirectoryNode *directory);
 
         // Add the prerequisites (i.e, the .gitignore and .yamignore file nodes
         // to the execution context.
@@ -56,15 +56,15 @@ namespace YAM
     protected:
 
     private:
-        friend class SourceDirectoryNode;
+        friend class DirectoryNode;
 
-        void directory(SourceDirectoryNode* directory);
+        void directory(DirectoryNode* directory);
         XXH64_hash_t computeHash() const;
         void handleRequisiteCompletion(Node::State state); 
         void parseDotIgnoreFiles();
 
 
-        SourceDirectoryNode* _directory;
+        DirectoryNode* _directory;
 
         // The input files, i.e. the .gitignore and/or .yamignore files
         std::vector<std::shared_ptr<SourceFileNode>> _dotIgnoreFiles;

@@ -16,10 +16,10 @@ namespace YAM
     // A FileRepositoryWatcher continuously watches a file repository for
     // directory and file changes. 
     //  
-    // Changes are queued for consumption via the function consumeChanges().
-    // On consumption DirectoryNodes and FileNodes associated with the queued 
-    // changes are marked Dirty. These nodes are looked-up from an Execution
-    // Context. Creation of these nodes is outside the scope of this class.
+    // Changes are queued. The queued changes can be dequeued via the function
+    // consumeChanges(). On consumption DirectoryNodes and FileNodes associated 
+    // with the changes are marked Dirty. These nodes are looked-up in an 
+    // ExecutionContext.
     // 
     // consumeChanges() can be called at any time between builds. At latest it
     // must be called at the start of a build. The build must then sync the 
@@ -47,6 +47,8 @@ namespace YAM
         FileRepositoryWatcher(
             std::filesystem::path const& directory,
             ExecutionContext* context);
+
+        std::filesystem::path const& directory();
 
         // Consume the changes that occurred in the filesystem since the previous
         // consumption by marking directory and file nodes associated with these 

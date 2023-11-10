@@ -2,7 +2,7 @@
 #include "executeNode.h"
 #include "../FileNode.h"
 #include "../ExecutionContext.h"
-#include "../SourceFileRepository.h"
+#include "../FileRepository.h"
 #include "../../xxhash/xxhash.h"
 
 #include <chrono>
@@ -76,7 +76,7 @@ namespace
         std::filesystem::path repoDir(std::tmpnam(nullptr));
         std::filesystem::create_directories(repoDir);
         ExecutionContext context;
-        auto repo = std::make_shared<SourceFileRepository>(
+        auto repo = std::make_shared<FileRepository>(
             std::string("repo"), 
             repoDir,
             &context);

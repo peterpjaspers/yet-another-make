@@ -97,7 +97,7 @@ to:
             std::shared_ptr<FileNode> _file;
     }
 A disadvantage of this approach is that it may cause frequent re-execution of the
-SourceDirectoryNode that contains the generated files because typically output files
+DirectoryNode that contains the generated files because typically output files
 are deleted before being re-generated, resulting in directory updates.
 
 Note: the above approach to file node creation and execution also simplifies 

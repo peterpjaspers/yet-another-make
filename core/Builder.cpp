@@ -4,8 +4,8 @@
 #include "CommandNode.h"
 #include "SourceFileNode.h"
 #include "GeneratedFileNode.h"
-#include "SourceDirectoryNode.h"
-#include "SourceFileRepository.h"
+#include "DirectoryNode.h"
+#include "FileRepository.h"
 #include "DotGitDirectory.h"
 #include "DotYamDirectory.h"
 
@@ -23,13 +23,13 @@ namespace
     using namespace YAM;
 
     void appendDirtyFileAndDirectoryNodes(
-        std::shared_ptr<SourceDirectoryNode> directory,
+        std::shared_ptr<DirectoryNode> directory,
         std::vector<std::shared_ptr<Node>>& dirtyNodes
     ) {
         if (directory->state() == Node::State::Dirty) dirtyNodes.push_back(directory);
         for (auto const& pair : directory->getContent()) {
             auto child = pair.second;
-            auto sourceDir = dynamic_pointer_cast<SourceDirectoryNode>(child);
+            auto sourceDir = dynamic_pointer_cast<DirectoryNode>(child);
             if (sourceDir != nullptr) {
                 appendDirtyFileAndDirectoryNodes(sourceDir, dirtyNodes);
             } else {
@@ -45,7 +45,7 @@ namespace
 
     //TODO
     void appendDirtyBuildFileNodes(
-        std::shared_ptr<SourceDirectoryNode> directory,
+        std::shared_ptr<DirectoryNode> directory,
         std::vector<std::shared_ptr<Node>>& dirtyBuildFiles
     ) {
         //Take care: buildFileNode is NOT a source file node.
@@ -115,7 +115,7 @@ namespace YAM
         if (_result->succeeded()) {
             std::filesystem::path repoPath = yamDir.parent_path();
             if (_context.findRepository(repoPath.filename().string()) == nullptr) {
-                auto repo = std::make_shared<SourceFileRepository>(
+                auto repo = std::make_shared<FileRepository>(
                     repoPath.filename().string(),
                     repoPath,
                     &_context);

@@ -1,10 +1,10 @@
 #include "DotIgnoreNode.h"
 #include "ExecutionContext.h"
 #include "SourceFileNode.h"
-#include "SourceDirectoryNode.h"
+#include "DirectoryNode.h"
 #include "FileSystem.h"
 #include "FileAspect.h"
-#include "SourceFileRepository.h"
+#include "FileRepository.h"
 #include "IStreamer.h"
 
 namespace
@@ -15,7 +15,7 @@ namespace
 
     void setDirtyRecursively(Node* node) {
         node->setState(Node::State::Dirty);
-        SourceDirectoryNode* dir = dynamic_cast<SourceDirectoryNode*>(node);
+        DirectoryNode* dir = dynamic_cast<DirectoryNode*>(node);
         if (dir != nullptr) {
             auto const& content = dir->getContent();
             for (auto const& pair : content) {
@@ -33,7 +33,7 @@ namespace YAM
     DotIgnoreNode::DotIgnoreNode(
         ExecutionContext* context,
         std::filesystem::path const& name,
-        SourceDirectoryNode* directory)
+        DirectoryNode* directory)
         : Node(context, name)
         , _directory(directory)
         , _hash(rand())
@@ -49,7 +49,7 @@ namespace YAM
         }
     }
 
-    void DotIgnoreNode::directory(SourceDirectoryNode* directory) {
+    void DotIgnoreNode::directory(DirectoryNode* directory) {
         _directory = directory;
     }
 

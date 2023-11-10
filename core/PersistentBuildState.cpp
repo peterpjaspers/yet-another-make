@@ -1,7 +1,7 @@
 #include "PersistentBuildState.h"
 #include "SourceFileNode.h"
 #include "GeneratedFileNode.h"
-#include "SourceDirectoryNode.h"
+#include "DirectoryNode.h"
 #include "DotIgnoreNode.h"
 #include "CommandNode.h"
 #include "Streamer.h"
@@ -9,7 +9,7 @@
 #include "ISharedObjectStreamer.h"
 #include "ExecutionContext.h"
 #include "NodeSet.h"
-#include "SourceFileRepository.h"
+#include "FileRepository.h"
 
 #include <memory>
 #include <filesystem>
@@ -26,9 +26,9 @@ namespace YAM
             CommandNode = 1,
             DotIgnoreNode = 2,
             GeneratedFileNode = 3,
-            SourceDirectoryNode = 4,
+            DirectoryNode = 4,
             SourceFileNode = 5,
-            SourceFileRepository = 6,
+            FileRepository = 6,
             Max = 7
         };
         std::vector<TypeId> ids;
@@ -37,26 +37,26 @@ namespace YAM
             YAM::CommandNode::setStreamableType(static_cast<uint32_t>(CommandNode));
             YAM::DotIgnoreNode::setStreamableType(static_cast<uint32_t>(DotIgnoreNode));
             YAM::GeneratedFileNode::setStreamableType(static_cast<uint32_t>(GeneratedFileNode));
-            YAM::SourceDirectoryNode::setStreamableType(static_cast<uint32_t>(SourceDirectoryNode));
+            YAM::DirectoryNode::setStreamableType(static_cast<uint32_t>(DirectoryNode));
             YAM::SourceFileNode::setStreamableType(static_cast<uint32_t>(SourceFileNode));
-            YAM::SourceFileRepository::setStreamableType(static_cast<uint32_t>(SourceFileRepository));
+            YAM::FileRepository::setStreamableType(static_cast<uint32_t>(FileRepository));
 
             ids.push_back(CommandNode);
             ids.push_back(DotIgnoreNode);
             ids.push_back(GeneratedFileNode);
-            ids.push_back(SourceDirectoryNode);
+            ids.push_back(DirectoryNode);
             ids.push_back(SourceFileNode);
-            ids.push_back(SourceFileRepository);
+            ids.push_back(FileRepository);
         }
 
         bool isNode(IPersistable* object) {
             auto tid = object->typeId();
-            return ((TypeId::Min < tid) && (tid < TypeId::SourceFileRepository));
+            return ((TypeId::Min < tid) && (tid < TypeId::FileRepository));
         }
 
         bool isFileRepo(IPersistable* object) {
             auto tid = object->typeId();
-            return TypeId::SourceFileRepository == tid;
+            return TypeId::FileRepository == tid;
         }
 
         uint32_t getTypeId(IPersistable* object) {
@@ -71,9 +71,9 @@ namespace YAM
             case TypeId::CommandNode: return new YAM::CommandNode();
             case TypeId::DotIgnoreNode: return new YAM::DotIgnoreNode();
             case TypeId::GeneratedFileNode: return new YAM::GeneratedFileNode();
-            case TypeId::SourceDirectoryNode: return new YAM::SourceDirectoryNode();
+            case TypeId::DirectoryNode: return new YAM::DirectoryNode();
             case TypeId::SourceFileNode: return new YAM::SourceFileNode();
-            case TypeId::SourceFileRepository: return new YAM::SourceFileRepository();
+            case TypeId::FileRepository: return new YAM::FileRepository();
             default: throw std::exception("unknown node type");
             }
         }
@@ -437,7 +437,7 @@ namespace YAM
 
     void PersistentBuildState::addToBuildState(std::shared_ptr<IPersistable> const& object) {
         auto node = dynamic_pointer_cast<Node>(object);
-        auto repo = dynamic_pointer_cast<SourceFileRepository>(object);
+        auto repo = dynamic_pointer_cast<FileRepository>(object);
         if (node != nullptr) {
             _context->nodes().add(node);
         } else if (repo != nullptr) {
@@ -449,7 +449,7 @@ namespace YAM
 
     void PersistentBuildState::removeFromBuildState(std::shared_ptr<IPersistable> const& object) {
         auto node = dynamic_pointer_cast<Node>(object);
-        auto repo = dynamic_pointer_cast<SourceFileRepository>(object);
+        auto repo = dynamic_pointer_cast<FileRepository>(object);
         if (node != nullptr) {
             _context->nodes().remove(node);
         } else if (repo != nullptr) {

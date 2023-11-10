@@ -8,7 +8,7 @@
 #include "../MultiwayLogBook.h"
 #include "../MemoryLogBook.h"
 #include "../BasicOStreamLogBook.h"
-#include "../SourceFileRepository.h"
+#include "../FileRepository.h"
 
 #include "gtest/gtest.h"
 #include <boost/process.hpp>
@@ -70,12 +70,12 @@ namespace
             logBook->add(stdoutLogBook);
             context.logBook(logBook);
             context.addRepository(
-                std::make_shared<SourceFileRepository>(
+                std::make_shared<FileRepository>(
                     "windows",
                     std::filesystem::path("c:\\windows"),
                     &context));
             context.addRepository(
-                std::make_shared<SourceFileRepository>(
+                std::make_shared<FileRepository>(
                     "repo",
                     repoDir,
                     &context));

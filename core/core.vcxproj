@@ -135,7 +135,7 @@
     <ClInclude Include="IIOStream.h" />
     <ClInclude Include="MemoryStream.h" />
     <ClInclude Include="ShutdownRequest.h" />
-    <ClInclude Include="SourceDirectoryNode.h" />
+    <ClInclude Include="DirectoryNode.h" />
     <ClInclude Include="DispatcherFrame.h" />
     <ClInclude Include="ExecutionContext.h" />
     <ClInclude Include="ExecutionStatistics.h" />
@@ -163,7 +163,7 @@
     <ClInclude Include="NodeSet.h" />
     <ClInclude Include="Node.h" />
     <ClInclude Include="SourceFileNode.h" />
-    <ClInclude Include="SourceFileRepository.h" />
+    <ClInclude Include="FileRepository.h" />
     <ClInclude Include="SyntaxTree.h" />
     <ClInclude Include="TcpStream.h" />
     <ClInclude Include="Thread.h" />
@@ -208,7 +208,7 @@
     <ClCompile Include="DotIgnoreNode.cpp" />
     <ClCompile Include="MemoryStream.cpp" />
     <ClCompile Include="ShutdownRequest.cpp" />
-    <ClCompile Include="SourceDirectoryNode.cpp" />
+    <ClCompile Include="DirectoryNode.cpp" />
     <ClCompile Include="DispatcherFrame.cpp" />
     <ClCompile Include="ExecutionContext.cpp" />
     <ClCompile Include="ExecutionStatistics.cpp" />
@@ -245,7 +245,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="SourceFileNode.cpp" />
-    <ClCompile Include="SourceFileRepository.cpp" />
+    <ClCompile Include="FileRepository.cpp" />
     <ClCompile Include="SyntaxTree.cpp" />
     <ClCompile Include="TcpStream.cpp" />
     <ClCompile Include="Thread.cpp" />

@@ -1,7 +1,7 @@
 #pragma once
 #include "gtest/gtest.h"
 #include "DirectoryTree.h"
-#include "../SourceDirectoryNode.h"
+#include "../DirectoryNode.h"
 #include "../SourceFileNode.h"
 #include "../FileNode.h"
 #include "../RegexSet.h"
@@ -132,7 +132,7 @@ namespace YAMTest
         _hash = XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
     }
     
-    void verify(DirectoryTree* expected, YAM::SourceDirectoryNode* actual) {
+    void verify(DirectoryTree* expected, YAM::DirectoryNode* actual) {
 
         EXPECT_EQ(YAM::Node::State::Ok, actual->state());
         EXPECT_EQ(expected->getHash(), actual->computeExecutionHash(0, actual->getContent()));
@@ -144,7 +144,7 @@ namespace YAMTest
             EXPECT_EQ(expected->getFiles()[i], fileNodes[i]->name());
         }
 
-        std::vector<std::shared_ptr<YAM::SourceDirectoryNode>> subDirNodes;
+        std::vector<std::shared_ptr<YAM::DirectoryNode>> subDirNodes;
         actual->getSubDirs(subDirNodes);
         EXPECT_EQ(expected->getSubDirs().size(), subDirNodes.size());
         for (std::size_t i = 0; i < subDirNodes.size(); ++i) {

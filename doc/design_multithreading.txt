@@ -13,7 +13,7 @@ Node::selfExecute may access (read+write)
 	- members variables of other nodes, e.g. CommandNode rehashes its output
 	  file nodes after completion of its command script.
 	- its execution context, e.g.:
-		- SourceDirectoryNode adds/removes directory and file nodes
+		- DirectoryNode adds/removes directory and file nodes
 		- BuildFileProcessorNode adds/removes/updates command nodes
 		- CommandNode finds file nodes associated with the files read by its
 		  command script

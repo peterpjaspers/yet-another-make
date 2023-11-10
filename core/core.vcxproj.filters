@@ -81,7 +81,7 @@
     <ClInclude Include="DirectoryWatcherWin32.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="SourceFileRepository.h">
+    <ClInclude Include="FileRepository.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="IMonitoredProcess.h">
@@ -121,9 +121,6 @@
       <Filter>Header Files\Node</Filter>
     </ClInclude>
     <ClInclude Include="NodeSet.h">
-      <Filter>Header Files\Node</Filter>
-    </ClInclude>
-    <ClInclude Include="SourceDirectoryNode.h">
       <Filter>Header Files\Node</Filter>
     </ClInclude>
     <ClInclude Include="SourceFileNode.h">
@@ -273,6 +270,9 @@
     <ClInclude Include="Glob.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="DirectoryNode.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -302,7 +302,7 @@
     <ClCompile Include="DirectoryWatcherWin32.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="SourceFileRepository.cpp">
+    <ClCompile Include="FileRepository.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="MonitoredProcessWin32.cpp">
@@ -366,9 +366,6 @@
       <Filter>Source Files\Node</Filter>
     </ClCompile>
     <ClCompile Include="NodeSet.cpp">
-      <Filter>Source Files\Node</Filter>
-    </ClCompile>
-    <ClCompile Include="SourceDirectoryNode.cpp">
       <Filter>Source Files\Node</Filter>
     </ClCompile>
     <ClCompile Include="SourceFileNode.cpp">
@@ -444,6 +441,9 @@
       <Filter>Source Files\BuildFileParser</Filter>
     </ClCompile>
     <ClCompile Include="Glob.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DirectoryNode.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -19,7 +19,7 @@ namespace YAM
         // directory that contains the .git directory. Fail if a .yam
         // directory already exists in one of the directories between
         // 'directory' and the git root dir.
-        // Rationale: YAM SourceFileRepository uses the .gitignore files 
+        // Rationale: YAM FileRepository uses the .gitignore files 
         // and must therefore be able to monitor all .gitignore files for
         // changes. This can only be done when monitoring the git repo dir.
         // 

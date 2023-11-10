@@ -8,7 +8,7 @@ namespace YAM
 {
     class Node;
     class FileNode;
-    class SourceDirectoryNode;
+    class DirectoryNode;
 
     class __declspec(dllexport) ExecutionStatistics
     {
@@ -21,7 +21,7 @@ namespace YAM
         void registerSelfExecuted(Node const* node);
 
         void registerRehashedFile(FileNode const* node);
-        void registerUpdatedDirectory(SourceDirectoryNode const* node);
+        void registerUpdatedDirectory(DirectoryNode const* node);
 
         // number of nodes started
         unsigned int nStarted;
@@ -43,6 +43,6 @@ namespace YAM
         // These 2 fields are updated from threadpool.
         // Use mutex to do MT-safe update.
         std::unordered_set<FileNode const*> rehashedFiles;
-        std::unordered_set<SourceDirectoryNode const*> updatedDirectories;
+        std::unordered_set<DirectoryNode const*> updatedDirectories;
     };
 }

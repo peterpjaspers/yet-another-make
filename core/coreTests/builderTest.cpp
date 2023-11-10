@@ -2,8 +2,8 @@
 #include "../CommandNode.h"
 #include "../SourceFileNode.h"
 #include "../GeneratedFileNode.h"
-#include "../SourceDirectoryNode.h"
-#include "../SourceFileRepository.h"
+#include "../DirectoryNode.h"
+#include "../FileRepository.h"
 #include "../ThreadPool.h"
 #include "../ExecutionContext.h"
 #include "../FileSystem.h"
@@ -168,7 +168,7 @@ namespace
             EXPECT_EQ(Node::State::Dirty, pietjanOut->state());
         }
 
-        std::shared_ptr<SourceFileRepository> sourceRepo() {
+        std::shared_ptr<FileRepository> sourceRepo() {
             return context->findRepository(repo.dir.filename().string());
         }
 
@@ -565,7 +565,7 @@ namespace
 
         ASSERT_TRUE(driver.consumeFileChangeEvent({ driver.repo.janCpp }));
         auto janCppNode = dynamic_pointer_cast<FileNode>(driver.context->nodes().find(driver.repo.janCpp));
-        auto srcDirNode = dynamic_pointer_cast<SourceDirectoryNode>(driver.context->nodes().find(driver.repo.dir / "src"));
+        auto srcDirNode = dynamic_pointer_cast<DirectoryNode>(driver.context->nodes().find(driver.repo.dir / "src"));
         EXPECT_EQ(Node::State::Ok, driver.ccPiet->state());
         EXPECT_EQ(Node::State::Dirty, janCppNode->state());
         EXPECT_EQ(Node::State::Dirty, driver.ccJan->state());

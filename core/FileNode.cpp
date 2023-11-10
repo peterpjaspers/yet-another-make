@@ -1,7 +1,7 @@
 #include "FileNode.h"
 #include "FileAspect.h"
 #include "ExecutionContext.h"
-#include "SourceFileRepository.h"
+#include "FileRepository.h"
 #include "ExecutionContext.h"
 #include "IStreamer.h"
 
@@ -16,18 +16,18 @@ namespace YAM
         : Node(context, name)
     {}
 
-    std::shared_ptr<SourceFileRepository> FileNode::fileRepository() const {
+    std::shared_ptr<FileRepository> FileNode::fileRepository() const {
         return context()->findRepositoryContaining(name());
     }
 
     std::filesystem::path FileNode::relativePath() const {
-        std::shared_ptr<SourceFileRepository> repo = fileRepository();
+        std::shared_ptr<FileRepository> repo = fileRepository();
         if (repo == nullptr) return name();
         return repo->relativePathOf(name());
     }
 
     std::filesystem::path FileNode::symbolicPath() const {
-        std::shared_ptr<SourceFileRepository> repo = fileRepository();
+        std::shared_ptr<FileRepository> repo = fileRepository();
         if (repo == nullptr) return name();
         return repo->symbolicPathOf(name());
     }

@@ -1,7 +1,7 @@
 #include "executeNode.h"
 #include "DirectoryTree.h"
-#include "../SourceFileRepository.h"
-#include "../SourceDirectoryNode.h"
+#include "../FileRepository.h"
+#include "../DirectoryNode.h"
 #include "../SourceFileNode.h"
 #include "../ExecutionContext.h"
 #include "../RegexSet.h"
@@ -37,25 +37,25 @@ namespace
     };
     RepoProps repoProps;
     ExecutionContext context;
-    SourceFileRepository repo(repoProps.name, repoProps.dir, &context);
+    FileRepository repo(repoProps.name, repoProps.dir, &context);
 
-    TEST(SourceFileRepository, construct) {
+    TEST(FileRepository, construct) {
         EXPECT_EQ(repoProps.name, repo.name());
         EXPECT_EQ(repoProps.dir, repo.directory());
     }
-    TEST(SourceFileRepository, contains) {
+    TEST(FileRepository, contains) {
         EXPECT_TRUE(repo.lexicallyContains(R"(C:\aap\noot\mies\file.cpp)"));
         EXPECT_FALSE(repo.lexicallyContains(R"(C:\aap\noot\file.cpp)"));
         EXPECT_FALSE(repo.lexicallyContains(R"(\aap\noot\mies\file.cpp)"));
         EXPECT_FALSE(repo.lexicallyContains(R"(aap\noot\mies\file.cpp)"));
     }
-    TEST(SourceFileRepository, relativePath) {
+    TEST(FileRepository, relativePath) {
         EXPECT_EQ(std::filesystem::path(R"(file.cpp)"), repo.relativePathOf(R"(C:\aap\noot\mies\file.cpp)"));
         EXPECT_EQ(std::filesystem::path(), repo.relativePathOf(R"(C:\aap\noot\file.cpp)"));
         EXPECT_EQ(std::filesystem::path(), repo.relativePathOf(R"(\aap\noot\file.cpp)"));
         EXPECT_EQ(std::filesystem::path(), repo.relativePathOf(R"(aap\noot\mies\file.cpp)"));
     }
-    TEST(SourceFileRepository, symbolicPath) {
+    TEST(FileRepository, symbolicPath) {
         EXPECT_EQ(std::filesystem::path(R"(testRepo\file.cpp)"), repo.symbolicPathOf(R"(C:\aap\noot\mies\file.cpp)"));
         EXPECT_EQ(std::filesystem::path(), repo.symbolicPathOf(R"(C:\aap\noot\file.cpp)"));
         EXPECT_EQ(std::filesystem::path(), repo.symbolicPathOf(R"(\aap\noot\file.cpp)"));
@@ -78,7 +78,7 @@ namespace
         if (node->state() == Node::State::Dirty) {
             dirtyNodes.push_back(node);
         }
-        auto dirNode = dynamic_cast<SourceDirectoryNode*>(node);
+        auto dirNode = dynamic_cast<DirectoryNode*>(node);
         if (dirNode != nullptr) {
             auto const& content = dirNode->getContent();
             for (auto const& pair : content) {
@@ -87,14 +87,14 @@ namespace
         }
     }
 
-    std::vector<Node*> getDirtyNodes(SourceDirectoryNode* dirNode) {
+    std::vector<Node*> getDirtyNodes(DirectoryNode* dirNode) {
         std::vector<Node*> dirtyNodes;
         std::unordered_set<Node*> visitedNodes;
         findDirtyNodes(dirNode, dirtyNodes, visitedNodes);
         return dirtyNodes;
     }
 
-    TEST(SourceFileRepository, update_threeDeepDirectoryTree) {
+    TEST(FileRepository, update_threeDeepDirectoryTree) {
         std::filesystem::path tmpDir = FileSystem::createUniqueDirectory();
         std::filesystem::path rootDir(tmpDir.string() + "_dirNodeTest");
         RegexSet excludes;
@@ -102,12 +102,12 @@ namespace
 
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
-        auto repo = std::make_shared<SourceFileRepository>(
+        auto repo = std::make_shared<FileRepository>(
             std::string("testRepo"), 
             rootDir,
             &context);
         context.addRepository(repo);
-        SourceDirectoryNode* dirNode = repo->directoryNode().get();
+        DirectoryNode* dirNode = repo->directoryNode().get();
 
         repo->consumeChanges();
         std::vector<Node*> dirtyNodes = getDirtyNodes(dirNode);
@@ -117,11 +117,11 @@ namespace
         EXPECT_TRUE(completed);
         verify(&testTree, dirNode);
 
-        std::vector<std::shared_ptr<SourceDirectoryNode>> subDirNodes;
+        std::vector<std::shared_ptr<DirectoryNode>> subDirNodes;
         dirNode->getSubDirs(subDirNodes);
-        std::shared_ptr<SourceDirectoryNode> dirNode_S1 = subDirNodes[1];
+        std::shared_ptr<DirectoryNode> dirNode_S1 = subDirNodes[1];
         dirNode_S1->getSubDirs(subDirNodes);
-        std::shared_ptr<SourceDirectoryNode> dirNode_S1_S2 = subDirNodes[2];
+        std::shared_ptr<DirectoryNode> dirNode_S1_S2 = subDirNodes[2];
 
         // Update file system
         DirectoryTree* testTree_S1 = testTree.getSubDirs()[1];
@@ -166,7 +166,7 @@ namespace
         // 13 nStarted and nSelfExecuted include the .ignore, .gitignore and
         // .yamignore of the added dir in testTree_S1_S2 
         EXPECT_EQ(13, context.statistics().nStarted);
-        // 10 because SourceDirectoryNode::pendingStartSelf always returns true.
+        // 10 because DirectoryNode::pendingStartSelf always returns true.
         // But only 4 dir nodes will see a modified directory. Only those 4
         // update their content.
         EXPECT_EQ(13, context.statistics().nSelfExecuted);

@@ -9,7 +9,7 @@
 
 namespace YAM
 {
-    class SourceDirectoryNode;
+    class DirectoryNode;
 }
 namespace YAMTest
 {
@@ -57,5 +57,5 @@ namespace YAMTest
 
 
     // Verify that 'actual' correctly mirrors 'expected'.
-    void verify(DirectoryTree* expected, YAM::SourceDirectoryNode* actual);
+    void verify(DirectoryTree* expected, YAM::DirectoryNode* actual);
 }

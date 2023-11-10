@@ -1,8 +1,8 @@
 
 #include "executeNode.h"
 #include "DirectoryTree.h"
-#include "../SourceFileRepository.h"
-#include "../SourceDirectoryNode.h"
+#include "../FileRepository.h"
+#include "../DirectoryNode.h"
 #include "../SourceFileNode.h"
 #include "../DotIgnoreNode.h"
 #include "../ExecutionContext.h"
@@ -32,7 +32,7 @@ namespace
     // When event is received then consume the changes.
     // Return whether event was consumed.
     bool consumeFileChangeEvents(
-        SourceFileRepository* sourceFileRepo,
+        FileRepository* sourceFileRepo,
         Dispatcher& mainThreadQueue,
         std::initializer_list<std::filesystem::path> paths)
     {
@@ -73,15 +73,15 @@ namespace
         DirectoryTree testTree;
         ExecutionContext context;
         PersistentBuildState persistentState;
-        std::shared_ptr<SourceFileRepository> sourceFileRepo;
-        std::shared_ptr<SourceDirectoryNode> repoDirNode;
+        std::shared_ptr<FileRepository> sourceFileRepo;
+        std::shared_ptr<DirectoryNode> repoDirNode;
 
         SetupHelper(std::filesystem::path const& repoDirectory)
             : repoDir(repoDirectory)
             , yamDir(DotYamDirectory::create(repoDir))
             , testTree(repoDir, 3, RegexSet({ ".yam" }))
             , persistentState(repoDir / "buildState", &context)
-            , sourceFileRepo(std::make_shared<SourceFileRepository>(
+            , sourceFileRepo(std::make_shared<FileRepository>(
                 "repo",
                 repoDir,
                 &context))
@@ -143,16 +143,16 @@ namespace
     {
     public:
         SetupHelper& setup;
-        std::shared_ptr<SourceDirectoryNode> repoDirNode;
+        std::shared_ptr<DirectoryNode> repoDirNode;
 
         StorageHelper(SetupHelper& setupHelper)
             : setup(setupHelper)
         {
         }
 
-        std::shared_ptr<SourceDirectoryNode> retrieve() {
+        std::shared_ptr<DirectoryNode> retrieve() {
             setup.persistentState.retrieve();
-            return dynamic_pointer_cast<SourceDirectoryNode>(setup.context.nodes().find(setup.repoDir));
+            return dynamic_pointer_cast<DirectoryNode>(setup.context.nodes().find(setup.repoDir));
         }
 
         std::size_t store() {

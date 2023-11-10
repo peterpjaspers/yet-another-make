@@ -1,5 +1,5 @@
 #include "FileRepositoryWatcher.h"
-#include "SourceDirectoryNode.h"
+#include "DirectoryNode.h"
 #include "FileNode.h"
 #include "DirectoryWatcher.h"
 #include "SourceFileNode.h"
@@ -12,7 +12,7 @@ namespace
     const std::filesystem::path overflowPath("overflow");
 
     bool isDirNode(Node* node) {
-        return dynamic_cast<SourceDirectoryNode*>(node) != nullptr;
+        return dynamic_cast<DirectoryNode*>(node) != nullptr;
     }
 
     bool isFileNode(Node* node) {
@@ -43,6 +43,11 @@ namespace YAM
             true,
             Delegate<void, FileChange const&>::CreateRaw(this, &FileRepositoryWatcher::_addChange))
         ) {}
+
+
+    std::filesystem::path const& FileRepositoryWatcher::directory() {
+        return _watcher->directory();
+    }
 
     void FileRepositoryWatcher::_addChange(FileChange const& change) {
         _changes.add(change);
@@ -78,7 +83,7 @@ namespace YAM
         // take care: cannot use change.lastWriteTime because it applies to
         // change.fileName, not to parentDir.
         std::shared_ptr<Node> node = _invalidateNode(parentDir, std::chrono::utc_clock::now());
-        if (node != nullptr && dynamic_cast<SourceDirectoryNode*>(node.get()) == nullptr) {
+        if (node != nullptr && dynamic_cast<DirectoryNode*>(node.get()) == nullptr) {
             throw std::exception("unexpected node type");
         }
         // File nodes may exist that are associated with files that may not yet
@@ -92,7 +97,7 @@ namespace YAM
         // take care: cannot use change.lastWriteTime because it applies to
         // change.fileName, not to parentDir.
         std::shared_ptr<Node> node = _invalidateNode(parentDir, std::chrono::utc_clock::now());
-        if (node != nullptr && dynamic_cast<SourceDirectoryNode*>(node.get()) == nullptr) {
+        if (node != nullptr && dynamic_cast<DirectoryNode*>(node.get()) == nullptr) {
             throw std::exception("unexpected node type");
         }
         _invalidateNodeRecursively(change.fileName);
@@ -126,7 +131,7 @@ namespace YAM
             if (fileNode != nullptr) {
                 dirty = fileNode->lastWriteTime() != lastWriteTime;
             } else {
-                auto dirNode = dynamic_pointer_cast<SourceDirectoryNode>(node);
+                auto dirNode = dynamic_pointer_cast<DirectoryNode>(node);
                 if (dirNode != nullptr) {
                     dirty = dirNode->lastWriteTime() != lastWriteTime;
                 }
@@ -145,7 +150,7 @@ namespace YAM
 
     void FileRepositoryWatcher::_invalidateNodeRecursively(std::shared_ptr<Node> const& node) {
         node->setState(Node::State::Dirty);
-        auto dirNode = dynamic_pointer_cast<SourceDirectoryNode>(node);
+        auto dirNode = dynamic_pointer_cast<DirectoryNode>(node);
         if (dirNode != nullptr) {
             for (auto const& pair : dirNode->getContent()) {
                 _invalidateNodeRecursively(pair.second);

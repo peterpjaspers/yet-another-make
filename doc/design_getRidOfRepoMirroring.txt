@@ -183,12 +183,12 @@ After discussion with Phil:
 The command node must be extended with a new member field: _allowedSourceInputs.
 The simplest way is to make this a set of SourceFileNode. This however will
 greatly increase storage size of the command node. A more efficient solution
-is to support SourceGlobNode, SourceDirectoryNode, SourceFileListNode and 
+is to support SourceGlobNode, DirectoryNode, SourceFileListNode and 
 SourceFileNode as allowed source inputs.
 
-SourceDirectoryNode was designed to mirror the entire repo directory tree.
+DirectoryNode was designed to mirror the entire repo directory tree.
 In option 4 only a subset of the directories in the repo tree will be
-mirrored. This has large impact on the implementation of SourceDirectoryNode.
+mirrored. This has large impact on the implementation of DirectoryNode.
 
 Imagine the user defined a glob to select input files: repoRoot/libx/include/*.h
 1. glob iterates on dir entries of repoRoot/libx/include
@@ -196,8 +196,8 @@ Imagine the user defined a glob to select input files: repoRoot/libx/include/*.h
 3. If match: add to glob postrequisites
 4. Use hash of matching path names to compute the glob hash. 
 5. Re-execute glob when content of repoRoot/libx/include changes:
-    Create a non-recursive SourceDirectoryNode to implement step 1. 
-    Each dir entry is mirrored as FileNode or SourceDirectoryNode.
+    Create a non-recursive DirectoryNode to implement step 1. 
+    Each dir entry is mirrored as FileNode or DirectoryNode.
     A not-recursive directory node does not have postrequisites.
     The directory node is a prerequisite of the glob.
    
@@ -207,10 +207,10 @@ User now adds a recursive glob: repoRoot/libx/include/**/*.h
 3. If match: add to glob postrequisites
 4. Use hash of matching path names to compute the glob hash. 
 5. Re-execute glob when content of repoRoot/libx/include tree changes:
-    Update the existing non-recursive SourceDirectoryNode to be recursive or
+    Update the existing non-recursive DirectoryNode to be recursive or
     create one if there is no exisiting one.
-    Each dir entry is mirrored as FileNode or SourceDirectoryNode.
-    These nodes are postrequisites of the recursive SourceDirectoryNode.
+    Each dir entry is mirrored as FileNode or DirectoryNode.
+    These nodes are postrequisites of the recursive DirectoryNode.
     All directories in the dir tree are glob prerequisites.
     Use all directory hashes to compute the glob hash. 
     E.g. repoRoot/libx/include/**/private/*.h must also re-execute when

@@ -49,8 +49,8 @@ Todo: non-core
 
 Done
 - Remove mutex from NodeSet. Instead post all NodeSet add/remove to main thread. 
-  To be changed: SourceDirectoryNode::updateContent(),
-  SourceDirectoryNode::SourceDirectoryNode(), DotIgnoreNode::setDotIgnoreFiles()
+  To be changed: DirectoryNode::updateContent(),
+  DirectoryNode::DirectoryNode(), DotIgnoreNode::setDotIgnoreFiles()
 - decide on MT-safe buildstate access: lock buildstate or post all node/buildstate access
   to main thread.
   Decision: post to main thread
@@ -62,7 +62,7 @@ Done
   main thread.
 - build state storage (PersistentBuildState)
 - streaming btree (provides streaming of value types into btree via ValueStreamer i/f)
-- SourceFileRepository: SourceDirectoryNode takes exclude (ignore) patterns
+- FileRepository: DirectoryNode takes exclude (ignore) patterns
   from .gitignore and from .yamignore (having gitignore syntex).
   In a git repo:
       .gitignore typically ignores build outputs.

@@ -5,7 +5,7 @@
 #include "MonitoredProcess.h"
 #include "FileAspectSet.h"
 #include "FileSystem.h"
-#include "SourceFileRepository.h"
+#include "FileRepository.h"
 #include "IStreamer.h"
 
 #include <iostream>

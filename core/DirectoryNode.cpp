@@ -1,4 +1,4 @@
-#include "SourceDirectoryNode.h"
+#include "DirectoryNode.h"
 #include "SourceFileNode.h"
 #include "ExecutionContext.h"
 #include "DotIgnoreNode.h"
@@ -12,13 +12,13 @@ namespace
     auto minLwt = std::chrono::time_point<std::chrono::utc_clock>::min();
 
     std::shared_ptr<Node> createNode(
-        SourceDirectoryNode* parent,
+        DirectoryNode* parent,
         std::filesystem::directory_entry const& dirEntry, 
         ExecutionContext* context
     ) {
         std::shared_ptr<Node> node = nullptr;
         if (dirEntry.is_directory()) {
-            node = std::make_shared<SourceDirectoryNode>(context, dirEntry.path(), parent);
+            node = std::make_shared<DirectoryNode>(context, dirEntry.path(), parent);
         } else if (dirEntry.is_regular_file()) {
             node = std::make_shared<SourceFileNode>(context, dirEntry.path());
         } else {
@@ -30,35 +30,35 @@ namespace
 
 namespace YAM
 {
-    SourceDirectoryNode::SourceDirectoryNode(
+    DirectoryNode::DirectoryNode(
         ExecutionContext* context, 
         std::filesystem::path const& dirName,
-        SourceDirectoryNode* parent)
+        DirectoryNode* parent)
         : Node(context, dirName)
         , _parent(parent)
         , _dotIgnoreNode(std::make_shared<DotIgnoreNode>(context, dirName / ".dotignore", this))
         , _executionHash(rand())
     {}
 
-    void SourceDirectoryNode::addPrerequisitesToContext() {
+    void DirectoryNode::addPrerequisitesToContext() {
         context()->nodes().add(_dotIgnoreNode);
         _dotIgnoreNode->addObserver(this);
         _dotIgnoreNode->addPrerequisitesToContext();
     }
 
-    XXH64_hash_t SourceDirectoryNode::executionHash() const {
+    XXH64_hash_t DirectoryNode::executionHash() const {
         return _executionHash;
     }
 
-    SourceDirectoryNode* SourceDirectoryNode::parent() const { 
+    DirectoryNode* DirectoryNode::parent() const { 
         return _parent;
     }
 
-    void SourceDirectoryNode::parent(SourceDirectoryNode* parent) {
+    void DirectoryNode::parent(DirectoryNode* parent) {
         _parent = parent;
     }
 
-    void SourceDirectoryNode::getFiles(std::vector<std::shared_ptr<FileNode>>& filesInDir) {
+    void DirectoryNode::getFiles(std::vector<std::shared_ptr<FileNode>>& filesInDir) {
         filesInDir.clear();
         for (auto it = _content.begin(); it != _content.end(); ++it) {
             std::shared_ptr<FileNode> n = dynamic_pointer_cast<FileNode>(it->second);
@@ -68,36 +68,36 @@ namespace YAM
         }
     }
 
-    void SourceDirectoryNode::getSubDirs(std::vector<std::shared_ptr<SourceDirectoryNode>>& subDirsInDir) {
+    void DirectoryNode::getSubDirs(std::vector<std::shared_ptr<DirectoryNode>>& subDirsInDir) {
         subDirsInDir.clear();
         for (auto it = _content.begin(); it != _content.end(); ++it) {
-            std::shared_ptr<SourceDirectoryNode> n = dynamic_pointer_cast<SourceDirectoryNode>(it->second);
+            std::shared_ptr<DirectoryNode> n = dynamic_pointer_cast<DirectoryNode>(it->second);
             if (n != nullptr) {
                 subDirsInDir.push_back(n);
             }
         }
     }
 
-    void SourceDirectoryNode::getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const {
+    void DirectoryNode::getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const {
         for (auto const& pair : _content) outputs.push_back(pair.second);
     }
 
-    void SourceDirectoryNode::getInputs(std::vector<std::shared_ptr<Node>>& inputs) const {
+    void DirectoryNode::getInputs(std::vector<std::shared_ptr<Node>>& inputs) const {
         inputs.push_back(dynamic_pointer_cast<Node>(_dotIgnoreNode));
     }
 
-    std::chrono::time_point<std::chrono::utc_clock> const& SourceDirectoryNode::lastWriteTime() {
+    std::chrono::time_point<std::chrono::utc_clock> const& DirectoryNode::lastWriteTime() {
         return _lastWriteTime;
     }
 
-    std::chrono::time_point<std::chrono::utc_clock> SourceDirectoryNode::retrieveLastWriteTime() const {
+    std::chrono::time_point<std::chrono::utc_clock> DirectoryNode::retrieveLastWriteTime() const {
         std::error_code ec;
         auto flwt = std::filesystem::last_write_time(name(), ec);
         auto ulwt = decltype(flwt)::clock::to_utc(flwt);
         return ulwt;
     }
 
-    std::shared_ptr<Node> SourceDirectoryNode::getNode(
+    std::shared_ptr<Node> DirectoryNode::getNode(
         std::filesystem::directory_entry const& dirEntry,
         std::unordered_set<std::shared_ptr<Node>>& added,
         std::unordered_set<std::shared_ptr<Node>>& kept
@@ -115,14 +115,14 @@ namespace YAM
                 // at this point is not allowed. Instead optimistically create a new node
                 // and check in main thread (commitResult) whether it already existed in
                 // buildstate.
-                child = createNode(const_cast<SourceDirectoryNode*>(this), dirEntry, context());
+                child = createNode(const_cast<DirectoryNode*>(this), dirEntry, context());
                 added.insert(child);
             }
         }
         return child;
     }
 
-    void SourceDirectoryNode::retrieveContent(
+    void DirectoryNode::retrieveContent(
         std::map<std::filesystem::path, std::shared_ptr<Node>>& content,
         std::unordered_set<std::shared_ptr<Node>>& added,
         std::unordered_set<std::shared_ptr<Node>>& removed,
@@ -142,18 +142,18 @@ namespace YAM
         }
     } 
 
-    void SourceDirectoryNode::_removeChildRecursively(std::shared_ptr<Node> const& child) {
+    void DirectoryNode::_removeChildRecursively(std::shared_ptr<Node> const& child) {
         child->removeObserver(this);
         // removeIfPresent because a parent directory may already have removed
         // this directory recursively
         context()->nodes().removeIfPresent(child);
-        auto dirChild = dynamic_pointer_cast<SourceDirectoryNode>(child);
+        auto dirChild = dynamic_pointer_cast<DirectoryNode>(child);
         if (dirChild != nullptr) {
             dirChild->clear();
         }
     }
 
-    void SourceDirectoryNode::clear() {
+    void DirectoryNode::clear() {
         if (_dotIgnoreNode != nullptr) {
             _dotIgnoreNode->clear();
             _dotIgnoreNode->removeObserver(this);
@@ -170,7 +170,7 @@ namespace YAM
         modified(true);
     }
 
-    XXH64_hash_t SourceDirectoryNode::computeExecutionHash(
+    XXH64_hash_t DirectoryNode::computeExecutionHash(
         XXH64_hash_t dotIgnoreNodeHash,
         std::map<std::filesystem::path, std::shared_ptr<Node>> const& content
     ) const {
@@ -183,14 +183,14 @@ namespace YAM
         return XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
     }
 
-    void SourceDirectoryNode::handleDirtyOf(Node* observedNode) {
+    void DirectoryNode::handleDirtyOf(Node* observedNode) {
         if (observedNode == _dotIgnoreNode.get()) {
             if (_dotIgnoreNode->state() != Node::State::Dirty) throw std::exception("Unexpected state of _dotIgnoreNode");
             setState(Node::State::Dirty);
         }
     }
 
-    void SourceDirectoryNode::start() {
+    void DirectoryNode::start() {
         Node::start();
         std::vector<Node*> requisites;
         requisites.push_back(_dotIgnoreNode.get());
@@ -200,7 +200,7 @@ namespace YAM
         Node::startNodes(requisites, std::move(callback));
     }
 
-    void SourceDirectoryNode::handleRequisitesCompletion(Node::State state) {
+    void DirectoryNode::handleRequisitesCompletion(Node::State state) {
         if (state != Node::State::Ok) {
             Node::notifyCompletion(state);
         } else if (canceling()) {
@@ -215,7 +215,7 @@ namespace YAM
     }
 
     // Executes in a threadpool thread
-    void SourceDirectoryNode::retrieveContentIfNeeded() {
+    void DirectoryNode::retrieveContentIfNeeded() {
         auto result = std::make_shared<RetrieveResult>();
         bool success = true;
         try {
@@ -238,7 +238,7 @@ namespace YAM
         context()->mainThreadQueue().push(std::move(d));
     }
 
-    void SourceDirectoryNode::handleRetrieveContentCompletion(RetrieveResult& result) {
+    void DirectoryNode::handleRetrieveContentCompletion(RetrieveResult& result) {
         if (result._newState != Node::State::Ok) {
             notifyCompletion(result._newState);
         } else if (canceling()) {
@@ -257,7 +257,7 @@ namespace YAM
         }
     }
 
-    void SourceDirectoryNode::startChildren() {
+    void DirectoryNode::startChildren() {
         std::vector<Node*> children;
         for (auto const& pair : _content) children.push_back(pair.second.get());
         auto callback = Delegate<void, Node::State>::CreateLambda(
@@ -267,7 +267,7 @@ namespace YAM
     }
 
     // Executes in main thread
-    void SourceDirectoryNode::commitResult(YAM::SourceDirectoryNode::RetrieveResult& result) {
+    void DirectoryNode::commitResult(YAM::DirectoryNode::RetrieveResult& result) {
         _lastWriteTime = result._lastWriteTime;
         _executionHash = result._executionHash;
         _content.clear();
@@ -284,7 +284,7 @@ namespace YAM
             }
             node->addObserver(this);
             _content.insert({ node->name(), node });
-            auto dir = dynamic_pointer_cast<SourceDirectoryNode>(node);
+            auto dir = dynamic_pointer_cast<DirectoryNode>(node);
             if (dir != nullptr) dir->addPrerequisitesToContext();
         }
         for (auto const& n : result._removed) {
@@ -298,15 +298,15 @@ namespace YAM
         }
     }
 
-    void SourceDirectoryNode::setStreamableType(uint32_t type) {
+    void DirectoryNode::setStreamableType(uint32_t type) {
         streamableTypeId = type;
     }
 
-    uint32_t SourceDirectoryNode::typeId() const {
+    uint32_t DirectoryNode::typeId() const {
         return streamableTypeId;
     }
 
-    void SourceDirectoryNode::stream(IStreamer* streamer) {
+    void DirectoryNode::stream(IStreamer* streamer) {
         Node::stream(streamer);
         streamer->stream(_lastWriteTime);
         streamer->stream(_executionHash);
@@ -329,7 +329,7 @@ namespace YAM
         }
     }
 
-    void SourceDirectoryNode::prepareDeserialize() {
+    void DirectoryNode::prepareDeserialize() {
         Node::prepareDeserialize();
         if (_dotIgnoreNode != nullptr) _dotIgnoreNode->removeObserver(this);
         for (auto const& p : _content) p.second->removeObserver(this);
@@ -337,7 +337,7 @@ namespace YAM
         _content.clear();
     }
 
-    void SourceDirectoryNode::restore(void* context) {
+    void DirectoryNode::restore(void* context) {
         Node::restore(context);
         _dotIgnoreNode->directory(this);
         _dotIgnoreNode->addObserver(this);
@@ -345,7 +345,7 @@ namespace YAM
         for (auto const& p : _content) {
             nodes.push_back(p.second);            
             p.second->addObserver(this);
-            auto dir = dynamic_cast<SourceDirectoryNode*>(p.second.get());
+            auto dir = dynamic_cast<DirectoryNode*>(p.second.get());
             if (dir != nullptr) dir->parent(this);
         }
         _content.clear();
