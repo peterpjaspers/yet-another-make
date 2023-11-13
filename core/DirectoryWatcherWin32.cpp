@@ -73,7 +73,7 @@ namespace YAM
         std::chrono::time_point<std::chrono::utc_clock> const& lwt
     ) {
         if (std::filesystem::is_directory(absPath)) {
-            isSpuriousDirModifiedEvent(absPath, lwt);
+            registerSpuriousDirModifiedEvent(absPath, lwt);
             for (auto const& entry : std::filesystem::directory_iterator(absPath)) {
                 auto flwt = entry.last_write_time();
                 fillDirUpdateTimes(absPath / entry.path(), decltype(flwt)::clock::to_utc(flwt));
@@ -81,7 +81,8 @@ namespace YAM
         }
     }
 
-    bool DirectoryWatcherWin32::isSpuriousDirModifiedEvent(
+    // Return whether event is spurious
+    bool DirectoryWatcherWin32::registerSpuriousDirModifiedEvent(
         std::filesystem::path const& absPath,
         std::chrono::time_point<std::chrono::utc_clock> const& lwt
     ) {
@@ -95,12 +96,13 @@ namespace YAM
         return false;
     }
 
-    bool DirectoryWatcherWin32::isSpuriousModifiedEvent(
+    // Return whether event is spurious
+    bool DirectoryWatcherWin32::registerSpuriousModifiedEvent(
         std::filesystem::path const& absPath,
         std::chrono::time_point<std::chrono::utc_clock>& lwt
     ) {
         if (std::filesystem::is_directory(absPath)) {
-            return isSpuriousDirModifiedEvent(absPath, lwt);
+            return registerSpuriousDirModifiedEvent(absPath, lwt);
         }
         return false;
     }
@@ -119,7 +121,9 @@ namespace YAM
             FILE_NOTIFY_CHANGE_DIR_NAME |
             FILE_NOTIFY_CHANGE_LAST_WRITE,
             NULL, &_overlapped, NULL);
-        if (!success) throw std::exception("ReadDirectoryChangesW failed");
+        if (!success) {
+            throw std::exception("ReadDirectoryChangesW failed");
+        }
     }
 
     void DirectoryWatcherWin32::run() {
@@ -149,7 +153,7 @@ namespace YAM
                         if (info->Action == FILE_ACTION_ADDED) {
                             change.action = FileChange::Action::Added;
                             change.fileName = fileName;
-                            if (_suppressSpuriousEvents) isSpuriousModifiedEvent(absFileName, change.lastWriteTime);
+                            if (_suppressSpuriousEvents) registerSpuriousModifiedEvent(absFileName, change.lastWriteTime);
                         } else if (info->Action == FILE_ACTION_REMOVED) {
                             change.action = FileChange::Action::Removed;
                             change.fileName = fileName;
@@ -159,7 +163,7 @@ namespace YAM
                             change.fileName = fileName;
                             if (
                                 _suppressSpuriousEvents &&
-                                isSpuriousModifiedEvent(absFileName, change.lastWriteTime)
+                                registerSpuriousModifiedEvent(absFileName, change.lastWriteTime)
                             ) {
                                 change.action = FileChange::Action::None;
                             }
@@ -170,7 +174,7 @@ namespace YAM
                         } else if (info->Action == FILE_ACTION_RENAMED_NEW_NAME) {
                             rename.action = FileChange::Action::Renamed;
                             rename.fileName = fileName;
-                            if (_suppressSpuriousEvents) isSpuriousModifiedEvent(absFileName, change.lastWriteTime);
+                            if (_suppressSpuriousEvents) registerSpuriousModifiedEvent(absFileName, change.lastWriteTime);
                         }
                         if (
                             rename.action == FileChange::Action::Renamed 

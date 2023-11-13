@@ -22,8 +22,8 @@ namespace YAM
         : _name(repoName)
         , _directory(directory)
         , _context(context)
-        , _watcher(std::make_shared<FileRepositoryWatcher>(directory, context))
-        , _directoryNode(std::make_shared<DirectoryNode>(context, directory, nullptr))
+        , _watcher(std::make_shared<FileRepositoryWatcher>(this, context))
+        , _directoryNode(std::make_shared<DirectoryNode>(context, repoName, nullptr))
         , _modified(true)
     {
         _context->nodes().add(_directoryNode);
@@ -38,8 +38,22 @@ namespace YAM
         return _directory;
     }
 
-    bool FileRepository::lexicallyContains(std::filesystem::path const& absPath) const {
-        const std::size_t result = absPath.string().find(_directory.string());
+    std::string repositoryNameOf(std::filesystem::path const& symbolicPath) {
+        if (symbolicPath.is_absolute()) return "";
+        auto it = symbolicPath.begin();
+        if (it == symbolicPath.end()) return "";
+        return (*it).string();
+    }
+
+    bool FileRepository::lexicallyContains(std::filesystem::path const& path) const {
+        std::size_t result;
+        if (path.is_absolute()) {
+            const std::string dirStr = (_directory / "").string();
+            result = path.string().find(dirStr);
+        } else {
+            auto it = path.begin();
+            result = (it != path.end() && (*it).string() == _name) ? 0 : 1;
+        }
         return result == 0;
     }
 
@@ -56,8 +70,24 @@ namespace YAM
 
     std::filesystem::path FileRepository::symbolicPathOf(std::filesystem::path const& absPath) const {
         auto relPath = relativePathOf(absPath);
-        if (relPath.empty()) return relPath;
+        if (relPath.empty()) {
+            if (absPath == _directory) return _name;
+            return relPath;
+        }
         return std::filesystem::path(_name) / relPath;
+    }
+
+    std::filesystem::path FileRepository::absolutePathOf(std::filesystem::path const& symbolicPath) const {
+        std::filesystem::path absPath;
+        auto it = symbolicPath.begin();
+        if (it == symbolicPath.end()) return absPath;
+        auto const& name = *it;
+        if (name != _name) return absPath;
+        absPath = _directory;
+        for (it++; it != symbolicPath.end(); it++) {
+            absPath /= *it;
+        }
+        return absPath;
     }
 
     void FileRepository::modified(bool newValue) {
@@ -107,7 +137,7 @@ namespace YAM
     void FileRepository::restore(void* context) {
         _context = reinterpret_cast<ExecutionContext*>(context);
         if (_watcher == nullptr || _watcher->directory() != _directory) {
-            _watcher = std::make_shared<FileRepositoryWatcher>(_directory, _context);
+            _watcher = std::make_shared<FileRepositoryWatcher>(this, _context);
         }
     }
 }

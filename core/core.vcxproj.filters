@@ -271,7 +271,7 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="DirectoryNode.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Node</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -444,7 +444,7 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="DirectoryNode.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Node</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

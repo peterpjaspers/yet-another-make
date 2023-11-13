@@ -1,6 +1,8 @@
 #include "gtest/gtest.h"
 #include "executeNode.h"
 #include "../FileNode.h"
+#include "../FileRepository.h"
+#include "../FileSystem.h"
 #include "../ExecutionContext.h"
 #include "../FileRepository.h"
 #include "../../xxhash/xxhash.h"
@@ -28,6 +30,29 @@ namespace
     }
 
     std::string entireFile = FileAspect::entireFileAspect().name();
+
+    class Driver {
+    public:
+        std::filesystem::path repoDir;
+        ExecutionContext context;
+        std::shared_ptr<FileRepository> repo;
+
+        Driver()
+            : repoDir(FileSystem::createUniqueDirectory())
+            , repo(std::make_shared<FileRepository>(
+                ".",
+                repoDir,
+                &context))
+        {
+            context.addRepository(repo);
+        }
+
+        ~Driver() {
+            context.removeRepository(repo->name());
+            repo = nullptr;
+            std::filesystem::remove_all(repoDir);
+        }
+    };
 }
 
 namespace
@@ -35,13 +60,15 @@ namespace
     using namespace YAM;
 
     TEST(FileNode, executeFileExists) {
+        Driver driver;
+
         std::string content("Hello world");
-        auto testPath(std::filesystem::temp_directory_path() / "fileNode_ex.txt");
+        auto testPath(driver.repoDir / "fileNode_ex.txt");
         XXH64_hash_t expectedHash = hashString(content);
         EXPECT_TRUE(createTestFile(testPath, content));
 
-        ExecutionContext context;
-        FileNode fnode(&context, testPath);
+        FileNode fnode(&driver.context, driver.repo->symbolicPathOf(testPath));
+        EXPECT_EQ(testPath.string(), fnode.absolutePath().string());
         EXPECT_EQ(Node::State::Dirty, fnode.state());
         EXPECT_ANY_THROW(fnode.hashOf(entireFile));
 
@@ -50,17 +77,17 @@ namespace
         EXPECT_TRUE(completed);
         EXPECT_EQ(Node::State::Ok, fnode.state());
         EXPECT_EQ(expectedHash, fnode.hashOf(entireFile));
-
-        std::filesystem::remove(testPath);
     }
 
     TEST(FileNode, executeFileDeleted) {
+        Driver driver;
+
         std::string content("Hello world");
-        auto testPath(std::filesystem::temp_directory_path() / "fileNode_del.txt");
         XXH64_hash_t expectedHash = hashString(content);
 
-        ExecutionContext context;
-        FileNode fnode(&context, testPath);
+        auto testPath(driver.repoDir / "fileNode_del.txt");
+        FileNode fnode(&driver.context, driver.repo->symbolicPathOf(testPath));
+        EXPECT_EQ(testPath.string(), fnode.absolutePath().string());
         EXPECT_EQ(Node::State::Dirty, fnode.state());
         EXPECT_ANY_THROW(fnode.hashOf(entireFile));
 
@@ -69,25 +96,5 @@ namespace
         EXPECT_TRUE(completed);
         EXPECT_EQ(Node::State::Ok, fnode.state());
         EXPECT_NE(expectedHash, fnode.hashOf(entireFile));
-    }
-
-    TEST(FileNode, relativePath) {
-
-        std::filesystem::path repoDir(std::tmpnam(nullptr));
-        std::filesystem::create_directories(repoDir);
-        ExecutionContext context;
-        auto repo = std::make_shared<FileRepository>(
-            std::string("repo"), 
-            repoDir,
-            &context);
-        context.addRepository(repo);
-
-        std::filesystem::path expectedRelativePath("sources\\file.cpp");
-        FileNode fnode(&context, repoDir / expectedRelativePath);
-        EXPECT_EQ(expectedRelativePath, fnode.relativePath());
-
-        context.removeRepository(repo->name());
-        repo.reset();
-        std::filesystem::remove_all(repoDir);
     }
 }

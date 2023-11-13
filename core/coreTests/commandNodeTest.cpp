@@ -28,10 +28,6 @@ namespace
         return content;        
     }
 
-    std::filesystem::path np(std::filesystem::path const& path) {
-        return FileSystem::normalizePath(path);
-    }
-
     class Commands
     {
     public:
@@ -55,17 +51,17 @@ namespace
             , memLogBook(std::make_shared<MemoryLogBook>())
             , stdoutLogBook(std::make_shared<BasicOStreamLogBook>(&std::cout))
             , logBook(std::make_shared<MultiwayLogBook>())
-            , pietCmd(std::make_shared<CommandNode>(&context, np("piet\\_cmd")))
-            , janCmd(std::make_shared<CommandNode>(& context, np("jan\\_cmd")))
-            , pietjanCmd(std::make_shared<CommandNode>(& context, np("pietjan\\_cmd")))
-            , pietOut(std::make_shared<GeneratedFileNode>(& context, np(repoDir / "generated\\pietOut.txt"), pietCmd.get()))
-            , janOut(std::make_shared<GeneratedFileNode>(&context, np(repoDir / "generated\\janOut.txt"), janCmd.get()))
-            , pietjanOut(std::make_shared<GeneratedFileNode>(&context, np(repoDir / "generated\\pietjanOut.txt"), pietjanCmd.get()))
-            , pietSrc(std::make_shared<SourceFileNode>(&context, np(repoDir / "pietSrc.txt")))
-            , janSrc(std::make_shared<SourceFileNode>(&context, np(repoDir / "janSrc.txt")))
+            , pietCmd(std::make_shared<CommandNode>(&context, "piet\\_cmd"))
+            , janCmd(std::make_shared<CommandNode>(&context, "jan\\_cmd"))
+            , pietjanCmd(std::make_shared<CommandNode>(& context, "pietjan\\_cmd"))
+            , pietOut(std::make_shared<GeneratedFileNode>(& context, R"(.\generated\pietout.txt)", pietCmd.get()))
+            , janOut(std::make_shared<GeneratedFileNode>(&context, R"(.\generated\janout.txt)", janCmd.get()))
+            , pietjanOut(std::make_shared<GeneratedFileNode>(&context, R"(.\generated\pietjanout.txt)", pietjanCmd.get()))
+            , pietSrc(std::make_shared<SourceFileNode>(&context, R"(.\pietsrc.txt)"))
+            , janSrc(std::make_shared<SourceFileNode>(&context, R"(.\jansrc.txt)"))
             , stats(context.statistics())
         {
-            std::filesystem::create_directories(np(repoDir / "generated"));
+            std::filesystem::create_directories(repoDir / "generated");
             logBook->add(memLogBook);
             logBook->add(stdoutLogBook);
             context.logBook(logBook);
@@ -76,28 +72,29 @@ namespace
                     &context));
             context.addRepository(
                 std::make_shared<FileRepository>(
-                    "repo",
+                    ".",
                     repoDir,
                     &context));
+
             stats.registerNodes = true;
             //context.threadPool().size(1); // to ease debugging
 
-            std::ofstream pietSrcFile(pietSrc->name().string());
+            std::ofstream pietSrcFile(pietSrc->absolutePath().string());
             pietSrcFile << "piet";
             pietSrcFile.close();
-            std::ofstream janSrcFile(janSrc->name().string());
+            std::ofstream janSrcFile(janSrc->absolutePath().string());
             janSrcFile << "jan";
             janSrcFile.close();
 
             {
                 std::stringstream script;
-                script << "type " << pietSrc->name().string() << " > " << pietOut->name().string();
+                script << "type " << pietSrc->absolutePath().string() << " > " << pietOut->absolutePath().string();
                 pietCmd->outputs({ pietOut });
                 pietCmd->script(script.str());
             }
             {
                 std::stringstream script;
-                script << "type " << janSrc->name().string() << " > " << janOut->name().string();
+                script << "type " << janSrc->absolutePath().string() << " > " << janOut->absolutePath().string();
                 janCmd->outputs({ janOut });
                 janCmd->script(script.str());
             }
@@ -106,8 +103,8 @@ namespace
                 pietjanCmd->outputs({ pietjanOut });
                 pietjanCmd->inputProducers({ pietCmd, janCmd });
                 script
-                    << "type " << pietOut->name().string() << " > " << pietjanOut->name().string()
-                    << " & type " << janOut->name().string() << " >> " << pietjanOut->name().string();
+                    << "type " << pietOut->absolutePath().string() << " > " << pietjanOut->absolutePath().string()
+                    << " & type " << janOut->absolutePath().string() << " >> " << pietjanOut->absolutePath().string();
                 pietjanCmd->script(script.str());
             }
 
@@ -135,7 +132,7 @@ namespace
         }
 
         void clean() {
-            context.removeRepository("repo");
+            context.removeRepository(".");
             std::filesystem::remove_all(repoDir);
         }
 
@@ -197,9 +194,9 @@ namespace
         EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietCmd.get()));
         EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietjanCmd.get()));
             
-        EXPECT_EQ("piet", readFile(cmds.pietOut->name()));
-        EXPECT_EQ("jan", readFile(cmds.janOut->name()));
-        EXPECT_EQ("pietjan", readFile(cmds.pietjanOut->name()));
+        EXPECT_EQ("piet", readFile(cmds.pietOut->absolutePath()));
+        EXPECT_EQ("jan", readFile(cmds.janOut->absolutePath()));
+        EXPECT_EQ("pietjan", readFile(cmds.pietjanOut->absolutePath()));
     }
 
     TEST(CommandNode, cleanBuildNoSources) {
@@ -254,9 +251,9 @@ namespace
         EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietCmd.get()));
         EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietjanCmd.get()));
 
-        EXPECT_EQ("piet", readFile(cmds.pietOut->name()));
-        EXPECT_EQ("jan", readFile(cmds.janOut->name()));
-        EXPECT_EQ("pietjan", readFile(cmds.pietjanOut->name()));
+        EXPECT_EQ("piet", readFile(cmds.pietOut->absolutePath()));
+        EXPECT_EQ("jan", readFile(cmds.janOut->absolutePath()));
+        EXPECT_EQ("pietjan", readFile(cmds.pietjanOut->absolutePath()));
     }
 
     TEST(CommandNode, incrementalBuildWhileNoModifications) {
@@ -303,7 +300,7 @@ namespace
 
         EXPECT_TRUE(cmds.execute());
 
-        std::ofstream janSrcFile(cmds.janSrc->name().string());
+        std::ofstream janSrcFile(cmds.janSrc->absolutePath().string());
         janSrcFile << "janjan" << std::endl;
         janSrcFile.close();
         cmds.janSrc->setState(Node::State::Dirty);
@@ -351,7 +348,7 @@ namespace
         Commands cmds;
 
         EXPECT_TRUE(cmds.execute());
-        std::filesystem::remove(cmds.janOut->name());
+        std::filesystem::remove(cmds.janOut->absolutePath());
         cmds.janOut->setState(Node::State::Dirty);
 
         EXPECT_EQ(Node::State::Ok, cmds.pietCmd->state());
@@ -436,7 +433,7 @@ namespace
 
         // Execution fails because pietCmd writes to source file.
         std::stringstream script;
-        script << "echo piet > " << cmds.pietSrc->name().string();
+        script << "echo piet > " << cmds.pietSrc->absolutePath().string();
         cmds.pietCmd->script(script.str());
         EXPECT_TRUE(cmds.execute());
         EXPECT_EQ(Node::State::Failed, cmds.pietCmd->state());
@@ -456,21 +453,6 @@ namespace
         EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Mismatch between declared outputs and actual outputs"));
     }
 
-    TEST(CommandNode, warning_inputNotInARepository) {
-        Commands cmds;
-
-        EXPECT_TRUE(cmds.execute());
-
-        std::ofstream janSrcFile(cmds.janSrc->name().string());
-        janSrcFile << "janjan" << std::endl;
-        janSrcFile.close();
-        cmds.janSrc->setState(Node::State::Dirty);
-        cmds.context.removeRepository("repo");
-        EXPECT_TRUE(cmds.execute());
-        EXPECT_EQ(Node::State::Ok, cmds.janCmd->state());
-        EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Input file ignored because not in a known file repository"));
-    }
-
     TEST(CommandNode, fail_notExpectedOutputProducer) {
         Commands cmds;
 
@@ -478,7 +460,7 @@ namespace
 
         // Execution fails because pietCmd produces same output file as janCmd.
         std::stringstream script;
-        script << "type " << cmds.pietSrc->name().string() << " > " << cmds.janOut->name().string();
+        script << "type " << cmds.pietSrc->absolutePath().string() << " > " << cmds.janOut->absolutePath().string();
         cmds.pietCmd->script(script.str());
         EXPECT_TRUE(cmds.execute());
         EXPECT_EQ(Node::State::Failed, cmds.pietCmd->state());

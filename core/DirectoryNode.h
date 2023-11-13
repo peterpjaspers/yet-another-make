@@ -13,20 +13,25 @@ namespace YAM
     class ExecutionContext;
     class FileNode;
     class DotIgnoreNode;
+    class FileRepository;
 
-    // A DirectoryNode caches the content of a directory:
-    //    - creates a SourceFileNode for each file in the directory.
-    //    - creates a DirectoryNode for each subdir in the directory.
-    //    - maintains the directory hash. This hash is computed from the
-    //      names of the files and subdirs in the directory.
-    //
+    // Executing a DirectoryNode caches the content of a directory as
+    //    - a Source or Generated FileNode for each file in the directory.
+    //    - a DirectoryNode for each subdir in the directory.
+    // 
     // When executing a DirectoryNode it will:
     //      - synchronize its content with the filesystem state
     //      - execute all dirty sub DirectoryNodes
-    // The DirectoryNode will  NOT execute its file nodes.
-    // Rationale: executing (rehashing) file nodes is expensive and therefore
-    // only done on demand during the execution of nodes that depend on these
-    // file nodes.
+    // The DirectoryNode will NOT execute its dirty file nodes.
+    // Rationale: executing file nodes (i.e. hashing file context) is expensive
+    // and therefore only done on demand during the execution of nodes that 
+    // depend on these file nodes.
+    // 
+    // DirectoryNode maintains the directory hash: a hash of the names
+    // of the files and subdirs in the directory.
+    // 
+    // The first component of a directory/file node path is the name of the
+    // repository that contains the directory/file.
     // 
     // All functions execute in main thread unless stated otherwise.
     //
@@ -45,6 +50,12 @@ namespace YAM
         // Add the prerequisites (i.e. the DotIgnoreNode and its prerequisites)
         // to the execution context.
         void addPrerequisitesToContext();
+
+        // Return the repository that contains the directory.
+        std::shared_ptr<FileRepository> const& repository() const;
+
+        // Return the absolute path name of the directory.
+        std::filesystem::path absolutePath() const;
 
         DirectoryNode* parent() const;
         std::shared_ptr<DotIgnoreNode> const& dotIgnoreNode() { return _dotIgnoreNode; }
@@ -110,6 +121,7 @@ namespace YAM
         std::chrono::time_point<std::chrono::utc_clock> retrieveLastWriteTime() const;
         std::shared_ptr<Node> getNode(
             std::filesystem::directory_entry const& dirEntry,
+            std::shared_ptr<FileRepository> const& repo,
             std::unordered_set<std::shared_ptr<Node>>& added,
             std::unordered_set<std::shared_ptr<Node>>& kept) const;
         void retrieveContent(

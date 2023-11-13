@@ -16,25 +16,19 @@ namespace YAM
         : Node(context, name)
     {}
 
-    std::shared_ptr<FileRepository> FileNode::fileRepository() const {
-        return context()->findRepositoryContaining(name());
+    std::shared_ptr<FileRepository> const& FileNode::repository() const {
+        auto it = name().begin();
+        auto repoName = *it;
+        return context()->findRepository(repoName.string());
     }
 
-    std::filesystem::path FileNode::relativePath() const {
-        std::shared_ptr<FileRepository> repo = fileRepository();
-        if (repo == nullptr) return name();
-        return repo->relativePathOf(name());
-    }
-
-    std::filesystem::path FileNode::symbolicPath() const {
-        std::shared_ptr<FileRepository> repo = fileRepository();
-        if (repo == nullptr) return name();
-        return repo->symbolicPathOf(name());
+    std::filesystem::path FileNode::absolutePath() const {
+        return repository()->absolutePathOf(name());
     }
      
     std::chrono::time_point<std::chrono::utc_clock> FileNode::retrieveLastWriteTime() const {
         std::error_code ec;
-        auto lwt = std::filesystem::last_write_time(name(), ec);
+        auto lwt = std::filesystem::last_write_time(absolutePath(), ec);
         auto lwutc = decltype(lwt)::clock::to_utc(lwt);
         return lwutc;
     }
@@ -52,7 +46,7 @@ namespace YAM
         if (newLastWriteTime != _lastWriteTime) {
             std::vector<FileAspect> aspects = context()->findFileAspects(name());
             for (auto const& aspect : aspects) {
-                newHashes[aspect.name()] = aspect.hash(name());
+                newHashes[aspect.name()] = aspect.hash(absolutePath());
             }
         }
         auto d = Delegate<void>::CreateLambda(

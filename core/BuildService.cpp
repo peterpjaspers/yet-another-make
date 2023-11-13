@@ -11,11 +11,15 @@ namespace YAM
     BuildService::BuildService()
         : _service(boost::asio::ip::tcp::v4(), 0)
         , _acceptor(_context, _service)
+        , _logBook(std::make_shared<BuildServiceLogBook>(this))
         , _serviceThread(&BuildService::run, this)
     {}
 
     boost::asio::ip::port_type BuildService::port() const {
         return _acceptor.local_endpoint().port();
+    }
+
+    BuildService::~BuildService() {
     }
 
     void BuildService::join() {
@@ -66,7 +70,7 @@ namespace YAM
     void BuildService::handleRequest(std::shared_ptr<IStreamable> request) {
         auto buildRequest = dynamic_pointer_cast<BuildRequest>(request);
         auto stopRequest = dynamic_pointer_cast<StopBuildRequest>(request);
-        _builder.context()->logBook(shared_from_this());
+        _builder.context()->logBook(_logBook);
         if (buildRequest != nullptr) {
             if (!_builder.running()) {
                 _builder.completor().AddRaw(this, &BuildService::handleBuildCompletion);

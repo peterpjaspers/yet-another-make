@@ -43,8 +43,10 @@ namespace
         EXPECT_EQ(repoProps.name, repo.name());
         EXPECT_EQ(repoProps.dir, repo.directory());
     }
-    TEST(FileRepository, contains) {
+    TEST(FileRepository, lexicallyContains) {
         EXPECT_TRUE(repo.lexicallyContains(R"(C:\aap\noot\mies\file.cpp)"));
+        EXPECT_TRUE(repo.lexicallyContains(R"(testRepo\file.cpp)"));
+        EXPECT_FALSE(repo.lexicallyContains(R"(unknown\file.cpp)"));
         EXPECT_FALSE(repo.lexicallyContains(R"(C:\aap\noot\file.cpp)"));
         EXPECT_FALSE(repo.lexicallyContains(R"(\aap\noot\mies\file.cpp)"));
         EXPECT_FALSE(repo.lexicallyContains(R"(aap\noot\mies\file.cpp)"));
@@ -125,12 +127,18 @@ namespace
         dirNode_S1->getSubDirs(subDirNodes);
         std::shared_ptr<DirectoryNode> dirNode_S1_S2 = subDirNodes[2];
 
+        while (!dirtyNodes.empty()) {
+            completed = YAMTest::executeNodes(dirtyNodes);
+            EXPECT_TRUE(completed);
+            repo->consumeChanges();
+            dirtyNodes = getDirtyNodes(dirNode);
+        }
         // Update file system. Note: 6 files are added and 4 dirs
         DirectoryTree* testTree_S1 = testTree.getSubDirs()[1];
         DirectoryTree* testTree_S1_S2 = testTree_S1->getSubDirs()[2];
         testTree.addFile();// adds 4-th file
         testTree_S1->addFile();// adds 4-th file
-        testTree_S1_S2->addDirectory(); // adds 1 dir with 3 files and 3 subdirs
+        testTree_S1_S2->addDirectory(); // adds 1 dir with 3 files
         testTree_S1_S2->addFile(); // adds 4-th file
 
         // Wait until file change events have resulted in nodes to become
@@ -154,15 +162,15 @@ namespace
             context.mainThreadQueue().push(fillDirtyNodes);
             // dispatcher.run() will block until main thread executed fillDirtyNodes.
             dispatcher.run();
-            done = dirtyNodes.size() == 123;
+            done = dirtyNodes.size() == 3;
             if (!done) std::this_thread::sleep_for(retryInterval);
         } while (nRetries < maxRetries && !done);
-        ASSERT_EQ(123, dirtyNodes.size()); // all file nodes + 3 dir nodes
+        ASSERT_EQ(3, dirtyNodes.size()); // testRepo, testRepo\subDir2, testRepo\subDir2\subDir3
 
         context.statistics().reset();
         context.statistics().registerNodes = true;
-        // This execution detects the 4 new dirs and 6 new files and
-        // creates 4 dir nodes and 6 file nodes.
+        // This execution detects the 1 new dirs and 6 new files and
+        // creates 1 dir node and 6 file nodes.
         // The dir nodes are executed, the file nodes are not.
         completed = YAMTest::executeNodes(dirtyNodes);
         EXPECT_TRUE(completed);
@@ -178,14 +186,14 @@ namespace
             else if (dynamic_cast<const DirectoryNode*>(n)) dirNodes.push_back(n);
             else otherNodes.push_back(n);
         }
-        // 120 file nodes + subDir4\.yamignore + subDir4\.gitignore + subDir4\dotIgnore
-        // + rootDir + subDir2 + subDir2\subDir3 | subDir2\subDir3\subDir4
+        // subDir4\.yamignore + subDir4\.gitignore + subDir4\dotIgnore
+        // + testRepo + subDir2 + subDir2\subDir3 + subDir2\subDir3\subDir4
         // 
-        EXPECT_EQ(127, context.statistics().nStarted);
-        EXPECT_EQ(127, context.statistics().nSelfExecuted);
-        // 120 file nodes + subDir4\.yamignore + subDir4\.gitignore
-        EXPECT_EQ(122, context.statistics().nRehashedFiles);
-        // rootDir + subDir2 + subDir2\subDir3 | subDir2\subDir3\subDir4
+        EXPECT_EQ(7, context.statistics().nStarted);
+        EXPECT_EQ(7, context.statistics().nSelfExecuted);
+        // subDir4\.yamignore + subDir4\.gitignore
+        EXPECT_EQ(2, context.statistics().nRehashedFiles);
+        // testRepo + subDir2 + subDir2\subDir3 + subDir2\subDir3\subDir4
         EXPECT_EQ(4, context.statistics().nDirectoryUpdates);
         EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode));
         EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode_S1.get()));

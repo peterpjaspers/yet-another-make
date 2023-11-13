@@ -44,8 +44,7 @@ namespace
     //      - start watching the directory tree
     //      - iterate the directories.
     TEST(DirectoryWatcherWin32, spuriousChangeEvents) {
-        std::string tmpDir= FileSystem::createUniqueDirectory().string();
-        std::filesystem::path rootDir(std::string(tmpDir + "_dirNodeTest"));
+        std::filesystem::path rootDir= FileSystem::createUniqueDirectory().string();
         std::vector<FileChange> detectedChanges;
         std::mutex mutex;
         std::condition_variable cond;
@@ -95,11 +94,13 @@ namespace
             done = !detectedChanges.empty();
         } while (!done && cond.wait_until(lock, deadline) != std::cv_status::timeout);
         EXPECT_EQ(0, detectedChanges.size());
+
+        watcher.stop();
+        std::filesystem::remove_all(rootDir);
     }
 
     TEST(DirectoryWatcherWin32, suppressSpuriousChangeEvents) {
-        std::string tmpDir = FileSystem::createUniqueDirectory().string();
-        std::filesystem::path rootDir(std::string(tmpDir + "_dirNodeTest"));
+        std::filesystem::path rootDir = FileSystem::createUniqueDirectory().string();
         std::vector<FileChange> detectedChanges;
         std::mutex mutex;
         std::condition_variable cond;
@@ -134,10 +135,12 @@ namespace
             done = !detectedChanges.empty();
         } while (!done && cond.wait_until(lock, deadline) != std::cv_status::timeout);
         EXPECT_EQ(0, detectedChanges.size());
+
+        watcher.stop();
+        std::filesystem::remove_all(rootDir);
     }
     TEST(DirectoryWatcherWin32, update_DirectoryTree) {
-        std::string tmpDir = FileSystem::createUniqueDirectory().string();
-        std::filesystem::path rootDir(std::string(tmpDir + "_dirNodeTest"));
+        std::filesystem::path rootDir = FileSystem::createUniqueDirectory().string();
         std::vector<FileChange> detectedChanges;
         std::mutex mutex;
         std::condition_variable cond;
@@ -224,5 +227,8 @@ namespace
         EXPECT_TRUE(contains(dcs, c5a));
         EXPECT_TRUE(contains(dcs, c6a));
         EXPECT_TRUE(contains(dcs, c7a) || contains(dcs, c7b));
+
+        watcher.stop();
+        std::filesystem::remove_all(rootDir);
     }
 }

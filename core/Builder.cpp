@@ -82,6 +82,10 @@ namespace YAM
         _dirtyCommands->setState(Node::State::Ok);
     }
 
+    Builder::~Builder() {
+
+    }
+
     // Called in any thread
     ExecutionContext* Builder::context() {
         return &_context;
@@ -113,10 +117,10 @@ namespace YAM
         std::filesystem::path yamDir = DotYamDirectory::initialize(directory, _context.logBook().get());
         _result->succeeded(!yamDir.empty());
         if (_result->succeeded()) {
-            std::filesystem::path repoPath = yamDir.parent_path();
-            if (_context.findRepository(repoPath.filename().string()) == nullptr) {
+            if (_context.findRepository(".") == nullptr) {
+                std::filesystem::path repoPath = yamDir.parent_path();
                 auto repo = std::make_shared<FileRepository>(
-                    repoPath.filename().string(),
+                    ".",
                     repoPath,
                     &_context);
                 _context.addRepository(repo);

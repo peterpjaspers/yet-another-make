@@ -10,7 +10,9 @@
 namespace YAM
 {
     class DirectoryNode;
+    class FileRepository;
 }
+
 namespace YAMTest
 {
     class DirectoryTree
@@ -42,11 +44,9 @@ namespace YAMTest
         std::vector<std::filesystem::path> getFiles() const;
         std::vector<DirectoryTree*> getSubDirs() const;
 
-        XXH64_hash_t getHash() const;
+        XXH64_hash_t getHash(YAM::FileRepository* repo) const;
 
     private:
-        void updateHash();
-
         std::filesystem::path _path;
         unsigned int _nLevels; 
         YAM::RegexSet _excludes;

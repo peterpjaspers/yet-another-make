@@ -110,13 +110,10 @@ namespace YAM
         XXH64_hash_t hashOf(std::string const& aspectName);
 
         // Return the file repository that contains this file.
-        std::shared_ptr<FileRepository> fileRepository() const;
+        std::shared_ptr<FileRepository> const& repository() const;
 
-        // Return fileRepository()->relativePathOf(name()).
-        std::filesystem::path relativePath() const;
-
-        // Return fileRepository()->symbolicPathOf(name()).
-        std::filesystem::path symbolicPath() const;
+        // Return repository()->absolutePathOf(name()).
+        std::filesystem::path absolutePath() const;
 
         static void setStreamableType(uint32_t type);
         // Inherited from IStreamable

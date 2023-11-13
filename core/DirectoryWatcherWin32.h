@@ -40,10 +40,10 @@ namespace YAM
         void fillDirUpdateTimes(
             std::filesystem::path const& absPath,
             std::chrono::time_point<std::chrono::utc_clock> const& lwt);
-        bool isSpuriousDirModifiedEvent(
+        bool registerSpuriousDirModifiedEvent(
             std::filesystem::path const& absPath,
             std::chrono::time_point<std::chrono::utc_clock> const& lwt);
-        bool isSpuriousModifiedEvent(
+        bool registerSpuriousModifiedEvent(
             std::filesystem::path const& absPath,
             std::chrono::time_point<std::chrono::utc_clock>& lwt);
         void removeFromDirUpdateTimes(std::filesystem::path const& absPath);

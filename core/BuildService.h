@@ -21,14 +21,13 @@ namespace YAM
     // Only one client at-a-time can connect.
     // Service adheres to BuildServiceProtocol.
     //
-    class __declspec(dllexport) BuildService : 
-        public ILogBook, 
-        public std::enable_shared_from_this<BuildService>
+    class __declspec(dllexport) BuildService : public ILogBook
     {
     public:
         // Run a build service that accepts client connections at a
         // dynamically allocated tcp port.
         BuildService();
+        virtual ~BuildService();
 
         // Return the port at which the service accepts client connections.
         boost::asio::ip::port_type port() const;
@@ -47,9 +46,20 @@ namespace YAM
         void send(std::shared_ptr<IStreamable> msg);
         void closeClient();
 
+        class BuildServiceLogBook : public ILogBook {
+        public:
+            BuildServiceLogBook(ILogBook* logBook) : _logBook(logBook) {}
+            void add(LogRecord const& record) override {
+                _logBook->add(record);
+            }
+        private:
+            ILogBook* _logBook;
+        };
+
         boost::asio::io_context _context;
         boost::asio::ip::tcp::endpoint _service;
         boost::asio::ip::tcp::acceptor _acceptor;
+        std::shared_ptr<BuildServiceLogBook> _logBook;
         Builder _builder;
         std::thread _serviceThread;
         std::mutex _connectMutex;

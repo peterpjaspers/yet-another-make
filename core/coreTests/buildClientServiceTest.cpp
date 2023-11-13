@@ -14,14 +14,20 @@ namespace
     using namespace YAM;
 
     class Session {
+    private:
+        bool _shutdown;
+        std::mutex _mutex;
+        std::condition_variable _cond;
+        std::shared_ptr<BuildResult> _result;
+
     public:
         MemoryLogBook logBook;
-        std::shared_ptr<BuildService> service;
-        std::shared_ptr<BuildClient> client;
+        std::unique_ptr<BuildService> service;
+        std::unique_ptr<BuildClient> client;
         std::filesystem::path repoDir;
 
         Session()
-            : service(std::make_shared<BuildService>())
+            : service(std::make_unique<BuildService>())
             , client(nullptr)
             , repoDir(FileSystem::createUniqueDirectory())
             , _shutdown(false)
@@ -35,10 +41,13 @@ namespace
                 client->startShutdown();
             }
             service->join(); // service can be joined because it was shutdown
+            service = nullptr; // release service to stop watching repoDir
             if (client != nullptr) {
                 client->completor().RemoveObject(this);
                 client.reset(); // close connection to service
+                client = nullptr;
             }
+            std::filesystem::remove_all(repoDir);
         }
 
         std::shared_ptr<BuildResult> shutdown() {
@@ -85,19 +94,13 @@ namespace
                 client->completor().RemoveObject(this);
                 client = nullptr;
             }
-            client = std::make_shared<BuildClient>(logBook, service->port());
-            client->completor().AddLambda([&](std::shared_ptr<BuildResult> r) {
+            client = std::make_unique<BuildClient>(logBook, service->port());
+            client->completor().AddLambda([this](std::shared_ptr<BuildResult> r) {
                 std::lock_guard<std::mutex> lock(_mutex);
                 _result = r;
                 _cond.notify_one();
             });
-        }
-
-    private:
-        bool _shutdown;
-        std::mutex _mutex;
-        std::condition_variable _cond;
-        std::shared_ptr<BuildResult> _result;
+        }        
     };
 
     TEST(BuildService, constructSession) {

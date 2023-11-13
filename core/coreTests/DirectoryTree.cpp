@@ -1,6 +1,7 @@
 #pragma once
 #include "gtest/gtest.h"
 #include "DirectoryTree.h"
+#include "../FileRepository.h"
 #include "../DirectoryNode.h"
 #include "../SourceFileNode.h"
 #include "../FileNode.h"
@@ -35,8 +36,6 @@ namespace YAMTest
             _subDirs.push_back(new DirectoryTree(dir2, nLevels - 1, _excludes));
             _subDirs.push_back(new DirectoryTree(dir3, nLevels - 1, _excludes));
         }
-
-        updateHash();
     }
 
     DirectoryTree::~DirectoryTree() {
@@ -53,7 +52,6 @@ namespace YAMTest
         const std::filesystem::path nextPath(_path / nextName);
         _files.push_back(nextPath);
         std::ofstream{ nextPath };
-        updateHash();
     }
 
     void DirectoryTree::addDirectory() {
@@ -64,7 +62,6 @@ namespace YAMTest
         const std::filesystem::path nextPath(_path / nextName);
         _subDirs.push_back(new DirectoryTree(nextPath, _nLevels - 1, _excludes));
         std::ofstream{ nextPath };
-        updateHash();
     }
 
     void DirectoryTree::modifyFile(std::string const& fileName) {
@@ -113,42 +110,42 @@ namespace YAMTest
         return dirs;
     }
 
-    XXH64_hash_t DirectoryTree::getHash() const { return _hash; }
-
-    void DirectoryTree::updateHash() {
+    XXH64_hash_t DirectoryTree::getHash(YAM::FileRepository* repo) const {
+        XXH64_hash_t hash;
         std::vector<XXH64_hash_t> hashes;
         hashes.push_back(0);
         for (auto const& f : _files)
         {
             if (!_excludes.matches(f.string())) {
-                hashes.push_back(XXH64_string(f.string()));
+                hashes.push_back(XXH64_string(repo->symbolicPathOf(f).string()));
             }
         }
         for (auto d : _subDirs) {
             if (!_excludes.matches(d->path().string())) {
-                hashes.push_back(XXH64_string(d->path().string()));
+                hashes.push_back(XXH64_string(repo->symbolicPathOf(d->path()).string()));
             }
         }
-        _hash = XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
+        hash = XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
+        return hash;
     }
     
     void verify(DirectoryTree* expected, YAM::DirectoryNode* actual) {
 
         EXPECT_EQ(YAM::Node::State::Ok, actual->state());
-        EXPECT_EQ(expected->getHash(), actual->computeExecutionHash(0, actual->getContent()));
+        EXPECT_EQ(expected->getHash(actual->repository().get()), actual->computeExecutionHash(0, actual->getContent()));
 
         std::vector<std::shared_ptr<YAM::FileNode>> fileNodes;
         actual->getFiles(fileNodes);
         EXPECT_EQ(expected->getFiles().size(), fileNodes.size());
         for (std::size_t i = 0; i < fileNodes.size(); ++i) {
-            EXPECT_EQ(expected->getFiles()[i], fileNodes[i]->name());
+            EXPECT_EQ(expected->getFiles()[i], fileNodes[i]->absolutePath());
         }
 
         std::vector<std::shared_ptr<YAM::DirectoryNode>> subDirNodes;
         actual->getSubDirs(subDirNodes);
         EXPECT_EQ(expected->getSubDirs().size(), subDirNodes.size());
         for (std::size_t i = 0; i < subDirNodes.size(); ++i) {
-            EXPECT_EQ(expected->getSubDirs()[i]->path(), subDirNodes[i]->name());
+            EXPECT_EQ(expected->getSubDirs()[i]->path(), subDirNodes[i]->absolutePath());
         }
 
         std::map<std::filesystem::path, std::shared_ptr<YAM::Node>> const& cNodes = actual->getContent();

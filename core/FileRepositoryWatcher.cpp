@@ -1,4 +1,5 @@
 #include "FileRepositoryWatcher.h"
+#include "FileRepository.h"
 #include "DirectoryNode.h"
 #include "FileNode.h"
 #include "DirectoryWatcher.h"
@@ -24,10 +25,16 @@ namespace
         return pair.second == base.end();
     }
 
-    bool isNodeInRepo(Node* node, std::filesystem::path const& repoDir) {
+    bool isNodeInRepo(Node* node, std::filesystem::path const& repoDir, FileRepository* repo) {
+        if (repo == nullptr) {
+            return
+                (isFileNode(node) || isDirNode(node))
+                && isSubpath(node->name(), repoDir);
+        }
+        std::string repoName = (*(node->name().begin())).string();
         return
             (isFileNode(node) || isDirNode(node))
-            && isSubpath(node->name(), repoDir);
+            && (repoName == repo->name());
     }
 }
 
@@ -37,12 +44,21 @@ namespace YAM
         std::filesystem::path const& directory,
         ExecutionContext* context)
         : _context(context)
+        , _repository(nullptr)
         , _changes(directory)
         , _watcher(std::make_shared<DirectoryWatcher>(
             directory,
             true,
-            Delegate<void, FileChange const&>::CreateRaw(this, &FileRepositoryWatcher::_addChange))
-        ) {}
+            Delegate<void, FileChange const&>::CreateRaw(this, &FileRepositoryWatcher::_addChange)))
+    {}
+
+    FileRepositoryWatcher::FileRepositoryWatcher(
+        FileRepository* repo,
+        ExecutionContext* context)
+        : FileRepositoryWatcher(repo->directory(), context)
+    {
+        _repository = repo;
+    }
 
 
     std::filesystem::path const& FileRepositoryWatcher::directory() {
@@ -110,9 +126,10 @@ namespace YAM
     void FileRepositoryWatcher::_handleOverflow() {
         std::vector<std::shared_ptr<Node>> nodesInRepo;
         std::filesystem::path const& repoDir = _changes.directory();
+        auto repo = _repository;
         auto includeNode = Delegate<bool, std::shared_ptr<Node> const&>::CreateLambda(
-            [&repoDir](std::shared_ptr<Node> const& node) {
-                return isNodeInRepo(node.get(), repoDir);
+            [&repoDir, repo](std::shared_ptr<Node> const& node) {
+                return isNodeInRepo(node.get(), repoDir, repo);
             });
         _context->nodes().find(includeNode, nodesInRepo);
         for (auto node : nodesInRepo) {
@@ -124,7 +141,8 @@ namespace YAM
         std::filesystem::path const& path,
         std::chrono::time_point<std::chrono::utc_clock> const& lastWriteTime
     ) {
-        std::shared_ptr<Node> node = _context->nodes().find(path);
+        auto spath = _repository == nullptr ? path : _repository->symbolicPathOf(path);
+        std::shared_ptr<Node> node = _context->nodes().find(spath);
         if (node != nullptr) {
             bool dirty = true;
             auto fileNode = dynamic_pointer_cast<FileNode>(node);
@@ -144,7 +162,8 @@ namespace YAM
     }
 
     void FileRepositoryWatcher::_invalidateNodeRecursively(std::filesystem::path const& path) {
-        std::shared_ptr<Node> node = _context->nodes().find(path);
+        auto spath = _repository == nullptr ? path : _repository->symbolicPathOf(path);
+        std::shared_ptr<Node> node = _context->nodes().find(spath);
         if (node != nullptr) _invalidateNodeRecursively(node);
     }
 

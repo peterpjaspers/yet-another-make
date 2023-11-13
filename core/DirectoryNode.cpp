@@ -1,4 +1,5 @@
 #include "DirectoryNode.h"
+#include "FileRepository.h"
 #include "SourceFileNode.h"
 #include "ExecutionContext.h"
 #include "DotIgnoreNode.h"
@@ -14,13 +15,14 @@ namespace
     std::shared_ptr<Node> createNode(
         DirectoryNode* parent,
         std::filesystem::directory_entry const& dirEntry, 
+        std::filesystem::path const& name,
         ExecutionContext* context
     ) {
         std::shared_ptr<Node> node = nullptr;
         if (dirEntry.is_directory()) {
-            node = std::make_shared<DirectoryNode>(context, dirEntry.path(), parent);
+            node = std::make_shared<DirectoryNode>(context, name, parent);
         } else if (dirEntry.is_regular_file()) {
-            node = std::make_shared<SourceFileNode>(context, dirEntry.path());
+            node = std::make_shared<SourceFileNode>(context, name);
         } else {
             // bool notHandled = true;
         }
@@ -48,6 +50,17 @@ namespace YAM
 
     XXH64_hash_t DirectoryNode::executionHash() const {
         return _executionHash;
+    }
+        // Return the repository that contains the directory.
+    std::shared_ptr<FileRepository> const& DirectoryNode::repository() const {
+        auto it = name().begin();
+        auto repoName = *it;
+        return context()->findRepository(repoName.string());
+    }
+
+    // Return the absolute path name of the directory.
+    std::filesystem::path DirectoryNode::absolutePath() const {
+        return repository()->absolutePathOf(name());
     }
 
     DirectoryNode* DirectoryNode::parent() const { 
@@ -92,20 +105,22 @@ namespace YAM
 
     std::chrono::time_point<std::chrono::utc_clock> DirectoryNode::retrieveLastWriteTime() const {
         std::error_code ec;
-        auto flwt = std::filesystem::last_write_time(name(), ec);
+        auto flwt = std::filesystem::last_write_time(absolutePath(), ec);
         auto ulwt = decltype(flwt)::clock::to_utc(flwt);
         return ulwt;
     }
 
     std::shared_ptr<Node> DirectoryNode::getNode(
         std::filesystem::directory_entry const& dirEntry,
+        std::shared_ptr<FileRepository> const& repo,
         std::unordered_set<std::shared_ptr<Node>>& added,
         std::unordered_set<std::shared_ptr<Node>>& kept
     ) const {
         std::shared_ptr<Node> child = nullptr;
-        auto const& path = dirEntry.path();
-        if (!_dotIgnoreNode->ignore(path)) {
-            auto it = _content.find(path);
+        auto const& absPath = dirEntry.path();
+        if (!_dotIgnoreNode->ignore(absPath)) {
+            auto symPath = repo->symbolicPathOf(absPath);
+            auto it = _content.find(symPath);
             if (it != _content.end()) {
                 child = it->second;
                 kept.insert(it->second);
@@ -115,7 +130,7 @@ namespace YAM
                 // at this point is not allowed. Instead optimistically create a new node
                 // and check in main thread (commitResult) whether it already existed in
                 // buildstate.
-                child = createNode(const_cast<DirectoryNode*>(this), dirEntry, context());
+                child = createNode(const_cast<DirectoryNode*>(this), dirEntry, symPath, context());
                 added.insert(child);
             }
         }
@@ -128,10 +143,12 @@ namespace YAM
         std::unordered_set<std::shared_ptr<Node>>& removed,
         std::unordered_set<std::shared_ptr<Node>>& kept
     ) const {
-        if (std::filesystem::exists(name())) {
+        auto repo = repository();
+        std::filesystem::path absDir = repo->absolutePathOf(name());
+        if (std::filesystem::exists(absDir)) {
             std::shared_ptr<Node> child = nullptr;
-            for (auto const& dirEntry : std::filesystem::directory_iterator{ name() }) {
-                child = getNode(dirEntry, added, kept);
+            for (auto const& dirEntry : std::filesystem::directory_iterator{ absDir }) {
+                child = getNode(dirEntry, repo, added, kept);
                 if (child != nullptr) content.insert({ child->name(), child });
             }
         }

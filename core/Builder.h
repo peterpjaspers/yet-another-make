@@ -16,6 +16,7 @@ namespace YAM
     {
     public:
         Builder(bool enableRepoMirroring = true);
+        virtual ~Builder();
 
         void enableRepoMirroring(bool enable)  {
             _repoMirroringEnabled = enable;

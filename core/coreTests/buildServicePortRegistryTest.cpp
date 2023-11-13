@@ -12,15 +12,22 @@ namespace
     class SetupYam
     {
     public:
-        SetupYam() {
-            MemoryLogBook logBook;
-            std::filesystem::path repoDir(FileSystem::createUniqueDirectory());
+        MemoryLogBook logBook;
+        std::filesystem::path repoDir;
+
+        SetupYam() 
+            : repoDir(FileSystem::createUniqueDirectory())
+        {
             DotYamDirectory::initialize(repoDir, &logBook);
+        }
+
+        ~SetupYam() {
+            std::filesystem::remove_all(repoDir);
         }
     };
 
     TEST(BuildServicePortRegistry, writeAndRead) {
-        SetupYam();
+        SetupYam setup;
 
         boost::asio::ip::port_type port = 55330;
         BuildServicePortRegistry writer(port);

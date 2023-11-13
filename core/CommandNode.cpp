@@ -74,7 +74,7 @@ namespace
             << "Build order is not guaranteed." << std::endl
             << "Fix: declare input file as input of command." << std::endl
             << "Command   : " << cmd->name().string() << std::endl
-            << "Input file: " << inputFile->name().string() << std::endl;
+            << "Input file: " << inputFile->absolutePath().string() << std::endl;
         LogRecord record(LogRecord::Error, ss.str());
         logBook.add(record);
     }
@@ -328,35 +328,42 @@ namespace YAM
     }
 
     std::shared_ptr<GeneratedFileNode> CommandNode::findOutputNode(
-        std::filesystem::path const& output,
+        std::filesystem::path const& absPath,
         MemoryLogBook& logBook
     ) {
-        bool valid = true;
-        std::shared_ptr<Node> node = context()->nodes().find(output);
-        auto genFileNode = dynamic_pointer_cast<GeneratedFileNode>(node);
-        if (genFileNode == nullptr) {
-            auto srcFileNode = dynamic_pointer_cast<SourceFileNode>(node);
-            if (srcFileNode != nullptr) {
-                logWriteAccessedSourceFile(this, srcFileNode.get(), logBook);
-            } else {
+        std::shared_ptr<GeneratedFileNode> outputNode;
+        auto const& repo = context()->findRepositoryContaining(absPath);
+        bool valid = repo != nullptr;
+        if (valid) {
+            auto symPath = repo->symbolicPathOf(absPath);
+            std::shared_ptr<Node> node = context()->nodes().find(symPath);
+            outputNode = dynamic_pointer_cast<GeneratedFileNode>(node);
+            if (outputNode == nullptr) {
+                auto srcFileNode = dynamic_pointer_cast<SourceFileNode>(node);
+                if (srcFileNode != nullptr) {
+                    logWriteAccessedSourceFile(this, srcFileNode.get(), logBook);
+                } else {
+                    valid = false;
+                    logOutputFileNotDeclared(this, absPath, logBook);
+                }
+            } else if (outputNode->producer() != this) {
                 valid = false;
-                logOutputFileNotDeclared(this, output, logBook);
+                logAlreadyProducedByOtherCommand(this, outputNode.get(), logBook);
             }
-        } else if (genFileNode->producer() != this) {
-            valid = false;
-            logAlreadyProducedByOtherCommand(this, genFileNode.get(), logBook);
+        } else {
+            logOutputFileNotDeclared(this, absPath, logBook);
         }
-        return valid ? genFileNode : nullptr;
+        return valid ? outputNode : nullptr;
     }
 
     bool CommandNode::findOutputNodes(
-        std::set<std::filesystem::path> const& outputPaths,
+        std::set<std::filesystem::path> const& absOutputPaths,
         std::vector<std::shared_ptr<GeneratedFileNode>>& outputNodes,
         MemoryLogBook& logBook
     ) {
         unsigned int illegals = 0;
-        for (auto const& path : outputPaths) {
-            std::shared_ptr<GeneratedFileNode> fileNode = findOutputNode(path, logBook);
+        for (auto const& absPath : absOutputPaths) {
+            std::shared_ptr<GeneratedFileNode> fileNode = findOutputNode(absPath, logBook);
             if (fileNode == nullptr) {
                 illegals++;
             } else {
@@ -398,7 +405,8 @@ namespace YAM
         if (canceling()) {
             std::shared_ptr<IMonitoredProcess> executor = _scriptExecutor.load();
             if (executor != nullptr) {
-                executor->terminate();
+                executor->terminate(); 
+                _scriptExecutor.store(nullptr);
             }
         }
     }
@@ -441,7 +449,7 @@ namespace YAM
                 result->_newState = canceling() ? Node::State::Canceled : Node::State::Failed;
             } else {
                 std::set<std::filesystem::path> inputPaths;
-                for (auto const& pair : _inputs) inputPaths.insert(pair.first);
+                for (auto const& pair : _inputs) inputPaths.insert(pair.second->absolutePath());
                 computePathSetsDifference(
                     inputPaths, scriptResult.readOnlyFiles,
                     result->_keptInputPaths,
@@ -545,11 +553,11 @@ namespace YAM
             cmdExe,
             std::string("/c ") + scriptFilePath.string(),
             env);
-        _scriptExecutor = executor;
+        _scriptExecutor.store(executor);
         MonitoredProcessResult result = executor->wait();
         _scriptExecutor.store(nullptr);
 
-        if (result.exitCode == 0) {
+        if (result.exitCode == 0 || canceling()) {
             std::error_code ec;
             bool removed = std::filesystem::remove_all(tmpDir, ec);
             if (!removed) {
@@ -564,54 +572,56 @@ namespace YAM
 
     bool CommandNode::findInputNodes(
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const& allowedGenInputFiles,
-        std::set<std::filesystem::path>const& inputPaths,
+        std::set<std::filesystem::path>const& absInputPaths,
         std::vector<std::shared_ptr<FileNode>>& inputNodes,
         std::vector<std::shared_ptr<Node>>& srcInputNodes,
         ILogBook& logBook
     ) {
-        bool valid = true;
+        bool allValid = true;
         auto& nodes = context()->nodes();
-        for (auto const& inputPath : inputPaths) {
-            auto inputNode = nodes.find(inputPath);
-            auto fileNode = dynamic_pointer_cast<FileNode>(inputNode);
-            if (inputNode != nullptr && fileNode == nullptr) {
-                throw std::exception("input node not a file node");
-            }
-            auto generatedInputFile = dynamic_pointer_cast<GeneratedFileNode>(fileNode);
-            if (generatedInputFile != nullptr) {
-                if (!allowedGenInputFiles.contains(inputPath)) {
-                    valid = false;
-                    logBuildOrderNotGuaranteed(this, generatedInputFile.get(), logBook);
-                } else {
-                    // _inputProducers must have moved the generated inputs to Ok,
-                    // Failed or Canceled state during requisite execution.
-                    auto state = generatedInputFile->state();
-                    if (
-                        state != Node::State::Ok
-                        && state != Node::State::Failed
-                        && state != Node::State::Canceled
-                    ) throw std::exception("generated input node not executed");
-                    inputNodes.push_back(generatedInputFile);
+        for (auto const& absInputPath : absInputPaths) {
+            bool valid = true;
+            auto repo = context()->findRepositoryContaining(absInputPath);
+            valid = repo != nullptr;
+            if (valid) {
+                auto symInputPath = repo->symbolicPathOf(absInputPath);
+                auto inputNode = nodes.find(symInputPath);
+                auto fileNode = dynamic_pointer_cast<FileNode>(inputNode);
+                if (inputNode != nullptr && fileNode == nullptr) {
+                    throw std::exception("input node not a file node");
                 }
-            } else {
-                auto repo = context()->findRepositoryContaining(inputPath);
-                if (repo == nullptr) {
-                    logInputNotInARepository(this, inputPath, logBook);
+                auto generatedInputFile = dynamic_pointer_cast<GeneratedFileNode>(fileNode);
+                if (generatedInputFile != nullptr) {
+                    if (!allowedGenInputFiles.contains(symInputPath)) {
+                        valid = false;
+                        logBuildOrderNotGuaranteed(this, generatedInputFile.get(), logBook);
+                    } else {
+                        // _inputProducers must have moved the generated inputs to Ok,
+                        // Failed or Canceled state during requisite execution.
+                        auto state = generatedInputFile->state();
+                        if (
+                            state != Node::State::Ok
+                            && state != Node::State::Failed
+                            && state != Node::State::Canceled
+                        ) throw std::exception("generated input node not executed");
+                        inputNodes.push_back(generatedInputFile);
+                    }
                 } else {
                     // In YAM all output (generated file) nodes must be created
                     // before command execution starts. Hence when inputPath is
                     // not a generated file it must be a source file.
                     auto srcInputFile = dynamic_pointer_cast<SourceFileNode>(fileNode);
                     if (srcInputFile == nullptr) {
-                        srcInputFile = std::make_shared<SourceFileNode>(context(), inputPath);
+                        srcInputFile = std::make_shared<SourceFileNode>(context(), symInputPath);
                         nodes.add(srcInputFile);
                     }
                     inputNodes.push_back(srcInputFile);
                     srcInputNodes.push_back(srcInputFile);
                 }
             }
+            allValid = allValid && valid;
         }
-        return valid;
+        return allValid;
     }
 
     void CommandNode::setStreamableType(uint32_t type) {

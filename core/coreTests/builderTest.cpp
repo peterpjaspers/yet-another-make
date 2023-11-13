@@ -109,67 +109,70 @@ namespace
         // Create repo and builder,fill builder context with CommandNodes that 
         // compile the source files in repo and that link the resulting object 
         // files into a dll.
-        TestDriver()
+        TestDriver(bool initialize = true)
             : repo()
             , builder(true)
             , context(builder.context())
-            , ccPiet(std::make_shared<CommandNode>(context, repo.dir / "ccpiet"))
-            , ccJan(std::make_shared<CommandNode>(context, repo.dir / "ccjan"))
-            , linkPietJan(std::make_shared<CommandNode>(context, repo.dir / "linkpietjan"))
-            , pietOut(std::make_shared<GeneratedFileNode>(context, repo.dir / "generated" / "pietout.obj", ccPiet.get()))
-            , janOut(std::make_shared<GeneratedFileNode>(context, repo.dir / "generated"/ "janout.obj", ccJan.get()))
-            , pietjanOut(std::make_shared<GeneratedFileNode>(context, repo.dir / "generated" / "pietjanout.dll", linkPietJan.get()))
+            , ccPiet(std::make_shared<CommandNode>(context, R"(.\ccpiet)"))
+            , ccJan(std::make_shared<CommandNode>(context, R"(.\ccjan)"))
+            , linkPietJan(std::make_shared<CommandNode>(context, R"(.\linkpietjan)"))
+            , pietOut(std::make_shared<GeneratedFileNode>(context, R"(.\generated\pietout.obj)", ccPiet.get()))
+            , janOut(std::make_shared<GeneratedFileNode>(context, R"(.\generated\janout.obj)", ccJan.get()))
+            , pietjanOut(std::make_shared<GeneratedFileNode>(context, R"(.\generated\pietjanout.dll)", linkPietJan.get()))
             , stats(context->statistics())
         {
             stats.registerNodes = true;
-            // context->threadPool().size(1); // to ease debugging
+            if (initialize) {
+                initializeYam();
+                // context->threadPool().size(1); // to ease debugging
 
-            // Simulate compilation and linking
-            {
-                std::stringstream script;
-                script
-                    << "type " << repo.pietH.string() << " > " << pietOut->name().string()
-                    << " & type " << repo.janH.string() << " >> " << pietOut->name().string()
-                    << " & type " << repo.pietCpp.string() << " >> " << pietOut->name().string() << std::endl;
-                ccPiet->outputs({ pietOut });
-                ccPiet->script(script.str());
+                // Simulate compilation and linking
+                {
+                    std::stringstream script;
+                    script
+                        << "type " << repo.pietH.string() << " > " << pietOut->absolutePath().string()
+                        << " & type " << repo.janH.string() << " >> " << pietOut->absolutePath().string()
+                        << " & type " << repo.pietCpp.string() << " >> " << pietOut->absolutePath().string() << std::endl;
+                    ccPiet->outputs({ pietOut });
+                    ccPiet->script(script.str());
+                }
+                {
+                    std::stringstream script;
+                    script
+                        << "type " << repo.janH.string() << " > " << janOut->absolutePath().string()
+                        << " & type " << repo.janCpp.string() << " >> " << janOut->absolutePath().string() << std::endl;
+
+                    ccJan->outputs({ janOut });
+                    ccJan->script(script.str());
+                }
+                {
+                    std::stringstream script;
+                    linkPietJan->outputs({ pietjanOut });
+                    linkPietJan->inputProducers({ ccPiet, ccJan });
+                    script
+                        << "type " << pietOut->absolutePath().string() << " > " << pietjanOut->absolutePath().string()
+                        << " & type " << janOut->absolutePath().string() << " >> " << pietjanOut->absolutePath().string() << std::endl;
+                    linkPietJan->script(script.str());
+                }
+
+                context->nodes().add(ccPiet);
+                context->nodes().add(pietOut);
+                context->nodes().add(ccJan);
+                context->nodes().add(janOut);
+                context->nodes().add(linkPietJan);
+                context->nodes().add(pietjanOut);
+
+                EXPECT_EQ(Node::State::Dirty, ccPiet->state());
+                EXPECT_EQ(Node::State::Dirty, ccJan->state());
+                EXPECT_EQ(Node::State::Dirty, linkPietJan->state());
+                EXPECT_EQ(Node::State::Dirty, pietOut->state());
+                EXPECT_EQ(Node::State::Dirty, janOut->state());
+                EXPECT_EQ(Node::State::Dirty, pietjanOut->state());
             }
-            {
-                std::stringstream script;
-                script 
-                    << "type " << repo.janH.string() << " > " << janOut->name().string()
-                    << " & type " << repo.janCpp.string() << " >> " << janOut->name().string() << std::endl;
-
-                ccJan->outputs({ janOut });
-                ccJan->script(script.str());
-            }
-            {
-                std::stringstream script;
-                linkPietJan->outputs({ pietjanOut });
-                linkPietJan->inputProducers({ ccPiet, ccJan });
-                script
-                    << "type " << pietOut->name().string() << " > " << pietjanOut->name().string()
-                    << " & type " << janOut->name().string() << " >> " << pietjanOut->name().string() << std::endl;
-                linkPietJan->script(script.str());
-            }
-
-            context->nodes().add(ccPiet);
-            context->nodes().add(pietOut);
-            context->nodes().add(ccJan);
-            context->nodes().add(janOut);
-            context->nodes().add(linkPietJan);
-            context->nodes().add(pietjanOut);
-
-            EXPECT_EQ(Node::State::Dirty, ccPiet->state());
-            EXPECT_EQ(Node::State::Dirty, ccJan->state());
-            EXPECT_EQ(Node::State::Dirty, linkPietJan->state());
-            EXPECT_EQ(Node::State::Dirty, pietOut->state());
-            EXPECT_EQ(Node::State::Dirty, janOut->state());
-            EXPECT_EQ(Node::State::Dirty, pietjanOut->state());
         }
 
         std::shared_ptr<FileRepository> sourceRepo() {
-            return context->findRepository(repo.dir.filename().string());
+            return context->findRepository(".");
         }
 
         Node* findNode(std::filesystem::path const& path) {
@@ -256,22 +259,22 @@ namespace
         std::string expectedPietOutContent() { return repo.pietHContent + repo.janHContent + repo.pietCppContent; }
         std::string expectedJanOutContent() { return repo.janHContent + repo.janCppContent; }
         std::string expectedPietjanOutContent() { return expectedPietOutContent() + expectedJanOutContent();}
-        std::string actualPietOutContent() { return readFile(pietOut->name()); }
-        std::string actualJanOutContent() { return readFile(janOut->name()); }
-        std::string actualPietjanOutContent() { return readFile(pietjanOut->name()); }
+        std::string actualPietOutContent() { return readFile(pietOut->absolutePath()); }
+        std::string actualJanOutContent() { return readFile(janOut->absolutePath()); }
+        std::string actualPietjanOutContent() { return readFile(pietjanOut->absolutePath()); }
     };
 
     TEST(Builder, initOnce) {
-        TestDriver driver;
+        TestDriver driver(false);
 
         std::shared_ptr<BuildResult> result = driver.initializeYam();
         EXPECT_TRUE(result->succeeded());
-        auto srcRepo = driver.builder.context()->findRepository(driver.repo.dir.filename().string());
+        auto srcRepo = driver.sourceRepo();
         EXPECT_NE(nullptr, srcRepo);
         EXPECT_EQ(driver.repo.dir, srcRepo->directory());
     }
     TEST(Builder, initTwice) {
-        TestDriver driver;
+        TestDriver driver(false);
 
         driver.initializeYam();
         std::shared_ptr<BuildResult> result = driver.initializeYam();
@@ -282,7 +285,6 @@ namespace
         TestDriver driver;
         driver.builder.enableRepoMirroring(true);
 
-        driver.initializeYam();
         std::shared_ptr<BuildResult> result = driver.build();
 
         EXPECT_TRUE(result->succeeded());
@@ -301,9 +303,10 @@ namespace
         std::vector<std::shared_ptr<Node>> inputs;
         driver.ccPiet->getInputs(inputs);
         EXPECT_EQ(3, inputs.size());
-        auto pietCpp = driver.context->nodes().find(driver.repo.pietCpp);
-        auto pietH = driver.context->nodes().find(driver.repo.pietH);
-        auto janH = driver.context->nodes().find(driver.repo.janH);
+        auto srcRepo = driver.sourceRepo();
+        auto pietCpp = driver.context->nodes().find(srcRepo->symbolicPathOf(driver.repo.pietCpp));
+        auto pietH = driver.context->nodes().find(srcRepo->symbolicPathOf(driver.repo.pietH));
+        auto janH = driver.context->nodes().find(srcRepo->symbolicPathOf(driver.repo.janH));
         EXPECT_TRUE(inputs.end() != std::find(inputs.begin(), inputs.end(), pietCpp));
         EXPECT_TRUE(inputs.end() != std::find(inputs.begin(), inputs.end(), pietH));
         EXPECT_TRUE(inputs.end() != std::find(inputs.begin(), inputs.end(), janH));
@@ -311,7 +314,7 @@ namespace
         inputs.clear();
         driver.ccJan->getInputs(inputs);
         EXPECT_EQ(2, inputs.size());
-        auto janCpp = driver.context->nodes().find(driver.repo.janCpp);
+        auto janCpp = driver.context->nodes().find(srcRepo->symbolicPathOf(driver.repo.janCpp));
         EXPECT_TRUE(inputs.end() != std::find(inputs.begin(), inputs.end(), janCpp));
         EXPECT_TRUE(inputs.end() != std::find(inputs.begin(), inputs.end(), janH));;
 
@@ -340,12 +343,12 @@ namespace
         // + 4 .gitignore + 4 .yamignore
         EXPECT_EQ(18, driver.stats.nRehashedFiles); 
 
-        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(driver.repo.dir)));
-        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(driver.repo.dir / "src")));
-        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(driver.repo.pietCpp)));
-        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(driver.repo.pietH)));
-        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(driver.repo.janCpp)));
-        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(driver.repo.janH)));
+        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.dir))));
+        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.dir / "src"))));
+        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietCpp))));
+        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietH))));
+        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.janCpp))));
+        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.janH))));
         EXPECT_TRUE(driver.stats.started.contains(driver.ccPiet.get()));
         EXPECT_TRUE(driver.stats.started.contains(driver.ccJan.get()));
         EXPECT_TRUE(driver.stats.started.contains(driver.linkPietJan.get()));
@@ -356,12 +359,12 @@ namespace
         // Verify nodes self-executed 
         EXPECT_EQ(31, driver.stats.nSelfExecuted);
         EXPECT_EQ(28, driver.stats.selfExecuted.size());
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(driver.repo.dir)));
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(driver.repo.dir / "src")));
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(driver.repo.pietCpp)));
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(driver.repo.pietH)));
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(driver.repo.janCpp)));
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(driver.repo.janH)));
+        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.dir))));
+        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.dir / "src"))));
+        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietCpp))));
+        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietH))));
+        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.janCpp))));
+        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.janH))));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.ccPiet.get()));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.ccJan.get()));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.linkPietJan.get()));
@@ -374,7 +377,6 @@ namespace
         TestDriver driver;
         driver.builder.enableRepoMirroring(false);
 
-        driver.initializeYam();
         std::shared_ptr<BuildResult> result = driver.build();
 
         EXPECT_TRUE(result->succeeded());
@@ -393,9 +395,10 @@ namespace
         std::vector<std::shared_ptr<Node>> inputs;
         driver.ccPiet->getInputs(inputs);
         EXPECT_EQ(3, inputs.size());
-        auto pietCpp = driver.context->nodes().find(driver.repo.pietCpp);
-        auto pietH = driver.context->nodes().find(driver.repo.pietH);
-        auto janH = driver.context->nodes().find(driver.repo.janH);
+        auto srcRepo = driver.sourceRepo();
+        auto pietCpp = driver.context->nodes().find(srcRepo->symbolicPathOf(driver.repo.pietCpp));
+        auto pietH = driver.context->nodes().find(srcRepo->symbolicPathOf(driver.repo.pietH));
+        auto janH = driver.context->nodes().find(srcRepo->symbolicPathOf(driver.repo.janH));
         EXPECT_EQ(Node::State::Ok, pietCpp->state());
         EXPECT_EQ(Node::State::Ok, pietH->state());
         EXPECT_EQ(Node::State::Ok, janH->state());
@@ -406,7 +409,7 @@ namespace
         inputs.clear();
         driver.ccJan->getInputs(inputs);
         EXPECT_EQ(2, inputs.size());
-        auto janCpp = driver.context->nodes().find(driver.repo.janCpp);
+        auto janCpp = driver.context->nodes().find(srcRepo->symbolicPathOf(driver.repo.janCpp));
         EXPECT_TRUE(inputs.end() != std::find(inputs.begin(), inputs.end(), janCpp));
         EXPECT_TRUE(inputs.end() != std::find(inputs.begin(), inputs.end(), janH));;
 
@@ -430,10 +433,10 @@ namespace
         // 4 source + 3 generated (before cmd exec) + 3 generated (after cmd exec)
         EXPECT_EQ(10, driver.stats.nRehashedFiles);
 
-        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(driver.repo.pietCpp)));
-        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(driver.repo.pietH)));
-        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(driver.repo.janCpp)));
-        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(driver.repo.janH)));
+        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietCpp))));
+        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietH))));
+        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.janCpp))));
+        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.janH))));
         EXPECT_TRUE(driver.stats.started.contains(driver.ccPiet.get()));
         EXPECT_TRUE(driver.stats.started.contains(driver.ccJan.get()));
         EXPECT_TRUE(driver.stats.started.contains(driver.linkPietJan.get()));
@@ -444,10 +447,10 @@ namespace
         // Verify nodes self-executed 
         EXPECT_EQ(14, driver.stats.nSelfExecuted);
         EXPECT_EQ(11, driver.stats.selfExecuted.size());
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(driver.repo.pietCpp)));
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(driver.repo.pietH)));
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(driver.repo.janCpp)));
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(driver.repo.janH)));
+        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietCpp))));
+        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietH))));
+        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.janCpp))));
+        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.janH))));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.ccPiet.get()));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.ccJan.get()));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.linkPietJan.get()));
@@ -464,9 +467,9 @@ namespace
         // Assert that the source file repository has detected the changes made
         // by the build to the generated files.
         ASSERT_TRUE(driver.consumeFileChangeEvent({ 
-            driver.pietOut->name(),
-            driver.janOut->name(),
-            driver.pietjanOut->name(),
+            driver.pietOut->absolutePath(),
+            driver.janOut->absolutePath(),
+            driver.pietjanOut->absolutePath(),
         }));
 
         // Because the generated files have not been modified since the last
@@ -479,10 +482,12 @@ namespace
         EXPECT_EQ(Node::State::Ok, driver.ccPiet->state());
         EXPECT_EQ(Node::State::Ok, driver.ccJan->state());
         EXPECT_EQ(Node::State::Ok, driver.linkPietJan->state());
-        EXPECT_EQ(Node::State::Ok, driver.findNode(driver.repo.pietCpp)->state());
-        EXPECT_EQ(Node::State::Ok, driver.findNode(driver.repo.pietH)->state());
-        EXPECT_EQ(Node::State::Ok, driver.findNode(driver.repo.janCpp)->state());
-        EXPECT_EQ(Node::State::Ok, driver.findNode(driver.repo.janH)->state());
+        auto srcRepo = driver.sourceRepo();
+        
+        EXPECT_EQ(Node::State::Ok, driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietCpp))->state());
+        EXPECT_EQ(Node::State::Ok, driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietH))->state());
+        EXPECT_EQ(Node::State::Ok, driver.findNode(srcRepo->symbolicPathOf(driver.repo.janCpp))->state());
+        EXPECT_EQ(Node::State::Ok, driver.findNode(srcRepo->symbolicPathOf(driver.repo.janH))->state());
     }
 
     TEST(Builder, incrementalBuildWhileNoModifications) {
@@ -543,7 +548,8 @@ namespace
         // 2: self-execution of ccJan => updates and rehashes janOut 
         // 3: pendingStartSelf of linkPietJan sees changed hash of janOut
         // 4: execution of linkPietJan updates and rehashes pietjanOut
-        auto janCppNode = driver.context->nodes().find(driver.repo.janCpp);
+        auto srcRepo = driver.sourceRepo();
+        auto janCppNode = driver.context->nodes().find(srcRepo->symbolicPathOf(driver.repo.janCpp));
         EXPECT_EQ(8, driver.stats.selfExecuted.size());
         EXPECT_TRUE(driver.stats.selfExecuted.contains(janCppNode.get()));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.ccJan.get()));
@@ -564,8 +570,9 @@ namespace
         std::filesystem::remove(driver.repo.janCpp);
 
         ASSERT_TRUE(driver.consumeFileChangeEvent({ driver.repo.janCpp }));
-        auto janCppNode = dynamic_pointer_cast<FileNode>(driver.context->nodes().find(driver.repo.janCpp));
-        auto srcDirNode = dynamic_pointer_cast<DirectoryNode>(driver.context->nodes().find(driver.repo.dir / "src"));
+        auto srcRepo = driver.sourceRepo();
+        auto janCppNode = dynamic_pointer_cast<FileNode>(driver.context->nodes().find(srcRepo->symbolicPathOf(driver.repo.janCpp)));
+        auto srcDirNode = dynamic_pointer_cast<DirectoryNode>(driver.context->nodes().find(srcRepo->symbolicPathOf(driver.repo.dir / "src")));
         EXPECT_EQ(Node::State::Ok, driver.ccPiet->state());
         EXPECT_EQ(Node::State::Dirty, janCppNode->state());
         EXPECT_EQ(Node::State::Dirty, driver.ccJan->state());

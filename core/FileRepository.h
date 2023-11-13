@@ -31,6 +31,12 @@ namespace YAM
     // Yam will register, in its buildstate, input and output dependencies on 
     // files/directories in known FileRepositories. Dependencies on files and
     // directories outside known FileRepositories are silently ignored.
+    // 
+    // FileRepository supports the conversion of so-called symbolic paths
+    // to/from absolute paths. A symbolic path is an absolute path in which
+    // the file repository directory is replaced by the repository name.
+    // A symbolic path is therefore a relative path, the first path component
+    // being the repository name.
     //
     class __declspec(dllexport) FileRepository : public IPersistable
     {
@@ -47,21 +53,29 @@ namespace YAM
         std::filesystem::path const& directory() const;
         std::shared_ptr<DirectoryNode> directoryNode() const;
 
-        // Return whether 'absPath' is a path in the repo directory.
-        // E.g. if directory = /a/b/ and path = /a/b/c/e then it
-        // lexically contains path. This is also true when /a/b/c/e does not
-        // exist in the file system.
-        bool lexicallyContains(std::filesystem::path const& absPath) const;
+        // Return whether 'path' is a path in the repository.
+        // 'path' can be a absolute or symbolic path.
+        // E.g. if repository directory = /a/b/ and path = /a/b/c/e then 
+        // the repository lexically contains path.
+        // E.g. if repository name is 'someRepo' and path is someRepo/a/b
+        // then repository lexically contains path. 
+        // Note: a lexically contained path need not exist in the file system.
+        // Pre: 'absPath' must be without . and .. path components.
+        bool lexicallyContains(std::filesystem::path const& path) const;
 
         // Return 'absPath' relative to the repo directory.
         // Return empty path when !lexicallyContains(absPath).
         // Pre: 'absPath' must be without . and .. path components.
         std::filesystem::path relativePathOf(std::filesystem::path const& absPath) const;
 
-        // Return given 'absPath' as <repoName>/<path relative to repo directory>.
+        // Return given 'absPath' as repoName/relativePathOf(absPath).
         // Return empty path when !lexicallyContains(absPath).
         // Pre: 'absPath' must be without . and .. path components.
         std::filesystem::path symbolicPathOf(std::filesystem::path const& absPath) const;
+
+        // Return the absolute path of given symbolic path.
+        // Return empty path when symbolicPath.begin() != name().
+        std::filesystem::path absolutePathOf(std::filesystem::path const& symbolicPath) const;
 
         // Consume the changes that occurred in the repo directory tree since
         // the previous consumeChanges() call by marking directory and file nodes

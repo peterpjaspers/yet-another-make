@@ -40,11 +40,11 @@ namespace YAM
         bool removeRepository(std::string const& repoName);
 
         // Find repository by name, return found repo, nullptr when not found.
-        std::shared_ptr<FileRepository> findRepository(std::string const& repoName) const;
+        std::shared_ptr<FileRepository> const& findRepository(std::string const& repoName) const;
 
         // Find repository that contains path, return found repo, nullptr when
         // not found.
-        std::shared_ptr<FileRepository> findRepositoryContaining(std::filesystem::path const& path) const;
+        std::shared_ptr<FileRepository> const& findRepositoryContaining(std::filesystem::path const& path) const;
 
         // Return repositories.
         std::map<std::string, std::shared_ptr<FileRepository>> const& repositories() const;
