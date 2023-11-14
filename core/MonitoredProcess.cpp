@@ -12,10 +12,11 @@ namespace YAM
     MonitoredProcess::MonitoredProcess(
         std::string const& program,
         std::string const& arguments,
+        std::filesystem::path const& workingDir,
         std::map<std::string, std::string> const& env)
-        : IMonitoredProcess(program, arguments, env)
+        : IMonitoredProcess(program, arguments, workingDir, env)
     {
-        _impl = std::make_shared<MP_IMPL_CLASS>(_program, _arguments, _env);
+        _impl = std::make_shared<MP_IMPL_CLASS>(_program, _arguments, _workingDir, _env);
     }
 
     MonitoredProcessResult const& MonitoredProcess::wait() {

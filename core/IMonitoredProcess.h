@@ -35,9 +35,11 @@ namespace YAM
         IMonitoredProcess(
             std::string const& program,
             std::string const& arguments,
+            std::filesystem::path const& workingDir,
             std::map<std::string, std::string> const & env)
             : _program(program)
             , _arguments(arguments)
+            , _workingDir(workingDir)
             , _env(env)
         {}
 
@@ -58,6 +60,7 @@ namespace YAM
     protected:
         std::string _program;
         std::string _arguments;
+        std::filesystem::path _workingDir;
         std::map<std::string, std::string> _env;
     };
 }

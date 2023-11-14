@@ -16,6 +16,7 @@ namespace YAM
         MonitoredProcessWin32(
             std::string const& program,
             std::string const& arguments,
+            std::filesystem::path const& workingDir,
             std::map<std::string, std::string> const& env);
 
         MonitoredProcessResult const& wait() override;

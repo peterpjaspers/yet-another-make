@@ -46,9 +46,10 @@ namespace YAM
 {
     MonitoredProcessWin32::MonitoredProcessWin32(
         std::string const& program,
-        std::string const& arguments,
+        std::string const& arguments, 
+        std::filesystem::path const& workingDir,
         std::map<std::string, std::string> const& env)
-        : IMonitoredProcess(program, arguments, env)
+        : IMonitoredProcess(program, arguments, workingDir, env)
         , _tempDir(FileSystem::createUniqueDirectory().string())
         , _groupExited(false)
         , _childExited(false)
@@ -56,6 +57,7 @@ namespace YAM
             generateCmd(_program, _arguments, _tempDir),
             generateEnv(_tempDir, _env),
             _group,
+            boost::process::start_dir(_workingDir.string()),
             boost::process::std_out > _stdout, 
             boost::process::std_err > _stderr,
             _ios)

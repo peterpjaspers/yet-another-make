@@ -2,6 +2,7 @@
 
 #include "IMonitoredProcess.h"
 #include <memory>
+#include <filesystem>
 
 namespace YAM
 {
@@ -11,6 +12,7 @@ namespace YAM
         MonitoredProcess(
             std::string const& program,
             std::string const& arguments,
+            std::filesystem::path const& workingDir,
             std::map<std::string, std::string> const& env);
 
         MonitoredProcessResult const& wait() override;

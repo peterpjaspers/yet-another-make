@@ -552,6 +552,7 @@ namespace YAM
         auto executor = std::make_shared<MonitoredProcess>(
             cmdExe,
             std::string("/c ") + scriptFilePath.string(),
+            std::filesystem::current_path(),
             env);
         _scriptExecutor.store(executor);
         MonitoredProcessResult result = executor->wait();

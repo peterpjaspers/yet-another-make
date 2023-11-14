@@ -1,4 +1,6 @@
+#include "../FileSystem.h"
 #include "gtest/gtest.h"
+
 #include <boost/process.hpp>
 #include <boost/asio.hpp>
 #include <chrono>
@@ -8,6 +10,14 @@
 namespace
 {
     using namespace boost::process;
+    using namespace YAM;
+
+    class WorkingDir {
+    public:
+        std::filesystem::path dir;
+        WorkingDir() : dir(FileSystem::createUniqueDirectory()) {}
+        ~WorkingDir() { std::filesystem::remove_all(dir); }
+    };
 
     void toLines(std::string const& str, std::vector<std::string>& outLines) {
         auto ss = std::stringstream(str);
@@ -132,28 +142,50 @@ namespace
         //}
         //envStream.close();
 
-        std::ofstream batchStream("batch.cmd");
-        batchStream << "echo Hallo";
+        WorkingDir wdir;
+        auto batchFile = wdir.dir / "batch.cmd";
+        auto halloFile = wdir.dir / "hallo.txt";
+        std::string hallo("Hallo"); 
+        auto readHalloFile = [&]() {
+            std::ifstream halloStream(halloFile);
+            std::string result;
+            halloStream >> result;
+            halloStream.close();
+            return result;
+        };
+
+        std::ofstream batchStream(batchFile);
+        batchStream << "echo Hallo> hallo.txt";
         batchStream.close();
 
         auto cmdExe = boost::process::search_path("cmd").string();
         std::string batch = cmdExe + " /c batch.cmd";
+
+        child batch_no_env(batch, start_dir(wdir.dir.string()));
+        batch_no_env.wait();
+        EXPECT_EQ(0, batch_no_env.exit_code());
+        EXPECT_EQ(hallo, readHalloFile());
+
+        child batch_env(batch, env, start_dir(wdir.dir.string()));
+        batch_env.wait();
+        EXPECT_EQ(0, batch_env.exit_code());
+        EXPECT_EQ(hallo, readHalloFile());
+    }
+
+    TEST(Process, executeEcho) {
+        boost::process::environment thisenv = boost::this_process::environment();
+        boost::process::environment env;
+        env["SystemRoot"] = thisenv.at("SystemRoot").to_string();
+
+        auto cmdExe = boost::process::search_path("cmd").string();
         std::string echo = cmdExe + " /c echo Hallo";
 
-        child batch_no_env_ok(batch);
-        batch_no_env_ok.wait();
-        EXPECT_EQ(0, batch_no_env_ok.exit_code());
+        child echo_no_env(echo);
+        echo_no_env.wait();
+        EXPECT_EQ(0, echo_no_env.exit_code());
 
-        child batch_env_fail(batch, env);
-        batch_env_fail.wait();
-        EXPECT_EQ(0, batch_env_fail.exit_code());
-
-        child echo_no_env_ok(echo);
-        echo_no_env_ok.wait();
-        EXPECT_EQ(0, echo_no_env_ok.exit_code());
-
-        child echo_env_ok(echo, env);
-        echo_env_ok.wait();
-        EXPECT_EQ(0, echo_env_ok.exit_code());
+        child echo_env(echo, env);
+        echo_env.wait();
+        EXPECT_EQ(0, echo_env.exit_code());
     }
 }
