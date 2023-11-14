@@ -187,10 +187,14 @@ namespace
         std::shared_ptr<IStreamable> pexpected0 = expected0;
         std::shared_ptr<Streamable> expected1 = std::make_shared<Streamable1>();
         std::shared_ptr<IStreamable> pexpected1 = expected1;
+        std::weak_ptr<IStreamable> wp = expected1;
         setup.writer()->stream(pexpected0);
         setup.writer()->stream(pexpected0);
         setup.writer()->stream(pexpected1);
-        setup.writer()->stream(pexpected1);
+        setup.writer()->stream(pexpected1); 
+        auto wplocked = wp.lock();
+        setup.writer()->stream(wplocked);
+
         std::shared_ptr<IStreamable> actual01;
         std::shared_ptr<IStreamable> actual02;
         std::shared_ptr<IStreamable> actual11;
@@ -199,6 +203,10 @@ namespace
         setup.reader()->stream(actual02);
         setup.reader()->stream(actual11);
         setup.reader()->stream(actual12);
+        wplocked = nullptr;
+        setup.reader()->stream(wplocked);
+
+        EXPECT_TRUE(wplocked == actual12);
 
         EXPECT_TRUE(actual01 == actual02);
         auto sactual01 = dynamic_pointer_cast<Streamable>(actual01);

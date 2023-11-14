@@ -4,6 +4,7 @@
 #include "../FileRepository.h"
 #include "../DirectoryNode.h"
 #include "../SourceFileNode.h"
+#include "../CommandNode.h"
 #include "../DotIgnoreNode.h"
 #include "../ExecutionContext.h"
 #include "../DotYamDirectory.h"
@@ -25,8 +26,10 @@ namespace
     // Each subdir contains 39 files and 12 directories.
     // Including repoDir and .yam dir: 42 dirs, 120 files.
     // Nodes: per directory 4 nodes (dir node, dotignore .yamignore and
-    // .gitignore). Per file 1 node. Total nodes: 42*4 + 120 = 288
-    const std::size_t nNodes = 288; // in context->nodes()
+    // .gitignore). Per file 1 node. 
+    // Node: 1 command node.
+    // Total nodes: 42*4 + 120 + 1 = 289
+    const std::size_t nNodes = 289; // in context->nodes()
 
     // Wait for file change event to be received for given paths.
     // When event is received then consume the changes.
@@ -75,6 +78,7 @@ namespace
         PersistentBuildState persistentState;
         std::shared_ptr<FileRepository> sourceFileRepo;
         std::shared_ptr<DirectoryNode> repoDirNode;
+        std::shared_ptr<CommandNode> cmdNode;
 
         SetupHelper(std::filesystem::path const& repoDirectory)
             : repoDir(repoDirectory)
@@ -86,12 +90,20 @@ namespace
                 repoDir,
                 &context))
             , repoDirNode(sourceFileRepo->directoryNode())
+            , cmdNode(std::make_shared<CommandNode>(&context, std::filesystem::path("repo") / "__cmd"))
         {
             context.threadPool().size(1);
             context.addRepository(sourceFileRepo);
             bool completed = YAMTest::executeNode(repoDirNode.get());
             EXPECT_TRUE(completed);
-            // Also execute the file nodes which are still dirty
+
+            std::vector<std::shared_ptr<DirectoryNode>> subDirs; 
+            repoDirNode->getSubDirs(subDirs);
+            cmdNode->script("cmd /c echo piet");
+            cmdNode->workingDirectory(subDirs[0]);
+            context.nodes().add(cmdNode);
+
+            // Also execute the cmdNode and file nodes which are still dirty
             std::vector<std::shared_ptr<Node>> dirtyNodes;
             context.getDirtyNodes(dirtyNodes);
             completed = YAMTest::executeNodes(dirtyNodes);
@@ -205,6 +217,11 @@ namespace
         ASSERT_NE(nullptr, repoDirNode);
         EXPECT_EQ(nNodes, setup.context.nodes().size());
 
+        auto node = setup.context.nodes().find(setup.cmdNode->name());
+        auto cmdNode = dynamic_pointer_cast<CommandNode>(node);
+        EXPECT_NE(nullptr, cmdNode);
+        EXPECT_EQ(setup.cmdNode->workingDirectory()->name(), cmdNode->workingDirectory()->name());
+
         // Verify that the rolled-back build state can be executed
         bool completed = YAMTest::executeNode(repoDirNode.get());
         EXPECT_TRUE(completed);
@@ -244,7 +261,7 @@ namespace
 
         std::string repoName = setup.sourceFileRepo->name();
         EXPECT_TRUE(setup.context.removeRepository(repoName));
-        EXPECT_EQ(0, setup.context.nodes().size());
+        EXPECT_EQ(1, setup.context.nodes().size()); // the command node
         setup.sourceFileRepo = nullptr;
         setup.repoDirNode = nullptr;
 
@@ -264,7 +281,7 @@ namespace
             setup.repoDirNode->getContent();
         EXPECT_EQ(8, dirContentBeforeClear.size());
         setup.sourceFileRepo->clear(); // will remove all nodes
-        EXPECT_EQ(0, setup.context.nodes().size());
+        EXPECT_EQ(1, setup.context.nodes().size()); // the command node
         EXPECT_EQ(0, setup.repoDirNode->getContent().size());
 
         setup.persistentState.rollback();

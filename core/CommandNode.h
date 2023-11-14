@@ -11,6 +11,7 @@
 namespace YAM
 {
     class GeneratedFileNode;
+    class DirectoryNode;
 
     // CommandNode is capable of:
     //    - executing a shell script with a given set of output files.
@@ -56,6 +57,9 @@ namespace YAM
         // Node execution will fail otherwise.
         void script(std::string const& newScript);
         std::string const& script() const { return _script; }
+
+        void workingDirectory(std::shared_ptr<DirectoryNode> const& dir);
+        std::shared_ptr<DirectoryNode> workingDirectory() const { return _workingDir.lock(); }
 
         // Set/get nodes that produce outputs that are (allowed to be) used as
         // inputs by this node. The producer nodes must be executed before this 
@@ -138,6 +142,7 @@ namespace YAM
         // script can then be detected by comparing its hash with hash 
         // of previous script (that was streamed to build state).
         std::string _script; 
+        std::weak_ptr<DirectoryNode> _workingDir;
 
         std::atomic<std::shared_ptr<IMonitoredProcess>> _scriptExecutor;
         

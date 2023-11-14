@@ -1,4 +1,5 @@
 #include "CommandNode.h"
+#include "DirectoryNode.h"
 #include "SourceFileNode.h"
 #include "GeneratedFileNode.h"
 #include "ExecutionContext.h"
@@ -248,6 +249,14 @@ namespace YAM
         }
     }
 
+    void CommandNode::workingDirectory(std::shared_ptr<DirectoryNode> const& dir) {
+        if (_workingDir.lock() != dir) {
+            _workingDir = dir;
+            modified(true);
+            setState(State::Dirty);
+        }
+    }
+
     void CommandNode::inputProducers(std::vector<std::shared_ptr<Node>> const& newInputProducers) {
         if (_inputProducers != newInputProducers) {
             for (auto i : _inputProducers) i->removeObserver(this);
@@ -276,6 +285,8 @@ namespace YAM
 
     XXH64_hash_t CommandNode::computeExecutionHash() const {
         std::vector<XXH64_hash_t> hashes;
+        auto wdir = _workingDir.lock();
+        if (wdir != nullptr) hashes.push_back(XXH64_string(wdir->name().string()));
         hashes.push_back(XXH64_string(_script));
         auto entireFile = FileAspect::entireFileAspect().name();
         for (auto node : _outputs) hashes.push_back(node->hashOf(entireFile));
@@ -549,10 +560,18 @@ namespace YAM
         std::map<std::string, std::string> env;
         env["TMP"] = tmpDir.string();
 
+        std::filesystem::path wdir;
+        auto locked = _workingDir.lock();
+        if (locked != nullptr) {
+            wdir = locked->absolutePath();
+        } else {
+            wdir = std::filesystem::current_path();
+        }
+
         auto executor = std::make_shared<MonitoredProcess>(
             cmdExe,
             std::string("/c ") + scriptFilePath.string(),
-            std::filesystem::current_path(),
+            wdir,
             env);
         _scriptExecutor.store(executor);
         MonitoredProcessResult result = executor->wait();
@@ -638,12 +657,16 @@ namespace YAM
         streamer->streamVector(_inputProducers);
         streamer->streamVector(_outputs);
         std::vector<std::shared_ptr<FileNode>> inputs;
+        std::shared_ptr<DirectoryNode> wdir;
         if (streamer->writing()) {
             for (auto const& pair : _inputs) inputs.push_back(pair.second);
+            wdir = _workingDir.lock();
         }
         streamer->streamVector(inputs);
+        streamer->stream(wdir);
         if (streamer->reading()) {
             for (auto const& n : inputs) _inputs.insert({ n->name(), n });
+            _workingDir = wdir;
         }
         streamer->stream(_script);
         streamer->stream(_executionHash);
