@@ -50,6 +50,11 @@ namespace YAM
 
         void run(); // runs in _thread
 
+        void handleNotification(
+            PFILE_NOTIFY_INFORMATION info,
+            FileChange& change, 
+            FileChange& rename);
+
         HANDLE _dirHandle;
         DWORD _changeBufferSize;
         std::unique_ptr<uint8_t> _changeBuffer;

@@ -141,58 +141,65 @@ namespace YAM
                 } else {
                     std::size_t offset = 0;
                     PFILE_NOTIFY_INFORMATION info;
-                    do
-                    {
+                    do {
                         info = reinterpret_cast<PFILE_NOTIFY_INFORMATION>(&_changeBuffer.get()[offset]);
-                        offset += info->NextEntryOffset;
-                        std::wstring fileNameStr(info->FileName, info->FileNameLength / sizeof(wchar_t));
-                        std::filesystem::path fileName(fileNameStr);
-                        std::filesystem::path absFileName = _directory / fileName;
-                        std::error_code ec;
-                        change.lastWriteTime = readLastWriteTime(absFileName);
-                        if (info->Action == FILE_ACTION_ADDED) {
-                            change.action = FileChange::Action::Added;
-                            change.fileName = fileName;
-                            if (_suppressSpuriousEvents) registerSpuriousModifiedEvent(absFileName, change.lastWriteTime);
-                        } else if (info->Action == FILE_ACTION_REMOVED) {
-                            change.action = FileChange::Action::Removed;
-                            change.fileName = fileName;
-                            if (_suppressSpuriousEvents) removeFromDirUpdateTimes(absFileName);
-                        } else if (info->Action == FILE_ACTION_MODIFIED) {
-                            change.action = FileChange::Action::Modified;
-                            change.fileName = fileName;
-                            if (
-                                _suppressSpuriousEvents &&
-                                registerSpuriousModifiedEvent(absFileName, change.lastWriteTime)
-                            ) {
-                                change.action = FileChange::Action::None;
-                            }
-                        } else if (info->Action == FILE_ACTION_RENAMED_OLD_NAME) {
-                            rename.action = FileChange::Action::Renamed;
-                            rename.oldFileName = fileName;
-                            if (_suppressSpuriousEvents) removeFromDirUpdateTimes(_directory / fileName);
-                        } else if (info->Action == FILE_ACTION_RENAMED_NEW_NAME) {
-                            rename.action = FileChange::Action::Renamed;
-                            rename.fileName = fileName;
-                            if (_suppressSpuriousEvents) registerSpuriousModifiedEvent(absFileName, change.lastWriteTime);
-                        }
-                        if (
-                            rename.action == FileChange::Action::Renamed 
-                            && !rename.fileName.empty() 
-                            && !rename.oldFileName.empty()
-                        ) {
-                            _changeHandler.Execute(rename);
-                            rename.action = FileChange::Action::None;
-                            rename.fileName = "";
-                            rename.oldFileName = "";
-                        } else if (change.action != FileChange::Action::None) {
-                            _changeHandler.Execute(change);
-                            change.action = FileChange::Action::None;
-                        }
+                        handleNotification(info, change, rename);
+                        offset += info->NextEntryOffset; 
                     } while (info->NextEntryOffset != 0);
                 }
                 queueReadChangeRequest();
             }
+        }
+    }
+
+    void DirectoryWatcherWin32::handleNotification(
+        PFILE_NOTIFY_INFORMATION info,
+        YAM::FileChange& change, 
+        YAM::FileChange& rename)
+    {
+        std::wstring fileNameStr(info->FileName, info->FileNameLength / sizeof(wchar_t));
+        std::filesystem::path fileName(fileNameStr);
+        std::filesystem::path absFileName = _directory / fileName;
+        std::error_code ec;
+        change.lastWriteTime = readLastWriteTime(absFileName);
+        if (info->Action == FILE_ACTION_ADDED) {
+            change.action = FileChange::Action::Added;
+            change.fileName = fileName;
+            if (_suppressSpuriousEvents) registerSpuriousModifiedEvent(absFileName, change.lastWriteTime);
+        } else if (info->Action == FILE_ACTION_REMOVED) {
+            change.action = FileChange::Action::Removed;
+            change.fileName = fileName;
+            if (_suppressSpuriousEvents) removeFromDirUpdateTimes(absFileName);
+        } else if (info->Action == FILE_ACTION_MODIFIED) {
+            change.action = FileChange::Action::Modified;
+            change.fileName = fileName;
+            if (
+                _suppressSpuriousEvents &&
+                registerSpuriousModifiedEvent(absFileName, change.lastWriteTime)
+            ) {
+                change.action = FileChange::Action::None;
+            }
+        } else if (info->Action == FILE_ACTION_RENAMED_OLD_NAME) {
+            rename.action = FileChange::Action::Renamed;
+            rename.oldFileName = fileName;
+            if (_suppressSpuriousEvents) removeFromDirUpdateTimes(_directory / fileName);
+        } else if (info->Action == FILE_ACTION_RENAMED_NEW_NAME) {
+            rename.action = FileChange::Action::Renamed;
+            rename.fileName = fileName;
+            if (_suppressSpuriousEvents) registerSpuriousModifiedEvent(absFileName, change.lastWriteTime);
+        }
+        if (
+            rename.action == FileChange::Action::Renamed
+            && !rename.fileName.empty()
+            && !rename.oldFileName.empty()
+        ) {
+            _changeHandler.Execute(rename);
+            rename.action = FileChange::Action::None;
+            rename.fileName = "";
+            rename.oldFileName = "";
+        } else if (change.action != FileChange::Action::None) {
+            _changeHandler.Execute(change);
+            change.action = FileChange::Action::None;
         }
     }
 }
