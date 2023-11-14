@@ -52,10 +52,13 @@ namespace YAM
         std::string const& name() const;
         std::filesystem::path const& directory() const;
         std::shared_ptr<DirectoryNode> directoryNode() const;
+        static std::string repositoryNameOf(std::filesystem::path const& symbolicPath);
 
         // Return whether 'path' is a path in the repository.
-        // 'path' can be a absolute or symbolic path.
-        // E.g. if repository directory = /a/b/ and path = /a/b/c/e then 
+        // 'path' can be an absolute path or a symbolic path.
+        // E.g. if repository directory = /a/b and path = /a/b/c/e then 
+        // the repository lexically contains path.
+        // E.g. if repository directory = /a/b and path = /a/b then 
         // the repository lexically contains path.
         // E.g. if repository name is 'someRepo' and path is someRepo/a/b
         // then repository lexically contains path. 
@@ -64,12 +67,14 @@ namespace YAM
         bool lexicallyContains(std::filesystem::path const& path) const;
 
         // Return 'absPath' relative to the repo directory.
-        // Return empty path when !lexicallyContains(absPath).
+        // Return empty path when !lexicallyContains(absPath) or when
+        // absPath == directory().
         // Pre: 'absPath' must be without . and .. path components.
         std::filesystem::path relativePathOf(std::filesystem::path const& absPath) const;
 
         // Return given 'absPath' as repoName/relativePathOf(absPath).
         // Return empty path when !lexicallyContains(absPath).
+        // Return name() when absPath == directory().
         // Pre: 'absPath' must be without . and .. path components.
         std::filesystem::path symbolicPathOf(std::filesystem::path const& absPath) const;
 

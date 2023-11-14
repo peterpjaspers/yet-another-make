@@ -7,12 +7,26 @@
 namespace
 {
     uint32_t streamableTypeId = 0;
+
+    bool equalPaths(std::filesystem::path const& p1, std::filesystem::path const& p2) {
+        auto p1it = p1.begin();
+        auto p2it = p2.begin();
+        bool equal = true;
+        for (;
+            p1it != p1.end() && p2it != p2.end() && equal;
+            p1it++, p2it++
+        ) {
+            equal = *p1it == *p2it;
+        }
+        return equal;
+    }
 }
 
 namespace YAM
 {
     FileRepository::FileRepository()
-        : _modified(false)
+        : _context(nullptr)
+        , _modified(false)
     {}
 
     FileRepository::FileRepository(
@@ -38,43 +52,72 @@ namespace YAM
         return _directory;
     }
 
-    std::string repositoryNameOf(std::filesystem::path const& symbolicPath) {
-        if (symbolicPath.is_absolute()) return "";
+    std::string FileRepository::repositoryNameOf(std::filesystem::path const& symbolicPath) {
+        if (symbolicPath.is_absolute()) throw std::runtime_error("not a symbolic path");
         auto it = symbolicPath.begin();
-        if (it == symbolicPath.end()) return "";
+        if (it == symbolicPath.end()) throw std::runtime_error("not a symbolic path");
         return (*it).string();
     }
 
     bool FileRepository::lexicallyContains(std::filesystem::path const& path) const {
-        std::size_t result;
+        bool contains = true;
         if (path.is_absolute()) {
-            const std::string dirStr = (_directory / "").string();
-            result = path.string().find(dirStr);
+            auto pit = path.begin();
+            auto rit = _directory.begin();
+            for (; 
+                pit != path.end() && rit != _directory.end() && contains;
+                pit++, rit++
+            ) {
+                contains = *pit == *rit;
+            }
         } else {
             auto it = path.begin();
-            result = (it != path.end() && (*it).string() == _name) ? 0 : 1;
+            contains = (it != path.end() && (*it).string() == _name);
         }
-        return result == 0;
+        return contains;
     }
 
     std::filesystem::path FileRepository::relativePathOf(std::filesystem::path const& absPath) const {
+        if (!absPath.is_absolute()) throw std::runtime_error("not an absolute path");
         std::filesystem::path relPath;
-        const std::string absStr = absPath.string();
-        const std::string dirStr = (_directory / "").string();
-        const std::size_t result = absStr.find(dirStr);
-        if (result == 0) {
-            relPath = absStr.substr(result + dirStr.length(), absStr.length() - dirStr.length());
+        auto pit = absPath.begin();
+        auto rit = _directory.begin();
+        bool contains = true;
+        for (;
+            pit != absPath.end() && rit != _directory.end() && contains;
+            pit++, rit++
+        ) {
+            contains = *pit == *rit;
+        }
+        if (contains) {
+            for (; pit != absPath.end(); pit++) {
+                relPath /= *pit;
+            }
         }
         return relPath;
     }
 
     std::filesystem::path FileRepository::symbolicPathOf(std::filesystem::path const& absPath) const {
-        auto relPath = relativePathOf(absPath);
-        if (relPath.empty()) {
-            if (absPath == _directory) return _name;
-            return relPath;
+        if (!absPath.is_absolute()) {
+            throw std::runtime_error("not an absolute path");
         }
-        return std::filesystem::path(_name) / relPath;
+        std::filesystem::path symPath;
+        bool contains = true;
+        auto pit = absPath.begin();
+        auto rit = _directory.begin();
+        for (;
+            pit != absPath.end() && rit != _directory.end() && contains;
+            pit++, rit++
+        ) {
+            contains = *pit == *rit;
+        }
+        if (contains) {
+            symPath /= name();
+            for (; pit != absPath.end(); pit++) {
+                symPath /= *pit;
+            }
+        }
+        return symPath;
     }
 
     std::filesystem::path FileRepository::absolutePathOf(std::filesystem::path const& symbolicPath) const {
