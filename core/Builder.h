@@ -15,16 +15,8 @@ namespace YAM
     class __declspec(dllexport) Builder
     {
     public:
-        Builder(bool enableRepoMirroring = true);
+        Builder();
         virtual ~Builder();
-
-        void enableRepoMirroring(bool enable)  {
-            _repoMirroringEnabled = enable;
-        }
-
-        bool repoMirroringEnabled() const {
-            return _repoMirroringEnabled;
-        }
 
         ExecutionContext* context();
 
@@ -56,7 +48,6 @@ namespace YAM
         void _handleCommandsCompletion(Node* n);
         void _notifyCompletion();
 
-        bool _repoMirroringEnabled;
         ExecutionContext _context;
         MulticastDelegate<std::shared_ptr<BuildResult>> _completor;
 

@@ -67,9 +67,8 @@ namespace
 namespace YAM
 {
     // Called in any thread
-    Builder::Builder(bool enableRepoMirroring)
-        : _repoMirroringEnabled(enableRepoMirroring)
-        , _dirtySources(std::make_shared<CommandNode>(&_context, "__dirtySources__"))
+    Builder::Builder()
+        : _dirtySources(std::make_shared<CommandNode>(&_context, "__dirtySources__"))
         , _dirtyBuildFiles(std::make_shared<CommandNode>(&_context, "__dirtyBuildFiles__"))
         , _dirtyCommands(std::make_shared<CommandNode>(&_context, "__dirtyCommands__"))
         , _result(nullptr)
@@ -144,15 +143,13 @@ namespace YAM
 
     // Called in main thread
     void Builder::_start() {
-        std::vector<std::shared_ptr<Node>> dirtyDirsAndFiles;
-        if (_repoMirroringEnabled) {
-            for (auto const& pair : _context.repositories()) {
-                auto repo = pair.second;
-                if (repo != nullptr) {
-                    auto dirNode = repo->directoryNode();
-                    repo->consumeChanges();
-                    appendDirtyFileAndDirectoryNodes(dirNode, dirtyDirsAndFiles);
-                }
+        std::vector<std::shared_ptr<Node>> dirtyDirsAndFiles;        
+        for (auto const& pair : _context.repositories()) {
+            auto repo = pair.second;
+            if (repo != nullptr) {
+                auto dirNode = repo->directoryNode();
+                repo->consumeChanges();
+                appendDirtyFileAndDirectoryNodes(dirNode, dirtyDirsAndFiles);
             }
         }
         if (dirtyDirsAndFiles.empty()) {

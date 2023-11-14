@@ -111,7 +111,6 @@ namespace
         // files into a dll.
         TestDriver(bool initialize = true)
             : repo()
-            , builder(true)
             , context(builder.context())
             , ccPiet(std::make_shared<CommandNode>(context, R"(.\ccpiet)"))
             , ccJan(std::make_shared<CommandNode>(context, R"(.\ccjan)"))
@@ -281,9 +280,8 @@ namespace
         EXPECT_TRUE(result->succeeded());
     }
 
-    TEST(Builder, firstBuildWithRepoMirroring) {
+    TEST(Builder, firstBuild) {
         TestDriver driver;
-        driver.builder.enableRepoMirroring(true);
 
         std::shared_ptr<BuildResult> result = driver.build();
 
@@ -373,91 +371,6 @@ namespace
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.pietjanOut.get()));
     }
 
-    TEST(Builder, firstBuildWithoutRepoMirroring) {
-        TestDriver driver;
-        driver.builder.enableRepoMirroring(false);
-
-        std::shared_ptr<BuildResult> result = driver.build();
-
-        EXPECT_TRUE(result->succeeded());
-        EXPECT_EQ(Node::State::Ok, driver.ccPiet->state());
-        EXPECT_EQ(Node::State::Ok, driver.pietOut->state());
-        EXPECT_EQ(Node::State::Ok, driver.ccJan->state());
-        EXPECT_EQ(Node::State::Ok, driver.janOut->state());
-        EXPECT_EQ(Node::State::Ok, driver.linkPietJan->state());
-        EXPECT_EQ(Node::State::Ok, driver.pietjanOut->state());
-
-        EXPECT_EQ(driver.expectedPietOutContent(), driver.actualPietOutContent());
-        EXPECT_EQ(driver.expectedJanOutContent(), driver.actualJanOutContent());
-        EXPECT_EQ(driver.expectedPietjanOutContent(), driver.actualPietjanOutContent());
-
-        // Verify input files of command nodes
-        std::vector<std::shared_ptr<Node>> inputs;
-        driver.ccPiet->getInputs(inputs);
-        EXPECT_EQ(3, inputs.size());
-        auto srcRepo = driver.sourceRepo();
-        auto pietCpp = driver.context->nodes().find(srcRepo->symbolicPathOf(driver.repo.pietCpp));
-        auto pietH = driver.context->nodes().find(srcRepo->symbolicPathOf(driver.repo.pietH));
-        auto janH = driver.context->nodes().find(srcRepo->symbolicPathOf(driver.repo.janH));
-        EXPECT_EQ(Node::State::Ok, pietCpp->state());
-        EXPECT_EQ(Node::State::Ok, pietH->state());
-        EXPECT_EQ(Node::State::Ok, janH->state());
-        EXPECT_TRUE(inputs.end() != std::find(inputs.begin(), inputs.end(), pietCpp));
-        EXPECT_TRUE(inputs.end() != std::find(inputs.begin(), inputs.end(), pietH));
-        EXPECT_TRUE(inputs.end() != std::find(inputs.begin(), inputs.end(), janH));
-
-        inputs.clear();
-        driver.ccJan->getInputs(inputs);
-        EXPECT_EQ(2, inputs.size());
-        auto janCpp = driver.context->nodes().find(srcRepo->symbolicPathOf(driver.repo.janCpp));
-        EXPECT_TRUE(inputs.end() != std::find(inputs.begin(), inputs.end(), janCpp));
-        EXPECT_TRUE(inputs.end() != std::find(inputs.begin(), inputs.end(), janH));;
-
-        inputs.clear();
-        driver.linkPietJan->getInputs(inputs);
-        EXPECT_EQ(2, inputs.size());
-        EXPECT_TRUE(inputs.end() != std::find(inputs.begin(), inputs.end(), driver.pietOut));
-        EXPECT_TRUE(inputs.end() != std::find(inputs.begin(), inputs.end(), driver.janOut));
-
-        // Verify nodes started for execution 
-        // 1   command node _dirtyCommands for executing compile and link nodes
-        // 2-3 source file nodes repo.dir/src/pietCpp, repo.dir/src/pietH
-        // 4-5 source file nodes repo.dir/src/janCpp, repo.dir/src/janH
-        // 6-8 generated file nodes pietOut, janOut, pietjanOut
-        // 9-11 generated file nodes pietOut, janOut, pietjanOut as preCommitNodes
-        // 12-14 commandNodes ccPiet, ccJan, linkPietjan
-        EXPECT_EQ(14, driver.stats.nStarted);
-        // pietOut, janOut, pietjanOut are started twice
-        EXPECT_EQ(11, driver.stats.started.size());
-        EXPECT_EQ(0, driver.stats.nDirectoryUpdates);
-        // 4 source + 3 generated (before cmd exec) + 3 generated (after cmd exec)
-        EXPECT_EQ(10, driver.stats.nRehashedFiles);
-
-        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietCpp))));
-        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietH))));
-        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.janCpp))));
-        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.janH))));
-        EXPECT_TRUE(driver.stats.started.contains(driver.ccPiet.get()));
-        EXPECT_TRUE(driver.stats.started.contains(driver.ccJan.get()));
-        EXPECT_TRUE(driver.stats.started.contains(driver.linkPietJan.get()));
-        EXPECT_TRUE(driver.stats.started.contains(driver.pietOut.get()));
-        EXPECT_TRUE(driver.stats.started.contains(driver.janOut.get()));
-        EXPECT_TRUE(driver.stats.started.contains(driver.pietjanOut.get()));
-
-        // Verify nodes self-executed 
-        EXPECT_EQ(14, driver.stats.nSelfExecuted);
-        EXPECT_EQ(11, driver.stats.selfExecuted.size());
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietCpp))));
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietH))));
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.janCpp))));
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.janH))));
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.ccPiet.get()));
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.ccJan.get()));
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.linkPietJan.get()));
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.pietOut.get()));
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.janOut.get()));
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.pietjanOut.get()));
-    }
     TEST(Builder, noDirtyNodesAfterConsumeChangesAfterBuild) {
         TestDriver driver;
 
@@ -492,7 +405,6 @@ namespace
 
     TEST(Builder, incrementalBuildWhileNoModifications) {
         TestDriver driver;
-        driver.builder.enableRepoMirroring(false);
 
         // First build
         driver.initializeYam();
@@ -501,6 +413,13 @@ namespace
 
         // Incremental build while no modifications
         std::shared_ptr<BuildResult> result = driver.build();
+        EXPECT_TRUE(result->succeeded());
+        EXPECT_EQ(1, driver.stats.nDirectoryUpdates); // the generated directory
+        EXPECT_EQ(0, driver.stats.nRehashedFiles);
+        EXPECT_EQ(2, driver.stats.started.size()); // __dirtySources__ and generated dir
+        EXPECT_EQ(2, driver.stats.selfExecuted.size()); // __dirtySources__ and generated dir
+
+        result = driver.build();
         EXPECT_TRUE(result->succeeded());
         EXPECT_EQ(0, driver.stats.nDirectoryUpdates);
         EXPECT_EQ(0, driver.stats.nRehashedFiles);
