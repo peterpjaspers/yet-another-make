@@ -95,6 +95,7 @@ namespace
         } while (!done && cond.wait_until(lock, deadline) != std::cv_status::timeout);
         EXPECT_EQ(0, detectedChanges.size());
 
+        lock.unlock();
         watcher.stop();
         std::filesystem::remove_all(rootDir);
     }
@@ -136,6 +137,7 @@ namespace
         } while (!done && cond.wait_until(lock, deadline) != std::cv_status::timeout);
         EXPECT_EQ(0, detectedChanges.size());
 
+        lock.unlock();
         watcher.stop();
         std::filesystem::remove_all(rootDir);
     }
@@ -228,6 +230,7 @@ namespace
         EXPECT_TRUE(contains(dcs, c6a));
         EXPECT_TRUE(contains(dcs, c7a) || contains(dcs, c7b));
 
+        lock.unlock();
         watcher.stop();
         std::filesystem::remove_all(rootDir);
     }
