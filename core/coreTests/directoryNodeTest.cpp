@@ -94,4 +94,70 @@ namespace
         EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode_S1.get()));
         EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode_S1_S2.get()));
     }
+
+    TEST(DirectoryNode, findChild) {
+        std::string tmpDir(std::tmpnam(nullptr));
+        std::filesystem::path rootDir(std::string(tmpDir + "_dirNodeTest"));
+        DirectoryTree testTree(rootDir, 3, RegexSet());
+
+        // Create the directory node tree that reflects testTree
+        ExecutionContext context;
+        auto repo = std::make_shared<FileRepository>("repo", rootDir, &context);
+        context.addRepository(repo);
+        auto dirNode = repo->directoryNode();
+        bool completed = YAMTest::executeNode(dirNode.get());
+        EXPECT_TRUE(completed);
+
+        std::vector<std::shared_ptr<DirectoryNode>> subDirNodes;
+        dirNode->getSubDirs(subDirNodes);
+        std::shared_ptr<DirectoryNode> dirNode_S2 = subDirNodes[1];
+        dirNode_S2->getSubDirs(subDirNodes);
+        std::shared_ptr<DirectoryNode> dirNode_S2_S2 = subDirNodes[1];
+        std::shared_ptr<DirectoryNode> dirNode_S2_S3 = subDirNodes[2];
+
+        {
+            auto file = std::filesystem::path("File1");
+            auto child = dirNode->findChild(file);
+            ASSERT_NE(nullptr, child);
+            EXPECT_EQ(repo->symbolicPathOf(repo->directory() / file), child->name());
+        }
+        {
+            auto file = std::filesystem::path(".\\File1");
+            auto child = dirNode->findChild(file);
+            ASSERT_NE(nullptr, child);
+            EXPECT_EQ(repo->symbolicPathOf(repo->directory() / "File1"), child->name());
+        }
+        {
+            auto file = std::filesystem::path("..\\..\\File1");
+            auto child = dirNode_S2_S3->findChild(file);
+            EXPECT_EQ(dirNode->findChild(std::filesystem::path("File1")), child);
+        }
+        {
+            auto file = std::filesystem::path("..\\SubDir2\\File1");
+            auto child = dirNode_S2_S3->findChild(file);
+            ASSERT_NE(nullptr, child);
+            EXPECT_EQ(R"(repo\SubDir2\SubDir2\File1)", child->name().string());
+        }
+        {
+            auto file = std::filesystem::path("..\\SubDir2\\..\\File1");
+            auto child = dirNode_S2->findChild(file);
+            EXPECT_EQ(dirNode->findChild(std::filesystem::path("File1")), child);
+        }
+        {
+            auto file = std::filesystem::path("..\\SubDir2\\.\\.\\..\\File1");
+            auto child = dirNode_S2->findChild(file);
+            EXPECT_EQ(dirNode->findChild(std::filesystem::path("File1")), child);
+        }
+        {
+            auto file = std::filesystem::path("File5");
+            auto child = dirNode->findChild(file);
+            EXPECT_EQ(nullptr, child);
+        }
+        {
+            auto file = std::filesystem::path("..\\..\\..\\File1");
+            auto child = dirNode_S2_S3->findChild(file);
+            EXPECT_EQ(nullptr, child);
+        }
+
+    }
 }

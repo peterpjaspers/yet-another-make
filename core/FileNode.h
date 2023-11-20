@@ -109,12 +109,6 @@ namespace YAM
         // Throw exception when aspect is unknown.
         XXH64_hash_t hashOf(std::string const& aspectName);
 
-        // Return the file repository that contains this file.
-        std::shared_ptr<FileRepository> const& repository() const;
-
-        // Return repository()->absolutePathOf(name()).
-        std::filesystem::path absolutePath() const;
-
         static void setStreamableType(uint32_t type);
         // Inherited from IStreamable
         uint32_t typeId() const override;

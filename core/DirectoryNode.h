@@ -51,12 +51,6 @@ namespace YAM
         // to the execution context.
         void addPrerequisitesToContext();
 
-        // Return the repository that contains the directory.
-        std::shared_ptr<FileRepository> const& repository() const;
-
-        // Return the absolute path name of the directory.
-        std::filesystem::path absolutePath() const;
-
         DirectoryNode* parent() const;
         std::shared_ptr<DotIgnoreNode> const& dotIgnoreNode() { return _dotIgnoreNode; }
 
@@ -70,6 +64,10 @@ namespace YAM
         std::map<std::filesystem::path, std::shared_ptr<Node>> const& getContent() {
             return _content;
         }
+
+        // Find and return the node identified by 'path'.
+        // Pre: 'path' is relative to name(). 
+        std::shared_ptr<Node> findChild(std::filesystem::path path) const;
 
         std::chrono::time_point<std::chrono::utc_clock> const& lastWriteTime();
 

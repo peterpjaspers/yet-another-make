@@ -15,16 +15,6 @@ namespace YAM
     FileNode::FileNode(ExecutionContext* context, std::filesystem::path const& name)
         : Node(context, name)
     {}
-
-    std::shared_ptr<FileRepository> const& FileNode::repository() const {
-        auto it = name().begin();
-        auto repoName = *it;
-        return context()->findRepository(repoName.string());
-    }
-
-    std::filesystem::path FileNode::absolutePath() const {
-        return repository()->absolutePathOf(name());
-    }
      
     std::chrono::time_point<std::chrono::utc_clock> FileNode::retrieveLastWriteTime() const {
         std::error_code ec;

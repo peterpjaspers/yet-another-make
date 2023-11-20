@@ -273,6 +273,9 @@
     <ClInclude Include="DirectoryNode.h">
       <Filter>Header Files\Node</Filter>
     </ClInclude>
+    <ClInclude Include="NodeFinder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -445,6 +448,9 @@
     </ClCompile>
     <ClCompile Include="DirectoryNode.cpp">
       <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="NodeFinder.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

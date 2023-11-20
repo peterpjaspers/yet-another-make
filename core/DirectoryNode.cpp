@@ -51,17 +51,6 @@ namespace YAM
     XXH64_hash_t DirectoryNode::executionHash() const {
         return _executionHash;
     }
-        // Return the repository that contains the directory.
-    std::shared_ptr<FileRepository> const& DirectoryNode::repository() const {
-        auto it = name().begin();
-        auto repoName = *it;
-        return context()->findRepository(repoName.string());
-    }
-
-    // Return the absolute path name of the directory.
-    std::filesystem::path DirectoryNode::absolutePath() const {
-        return repository()->absolutePathOf(name());
-    }
 
     DirectoryNode* DirectoryNode::parent() const { 
         return _parent;
@@ -97,6 +86,30 @@ namespace YAM
 
     void DirectoryNode::getInputs(std::vector<std::shared_ptr<Node>>& inputs) const {
         inputs.push_back(dynamic_pointer_cast<Node>(_dotIgnoreNode));
+    }
+
+    std::shared_ptr<Node> DirectoryNode::findChild(std::filesystem::path path) const {
+        static std::filesystem::path up("..");
+        static std::filesystem::path stay(".");
+        std::shared_ptr<Node> child;
+        DirectoryNode const* dir = this;
+        auto it = path.begin();
+        for (; dir != nullptr && it != path.end(); it++) {
+            if (*it == up) dir = dir->_parent;
+            else if (*it == stay) dir = dir;
+            else {
+                auto cit = dir->_content.find(dir->name() / *it);
+                if (cit == dir->_content.end()) break;
+                auto citDir = dynamic_pointer_cast<DirectoryNode>(cit->second);
+                if (citDir != nullptr) {
+                    dir = citDir.get();
+                } else {
+                    dir = nullptr;
+                    child = cit->second;
+                }
+            }
+        }
+        return child;
     }
 
     std::chrono::time_point<std::chrono::utc_clock> const& DirectoryNode::lastWriteTime() {

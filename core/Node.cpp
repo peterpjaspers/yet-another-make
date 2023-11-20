@@ -2,6 +2,7 @@
 #include "NodeSet.h"
 #include "Delegates.h"
 #include "ExecutionContext.h"
+#include "FileRepository.h"
 #include "IStreamer.h"
 
 #include <iostream>
@@ -51,6 +52,18 @@ namespace YAM
     {} 
 
     Node::~Node() {}
+
+        // Return the repository that contains the directory.
+    std::shared_ptr<FileRepository> const& Node::repository() const {
+        auto it = name().begin();
+        auto repoName = *it;
+        return context()->findRepository(repoName.string());
+    }
+
+    // Return the absolute path name of the directory.
+    std::filesystem::path Node::absolutePath() const {
+        return repository()->absolutePathOf(name());
+    }
 
     void Node::setState(State newState) {
         if (_state != newState) {

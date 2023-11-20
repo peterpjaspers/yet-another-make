@@ -16,9 +16,12 @@ namespace {
     }
 
     void test(bool globstar) {
-        // Literals (i.e. no glob)
+        EXPECT_FALSE(Glob::isGlob("foo"));
+        EXPECT_FALSE(Glob::isGlob("a/b/c/foo"));
+        EXPECT_TRUE(Glob::isGlob("*.cpp"));
+        EXPECT_TRUE(Glob::isGlob("a/b/c/foo*.txt"));
+
         Glob glob("foo", globstar);
-        EXPECT_TRUE(glob.isLiteral());
         EXPECT_TRUE(glob.matches(std::string("foo")));
         EXPECT_FALSE(glob.matches(std::string("foofoo")));
 

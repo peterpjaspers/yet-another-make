@@ -17,6 +17,7 @@ namespace YAM
 {
     class ExecutionContext;
     class Node;
+    class FileRepository;
 
     class StateObserver {
     public:
@@ -60,7 +61,18 @@ namespace YAM
         virtual ~Node();
 
         ExecutionContext* context() const { return _context; }
+
+        // Return name of this name. name() format is: <repoName>\<path>
+        // where <repoName> matches one of the names in context()->repositories().
         std::filesystem::path const& name() const { return _name; }
+
+        // Return the repository that contains this node.
+        std::shared_ptr<FileRepository> const& repository() const;
+
+        // Return the absolute path name of the node, i.e. return name() in which
+        // <repoName> is replace by the repository absolute root directory path.
+        std::filesystem::path absolutePath() const;
+
         State state() const { return _state; }
         virtual void setState(State newState);
 

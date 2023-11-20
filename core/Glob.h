@@ -17,15 +17,15 @@ namespace YAM {
         //
         Glob(std::string const& globPattern, bool globstar);
 
+        // Return whether patterns contains glob special characters.
+        // I.e. one or more of * ? [] {} ,
+        static bool isGlob(std::string const& pattern);
+
         bool matches(std::string const& str) const;
         bool matches(std::filesystem::path const& path) const;
 
-        // Return whether the glob is a literal, i.e. a string
-        // without glob special characters (* ? [] {} ,)
-        bool isLiteral() const { return _re.second; }
-
     private:
-        std::pair<std::regex, bool> _re;
+        std::regex _re;
     };
 }
 

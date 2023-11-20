@@ -4,10 +4,8 @@
 
 namespace {
 
-
-    std::pair<std::regex, bool> globPatternAsRegex(std::string const& input, bool globstar) {
+    std::regex globPatternAsRegex(std::string const& input, bool globstar) {
         bool inGroup = false;
-        bool isLiteral = true;
         std::stringstream ss;
         ss << '^';
         for (std::size_t i = 0; i < input.length(); i++) {
@@ -29,28 +27,24 @@ namespace {
 
             case '?': {
                 ss << '.';
-                isLiteral = false;
                 break;
             }
 
             case '[':
             case ']': {
                 ss << c;
-                isLiteral = false;
                 break;
             }
 
             case '{': {
                 inGroup = true;
                 ss << '(';
-                isLiteral = false;
                 break;
             }
 
             case '}': {
                 inGroup = false;
                 ss << ')';
-                isLiteral = false;
                 break;
             }
 
@@ -60,7 +54,6 @@ namespace {
                     break;
                 }
                 ss << "\\" << c;
-                isLiteral = false;
                 break;
             }
 
@@ -91,7 +84,6 @@ namespace {
                         ss << R"(([^/]*))";
                     }
                 }
-                isLiteral = false;
                 break;
             }
 
@@ -100,7 +92,7 @@ namespace {
             }
         }
         ss << '$';
-        return { std::regex(ss.str()), isLiteral };
+        return std::regex(ss.str());
     }
 }
 
@@ -110,12 +102,17 @@ namespace YAM {
         : _re(globPatternAsRegex(globPattern, globstar))
     {}
 
+    bool Glob::isGlob(std::string const& pattern) {
+        static const auto check = std::regex("([*?},])");
+        return std::regex_search(pattern, check);
+    }
+
     bool Glob::matches(std::string const& str) const {
-        return std::regex_match(str, _re.first);
+        return std::regex_match(str, _re);
     }
 
     bool Glob::matches(std::filesystem::path const& path) const {
-        return std::regex_match(path.string(), _re.first);
+        return std::regex_match(path.string(), _re);
     }
 }
 
