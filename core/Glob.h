@@ -16,6 +16,7 @@ namespace YAM {
         // collapsed to one *. E.g. B/**/C becomes B/*/C.
         //
         Glob(std::string const& globPattern, bool globstar);
+        Glob(std::filesystem::path const& globPattern);
 
         // Return whether patterns contains glob special characters.
         // I.e. one or more of * ? [] {} ,

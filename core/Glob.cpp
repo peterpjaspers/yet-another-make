@@ -98,8 +98,12 @@ namespace {
 
 namespace YAM {
 
-    Glob::Glob(std::string const& globPattern, bool globstar) 
+    Glob::Glob(std::string const& globPattern, bool globstar)
         : _re(globPatternAsRegex(globPattern, globstar))
+    {}
+
+    Glob::Glob(std::filesystem::path const& globPattern)
+        : _re(globPatternAsRegex(globPattern.string(), true))
     {}
 
     bool Glob::isGlob(std::string const& pattern) {
