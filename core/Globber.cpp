@@ -1,4 +1,4 @@
-#include "NodeFinder.h"
+#include "Globber.h"
 #include "Node.h"
 #include "FileNode.h"
 #include "DirectoryNode.h"
@@ -14,7 +14,9 @@ namespace
 
 namespace YAM
 {
-    NodeFinder::NodeFinder(
+    // TODO: handle symbolic path patterns
+    //
+    Globber::Globber(
         ExecutionContext* context,
         std::shared_ptr<DirectoryNode>& baseDir,
         std::filesystem::path const& pattern,
@@ -40,25 +42,25 @@ namespace YAM
                 exists(filePattern);
             }
         } else if (Glob::isGlob(dirPattern.string())) {
-            NodeFinder finder(_context, _baseDir, dirPattern, true, _inputDirs);
+            Globber finder(_context, _baseDir, dirPattern, true, _inputDirs);
             for (auto const& m : finder._matches) {
                 auto dirNode = dynamic_pointer_cast<DirectoryNode>(m);
-                NodeFinder mfinder(_context, dirNode, filePattern, _dirsOnly, _inputDirs);
+                Globber mfinder(_context, dirNode, filePattern, _dirsOnly, _inputDirs);
                 _matches = mfinder._matches;
             }
         } else {
             auto dirNode = findDirectory(dirPattern);
             if (dirNode != nullptr) {
-                NodeFinder finder(_context, dirNode, filePattern, _dirsOnly, _inputDirs);
+                Globber finder(_context, dirNode, filePattern, _dirsOnly, _inputDirs);
                 _matches = finder._matches;
             }
         }
     }
 
-    bool NodeFinder::isHidden(std::filesystem::path const& path) { return path.string()[0] == '.'; }
-    bool NodeFinder::isRecursive(std::filesystem::path const& pattern) { return pattern == "**"; }
+    bool Globber::isHidden(std::filesystem::path const& path) { return path.string()[0] == '.'; }
+    bool Globber::isRecursive(std::filesystem::path const& pattern) { return pattern == "**"; }
 
-    void NodeFinder::walk(DirectoryNode* dir) {
+    void Globber::walk(DirectoryNode* dir) {
         for (auto const& pair : dir->getContent()) {
             auto const& child = pair.second;
             auto subDir = dynamic_pointer_cast<DirectoryNode>(child);
@@ -75,7 +77,7 @@ namespace YAM
         }
     }
 
-    void NodeFinder::match(std::filesystem::path const& pattern) {
+    void Globber::match(std::filesystem::path const& pattern) {
         Glob glob(pattern);
         for (auto const& pair : _baseDir->getContent()) {
             auto const& child = pair.second;
@@ -91,16 +93,20 @@ namespace YAM
         }
     }
 
-    void NodeFinder::exists(std::filesystem::path const& file) {
-        std::shared_ptr<Node> node = _baseDir->findChild(file);
-        if (node != nullptr) _matches.push_back(node);
+    void Globber::exists(std::filesystem::path const& file) {
+        if (file.empty()) {
+            _matches.push_back(_baseDir);
+        } else {
+            std::shared_ptr<Node> node = _baseDir->findChild(file);
+            if (node != nullptr) {
+                _matches.push_back(node);
+            }
+        } 
     }
 
     // path is a symbolic path or a path relative to _baseDir
-    std::shared_ptr<DirectoryNode> NodeFinder::findDirectory(std::filesystem::path const& path) {
+    std::shared_ptr<DirectoryNode> Globber::findDirectory(std::filesystem::path const& path) {
         std::shared_ptr<Node> node = _baseDir->findChild(path);
         return dynamic_pointer_cast<DirectoryNode>(node);
     }
-
-
 }

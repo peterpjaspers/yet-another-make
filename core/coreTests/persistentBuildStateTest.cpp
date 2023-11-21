@@ -76,30 +76,25 @@ namespace
         DirectoryTree testTree;
         ExecutionContext context;
         PersistentBuildState persistentState;
-        std::shared_ptr<FileRepository> sourceFileRepo;
-        std::shared_ptr<DirectoryNode> repoDirNode;
-        std::shared_ptr<CommandNode> cmdNode;
 
         SetupHelper(std::filesystem::path const& repoDirectory)
             : repoDir(repoDirectory)
             , yamDir(DotYamDirectory::create(repoDir))
             , testTree(repoDir, 3, RegexSet({ ".yam" }))
             , persistentState(repoDir / "buildState", &context)
-            , sourceFileRepo(std::make_shared<FileRepository>(
-                "repo",
-                repoDir,
-                &context))
-            , repoDirNode(sourceFileRepo->directoryNode())
-            , cmdNode(std::make_shared<CommandNode>(&context, std::filesystem::path("repo") / "__cmd"))
         {
             context.threadPool().size(1);
-            context.addRepository(sourceFileRepo);
-            bool completed = YAMTest::executeNode(repoDirNode.get());
+            context.addRepository(std::make_shared<FileRepository>(
+                "repo",
+                repoDir,
+                &context));
+            bool completed = YAMTest::executeNode(sourceFileRepo()->directoryNode().get());
             EXPECT_TRUE(completed);
 
             std::vector<std::shared_ptr<DirectoryNode>> subDirs; 
-            repoDirNode->getSubDirs(subDirs);
-            cmdNode->script("cmd /c echo piet");
+            sourceFileRepo()->directoryNode()->getSubDirs(subDirs); 
+            auto cmdNode = std::make_shared<CommandNode>(&context, std::filesystem::path("<repo>") / "__cmd");
+            cmdNode->script(R"(C:\Windows\System32\cmd.exe /c echo piet)");
             cmdNode->workingDirectory(subDirs[0]);
             context.nodes().add(cmdNode);
 
@@ -111,8 +106,22 @@ namespace
             persistentState.store();
         }
 
+        std::shared_ptr<FileRepository> sourceFileRepo() {
+            return context.findRepository(std::string("repo"));
+        }
+
+        std::shared_ptr<CommandNode> cmdNode() {
+            auto node = context.nodes().find(std::filesystem::path("<repo>") / "__cmd");
+            return dynamic_pointer_cast<CommandNode>(node);
+        }
+
+        void retrieve() {
+            std::filesystem::path repoSymPath = sourceFileRepo()->symbolicDirectory();
+            persistentState.retrieve();
+        }
+
         bool consumeFileChangeEvent(std::initializer_list<std::filesystem::path> paths) {
-            return consumeFileChangeEvents(sourceFileRepo.get(), context.mainThreadQueue(), paths);
+            return consumeFileChangeEvents(sourceFileRepo().get(), context.mainThreadQueue(), paths);
         }
 
         void updateFile(std::filesystem::path const& fileToUpdate) {
@@ -123,7 +132,7 @@ namespace
 
         std::filesystem::path addNode() {
             std::filesystem::path file4(repoDir / "File4");
-            auto symFile4 = sourceFileRepo->symbolicPathOf(file4);
+            auto symFile4 = sourceFileRepo()->symbolicPathOf(file4);
             testTree.addFile(); // File4
             EXPECT_TRUE(consumeFileChangeEvent({ file4 }));
             std::vector<std::shared_ptr<Node>> dirtyNodes;
@@ -135,7 +144,7 @@ namespace
 
         std::tuple<std::filesystem::path, XXH64_hash_t> modifyNode() {
             std::filesystem::path file3(repoDir / "File3");
-            auto symFile3 = sourceFileRepo->symbolicPathOf(file3);
+            auto symFile3 = sourceFileRepo()->symbolicPathOf(file3);
             auto node = dynamic_pointer_cast<FileNode>(context.nodes().find(symFile3));
             YAMTest::executeNode(node.get());
             XXH64_hash_t oldHash = node->hashOf(FileAspect::entireFileAspect().name());
@@ -162,7 +171,6 @@ namespace
     {
     public:
         SetupHelper& setup;
-        std::shared_ptr<DirectoryNode> repoDirNode;
 
         StorageHelper(SetupHelper& setupHelper)
             : setup(setupHelper)
@@ -170,9 +178,8 @@ namespace
         }
 
         std::shared_ptr<DirectoryNode> retrieve() {
-            setup.persistentState.retrieve();
-            auto repoName = setup.sourceFileRepo->name();
-            return dynamic_pointer_cast<DirectoryNode>(setup.context.nodes().find(repoName));
+            setup.retrieve();
+            return setup.sourceFileRepo()->directoryNode();
         }
 
         std::size_t store() {
@@ -217,19 +224,19 @@ namespace
         ASSERT_NE(nullptr, repoDirNode);
         EXPECT_EQ(nNodes, setup.context.nodes().size());
 
-        auto node = setup.context.nodes().find(setup.cmdNode->name());
-        auto cmdNode = dynamic_pointer_cast<CommandNode>(node);
+        auto cmdNode = setup.cmdNode();
         EXPECT_NE(nullptr, cmdNode);
-        EXPECT_EQ(setup.cmdNode->workingDirectory()->name(), cmdNode->workingDirectory()->name());
+        EXPECT_EQ(cmdNode->workingDirectory()->name(), cmdNode->workingDirectory()->name());
+        cmdNode = nullptr;
 
-        // Verify that the rolled-back build state can be executed
+        // Verify that the retrieved build state can be executed
         bool completed = YAMTest::executeNode(repoDirNode.get());
         EXPECT_TRUE(completed);
         EXPECT_EQ(nNodes, setup.context.nodes().size());
         storage.store(); // executeNode put all nodes to modified state
 
         // Verify that re-executing a file node sets it modified.
-        std::filesystem::path root(setup.sourceFileRepo->name());
+        std::filesystem::path root(setup.sourceFileRepo()->symbolicDirectory());
         auto fileNode = dynamic_pointer_cast<FileNode>(setup.context.nodes().find(root / "File3"));
         ASSERT_NE(nullptr, fileNode);
         auto updatedHash = storage.addFileAndUpdateFileAndExecuteNode(fileNode);
@@ -259,11 +266,9 @@ namespace
         SetupHelper setup(FileSystem::createUniqueDirectory());
         EXPECT_EQ(nNodes, setup.context.nodes().size());
 
-        std::string repoName = setup.sourceFileRepo->name();
+        std::string repoName = setup.sourceFileRepo()->name();
         EXPECT_TRUE(setup.context.removeRepository(repoName));
         EXPECT_EQ(1, setup.context.nodes().size()); // the command node
-        setup.sourceFileRepo = nullptr;
-        setup.repoDirNode = nullptr;
 
         setup.persistentState.rollback();
 
@@ -278,16 +283,16 @@ namespace
         EXPECT_EQ(nNodes, setup.context.nodes().size());
 
         std::map<std::filesystem::path, std::shared_ptr<Node>> dirContentBeforeClear =  
-            setup.repoDirNode->getContent();
+            setup.sourceFileRepo()->directoryNode()->getContent();
         EXPECT_EQ(8, dirContentBeforeClear.size());
-        setup.sourceFileRepo->clear(); // will remove all nodes
+        setup.sourceFileRepo()->clear(); // will remove all nodes
         EXPECT_EQ(1, setup.context.nodes().size()); // the command node
-        EXPECT_EQ(0, setup.repoDirNode->getContent().size());
+        EXPECT_EQ(0, setup.sourceFileRepo()->directoryNode()->getContent().size());
 
         setup.persistentState.rollback();
 
         EXPECT_EQ(nNodes, setup.context.nodes().size());
-        EXPECT_EQ(dirContentBeforeClear.size(), setup.repoDirNode->getContent().size());
+        EXPECT_EQ(dirContentBeforeClear.size(), setup.sourceFileRepo()->directoryNode()->getContent().size());
         // Verify that the rolled-back build state can be executed
         setup.executeAll();
     }
@@ -303,7 +308,7 @@ namespace
 
         setup.persistentState.rollback();
 
-        auto symAddedFile = setup.sourceFileRepo->symbolicPathOf(addedFile);
+        auto symAddedFile = setup.sourceFileRepo()->symbolicPathOf(addedFile);
         EXPECT_EQ(nNodes, setup.context.nodes().size());
         EXPECT_EQ(nullptr, setup.context.nodes().find(symAddedFile));
         // Verify that the rolled-back build state can be executed
@@ -321,7 +326,7 @@ namespace
         setup.persistentState.rollback();
 
         EXPECT_EQ(nNodes, setup.context.nodes().size());
-        auto symModifiedFile = setup.sourceFileRepo->symbolicPathOf(modifiedFile);
+        auto symModifiedFile = setup.sourceFileRepo()->symbolicPathOf(modifiedFile);
         auto node = dynamic_pointer_cast<FileNode>(setup.context.nodes().find(symModifiedFile));
         YAMTest::executeNode(node.get());
         XXH64_hash_t hash = node->hashOf(FileAspect::entireFileAspect().name());

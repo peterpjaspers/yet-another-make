@@ -11,14 +11,28 @@ namespace YAM
     class ExecutionContext;
     class DirectoryNode;
 
-    class __declspec(dllexport) NodeFinder
+    class __declspec(dllexport) Globber
     {
     public:
-        // Find nodes File and Directory nodes that match 'pattern'.
-        // The pattern is relative to 'baseDir'.
+        // Find nodes FileNodes and DirectoryNodes that match 'pattern'.
+        // The pattern is either a glob, e.g. src\*.cpp, or a non-glob, 
+        // e.g. src\main.cpp. See class Glob for supported patterns.
+        // The pattern can be a path relative to 'baseDir' or a symbolic
+        // path. In the latter case baseDir is ignored.
+        // If the pattern is a relative path then it is matched relative 
+        // to 'baseDir'. 
+        // If the pattern is a symbolic path then the relative part of pattern
+        // is matched against the repo root directory.
+        // Examples:
+        //    - src\*.cpp matches all cpp file nodes in baseDir\src. 
+        //    - src\main.cpp matches baseDir\src\main.cpp.
+        //    - ..\src\*.cpp matches all cpp file nodes in baseDir\..\src. 
+        //    - given a repository with name repo and root dir C:\repoRoot
+        //      then the pattern <repo>\src\*.cpp matches all cpp files in 
+        //      C:\repoRoot\src
         // If 'dirsOnly' then only match directory nodes.
         // Add visited directory nodes to inputDirs.
-        NodeFinder(
+        Globber(
             ExecutionContext* context,
             std::shared_ptr<DirectoryNode>& baseDir,
             std::filesystem::path const& pattern,

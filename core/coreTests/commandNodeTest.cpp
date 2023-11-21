@@ -54,11 +54,11 @@ namespace
             , pietCmd(std::make_shared<CommandNode>(&context, "piet\\_cmd"))
             , janCmd(std::make_shared<CommandNode>(&context, "jan\\_cmd"))
             , pietjanCmd(std::make_shared<CommandNode>(& context, "pietjan\\_cmd"))
-            , pietOut(std::make_shared<GeneratedFileNode>(& context, R"(.\generated\pietout.txt)", pietCmd.get()))
-            , janOut(std::make_shared<GeneratedFileNode>(&context, R"(.\generated\janout.txt)", janCmd.get()))
-            , pietjanOut(std::make_shared<GeneratedFileNode>(&context, R"(.\generated\pietjanout.txt)", pietjanCmd.get()))
-            , pietSrc(std::make_shared<SourceFileNode>(&context, R"(.\pietsrc.txt)"))
-            , janSrc(std::make_shared<SourceFileNode>(&context, R"(.\jansrc.txt)"))
+            , pietOut(std::make_shared<GeneratedFileNode>(& context, R"(<.>\generated\pietout.txt)", pietCmd.get()))
+            , janOut(std::make_shared<GeneratedFileNode>(&context, R"(<.>\generated\janout.txt)", janCmd.get()))
+            , pietjanOut(std::make_shared<GeneratedFileNode>(&context, R"(<.>\generated\pietjanout.txt)", pietjanCmd.get()))
+            , pietSrc(std::make_shared<SourceFileNode>(&context, R"(<.>\pietsrc.txt)"))
+            , janSrc(std::make_shared<SourceFileNode>(&context, R"(<.>\jansrc.txt)"))
             , stats(context.statistics())
         {
             std::filesystem::create_directories(repoDir / "generated");

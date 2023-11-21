@@ -53,14 +53,11 @@ namespace YAM
 
     Node::~Node() {}
 
-        // Return the repository that contains the directory.
     std::shared_ptr<FileRepository> const& Node::repository() const {
-        auto it = name().begin();
-        auto repoName = *it;
-        return context()->findRepository(repoName.string());
+        auto repoName = FileRepository::repoNameFromSymbolicPath(name());
+        return context()->findRepository(repoName);
     }
 
-    // Return the absolute path name of the directory.
     std::filesystem::path Node::absolutePath() const {
         return repository()->absolutePathOf(name());
     }

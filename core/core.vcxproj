@@ -102,7 +102,7 @@
     <ClInclude Include="BuildClient.h" />
     <ClInclude Include="Builder.h" />
     <ClInclude Include="Glob.h" />
-    <ClInclude Include="NodeFinder.h" />
+    <ClInclude Include="Globber.h" />
     <ClInclude Include="Parser.h" />
     <ClInclude Include="BuildRequest.h" />
     <ClInclude Include="BuildResult.h" />
@@ -181,7 +181,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="Glob.cpp" />
-    <ClCompile Include="NodeFinder.cpp" />
+    <ClCompile Include="Globber.cpp" />
     <ClCompile Include="Parser.cpp" />
     <ClCompile Include="BuildRequest.cpp" />
     <ClCompile Include="BuildResult.cpp" />

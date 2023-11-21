@@ -273,7 +273,7 @@
     <ClInclude Include="DirectoryNode.h">
       <Filter>Header Files\Node</Filter>
     </ClInclude>
-    <ClInclude Include="NodeFinder.h">
+    <ClInclude Include="Globber.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -449,7 +449,7 @@
     <ClCompile Include="DirectoryNode.cpp">
       <Filter>Source Files\Node</Filter>
     </ClCompile>
-    <ClCompile Include="NodeFinder.cpp">
+    <ClCompile Include="Globber.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

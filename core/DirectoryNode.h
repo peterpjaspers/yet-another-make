@@ -45,6 +45,8 @@ namespace YAM
             std::filesystem::path const& dirName,
             DirectoryNode* parent);
 
+        virtual ~DirectoryNode();
+
         void start() override;
 
         // Add the prerequisites (i.e. the DotIgnoreNode and its prerequisites)

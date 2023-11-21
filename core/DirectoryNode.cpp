@@ -47,6 +47,10 @@ namespace YAM
         _dotIgnoreNode->addObserver(this);
         _dotIgnoreNode->addPrerequisitesToContext();
     }
+    
+    DirectoryNode::~DirectoryNode() {
+        int x = 0;
+    }
 
     XXH64_hash_t DirectoryNode::executionHash() const {
         return _executionHash;

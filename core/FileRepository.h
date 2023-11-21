@@ -33,10 +33,13 @@ namespace YAM
     // directories outside known FileRepositories are silently ignored.
     // 
     // FileRepository supports the conversion of so-called symbolic paths
-    // to/from absolute paths. A symbolic path is an absolute path in which
-    // the file repository directory is replaced by the repository name.
-    // A symbolic path is therefore a relative path, the first path component
-    // being the repository name.
+    // to/from absolute paths. The format of a symbolic path is
+    // <repoName>\relPath where repoName is the name of the repository and 
+    // relPath is a path relative to the root directory of the repository.
+    // E.g. given a repo with name XYZ and root dir C:\repos\XYZ_root. Then
+    // the following paths convert to/from each other:
+    //        Symbolic path   <=>    Absolute path
+    //     <XYZ>\src\main.cpp <=> C:\repos\XYZ_root\src\main.cpp 
     //
     class __declspec(dllexport) FileRepository : public IPersistable
     {
@@ -47,12 +50,23 @@ namespace YAM
             std::filesystem::path const& directory,
             ExecutionContext* context);
 
-        virtual ~FileRepository() {}
+        virtual ~FileRepository();
 
         std::string const& name() const;
         std::filesystem::path const& directory() const;
         std::shared_ptr<DirectoryNode> directoryNode() const;
         static std::string repositoryNameOf(std::filesystem::path const& symbolicPath);
+
+        // Return repositoryNameOf(name())
+        std::filesystem::path const& symbolicDirectory() const {
+            return _symbolicDirectory;
+        }
+
+        // Return empty string when symbolicPath has invalid format.
+        static std::string repoNameFromSymbolicPath(std::filesystem::path const& symbolicPath);
+
+        // Return <repoName>
+        static std::filesystem::path repoNameToSymbolicPath(std::string const& repoName);
 
         // Return whether 'path' is a path in the repository.
         // 'path' can be an absolute path or a symbolic path.
@@ -60,26 +74,24 @@ namespace YAM
         // the repository lexically contains path.
         // E.g. if repository directory = /a/b and path = /a/b then 
         // the repository lexically contains path.
-        // E.g. if repository name is 'someRepo' and path is someRepo/a/b
+        // E.g. if repository name is 'someRepo' and path is <someRepo>/a/b
         // then repository lexically contains path. 
         // Note: a lexically contained path need not exist in the file system.
-        // Pre: 'absPath' must be without . and .. path components.
         bool lexicallyContains(std::filesystem::path const& path) const;
 
         // Return 'absPath' relative to the repo directory.
         // Return empty path when !lexicallyContains(absPath) or when
         // absPath == directory().
-        // Pre: 'absPath' must be without . and .. path components.
         std::filesystem::path relativePathOf(std::filesystem::path const& absPath) const;
 
-        // Return given 'absPath' as repoName/relativePathOf(absPath).
+        // Return given 'absPath' as <repoName>/absPath.relative_path().
         // Return empty path when !lexicallyContains(absPath).
         // Return name() when absPath == directory().
-        // Pre: 'absPath' must be without . and .. path components.
+        // Pre: absPath.is_absolute();
         std::filesystem::path symbolicPathOf(std::filesystem::path const& absPath) const;
 
         // Return the absolute path of given symbolic path.
-        // Return empty path when symbolicPath.begin() != name().
+        // Return empty path when !lexicallyContains(symbolicPath).
         std::filesystem::path absolutePathOf(std::filesystem::path const& symbolicPath) const;
 
         // Consume the changes that occurred in the repo directory tree since
@@ -111,6 +123,7 @@ namespace YAM
     private:
         std::string _name;
         std::filesystem::path _directory;
+        std::filesystem::path _symbolicDirectory;
         ExecutionContext* _context;
         std::shared_ptr<FileRepositoryWatcher> _watcher;
         std::shared_ptr<DirectoryNode> _directoryNode;
