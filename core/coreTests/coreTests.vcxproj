@@ -63,6 +63,7 @@
     <ClCompile Include="fileAspectTest.cpp" />
     <ClCompile Include="fileNodeTest.cpp" />
     <ClCompile Include="directoryWatcherWin32Test.cpp" />
+    <ClCompile Include="globberTest.cpp" />
     <ClCompile Include="globTest.cpp" />
     <ClCompile Include="memoryStreamTest.cpp" />
     <ClCompile Include="monitoredProcessWin32Test.cpp" />
@@ -74,7 +75,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="sourceFileRepositoryTest.cpp" />
+    <ClCompile Include="fileRepositoryTest.cpp" />
     <ClCompile Include="threadPoolTest.cpp" />
     <ClCompile Include="threadTest.cpp" />
     <ClCompile Include="main_gtest.cpp" />

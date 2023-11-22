@@ -83,7 +83,7 @@ namespace
             , testTree(repoDir, 3, RegexSet({ ".yam" }))
             , persistentState(repoDir / "buildState", &context)
         {
-            context.threadPool().size(1);
+            //context.threadPool().size(1);
             context.addRepository(std::make_shared<FileRepository>(
                 "repo",
                 repoDir,

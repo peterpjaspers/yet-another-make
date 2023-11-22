@@ -107,7 +107,7 @@ namespace YAM {
     {}
 
     bool Glob::isGlob(std::string const& pattern) {
-        static const auto check = std::regex("([*?},])");
+        static const auto check = std::regex(R"(([\*\?\{\}\,\[\]]))");
         return std::regex_search(pattern, check);
     }
 

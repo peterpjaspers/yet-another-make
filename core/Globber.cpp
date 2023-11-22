@@ -18,40 +18,48 @@ namespace YAM
     //
     Globber::Globber(
         ExecutionContext* context,
-        std::shared_ptr<DirectoryNode>& baseDir,
+        std::shared_ptr<DirectoryNode> const& baseDir,
         std::filesystem::path const& pattern,
         bool dirsOnly,
         std::set<std::shared_ptr<DirectoryNode>>& inputDirs
     )
-        : _context(_context)
-        , _baseDir(baseDir)
+        : _baseDir(baseDir)
         , _pattern(pattern)
         , _dirsOnly(dirsOnly)
         , _inputDirs(inputDirs)
     {
+        auto repo = context->findRepositoryContaining(pattern);
+        if (repo != nullptr) {
+            _baseDir = repo->directoryNode();
+            _pattern = repo->relativePathOf(repo->absolutePathOf(pattern));
+        }
         _inputDirs.insert(_baseDir);
 
         std::filesystem::path dirPattern = pattern.parent_path();
         std::filesystem::path filePattern = pattern.filename();        
         if (dirPattern.empty()) {
             if (isRecursive(filePattern)) {
-                walk(_baseDir.get());
+                walk(_baseDir);
             } else if (Glob::isGlob(filePattern.string())) {
                 match(filePattern);
             } else {
                 exists(filePattern);
             }
         } else if (Glob::isGlob(dirPattern.string())) {
-            Globber finder(_context, _baseDir, dirPattern, true, _inputDirs);
-            for (auto const& m : finder._matches) {
-                auto dirNode = dynamic_pointer_cast<DirectoryNode>(m);
-                Globber mfinder(_context, dirNode, filePattern, _dirsOnly, _inputDirs);
-                _matches = mfinder._matches;
+            Globber finder(context, _baseDir, dirPattern, true, _inputDirs);
+            if (filePattern.empty()) {
+                _matches.insert(_matches.end(), finder._matches.begin(), finder._matches.end());
+            } else {
+                for (auto const& m : finder._matches) {
+                    auto dirNode = dynamic_pointer_cast<DirectoryNode>(m);
+                    Globber mfinder(context, dirNode, filePattern, _dirsOnly, _inputDirs);
+                    _matches.insert(_matches.end(), mfinder._matches.begin(), mfinder._matches.end());
+                }
             }
         } else {
             auto dirNode = findDirectory(dirPattern);
             if (dirNode != nullptr) {
-                Globber finder(_context, dirNode, filePattern, _dirsOnly, _inputDirs);
+                Globber finder(context, dirNode, filePattern, _dirsOnly, _inputDirs);
                 _matches = finder._matches;
             }
         }
@@ -60,19 +68,15 @@ namespace YAM
     bool Globber::isHidden(std::filesystem::path const& path) { return path.string()[0] == '.'; }
     bool Globber::isRecursive(std::filesystem::path const& pattern) { return pattern == "**"; }
 
-    void Globber::walk(DirectoryNode* dir) {
+    void Globber::walk(std::shared_ptr<DirectoryNode> const& dir) {
+        _matches.push_back(dir);
         for (auto const& pair : dir->getContent()) {
             auto const& child = pair.second;
             auto subDir = dynamic_pointer_cast<DirectoryNode>(child);
-            if (_dirsOnly) {
-                if (subDir != nullptr) {
-                    _matches.push_back(child);
-                }
-            } else {
-                _matches.push_back(child);
-            }
             if (subDir != nullptr) {
-                walk(subDir.get());
+                walk(subDir);
+            } else if (!_dirsOnly) {
+                _matches.push_back(child);
             }
         }
     }

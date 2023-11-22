@@ -46,7 +46,6 @@ namespace YAM
     }
 
     FileRepository::~FileRepository() {
-        int x = 0;
     }
 
     std::string const& FileRepository::name() const {

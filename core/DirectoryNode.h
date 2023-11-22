@@ -35,7 +35,9 @@ namespace YAM
     // 
     // All functions execute in main thread unless stated otherwise.
     //
-    class __declspec(dllexport) DirectoryNode : public Node
+    class __declspec(dllexport) DirectoryNode : 
+        public Node,
+        public std::enable_shared_from_this<DirectoryNode>
     {
     public:
         DirectoryNode() {} // needed for deserialization
@@ -53,7 +55,7 @@ namespace YAM
         // to the execution context.
         void addPrerequisitesToContext();
 
-        DirectoryNode* parent() const;
+        std::shared_ptr<DirectoryNode> parent() const;
         std::shared_ptr<DotIgnoreNode> const& dotIgnoreNode() { return _dotIgnoreNode; }
 
         // Query the directory content, vector content is sorted by node name.
@@ -69,7 +71,7 @@ namespace YAM
 
         // Find and return the node identified by 'path'.
         // Pre: 'path' is relative to name(). 
-        std::shared_ptr<Node> findChild(std::filesystem::path path) const;
+        std::shared_ptr<Node> findChild(std::filesystem::path path);
 
         std::chrono::time_point<std::chrono::utc_clock> const& lastWriteTime();
 
@@ -97,6 +99,10 @@ namespace YAM
 
     private:
         void parent(DirectoryNode* parent);
+        std::shared_ptr<Node> findChild(
+            std::shared_ptr<DirectoryNode> directory,
+            std::filesystem::path::iterator it,
+            std::filesystem::path::iterator itEnd);
 
         struct RetrieveResult {
             Node::State _newState;
@@ -123,12 +129,12 @@ namespace YAM
             std::filesystem::directory_entry const& dirEntry,
             std::shared_ptr<FileRepository> const& repo,
             std::unordered_set<std::shared_ptr<Node>>& added,
-            std::unordered_set<std::shared_ptr<Node>>& kept) const;
+            std::unordered_set<std::shared_ptr<Node>>& kept);
         void retrieveContent(
             std::map<std::filesystem::path, std::shared_ptr<Node>>& content,
             std::unordered_set<std::shared_ptr<Node>>& added,
             std::unordered_set<std::shared_ptr<Node>>& kept,
-            std::unordered_set<std::shared_ptr<Node>>& removed) const;
+            std::unordered_set<std::shared_ptr<Node>>& removed);
 
         DirectoryNode* _parent;
         std::shared_ptr<DotIgnoreNode> _dotIgnoreNode;

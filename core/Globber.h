@@ -21,8 +21,8 @@ namespace YAM
         // path. In the latter case baseDir is ignored.
         // If the pattern is a relative path then it is matched relative 
         // to 'baseDir'. 
-        // If the pattern is a symbolic path then the relative part of pattern
-        // is matched against the repo root directory.
+        // If the pattern is a symbolic path then baseDir is ignored and the 
+        // relative part of pattern is matched against the repo root directory.
         // Examples:
         //    - src\*.cpp matches all cpp file nodes in baseDir\src. 
         //    - src\main.cpp matches baseDir\src\main.cpp.
@@ -34,7 +34,7 @@ namespace YAM
         // Add visited directory nodes to inputDirs.
         Globber(
             ExecutionContext* context,
-            std::shared_ptr<DirectoryNode>& baseDir,
+            std::shared_ptr<DirectoryNode> const& baseDir,
             std::filesystem::path const& pattern,
             bool dirsOnly,
             std::set<std::shared_ptr<DirectoryNode>>& inputDirs
@@ -44,12 +44,11 @@ namespace YAM
     private:
         bool isHidden(std::filesystem::path const& path);
         bool isRecursive(std::filesystem::path const& pattern);
-        void walk(DirectoryNode* dir);
+        void walk(std::shared_ptr<DirectoryNode> const& dir);
         void match(std::filesystem::path const& pattern);
         void exists(std::filesystem::path const& file);
         std::shared_ptr<DirectoryNode> findDirectory(std::filesystem::path const& relativeToBase);
 
-        ExecutionContext* _context;
         std::shared_ptr<DirectoryNode> _baseDir;
         std::filesystem::path _pattern;
         bool _dirsOnly;

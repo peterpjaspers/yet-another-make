@@ -49,15 +49,14 @@ namespace YAM
     }
     
     DirectoryNode::~DirectoryNode() {
-        int x = 0;
     }
 
     XXH64_hash_t DirectoryNode::executionHash() const {
         return _executionHash;
     }
 
-    DirectoryNode* DirectoryNode::parent() const { 
-        return _parent;
+    std::shared_ptr<DirectoryNode> DirectoryNode::parent() const { 
+        return _parent == nullptr ? nullptr : _parent->shared_from_this();
     }
 
     void DirectoryNode::parent(DirectoryNode* parent) {
@@ -92,28 +91,53 @@ namespace YAM
         inputs.push_back(dynamic_pointer_cast<Node>(_dotIgnoreNode));
     }
 
-    std::shared_ptr<Node> DirectoryNode::findChild(std::filesystem::path path) const {
+    std::shared_ptr<Node> DirectoryNode::findChild(
+        std::shared_ptr<DirectoryNode> directory,
+        std::filesystem::path::iterator pit,
+        std::filesystem::path::iterator pitEnd
+     ) {
         static std::filesystem::path up("..");
         static std::filesystem::path stay(".");
+
         std::shared_ptr<Node> child;
-        DirectoryNode const* dir = this;
-        auto it = path.begin();
-        for (; dir != nullptr && it != path.end(); it++) {
-            if (*it == up) dir = dir->_parent;
-            else if (*it == stay) dir = dir;
-            else {
-                auto cit = dir->_content.find(dir->name() / *it);
-                if (cit == dir->_content.end()) break;
-                auto citDir = dynamic_pointer_cast<DirectoryNode>(cit->second);
-                if (citDir != nullptr) {
-                    dir = citDir.get();
-                } else {
-                    dir = nullptr;
+        if (pit == pitEnd) return child;
+
+        if (*pit == up) {
+            pit++;
+            auto pdir = directory->parent();
+            if (pit == pitEnd) {
+                child = pdir;
+            } else if (pdir != nullptr) {
+                child = findChild(pdir, pit, pitEnd);
+            }
+        } else if (*pit == stay) {
+            pit++;
+            if (pit == pitEnd) {
+                child = directory;
+            } else {
+                child = findChild(directory, pit, pitEnd);
+            }
+        } else {
+            auto cit = directory->_content.find(directory->name() / *pit);
+            if (cit != directory->_content.end()) {
+                pit++;
+                if (pit == pitEnd) {
                     child = cit->second;
+                } else {
+                    auto cdir = dynamic_pointer_cast<DirectoryNode>(cit->second);
+                    if (cdir != nullptr) {
+                        child = findChild(cdir, pit, pitEnd);
+                    } else {
+                        child = cit->second;
+                    }
                 }
             }
         }
         return child;
+    }
+
+    std::shared_ptr<Node> DirectoryNode::findChild(std::filesystem::path path) {
+        return findChild(shared_from_this(), path.begin(), path.end());
     }
 
     std::chrono::time_point<std::chrono::utc_clock> const& DirectoryNode::lastWriteTime() {
@@ -132,7 +156,7 @@ namespace YAM
         std::shared_ptr<FileRepository> const& repo,
         std::unordered_set<std::shared_ptr<Node>>& added,
         std::unordered_set<std::shared_ptr<Node>>& kept
-    ) const {
+    ) {
         std::shared_ptr<Node> child = nullptr;
         auto const& absPath = dirEntry.path();
         if (!_dotIgnoreNode->ignore(absPath)) {
@@ -147,7 +171,7 @@ namespace YAM
                 // at this point is not allowed. Instead optimistically create a new node
                 // and check in main thread (commitResult) whether it already existed in
                 // buildstate.
-                child = createNode(const_cast<DirectoryNode*>(this), dirEntry, symPath, context());
+                child = createNode(this, dirEntry, symPath, context());
                 added.insert(child);
             }
         }
@@ -159,7 +183,7 @@ namespace YAM
         std::unordered_set<std::shared_ptr<Node>>& added,
         std::unordered_set<std::shared_ptr<Node>>& removed,
         std::unordered_set<std::shared_ptr<Node>>& kept
-    ) const {
+    ) {
         auto repo = repository();
         std::filesystem::path absDir = repo->absolutePathOf(name());
         if (std::filesystem::exists(absDir)) {
@@ -382,7 +406,7 @@ namespace YAM
         _dotIgnoreNode->addObserver(this);
         std::vector<std::shared_ptr<Node>> nodes;
         for (auto const& p : _content) {
-            nodes.push_back(p.second);            
+            nodes.push_back(p.second);
             p.second->addObserver(this);
             auto dir = dynamic_cast<DirectoryNode*>(p.second.get());
             if (dir != nullptr) dir->parent(this);
