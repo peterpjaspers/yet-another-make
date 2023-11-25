@@ -14,6 +14,7 @@ namespace YAM
     class FileNode;
     class DotIgnoreNode;
     class FileRepository;
+    class BuildFileProcessingNode;
 
     // Executing a DirectoryNode caches the content of a directory as
     //    - a Source or Generated FileNode for each file in the directory.
@@ -121,6 +122,7 @@ namespace YAM
         void handleRetrieveContentCompletion(RetrieveResult& result);
         void startSubDirs();
         void commitResult(YAM::DirectoryNode::RetrieveResult& result);
+        void updateBuildFileProcessingNode();
         void _removeChildRecursively(std::shared_ptr<Node> const& child);
 
         // Next 3 functions execute in a threadpool thread
@@ -138,6 +140,7 @@ namespace YAM
 
         DirectoryNode* _parent;
         std::shared_ptr<DotIgnoreNode> _dotIgnoreNode;
+        std::shared_ptr<BuildFileProcessingNode> _buildFileProcessingNode;
         std::chrono::time_point<std::chrono::utc_clock> _lastWriteTime;
         std::map<std::filesystem::path, std::shared_ptr<Node>> _content;
         XXH64_hash_t _executionHash;

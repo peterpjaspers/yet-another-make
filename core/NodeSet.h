@@ -19,18 +19,18 @@ namespace YAM
         NodeSet() = default;
 
         // Add node to the set.
-        void addIfAbsent(std::shared_ptr<Node> node);
+        void addIfAbsent(std::shared_ptr<Node> const& node);
 
         // Add node to the set.
         // Pre: !Contains(node->Name())
-        void add(std::shared_ptr<Node> node);
+        void add(std::shared_ptr<Node> const& node);
 
         // Remove node from the set.
         // Pre: Contains(node->Name())
-        void remove(std::shared_ptr<Node> node);
+        void remove(std::shared_ptr<Node> const& node);
 
         // Remove node from the set.
-        void removeIfPresent(std::shared_ptr<Node> node);
+        void removeIfPresent(std::shared_ptr<Node> const& node);
 
         // Remove all nodes from the set.
         void clear();

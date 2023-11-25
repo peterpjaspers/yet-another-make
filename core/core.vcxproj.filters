@@ -276,6 +276,9 @@
     <ClInclude Include="Globber.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="BuildFileProcessingNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -451,6 +454,9 @@
     </ClCompile>
     <ClCompile Include="Globber.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildFileProcessingNode.cpp">
+      <Filter>Source Files\Node</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

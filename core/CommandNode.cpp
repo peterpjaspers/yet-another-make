@@ -233,9 +233,12 @@ namespace YAM
 
     void CommandNode::outputs(std::vector<std::shared_ptr<GeneratedFileNode>> const & newOutputs) {
         if (_outputs != newOutputs) {
-            for (auto i : _outputs) i->removeObserver(this);
+            for (auto output : _outputs) {
+                output->deleteFile();
+                output->removeObserver(this);
+            }
             _outputs = newOutputs;
-            for (auto i : _outputs) i->addObserver(this);
+            for (auto output : _outputs) output->addObserver(this);
             modified(true);
             setState(State::Dirty);
         }
@@ -422,6 +425,7 @@ namespace YAM
         }
     }
 
+    // main thread
     void CommandNode::start() {
         Node::start();
         std::vector<Node*> requisites;
@@ -450,6 +454,7 @@ namespace YAM
         }
     }
 
+    // threadpool
     void CommandNode::executeScript() {
         auto result = std::make_shared<ExecutionResult>();
         if (canceling()) {
@@ -548,6 +553,7 @@ namespace YAM
         notifyCompletion(state);
     }
 
+    // threadpool
     MonitoredProcessResult CommandNode::executeMonitoredScript(MemoryLogBook& logBook) {
         if (_script.empty()) return MonitoredProcessResult();
 

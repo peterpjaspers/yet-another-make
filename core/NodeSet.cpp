@@ -3,21 +3,21 @@
 
 namespace YAM
 {
-    void NodeSet::addIfAbsent(std::shared_ptr<Node> node) {
+    void NodeSet::addIfAbsent(std::shared_ptr<Node> const& node) {
         const auto notUsed = _nodes.insert({ node->name(), node });
     }
 
-    void NodeSet::add(std::shared_ptr<Node> node) {
+    void NodeSet::add(std::shared_ptr<Node> const& node) {
         const auto [it, success] = _nodes.insert({ node->name(), node });
         if (!success) throw std::runtime_error("failed to add node");
     }
 
-    void NodeSet::remove(std::shared_ptr<Node> node) {
+    void NodeSet::remove(std::shared_ptr<Node> const& node) {
         auto nRemoved = _nodes.erase(node->name());
         if (nRemoved != 1) throw std::runtime_error("failed to remove node");
     }
 
-    void NodeSet::removeIfPresent(std::shared_ptr<Node> node) {
+    void NodeSet::removeIfPresent(std::shared_ptr<Node> const& node) {
         auto notUsed = _nodes.erase(node->name());
     }
 

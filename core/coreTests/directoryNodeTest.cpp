@@ -158,6 +158,36 @@ namespace
             auto child = dirNode_S2_S3->findChild(file);
             EXPECT_EQ(nullptr, child);
         }
+    }
 
+    TEST(DirectoryNode, buildFileProcessingNode) {
+        std::string tmpDir(std::tmpnam(nullptr));
+        std::filesystem::path rootDir(std::string(tmpDir + "_dirNodeTest"));
+        std::filesystem::path buildFilePath(rootDir / R"(buildfile_yam.cmd)");
+        DirectoryTree testTree(rootDir, 2, RegexSet());
+        std::ofstream buildFileStream(buildFilePath.string().c_str());
+        EXPECT_TRUE(buildFileStream.is_open());
+        buildFileStream.close();
+
+        // Create the directory node tree that reflects testTree
+        ExecutionContext context;
+        auto repo = std::make_shared<FileRepository>("repo", rootDir, &context);
+        context.addRepository(repo);
+        auto dirNode = repo->directoryNode();
+        EXPECT_EQ(Node::State::Dirty, dirNode->state());
+
+        bool completed = YAMTest::executeNode(dirNode.get());
+        EXPECT_TRUE(completed);
+
+        auto symBuildFilePath = repo->symbolicPathOf(buildFilePath);
+        auto buildFile = dirNode->findChild(buildFilePath.filename());
+        EXPECT_NE(nullptr, buildFile);
+        EXPECT_EQ(buildFile, context.nodes().find(symBuildFilePath));
+        std::filesystem::path buildFileProcessingPath = buildFile->name() / "__processing__";
+        auto buildFileProcessingNode = context.nodes().find(buildFileProcessingPath);
+        ASSERT_NE(nullptr, buildFileProcessingNode); 
+        std::vector<std::shared_ptr<Node>> inputs;
+        buildFileProcessingNode->getInputs(inputs);
+        EXPECT_NE(inputs.end(), std::find(inputs.begin(), inputs.end(), buildFile));
     }
 }

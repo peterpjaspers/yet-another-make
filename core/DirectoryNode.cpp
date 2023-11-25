@@ -3,7 +3,10 @@
 #include "SourceFileNode.h"
 #include "ExecutionContext.h"
 #include "DotIgnoreNode.h"
+#include "BuildFileProcessingNode.h"
 #include "IStreamer.h"
+
+#include <regex>
 
 namespace
 {
@@ -27,6 +30,21 @@ namespace
             // bool notHandled = true;
         }
         return node;
+    }
+
+    std::shared_ptr<SourceFileNode> findBuildFile(
+        std::map<std::filesystem::path,
+        std::shared_ptr<Node>> content
+    ) {
+        static std::regex fileNameRe(R"(^buildfile_yam\..*$)");
+        for (auto const& pair : content) {
+            auto fileName = pair.first.filename();
+            if (std::regex_match(fileName.string(), fileNameRe)) {
+                auto buildFileNode = dynamic_pointer_cast<SourceFileNode>(pair.second);
+                return buildFileNode;
+            }
+        }
+        return nullptr;
     }
 }
 
@@ -353,11 +371,31 @@ namespace YAM
         for (auto const& n : result._removed) {
             _removeChildRecursively(n);
         }
+        updateBuildFileProcessingNode();
+
         modified(true);
         context()->statistics().registerUpdatedDirectory(this);
         if (context()->logBook()->mustLogAspect(LogRecord::Aspect::DirectoryChanges)) {
             LogRecord progress(LogRecord::Aspect::Progress, std::string("Rehashed directory ").append(name().string()));
             context()->addToLogBook(progress);
+        }
+    }
+    
+    void DirectoryNode::updateBuildFileProcessingNode() {
+        std::shared_ptr<SourceFileNode> buildFile = findBuildFile(_content);
+        if (buildFile != nullptr) {
+            if (_buildFileProcessingNode == nullptr) {
+                std::filesystem::path bfpName(buildFile->name() / "__processing__");
+                _buildFileProcessingNode = std::make_shared<BuildFileProcessingNode>(context(), bfpName);
+                context()->nodes().add(_buildFileProcessingNode);
+            }
+            _buildFileProcessingNode->buildFile(buildFile);
+        } else {
+            if (_buildFileProcessingNode != nullptr) {
+                _buildFileProcessingNode->buildFile(nullptr);
+                context()->nodes().remove(_buildFileProcessingNode);
+                _buildFileProcessingNode = nullptr;
+            }
         }
     }
 
