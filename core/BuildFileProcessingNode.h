@@ -1,5 +1,6 @@
 #pragma once
 #include "Node.h"
+#include "../xxHash/xxhash.h"
 
 #include <map>
 #include <memory>
@@ -14,6 +15,7 @@ namespace YAM {
     public:
         BuildFileProcessingNode(); // needed for deserialization
         BuildFileProcessingNode(ExecutionContext* context, std::filesystem::path const& name);
+        virtual ~BuildFileProcessingNode();
 
         void buildFile(std::shared_ptr<SourceFileNode> const& newFile);
         std::shared_ptr<SourceFileNode> buildFile() const;
@@ -32,7 +34,13 @@ namespace YAM {
         void restore(void* context) override;
 
     private:
-        std::shared_ptr<SourceFileNode> _buildFile;
+        void setupBuildFileExecutor();
+        void teardownBuildFileExecutor();
+        void handleBuildFileExecutorCompletion(Node::State state);
+
+        std::shared_ptr<SourceFileNode> _buildFile; 
+        std::shared_ptr<CommandNode> _buildFileExecutor;
+        std::filesystem::path _rulesFile;
         std::map<std::filesystem::path, std::shared_ptr<Node>> _inputs;
         std::set<std::shared_ptr<CommandNode>> _commands;
     };

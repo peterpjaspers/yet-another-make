@@ -342,30 +342,26 @@ namespace YAM
     }
 
     std::shared_ptr<GeneratedFileNode> CommandNode::findOutputNode(
+        std::shared_ptr<FileRepository> repo,
         std::filesystem::path const& absPath,
         MemoryLogBook& logBook
     ) {
+        bool valid = true;
         std::shared_ptr<GeneratedFileNode> outputNode;
-        auto const& repo = context()->findRepositoryContaining(absPath);
-        bool valid = repo != nullptr;
-        if (valid) {
-            auto symPath = repo->symbolicPathOf(absPath);
-            std::shared_ptr<Node> node = context()->nodes().find(symPath);
-            outputNode = dynamic_pointer_cast<GeneratedFileNode>(node);
-            if (outputNode == nullptr) {
-                auto srcFileNode = dynamic_pointer_cast<SourceFileNode>(node);
-                if (srcFileNode != nullptr) {
-                    logWriteAccessedSourceFile(this, srcFileNode.get(), logBook);
-                } else {
-                    valid = false;
-                    logOutputFileNotDeclared(this, absPath, logBook);
-                }
-            } else if (outputNode->producer() != this) {
+        auto symPath = repo->symbolicPathOf(absPath);
+        std::shared_ptr<Node> node = context()->nodes().find(symPath);
+        outputNode = dynamic_pointer_cast<GeneratedFileNode>(node);
+        if (outputNode == nullptr) {
+            auto srcFileNode = dynamic_pointer_cast<SourceFileNode>(node);
+            if (srcFileNode != nullptr) {
+                logWriteAccessedSourceFile(this, srcFileNode.get(), logBook);
+            } else {
                 valid = false;
-                logAlreadyProducedByOtherCommand(this, outputNode.get(), logBook);
+                logOutputFileNotDeclared(this, absPath, logBook);
             }
-        } else {
-            logOutputFileNotDeclared(this, absPath, logBook);
+        } else if (outputNode->producer() != this) {
+            valid = false;
+            logAlreadyProducedByOtherCommand(this, outputNode.get(), logBook);
         }
         return valid ? outputNode : nullptr;
     }
@@ -377,11 +373,14 @@ namespace YAM
     ) {
         unsigned int illegals = 0;
         for (auto const& absPath : absOutputPaths) {
-            std::shared_ptr<GeneratedFileNode> fileNode = findOutputNode(absPath, logBook);
-            if (fileNode == nullptr) {
-                illegals++;
-            } else {
-                outputNodes.push_back(fileNode);
+            std::shared_ptr<FileRepository> const& repo = context()->findRepositoryContaining(absPath);
+            if (repo != nullptr) {
+                std::shared_ptr<GeneratedFileNode> fileNode = findOutputNode(repo, absPath, logBook);
+                if (fileNode == nullptr) {
+                    illegals++;
+                } else {
+                    outputNodes.push_back(fileNode);
+                }
             }
         }
         return illegals == 0;

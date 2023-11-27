@@ -385,7 +385,7 @@ namespace YAM
         std::shared_ptr<SourceFileNode> buildFile = findBuildFile(_content);
         if (buildFile != nullptr) {
             if (_buildFileProcessingNode == nullptr) {
-                std::filesystem::path bfpName(buildFile->name() / "__processing__");
+                std::filesystem::path bfpName(name() / "__buildfile");
                 _buildFileProcessingNode = std::make_shared<BuildFileProcessingNode>(context(), bfpName);
                 context()->nodes().add(_buildFileProcessingNode);
             }

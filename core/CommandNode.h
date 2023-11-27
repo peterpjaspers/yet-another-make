@@ -12,6 +12,7 @@ namespace YAM
 {
     class GeneratedFileNode;
     class DirectoryNode;
+    class FileRepository;
 
     // CommandNode is capable of:
     //    - executing a shell script with a given set of output files.
@@ -110,6 +111,7 @@ namespace YAM
         XXH64_hash_t computeExecutionHash() const;
 
         std::shared_ptr<GeneratedFileNode> findOutputNode(
+            std::shared_ptr<FileRepository> repo,
             std::filesystem::path const& output,
             MemoryLogBook& logBook);
         bool findOutputNodes(

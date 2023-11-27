@@ -40,6 +40,30 @@ Todo: core
        as usual. Disadvantage: if other repo was already build then this repo will build
        it again.
     - build file must tell YAM which repo's to build
+- detecting cycles in node graph: add trail argument to Node::start()
+- createFileRepositories(RepoConfigFile cfg) {
+      for (repo : cfg.repos) {
+          fileRepo = new FileRepository(repo.name, repo.rootDir)
+          context->addRepo(fileRepo)
+          createFileRepositories(fileRepo->repoConfigFile())
+      }
+- Handle changes in RepoConfig
+  Add FileRepositoriesNode to buildstate with well known name “.\FileRepositories”.
+  This node executes createFileRepositories and adds dependencies on the 
+   RepoConfigFiles.
+  On change: compute kept/added/removed repo names. Update root dirs of kept 
+   FileRepos, clear and remove removed FileRepos (remove all nodes related to
+   removed repos), reate added FileRepos
+- CommandNode: consider keeping script text as defined by buildfile.
+  Postpone resolving of %f, %i etc flags until execution time. This requires 
+  CommandNode to store references to cmdInput nodes, orderOnlyInput nodes.
+  Rationale: reduce script size in persistent buildstate.
+  ote: node paths are relative to repo, input paths are relative to working dir.
+  So paths of input nodes must be converted.
+- Adapt Parser to give better error messages.
+  eplace Tokenizer approach by 'Phil' approach.
+- Adapt Parser/SyntaxTree executor to reject absolute path names.
+
 
 Todo: non-core
 - build file syntax (follow tup, follow mrmake, something completely different?)

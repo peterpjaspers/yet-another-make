@@ -79,8 +79,11 @@ Design aspects:
        b) FileNode has subclasses SourceFileNode and GeneratedFileNode
           The latter has a reference to the CommandNode that produced it
           and that can only be set at construction time.
+       c) FileNode has subclasses SourceFileNode and GeneratedFileNode
+          The latter has a reference to the CommandNode that can be set
+          at any time.
     2) Number of processing phases
-       a) 1-phase (only in combination with 1a)
+       a) 1-phase (only in combination with 1a and 1c)
           The inputs of a command node are all FileNodes. Only after 
           processing of all buildfiles the commands are ready for execution
           because only then one can be sure that the producer fields of all
@@ -121,12 +124,12 @@ generated file. But this will not happen because of the mis-spelled name. As a
 consequence the command script will fail because it references a non-existing 
 input file. This violates the fail-early principle.
 
-1b+2a (SourceFileNode/GeneratedFileNode and 1-phase)
+1b+2a (SourceFileNode/GeneratedFileNode mandatory producer, 1-phase)
 This combination is not possible because a rule with a generated input file
-for which no GeneratedFileNode was yet created can not construct the 
+for which no GeneratedFileNode can be found can not construct the 
 GeneratedFileNode itself because it does not know its producer.
 
-1b+2b (SourceFileNode/GeneratedFileNode and 1.5-phase)
+1b+2b (SourceFileNode/GeneratedFileNode mandatory producer,  1.5-phase)
 When the proper buildfile dependencies of buildfile X have been processed then
 during processing of X the graph will contain all generated input nodes
 referenced by X.
@@ -136,20 +139,63 @@ generated input file the graph will not contain a matching SourceFileNode/
 correct his error (i.e. fix buildfile dependencies declaration or fix spelling
 of input file name).
 
-1b+2c
-Similar to previous scenario: when in second phase no matching input node is
-found then buildfile processing fails.
+1b+2c (SourceFileNode/GeneratedFileNode mandatory producer, 2-phase)
+When in second phase no matching input node is found due to mis-spelled name
+then buildfile processing fails. It is clear that the mis-spelled name is 
+refering to a generated file
 
-The design 1b+2b (SourceFileNode/GeneratedFileNode and 1.5-phase) is the most
+1c+2a (SourceFileNode/GeneratedFileNode optional producer, 1-phase)
+Similar to 1a+2a. Error can be detected at start of executing a command that 
+has a GeneratedFileNode with null producer. So detection is earlier than in
+1a+2* scenarios, but still not optimal.
+
+1c+2b (SourceFileNode/GeneratedFileNode optional producer, 1.5-phase)
+Same as to 1b+2b.
+
+1c+2c (SourceFileNode/GeneratedFileNode optional producer, 2-phase)
+Similar to 1a+2a. Error can be detected during phase 2, so before command
+execution can start.
+
+The design 1b+2b (SourceFileNode/GeneratedFileNode and 1.5-phase) is
 attractive because:
     - it enables parallel processing of buildfiles and commands
     - it fails early and is able to produce an error message that explains the 
       two possible causes of the error (incomplete buildfile dependencies or
       mis-spelled input file.)
+      
+Disadvantages of design 1b+2b:
+    - user must define buildfile dependencies
+    - buildfiles cannot be cyclic dependent
 
-Decision: implement 1b+2b
+Robustness of 1b+2b for other user errors:
+-- Removing a rule while not removing references to the its output files.
+   Assume buildfiles X and Y. A rule in X uses input file F that is generated 
+   by a rule in Y. So X depends on Y. The user now removes that rule from Y but
+   forgets to remove the reference to F from buildfile X.
+   Yam handles this as follows:
+       - X depends on Y. When Y changes than both Y and X, in that order, will
+         be reprocessed.
+       - Processing of X detects that F does not exist (no source file F exists
+         nor generated file F exists). Yam raises an error, the build fails.
+   Note: in the 1- and 2-phase scenarios stale references can only be detected
+   after all buildfiles have been processed. 
+-- Cycles between build files.
+   Buildfile X refs output file F defined in Y, Y refs outputfile G defined in
+   X. Yam cannot handle this because X and Y are represented as nodes. Y is 
+   requisite of X, X is requisite of Y. This will cause a deadlock. Yam must 
+   detect this cycle and fail the build. 
+   Note: the 1-phase and 2-phase processing options can handle this situation.
+-- Cycles between rules.
+   If the cycling rules are defined in two buildfiles then see above.
+   Cycles between rules in one buildfile: assume rule A produces F, rule B
+   produces G. A has input G, B has input F. A is defined before B. When
+   interpreting rule A yam cannot find the filenode for G. Yam raises an error, 
+   the build fails.
+   Note: the 1-phase and 2-phase processing options can only detect this 
+   once all buildfiles have been processed.
 
----Buildfile dependencies
+
+---Buildfile dependencies (in 1b+2b)
 
 A buildfile is an executable program that outputs rules that are interpreted by
 yam to produce a set of command and generated file nodes. The process of 
@@ -210,35 +256,50 @@ For the time being yam will support foreach rules. Rationale: Yam caches directo
 and glob results. Such caches cannot be implemented in the buildfile logic. Hence
 yam foreach support will result in faster processing of buildfiles.
 
----BuildFileNode
-Processing of buildfile X is performed by a BuildFileNode associated with a
-SourceFileNode associated with X. BuildFileNodes are stored in the graph.
-BuildFileNode keeps track of the command and generated file nodes created by
-that BuildFileNode and added to the graph. It owns these nodes, i.e. it is 
-responsible to remove obsolete nodes from the graph.
-Note that the BuildFileNode does not own source file nodes as these are created
-and owned by DirectoryNodes during repo mirroring.
+---BuildFileProcessingNode
+Processing of a buildfile is performed by a BuildFileProcessingNode.
+BuildFileProcessingNodes are stored in the graph. BuildFileProcessingNode keeps
+track of the command and generated file nodes that it created from the rules.
+It is responsible to add these nodes to the graph and to remove them from the 
+when the rules from which they were created are deleted/changed.
 
-When buildfile X is modified yam detects this change and will set SourceFileNode
-X and BuildFileNode X dirty. Next build these nodes will re-execute. When file X
-has changed BuildFileNode X will re-process file X. This will update the set of
-command and generated file nodes owned by BuildFileNode X.
-
-When a new buildfile X is created in directory D yam detects a change in D and
+For each directory there is 0 or 1 BuildFileProcessingNode.
+When a buildfile X is created in directory D yam detects a change in D and
 will set DirectoryNode D dirty. At next build DirectoryNode D will be 
 re-executed and will will pick-up X. The directory node creates a SourceFileNode
-for X and a BuildFileNode on SourceFileNode X. The directory node owns the
-new nodes and adds them to the graph.
+for X and a BuildFileProcessingNode D for SourceFileNode X. The directory node 
+owns the new nodes and adds them to the graph.
 After completion of the mirror update yam will execute all dirty nodes. These
-include the new SourceFileNode X and BuildFileNode X.
+include the new SourceFileNode X and BuildFileProcessingNode D.
+
+When buildfile X is modified yam detects this change and will set SourceFileNode
+X dirty, which propagates to BuildFileProcessingNode D. Next build these nodes
+will re-execute. When file X has changed BuildFileProcessingNode D will 
+re-process file X. This will update the set of command and generated file nodes 
+owned by BuildFileProcessingNode X.
 
 When buildfile X is deleted from directory D yam detects both a change in 
-buildfile X and in directory D. This causes SourceFileNode X, BuildFileNode X
-and DirectoryNode D to be set dirty. Next build DirectoryNode D will re-execute
-and notice that SourceFileNode X no longer exists. It will then request 
-BuildFileNode X to remove all its command and generated file nodes from the
-graph and will then remove SourceFileNode X and BuildFileNode X from the graph.
+buildfile X and in directory D. This causes SourceFileNode X, 
+BuildFileProcessingNode D and DirectoryNode D to be set dirty. Next build
+DirectoryNode D will re-execute and notice that SourceFileNode X no longer
+exists. After completion of the mirror update BuildFileProcessingNode D will
+re-execute, detect that X has been deleted and remove all its command and 
+generated file nodes from the graph.
+When buildfile X is deleted then DirectoryNode D will remove processing node D.
+When buildfile X is replaced by Y (e.g. buildfile_yam.rb replaced by 
+buildfile_yam.py) DirectoryNode D will associate processing node D with Y.
+Note: BuildFileProcessingNode D1 may depend on BuildFileProcessingNode D2.
+When the buildfile in D2 is deleted processing node D2 will be removed from
+the graph. D1 however still references D2. D1 will re-execute discover that
+D2 is deleted. If D1 still depends on D2 (because user forgot to remove
+the dependency of D1 on D2) then it fails.
 
+When yam buildfile X is changed/deleted it sets X dirty which propagates
+to BuildFileProcessingNode X which propagates to any BuildFileProcessingNode Y
+that depends on BuildFileProcessingNode X (because X creates GeneratedFileNodes
+referenced by Y). After X completes, Y will re-process and discover that 
+it references GeneratedFileNodes that no longer exist in the graph.
+Build fails, user is prompted to remove the dangling reference from Y.
 
 Note: the design in this document requires repos to be mirrored in the graph.
 In design_getRidOfRepoMirroring.txt however it was decided to get rid of repo

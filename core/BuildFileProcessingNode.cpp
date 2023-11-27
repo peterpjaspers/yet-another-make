@@ -1,8 +1,10 @@
 #include "BuildFileProcessingNode.h"
 #include "SourceFileNode.h"
 #include "GeneratedFileNode.h"
+#include "DirectoryNode.h"
 #include "CommandNode.h"
 #include "ExecutionContext.h"
+#include "FileSystem.h"
 
 #include <vector>
 
@@ -28,26 +30,26 @@ namespace
 namespace YAM
 {
 
-    BuildFileProcessingNode::BuildFileProcessingNode() {
+    BuildFileProcessingNode::BuildFileProcessingNode() {}
 
-    }
     BuildFileProcessingNode::BuildFileProcessingNode(ExecutionContext* context, std::filesystem::path const& name)
         : Node(context, name)
-    { }
+        , _buildFileExecutor(std::make_shared<CommandNode>(context, "executor"))
+    {
+        _buildFileExecutor->addObserver(this);
+    }
+
+    BuildFileProcessingNode::~BuildFileProcessingNode() {
+        _buildFileExecutor->removeObserver(this);
+    }
 
     void BuildFileProcessingNode::buildFile(std::shared_ptr<SourceFileNode> const& newFile) {
         if (_buildFile != newFile) {
             if (_buildFile != nullptr) {
-                _inputs.erase(_buildFile->name());
-                _buildFile->removeObserver(this);
                 for (auto const& cmd : _commands) removeCommand(context(), cmd);
                 _commands.clear();
             }
             _buildFile = newFile;
-            if (_buildFile != nullptr) {
-                _buildFile->addObserver(this);
-                _inputs.insert({ _buildFile->name(), _buildFile });
-            }
             setState(Node::State::Dirty);
         }
     }
@@ -56,8 +58,59 @@ namespace YAM
         return _buildFile;
     }
 
+    void BuildFileProcessingNode::setupBuildFileExecutor() {
+        _rulesFile = FileSystem::createUniqueDirectory() / "rules.txt";
+
+        std::stringstream ss;
+        ss << _buildFile->name().filename() << " > " << _rulesFile.string();
+        std::string script = ss.str();
+        _buildFileExecutor->script(script);
+
+        auto wdir = _buildFile->name().parent_path();
+        auto wdirNode = dynamic_pointer_cast<DirectoryNode>(context()->nodes().find(wdir));
+        _buildFileExecutor->workingDirectory(wdirNode);
+    }
+    
+    void BuildFileProcessingNode::teardownBuildFileExecutor() {
+        _buildFileExecutor->workingDirectory(nullptr);
+        _buildFileExecutor->script(std::string());
+        std::filesystem::remove_all(_rulesFile.parent_path());
+        _rulesFile = "";
+    }
+
     void BuildFileProcessingNode::start() {
-        postCompletion(Node::State::Ok);
+        Node::start();
+        if (_buildFile == nullptr) {
+            postCompletion(Node::State::Ok);
+            return;
+        }
+
+        std::vector<Node*> requisites;
+        // 1. execute buildfile => output to temporary file
+        //    if (output hash not changed) => finish
+        // 2. parse buildfile output => syntaxtree + buildfile dependencies
+        // 3. delete temporary file
+        // 4. execute buildfile dependencies => refd generated files
+        // 5. evaluate syntax tree => updated set of command nodes
+
+        setupBuildFileExecutor();
+        requisites.push_back(_buildFileExecutor.get());
+        auto callback = Delegate<void, Node::State>::CreateLambda(
+            [this](Node::State state) { handleBuildFileExecutorCompletion(state); }
+        );
+        startNodes(requisites, std::move(callback));
+    }
+
+    void BuildFileProcessingNode::handleBuildFileExecutorCompletion(Node::State state) {
+        if (state != Node::State::Ok) {
+            Node::notifyCompletion(state);
+        } else if (canceling()) {
+            Node::notifyCompletion(Node::State::Canceled);
+        } else {
+            bool completed = true;
+            Node::notifyCompletion(state);
+        }
+        teardownBuildFileExecutor();
     }
 
     void BuildFileProcessingNode::getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const {

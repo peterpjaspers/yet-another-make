@@ -45,6 +45,7 @@
     </ClCompile>
     <ClCompile Include="buildClientServiceTest.cpp" />
     <ClCompile Include="builderTest.cpp" />
+    <ClCompile Include="buildFileProcessingNodeTest.cpp" />
     <ClCompile Include="buildServicePortRegistryTest.cpp" />
     <ClCompile Include="buildServiceProtocolTest.cpp" />
     <ClCompile Include="collapsedFileChangesTest.cpp" />
@@ -63,6 +64,7 @@
     <ClCompile Include="fileAspectTest.cpp" />
     <ClCompile Include="fileNodeTest.cpp" />
     <ClCompile Include="directoryWatcherWin32Test.cpp" />
+    <ClCompile Include="fileSystemTest.cpp" />
     <ClCompile Include="globberTest.cpp" />
     <ClCompile Include="globTest.cpp" />
     <ClCompile Include="memoryStreamTest.cpp" />
