@@ -33,11 +33,11 @@ namespace YAM {
     BuildFileCompiler::BuildFileCompiler(
             ExecutionContext* context,
             std::shared_ptr<DirectoryNode> const& baseDir,
-            std::shared_ptr<BuildFile::File> const& buildFile)
+            BuildFile::File const& buildFile)
         : _context(context)
         , _baseDir(baseDir)
     {
-        for (auto const& varOrRule : buildFile->variablesAndRules) {
+        for (auto const& varOrRule : buildFile.variablesAndRules) {
             auto rule = dynamic_cast<BuildFile::Rule*>(varOrRule.get());
             if (rule != nullptr) compileRule(*rule);
         }
@@ -102,7 +102,7 @@ namespace YAM {
             std::shared_ptr<Node> node = _context->nodes().find(fileName);
             if (node != nullptr) {
                 fileNode = dynamic_pointer_cast<GeneratedFileNode>(node);
-                if (fileNode == nullptr) throw std::runtime_error("not a file node");
+                if (fileNode == nullptr) throw std::runtime_error("not a generated file node");
             } else {
                 fileNode = std::make_shared<GeneratedFileNode>(_context, fileName, nullptr);
             }
@@ -149,6 +149,7 @@ namespace YAM {
         if (cmdNode == nullptr) {
             cmdNode = std::make_shared<CommandNode>(_context, cmdName);
         }
+        cmdNode->script(script);
         // TODO: initialize cmdNode
         _commands.push_back(cmdNode);
     }    

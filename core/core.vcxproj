@@ -257,7 +257,7 @@
     <ClCompile Include="ThreadPool.cpp" />
     <ClCompile Include="TimePoint.cpp" />
     <ClCompile Include="BinaryValueStreamer.cpp" />
-    <ClCompile Include="Tokenizer.cpp" />
+    <ClCompile Include="BuildFileTokenizer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="IStreamer.inl" />

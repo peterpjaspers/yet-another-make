@@ -45,6 +45,7 @@
     </ClCompile>
     <ClCompile Include="buildClientServiceTest.cpp" />
     <ClCompile Include="builderTest.cpp" />
+    <ClCompile Include="buildFileCompilerTest.cpp" />
     <ClCompile Include="buildFileProcessingNodeTest.cpp" />
     <ClCompile Include="buildServicePortRegistryTest.cpp" />
     <ClCompile Include="buildServiceProtocolTest.cpp" />

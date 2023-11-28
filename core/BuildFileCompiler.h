@@ -21,7 +21,7 @@ namespace YAM {
         BuildFileCompiler(
             ExecutionContext* context,
             std::shared_ptr<DirectoryNode> const& baseDir,
-            std::shared_ptr<BuildFile::File> const& buildFile);
+            BuildFile::File const& buildFile);
 
         std::vector<std::shared_ptr<CommandNode>> const& commands() {
             return _commands;

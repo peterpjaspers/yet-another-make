@@ -43,10 +43,10 @@
     <Filter Include="Source Files\BuildService">
       <UniqueIdentifier>{9d6d618b-9987-41d7-b09d-c4c3eaeb0900}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\BuildFileParser">
+    <Filter Include="Header Files\BuildFileCompiler">
       <UniqueIdentifier>{9cf55302-45d8-4d05-96a1-f099dae4bafb}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\BuildFileParser">
+    <Filter Include="Source Files\BuildFileCompiler">
       <UniqueIdentifier>{5dd8690a-6430-48bb-ae69-fc2736b8e358}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -256,16 +256,16 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="BuildFileParser.h">
-      <Filter>Header Files\BuildFileParser</Filter>
+      <Filter>Header Files\BuildFileCompiler</Filter>
     </ClInclude>
     <ClInclude Include="BuildFileTokenizer.h">
-      <Filter>Header Files\BuildFileParser</Filter>
+      <Filter>Header Files\BuildFileCompiler</Filter>
     </ClInclude>
     <ClInclude Include="BuildFile.h">
-      <Filter>Header Files\BuildFileParser</Filter>
+      <Filter>Header Files\BuildFileCompiler</Filter>
     </ClInclude>
     <ClInclude Include="buildFileTokenSpecs.h">
-      <Filter>Header Files\BuildFileParser</Filter>
+      <Filter>Header Files\BuildFileCompiler</Filter>
     </ClInclude>
     <ClInclude Include="Glob.h">
       <Filter>Header Files</Filter>
@@ -280,7 +280,7 @@
       <Filter>Header Files\Node</Filter>
     </ClInclude>
     <ClInclude Include="BuildFileCompiler.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\BuildFileCompiler</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -441,10 +441,10 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="BuildFileParser.cpp">
-      <Filter>Source Files\BuildFileParser</Filter>
+      <Filter>Source Files\BuildFileCompiler</Filter>
     </ClCompile>
-    <ClCompile Include="Tokenizer.cpp">
-      <Filter>Source Files\BuildFileParser</Filter>
+    <ClCompile Include="BuildFileTokenizer.cpp">
+      <Filter>Source Files\BuildFileCompiler</Filter>
     </ClCompile>
     <ClCompile Include="Glob.cpp">
       <Filter>Source Files</Filter>
@@ -459,7 +459,7 @@
       <Filter>Source Files\Node</Filter>
     </ClCompile>
     <ClCompile Include="BuildFileCompiler.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\BuildFileCompiler</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

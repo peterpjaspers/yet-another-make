@@ -165,7 +165,7 @@ namespace YAM
             context()->logBook()->add(record);
             notifyProcessingCompletion(Node::State::Failed);
         } else {
-            BuildFileCompiler compiler(context(), _buildFileExecutor->workingDirectory(), file);
+            BuildFileCompiler compiler(context(), _buildFileExecutor->workingDirectory(), *file);
             auto newCommands = compiler.commands();
 
             std::unordered_set<std::shared_ptr<CommandNode>> newSet(newCommands.begin(), newCommands.end());
