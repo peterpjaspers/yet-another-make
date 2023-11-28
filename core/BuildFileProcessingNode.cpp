@@ -5,8 +5,12 @@
 #include "CommandNode.h"
 #include "ExecutionContext.h"
 #include "FileSystem.h"
+#include "FileAspect.h"
+#include "BuildFileParser.h"
+#include "BuildFileCompiler.h"
 
 #include <vector>
+#include <unordered_set>
 
 
 namespace
@@ -25,6 +29,27 @@ namespace
         }
         context->nodes().remove(cmd);
     }
+    template<class T>
+    void computeSetsDifference(
+        std::unordered_set<T> const& in1,
+        std::unordered_set<T> const& in2,
+        std::unordered_set<T>& inBoth,
+        std::unordered_set<T>& onlyIn1,
+        std::unordered_set<T>& onlyIn2
+    ) {
+        std::set_intersection(
+            in1.begin(), in1.end(),
+            in2.begin(), in2.end(),
+            std::inserter(inBoth, inBoth.begin()));
+        std::set_difference(
+            in1.begin(), in1.end(),
+            inBoth.begin(), inBoth.end(),
+            std::inserter(onlyIn1, onlyIn1.begin()));
+        std::set_difference(
+            in2.begin(), in2.end(),
+            inBoth.begin(), inBoth.end(),
+            std::inserter(onlyIn2, onlyIn2.begin()));
+    }
 }
 
 namespace YAM
@@ -35,6 +60,7 @@ namespace YAM
     BuildFileProcessingNode::BuildFileProcessingNode(ExecutionContext* context, std::filesystem::path const& name)
         : Node(context, name)
         , _buildFileExecutor(std::make_shared<CommandNode>(context, "executor"))
+        , _buildFileHash(rand())
     {
         _buildFileExecutor->addObserver(this);
     }
@@ -103,14 +129,70 @@ namespace YAM
 
     void BuildFileProcessingNode::handleBuildFileExecutorCompletion(Node::State state) {
         if (state != Node::State::Ok) {
-            Node::notifyCompletion(state);
+            notifyProcessingCompletion(state);
         } else if (canceling()) {
-            Node::notifyCompletion(Node::State::Canceled);
+            notifyProcessingCompletion(Node::State::Canceled);
+        } else if (_buildFile->hashOf(FileAspect::entireFileAspect().name()) != _buildFileHash) {
+            context()->statistics().registerSelfExecuted(this);
+            auto d = Delegate<void>::CreateLambda(
+                [this]() { parseBuildFile(); }
+            );
+            context()->threadPoolQueue().push(std::move(d));
         } else {
-            bool completed = true;
-            Node::notifyCompletion(state);
+            notifyProcessingCompletion(Node::State::Canceled);
         }
+    }
+
+    // threadpool
+    void BuildFileProcessingNode::parseBuildFile() {
+        std::shared_ptr<BuildFile::File> buildFile;
+        std::string errorMsg;
+        try {
+            BuildFileParser parser(_rulesFile);
+            buildFile = parser.file();
+        } catch (std::runtime_error ex) {
+            errorMsg = ex.what();
+        }
+        auto d = Delegate<void>::CreateLambda(
+            [this, buildFile, errorMsg]() { handleParseBuildFileCompletion(buildFile, errorMsg); }
+        );
+        context()->mainThreadQueue().push(std::move(d));
+    }
+
+    void BuildFileProcessingNode::handleParseBuildFileCompletion(std::shared_ptr<BuildFile::File> file, std::string error) {
+        if (!error.empty()) {
+            LogRecord record(LogRecord::Aspect::Error, error);
+            context()->logBook()->add(record);
+            notifyProcessingCompletion(Node::State::Failed);
+        } else {
+            BuildFileCompiler compiler(context(), _buildFileExecutor->workingDirectory(), file);
+            auto newCommands = compiler.commands();
+
+            std::unordered_set<std::shared_ptr<CommandNode>> newSet(newCommands.begin(), newCommands.end());
+            std::unordered_set<std::shared_ptr<CommandNode>> oldSet(_commands.begin(), _commands.end());
+            std::unordered_set<std::shared_ptr<CommandNode>> keptCmds;
+            std::unordered_set<std::shared_ptr<CommandNode>> newCmds;
+            std::unordered_set<std::shared_ptr<CommandNode>> removedCmds;
+            computeSetsDifference(
+                newSet,
+                oldSet,
+                keptCmds,
+                newCmds,
+                removedCmds);
+            for (auto const& cmd : newCmds) context()->nodes().add(cmd);
+            for (auto const& cmd : removedCmds) cmd->setState(Node::State::Deleted);
+            _commands = newCommands;
+        }
+        notifyProcessingCompletion(Node::State::Ok);
+    }
+
+    void BuildFileProcessingNode::compile(std::shared_ptr<BuildFile::File> const& file) {
+    }
+
+    void BuildFileProcessingNode::notifyProcessingCompletion(Node::State state) {
         teardownBuildFileExecutor();
+        Node::notifyCompletion(state);
+
     }
 
     void BuildFileProcessingNode::getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const {

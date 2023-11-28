@@ -104,7 +104,7 @@
     <ClInclude Include="BuildFileProcessingNode.h" />
     <ClInclude Include="Glob.h" />
     <ClInclude Include="Globber.h" />
-    <ClInclude Include="Parser.h" />
+    <ClInclude Include="BuildFileParser.h" />
     <ClInclude Include="BuildRequest.h" />
     <ClInclude Include="BuildResult.h" />
     <ClInclude Include="BuildService.h" />
@@ -166,14 +166,15 @@
     <ClInclude Include="Node.h" />
     <ClInclude Include="SourceFileNode.h" />
     <ClInclude Include="FileRepository.h" />
-    <ClInclude Include="SyntaxTree.h" />
+    <ClInclude Include="BuildFile.h" />
+    <ClInclude Include="BuildFileCompiler.h" />
     <ClInclude Include="TcpStream.h" />
     <ClInclude Include="Thread.h" />
     <ClInclude Include="ThreadPool.h" />
     <ClInclude Include="TimePoint.h" />
     <ClInclude Include="BinaryValueStreamer.h" />
-    <ClInclude Include="Tokenizer.h" />
-    <ClInclude Include="tokenSpecs.h" />
+    <ClInclude Include="BuildFileTokenizer.h" />
+    <ClInclude Include="buildFileTokenSpecs.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BasicOStreamLogBook.cpp" />
@@ -184,7 +185,7 @@
     <ClCompile Include="BuildFileProcessingNode.cpp" />
     <ClCompile Include="Glob.cpp" />
     <ClCompile Include="Globber.cpp" />
-    <ClCompile Include="Parser.cpp" />
+    <ClCompile Include="BuildFileParser.cpp" />
     <ClCompile Include="BuildRequest.cpp" />
     <ClCompile Include="BuildResult.cpp" />
     <ClCompile Include="BuildService.cpp">
@@ -250,7 +251,7 @@
     </ClCompile>
     <ClCompile Include="SourceFileNode.cpp" />
     <ClCompile Include="FileRepository.cpp" />
-    <ClCompile Include="SyntaxTree.cpp" />
+    <ClCompile Include="BuildFileCompiler.cpp" />
     <ClCompile Include="TcpStream.cpp" />
     <ClCompile Include="Thread.cpp" />
     <ClCompile Include="ThreadPool.cpp" />

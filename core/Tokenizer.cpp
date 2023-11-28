@@ -1,11 +1,11 @@
 #pragma once
 
-#include "Tokenizer.h"
+#include "BuildFileTokenizer.h"
 #include <sstream>
 
 
 namespace YAM {
-    Tokenizer::Tokenizer(std::string const& content, std::vector<TokenSpec> const& specs)
+    BuildFileTokenizer::BuildFileTokenizer(std::string const& content, std::vector<TokenSpec> const& specs)
         : _content(content)
         , _specs(specs)
         , _tokenStartOffset(0)
@@ -20,7 +20,7 @@ namespace YAM {
         , _column(0)
     {}
 
-    void Tokenizer::readNextToken(Token& token) {
+    void BuildFileTokenizer::readNextToken(Token& token) {
         token.type = "";
         token.value = "";
 
@@ -41,11 +41,11 @@ namespace YAM {
         throwUnexpectedToken();
     }
 
-    bool Tokenizer::hasMoreTokens() {
+    bool BuildFileTokenizer::hasMoreTokens() {
         return _cursor < _content.length();
     }
 
-    bool Tokenizer::match(TokenSpec const& spec, const char* str, std::string& match) {
+    bool BuildFileTokenizer::match(TokenSpec const& spec, const char* str, std::string& match) {
         std::cmatch cm;
         bool matched = std::regex_search(str, cm, spec.regex, std::regex_constants::match_continuous);
         if (!matched) return false;
@@ -56,7 +56,7 @@ namespace YAM {
         return true;
     }
 
-    void Tokenizer::captureLocation(std::string const& matched) {
+    void BuildFileTokenizer::captureLocation(std::string const& matched) {
         std::regex nlRe(R"(\n)");
 
         // Absolute offsets.
@@ -82,7 +82,7 @@ namespace YAM {
         _column = _tokenEndColumn;
     }
 
-    void Tokenizer::throwUnexpectedToken() {
+    void BuildFileTokenizer::throwUnexpectedToken() {
         std::stringstream ss;
         ss
             << "Unexpected token at line " << _line

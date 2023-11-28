@@ -1,12 +1,13 @@
-#include "../Parser.h"
+#include "../BuildFileParser.h"
+#include "../Glob.h"
 #include "gtest/gtest.h"
 #include <string>
 
 namespace {
     using namespace YAM;
 
-    TEST(Parser, simpleRule) {
-        const std::string file = R"(
+    TEST(BuildFileParser, simpleRule) {
+        const std::string rules = R"(
         : 
             hello.c
             |>
@@ -14,44 +15,36 @@ namespace {
             |> 
             hello 
         )";
-        Parser parser(file);
+        BuildFileParser parser(rules);
 
-        auto buildFile = dynamic_pointer_cast<SyntaxTree::BuildFile>(parser.syntaxTree());
+        auto const buildFile = dynamic_pointer_cast<BuildFile::File>(parser.file());
         ASSERT_NE(nullptr, buildFile);
-        ASSERT_EQ(1, buildFile->children().size());
-        auto rule = dynamic_pointer_cast<SyntaxTree::Rule>(buildFile->children()[0]);
+        ASSERT_EQ(1, buildFile->variablesAndRules.size());
+        auto rule = dynamic_pointer_cast<BuildFile::Rule>(buildFile->variablesAndRules[0]);
 
         ASSERT_NE(nullptr, rule);
-        ASSERT_EQ(3, rule->children().size());
 
-        auto inputs = dynamic_pointer_cast<SyntaxTree::Inputs>(rule->children()[0]);
-        ASSERT_NE(nullptr, inputs);
-        ASSERT_EQ(1, inputs->children().size());
-        auto input = dynamic_pointer_cast<SyntaxTree::Input>(inputs->children()[0]);
-        ASSERT_NE(nullptr, input);
-        EXPECT_FALSE(input->exclude);
-        EXPECT_TRUE(input->glob.matches(std::string("hello.c")));
+        ASSERT_EQ(1, rule->cmdInputs.inputs.size());
+        auto const& input = rule->cmdInputs.inputs[0];
+        EXPECT_FALSE(input.exclude);
+        Glob glob(input.pathPattern);
+        EXPECT_TRUE(glob.matches(std::string("hello.c")));
 
-        auto script = dynamic_pointer_cast<SyntaxTree::Script>(rule->children()[1]);
-        ASSERT_NE(nullptr, script);
         std::string expectedScript(R"(
                 gcc hello.c -o hello
             )");
-        EXPECT_EQ(expectedScript, script->script);
+        EXPECT_EQ(expectedScript, rule->script.script);
 
-        auto outputs = dynamic_pointer_cast<SyntaxTree::Outputs>(rule->children()[2]);
-        ASSERT_NE(nullptr, outputs);
-        ASSERT_EQ(1, outputs->children().size());
-        auto output = dynamic_pointer_cast<SyntaxTree::Output>(outputs->children()[0]);
-        EXPECT_NE(nullptr, output);
-        EXPECT_EQ("hello", output->path);
+        ASSERT_EQ(1, rule->outputs.outputs.size());
+        auto const& output = rule->outputs.outputs[0];
+        EXPECT_EQ("hello", output.path);
     }
 
-    TEST(Parser, wrongScriptDelimitersToken) {
+    TEST(BuildFileParser, wrongScriptDelimitersToken) {
         const std::string file = R"(: hello.c >| gcc hello.c -o hello >| hello)";
         try
         {
-            Parser parser(file);
+            BuildFileParser parser(file);
         } catch (std::runtime_error e)
         {
             std::string expected(R"(Unexpected token at line 0, column 10
@@ -61,11 +54,11 @@ namespace {
         }
     }
 
-    TEST(Parser, missingScriptDelimiterToken) {
+    TEST(BuildFileParser, missingScriptDelimiterToken) {
         const std::string file = R"(: hello.c |> gcc hello.c -o hello hello)";
         try
         {
-            Parser parser(file);
+            BuildFileParser parser(file);
         } catch (std::runtime_error e)
         {
             std::string expected(R"(Unexpected token at line 0, column 10

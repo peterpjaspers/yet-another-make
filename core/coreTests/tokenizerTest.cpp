@@ -1,5 +1,5 @@
-#include "../Tokenizer.h"
-#include "../tokenSpecs.h" // defines variable tokenSpecs
+#include "../BuildFileTokenizer.h"
+#include "../buildFileTokenSpecs.h" // defines variable tokenSpecs
 #include "gtest/gtest.h"
 #include <regex>
 #include <chrono>
@@ -70,24 +70,24 @@ namespace {
         return allMatched;
     }
 
-    TEST(Tokenizer, performance) {
+    TEST(BuildFileTokenizer, performance) {
         EXPECT_TRUE(testCommandMatching());
     }
 
-    TEST(Tokenizer, whiteSpace) {
+    TEST(BuildFileTokenizer, whiteSpace) {
         const std::string whitespace(R"(    )");
-        Tokenizer tokenizer(whitespace, tokenSpecs);
+        BuildFileTokenizer tokenizer(whitespace, tokenSpecs);
         Token token;
         tokenizer.readNextToken(token);
         EXPECT_EQ("eos", token.type);
         EXPECT_EQ("", token.value);
     }
 
-    TEST(Tokenizer, ruleStart) {
+    TEST(BuildFileTokenizer, ruleStart) {
         const std::string rule(R"(
   : 
   )");
-        Tokenizer tokenizer(rule, tokenSpecs);
+        BuildFileTokenizer tokenizer(rule, tokenSpecs);
         Token token;
         tokenizer.readNextToken(token);
         EXPECT_EQ("rule", token.type);
@@ -106,10 +106,10 @@ namespace {
         EXPECT_EQ("", token.value);
     }
 
-    TEST(Tokenizer, commentLine) {
+    TEST(BuildFileTokenizer, commentLine) {
         const std::string commentLine(R"(  : // comment  :  
   : )");
-        Tokenizer tokenizer(commentLine, tokenSpecs);
+        BuildFileTokenizer tokenizer(commentLine, tokenSpecs);
         Token token;
         tokenizer.readNextToken(token);
         EXPECT_EQ("rule", token.type);
@@ -131,14 +131,14 @@ namespace {
         EXPECT_EQ("", token.value);
     }
 
-    TEST(Tokenizer, commentLines) {
+    TEST(BuildFileTokenizer, commentLines) {
         const std::string commentLines(R"(         
         /* c1
          * c2
         c3
         c4 
   */  :)");
-        Tokenizer tokenizer(commentLines, tokenSpecs);
+        BuildFileTokenizer tokenizer(commentLines, tokenSpecs);
         Token token;
         tokenizer.readNextToken(token);
         EXPECT_EQ("rule", token.type);
@@ -157,9 +157,9 @@ namespace {
         EXPECT_EQ("", token.value);
     }
 
-    TEST(Tokenizer, not) {
+    TEST(BuildFileTokenizer, not) {
         const std::string whitespace(R"(^aap.c)");
-        Tokenizer tokenizer(whitespace, tokenSpecs);
+        BuildFileTokenizer tokenizer(whitespace, tokenSpecs);
         Token token;
         tokenizer.readNextToken(token);
         EXPECT_EQ("not", token.type);
@@ -172,9 +172,9 @@ namespace {
         EXPECT_EQ("", token.value);
     }
 
-    TEST(Tokenizer, relativePath3) {
+    TEST(BuildFileTokenizer, relativePath3) {
         const std::string path(R"(aap\noot\mies.txt)");
-        Tokenizer tokenizer(path, tokenSpecs);
+        BuildFileTokenizer tokenizer(path, tokenSpecs);
         Token token;
         tokenizer.readNextToken(token);
         EXPECT_EQ("glob", token.type);
@@ -184,9 +184,9 @@ namespace {
         EXPECT_EQ("", token.value);
     }
 
-    TEST(Tokenizer, relativePath1) {
+    TEST(BuildFileTokenizer, relativePath1) {
         const std::string path(R"(mies.txt)");
-        Tokenizer tokenizer(path, tokenSpecs);
+        BuildFileTokenizer tokenizer(path, tokenSpecs);
         Token token;
         tokenizer.readNextToken(token);
         EXPECT_EQ("glob", token.type);
@@ -196,9 +196,9 @@ namespace {
         EXPECT_EQ("", token.value);
     }
 
-    TEST(Tokenizer, absolutePath3) {
+    TEST(BuildFileTokenizer, absolutePath3) {
         const std::string path(R"(\aap\noot\mies.txt)");
-        Tokenizer tokenizer(path, tokenSpecs);
+        BuildFileTokenizer tokenizer(path, tokenSpecs);
         Token token;
         tokenizer.readNextToken(token);
         EXPECT_EQ("glob", token.type);
@@ -208,9 +208,9 @@ namespace {
         EXPECT_EQ("", token.value);
     }
 
-    TEST(Tokenizer, absolutePath1) {
+    TEST(BuildFileTokenizer, absolutePath1) {
         const std::string path(R"(mies.txt)");
-        Tokenizer tokenizer(path, tokenSpecs);
+        BuildFileTokenizer tokenizer(path, tokenSpecs);
         Token token;
         tokenizer.readNextToken(token);
         EXPECT_EQ("glob", token.type);
@@ -220,9 +220,9 @@ namespace {
         EXPECT_EQ("", token.value);
     }
 
-    TEST(Tokenizer, relativeGlob1) {
+    TEST(BuildFileTokenizer, relativeGlob1) {
         const std::string glob(R"(aap\a?b?[cde]*.txt)");
-        Tokenizer tokenizer(glob, tokenSpecs);
+        BuildFileTokenizer tokenizer(glob, tokenSpecs);
         Token token;
         tokenizer.readNextToken(token);
         EXPECT_EQ("glob", token.type);
@@ -232,9 +232,9 @@ namespace {
         EXPECT_EQ("", token.value);
     }
 
-    TEST(Tokenizer, absoluteGlob1) {
+    TEST(BuildFileTokenizer, absoluteGlob1) {
         const std::string glob(R"(\aap\a?b?[cde]*.txt)");
-        Tokenizer tokenizer(glob, tokenSpecs);
+        BuildFileTokenizer tokenizer(glob, tokenSpecs);
         Token token;
         tokenizer.readNextToken(token);
         EXPECT_EQ("glob", token.type);
@@ -244,11 +244,11 @@ namespace {
         EXPECT_EQ("", token.value);
     }
 
-    TEST(Tokenizer, singleLineScript) {
+    TEST(BuildFileTokenizer, singleLineScript) {
         const std::string group(R"(gcc src\hello.c -o bin\hello)");
         const std::string script = R"(|>gcc src\hello.c -o bin\hello|> )";
 
-        Tokenizer tokenizer(script, tokenSpecs);
+        BuildFileTokenizer tokenizer(script, tokenSpecs);
         Token token;
 
         tokenizer.readNextToken(token);
@@ -259,7 +259,7 @@ namespace {
         EXPECT_EQ("", token.value);
     }
 
-    TEST(Tokenizer, multiLineScript) {
+    TEST(BuildFileTokenizer, multiLineScript) {
         const std::string group(R"(
                 gcc 
                 src\hello.c 
@@ -269,7 +269,7 @@ namespace {
                 src\hello.c 
                -o bin\hello|> )";
 
-        Tokenizer tokenizer(script, tokenSpecs);
+        BuildFileTokenizer tokenizer(script, tokenSpecs);
         Token token;
 
         tokenizer.readNextToken(token);
@@ -279,7 +279,7 @@ namespace {
         EXPECT_EQ("eos", token.type);
         EXPECT_EQ("", token.value);
     }
-    TEST(Tokenizer, rule) {
+    TEST(BuildFileTokenizer, rule) {
         const std::string command(R"(
                 gcc 
                 src\hello.c 
@@ -292,7 +292,7 @@ namespace {
                -o bin\hello 
             |> bin\hello )");
 
-        Tokenizer tokenizer(rule, tokenSpecs);
+        BuildFileTokenizer tokenizer(rule, tokenSpecs);
         Token token;
 
         tokenizer.readNextToken(token);

@@ -5,6 +5,7 @@
 #include "../DirectoryNode.h"
 #include "../SourceFileNode.h"
 #include "../ExecutionContext.h"
+#include "../BuildFileProcessingNode.h"
 #include "../../xxhash/xxhash.h"
 
 #include <chrono>
@@ -183,11 +184,11 @@ namespace
         auto buildFile = dirNode->findChild(buildFilePath.filename());
         EXPECT_NE(nullptr, buildFile);
         EXPECT_EQ(buildFile, context.nodes().find(symBuildFilePath));
-        std::filesystem::path buildFileProcessingPath = buildFile->name() / "__processing__";
-        auto buildFileProcessingNode = context.nodes().find(buildFileProcessingPath);
-        ASSERT_NE(nullptr, buildFileProcessingNode); 
-        std::vector<std::shared_ptr<Node>> inputs;
-        buildFileProcessingNode->getInputs(inputs);
-        EXPECT_NE(inputs.end(), std::find(inputs.begin(), inputs.end(), buildFile));
+        std::filesystem::path buildFileProcessingPath = dirNode->name() / "__buildfile";
+        auto node = context.nodes().find(buildFileProcessingPath);
+        ASSERT_NE(nullptr, node); 
+        auto buildFileProcessingNode = dynamic_pointer_cast<BuildFileProcessingNode>(node);
+        ASSERT_NE(nullptr, buildFileProcessingNode);
+        EXPECT_EQ(buildFilePath, buildFileProcessingNode->buildFile()->absolutePath());
     }
 }

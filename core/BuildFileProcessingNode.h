@@ -1,14 +1,16 @@
 #pragma once
 #include "Node.h"
+
 #include "../xxHash/xxhash.h"
 
 #include <map>
 #include <memory>
-#include <set>
+#include <vector>
 
 namespace YAM {
     class SourceFileNode;
     class CommandNode;
+    namespace BuildFile { class File; }
 
     class __declspec(dllexport) BuildFileProcessingNode : public Node
     {
@@ -37,12 +39,17 @@ namespace YAM {
         void setupBuildFileExecutor();
         void teardownBuildFileExecutor();
         void handleBuildFileExecutorCompletion(Node::State state);
+        void parseBuildFile();
+        void handleParseBuildFileCompletion(std::shared_ptr<BuildFile::File> tree, std::string error);
+        void compile(std::shared_ptr<BuildFile::File> const& file);
+        void notifyProcessingCompletion(Node::State state);
 
-        std::shared_ptr<SourceFileNode> _buildFile; 
+        std::shared_ptr<SourceFileNode> _buildFile;
+        XXH64_hash_t _buildFileHash;
         std::shared_ptr<CommandNode> _buildFileExecutor;
         std::filesystem::path _rulesFile;
         std::map<std::filesystem::path, std::shared_ptr<Node>> _inputs;
-        std::set<std::shared_ptr<CommandNode>> _commands;
+        std::vector<std::shared_ptr<CommandNode>> _commands;
     };
 }
 

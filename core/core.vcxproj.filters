@@ -255,16 +255,16 @@
     <ClInclude Include="IPersistable.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Parser.h">
+    <ClInclude Include="BuildFileParser.h">
       <Filter>Header Files\BuildFileParser</Filter>
     </ClInclude>
-    <ClInclude Include="Tokenizer.h">
+    <ClInclude Include="BuildFileTokenizer.h">
       <Filter>Header Files\BuildFileParser</Filter>
     </ClInclude>
-    <ClInclude Include="SyntaxTree.h">
+    <ClInclude Include="BuildFile.h">
       <Filter>Header Files\BuildFileParser</Filter>
     </ClInclude>
-    <ClInclude Include="tokenSpecs.h">
+    <ClInclude Include="buildFileTokenSpecs.h">
       <Filter>Header Files\BuildFileParser</Filter>
     </ClInclude>
     <ClInclude Include="Glob.h">
@@ -278,6 +278,9 @@
     </ClInclude>
     <ClInclude Include="BuildFileProcessingNode.h">
       <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildFileCompiler.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -437,13 +440,10 @@
     <ClCompile Include="PersistentBuildState.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Parser.cpp">
+    <ClCompile Include="BuildFileParser.cpp">
       <Filter>Source Files\BuildFileParser</Filter>
     </ClCompile>
     <ClCompile Include="Tokenizer.cpp">
-      <Filter>Source Files\BuildFileParser</Filter>
-    </ClCompile>
-    <ClCompile Include="SyntaxTree.cpp">
       <Filter>Source Files\BuildFileParser</Filter>
     </ClCompile>
     <ClCompile Include="Glob.cpp">
@@ -457,6 +457,9 @@
     </ClCompile>
     <ClCompile Include="BuildFileProcessingNode.cpp">
       <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildFileCompiler.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

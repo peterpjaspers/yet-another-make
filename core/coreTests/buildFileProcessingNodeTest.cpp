@@ -5,6 +5,7 @@
 #include "../FileRepository.h"
 #include "../DirectoryNode.h"
 #include "../SourceFileNode.h"
+#include "../CommandNode.h"
 #include "../ExecutionContext.h"
 #include "../FileSystem.h"
 #include "../RegexSet.h"
@@ -23,18 +24,23 @@ namespace
         ExecutionContext context;
         std::shared_ptr<FileRepository> fileRepo;
         std::filesystem::path absBuildFilePath;
+        std::filesystem::path cmdOutputFile;
 
         TestSetup()
             : repoTree(FileSystem::createUniqueDirectory("_buildFileProcessingTest"), 2, RegexSet())
             , fileRepo(std::make_shared<FileRepository>("repo", repoTree.path(), &context))
             , absBuildFilePath(repoTree.path() / R"(buildfile_yam.bat)")
+            , cmdOutputFile(fileRepo->directoryNode()->name() / "main.obj")
         {
-            std::string echoOff("@echo off\n");
-            std::string buildFileProgramText(R"(echo : foreach *.cpp ^|^< cc %f -o %o ^|^< %B.obj)");
+            //R"(echo : foreach *.cpp ^|^< cc %f -o %o ^|^< %B.obj)"
+
+            std::filesystem::create_directory(repoTree.path() / "outputs");
             std::ofstream stream(absBuildFilePath.string().c_str());
             EXPECT_TRUE(stream.is_open());
-            stream << echoOff << std::endl;
-            stream << buildFileProgramText << std::endl;
+            stream
+                << "@echo off" << std::endl
+                << R"(echo : main.cpp ^|^> cc main.cpp -o main.obj ^|^> main.obj)"
+                << std::endl;
             stream.close();
 
             context.addRepository(fileRepo);
@@ -58,5 +64,14 @@ namespace
         bool completed = YAMTest::executeNode(processingNode.get());
         EXPECT_TRUE(completed);
         EXPECT_EQ(Node::State::Ok, processingNode->state());
+        std::filesystem::path cmdName = setup.fileRepo->symbolicDirectory() / "main.obj\\__cmd";
+        std::shared_ptr<Node> node = setup.context.nodes().find(cmdName);
+        ASSERT_NE(nullptr, node);
+        std::shared_ptr<CommandNode> cmdNode = dynamic_pointer_cast<CommandNode>(node);
+        ASSERT_NE(nullptr, cmdNode);
+        EXPECT_EQ(Node::State::Dirty, cmdNode->state());
+
+        completed = YAMTest::executeNode(cmdNode.get());
+        EXPECT_TRUE(completed);
     }
 }

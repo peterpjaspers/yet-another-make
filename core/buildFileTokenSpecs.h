@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Tokenizer.h"
+#include "BuildFileTokenizer.h"
 
 namespace {
     using namespace YAM;

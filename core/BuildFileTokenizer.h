@@ -20,9 +20,9 @@ namespace YAM {
         std::size_t group;
     };
 
-    class __declspec(dllexport) Tokenizer {
+    class __declspec(dllexport) BuildFileTokenizer {
     public:
-        Tokenizer(std::string const& content, std::vector<TokenSpec> const& specs);
+        BuildFileTokenizer(std::string const& content, std::vector<TokenSpec> const& specs);
         void readNextToken(Token& token);
 
         std::size_t tokenStartOffset() const { return _tokenStartOffset; }

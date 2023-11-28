@@ -46,6 +46,7 @@ namespace YAM
             Ok = 3,         // last execution succeeded
             Failed = 4,     // last execution failed
             Canceled = 5,   // last execution was canceled
+            Deleted = 6,    // node is pending destruction
         };
 
         // Implementation of std::less allows nodes to be stored in a std::set

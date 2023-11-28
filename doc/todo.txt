@@ -60,10 +60,16 @@ Todo: core
   Rationale: reduce script size in persistent buildstate.
   ote: node paths are relative to repo, input paths are relative to working dir.
   So paths of input nodes must be converted.
-- Adapt Parser to give better error messages.
-  eplace Tokenizer approach by 'Phil' approach.
-- Adapt Parser/SyntaxTree executor to reject absolute path names.
-
+- Adapt BuildFileParser to give better error messages.
+  eplace BuildFileTokenizer approach by 'Phil' approach.
+- Adapt BuildFileParser/BuildFileContent executor to reject absolute path names.
+- How to deal with storing references to node that are removed from graph?
+  Given PersistentBuildState implementation these cannot be stored.
+  Idea: object must be kept in graph in state Deleted. 
+  When computeStorageNeeded then if Deleted && useCount==1, then remove from 
+  context, else add to _toRemove from persistent storage.
+  context keep track of nodeType->state->node and nodetype->modifiedNode
+- add unittest for BuildFileCompiler  
 
 Todo: non-core
 - build file syntax (follow tup, follow mrmake, something completely different?)
