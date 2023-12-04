@@ -14,8 +14,6 @@ namespace
 
 namespace YAM
 {
-    // TODO: handle symbolic path patterns
-    //
     Globber::Globber(
         ExecutionContext* context,
         std::shared_ptr<DirectoryNode> const& baseDir,
@@ -110,6 +108,7 @@ namespace YAM
 
     // path is a symbolic path or a path relative to _baseDir
     std::shared_ptr<DirectoryNode> Globber::findDirectory(std::filesystem::path const& path) {
+        if (path == _baseDir->name()) return _baseDir;
         std::shared_ptr<Node> node = _baseDir->findChild(path);
         return dynamic_pointer_cast<DirectoryNode>(node);
     }

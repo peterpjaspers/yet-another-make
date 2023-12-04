@@ -113,6 +113,16 @@ namespace
         ASSERT_EQ(80, matches.size());
     }
 
+    TEST(Globber, AllFiles12WithSymbolicPathPattern) {
+        GlobberSetup setup;
+        std::filesystem::path pattern(R"(<repo>\**\File[12])");
+        std::set<std::shared_ptr<DirectoryNode>> inputDirs;
+
+        Globber globber(&(setup.context), setup.rootDir(), pattern, false, inputDirs);
+        auto matches = globber.matches();
+        ASSERT_EQ(80, matches.size());
+    }
+
     TEST(Globber, AllFilesAndDirs) {
         GlobberSetup setup;
         std::filesystem::path pattern(R"(**)");
@@ -126,6 +136,16 @@ namespace
     TEST(Globber, AllDirs) {
         GlobberSetup setup;
         std::filesystem::path pattern(R"(**\)");
+        std::set<std::shared_ptr<DirectoryNode>> inputDirs;
+
+        Globber globber(&(setup.context), setup.rootDir(), pattern, false, inputDirs);
+        auto matches = globber.matches();
+        ASSERT_EQ(40, matches.size());
+    }
+
+    TEST(Globber, AllDirsWithSymbolicPathPattern) {
+        GlobberSetup setup;
+        std::filesystem::path pattern(R"(<repo>\**\)");
         std::set<std::shared_ptr<DirectoryNode>> inputDirs;
 
         Globber globber(&(setup.context), setup.rootDir(), pattern, false, inputDirs);
