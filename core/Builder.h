@@ -10,7 +10,7 @@ namespace YAM
 {
     class BuildRequest;
     class BuildResult;
-    class CommandNode;
+    class GroupNode;
 
     class __declspec(dllexport) Builder
     {
@@ -55,9 +55,9 @@ namespace YAM
         // nodes and dirty command nodes are collected as the input producers
         // of command nodes. This avoids duplicating execution logic already 
         // present in CommandNode (and its baseclass Node).
-        std::shared_ptr<CommandNode> _dirtySources;
-        std::shared_ptr<CommandNode> _dirtyBuildFiles;
-        std::shared_ptr<CommandNode> _dirtyCommands;
+        std::shared_ptr<GroupNode> _dirtySources;
+        std::shared_ptr<GroupNode> _dirtyBuildFiles;
+        std::shared_ptr<GroupNode> _dirtyCommands;
         std::shared_ptr<BuildResult> _result;
     };
 }

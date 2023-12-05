@@ -3,6 +3,8 @@
 
 namespace YAM
 {
+    class CommandNode;
+
     class __declspec(dllexport) GeneratedFileNode : public FileNode
     {
     public:
@@ -13,9 +15,9 @@ namespace YAM
         GeneratedFileNode(
             ExecutionContext* context, 
             std::filesystem::path const& name, 
-            Node* producer);
+            CommandNode* producer);
 
-        Node* producer() const;
+        CommandNode* producer() const;
         bool deleteFile();
 
         static void setStreamableType(uint32_t type);
@@ -24,8 +26,8 @@ namespace YAM
 
     private:
         friend class CommandNode;
-        void producer(Node* producer);
+        void producer(CommandNode* producer);
 
-        Node* _producer;
+        CommandNode* _producer;
     };
 }

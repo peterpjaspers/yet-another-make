@@ -11,12 +11,12 @@ namespace YAM
     GeneratedFileNode::GeneratedFileNode(
         ExecutionContext* context,
         std::filesystem::path const& name,
-        Node* producer)
+        CommandNode* producer)
         : FileNode(context, name)
         , _producer(producer) 
     {}
 
-    Node* GeneratedFileNode::producer() const {
+    CommandNode* GeneratedFileNode::producer() const {
         return _producer;
     }
 
@@ -38,7 +38,7 @@ namespace YAM
         return streamableTypeId;
     }
 
-    void GeneratedFileNode::producer(Node* producer) {
+    void GeneratedFileNode::producer(CommandNode* producer) {
         _producer = producer;
     }
 }

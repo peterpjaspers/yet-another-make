@@ -2,6 +2,7 @@
 #include "BuildRequest.h"
 #include "BuildResult.h"
 #include "CommandNode.h"
+#include "GroupNode.h"
 #include "SourceFileNode.h"
 #include "GeneratedFileNode.h"
 #include "DirectoryNode.h"
@@ -68,9 +69,9 @@ namespace YAM
 {
     // Called in any thread
     Builder::Builder()
-        : _dirtySources(std::make_shared<CommandNode>(&_context, "__dirtySources__"))
-        , _dirtyBuildFiles(std::make_shared<CommandNode>(&_context, "__dirtyBuildFiles__"))
-        , _dirtyCommands(std::make_shared<CommandNode>(&_context, "__dirtyCommands__"))
+        : _dirtySources(std::make_shared<GroupNode>(&_context, "__dirtySources__"))
+        , _dirtyBuildFiles(std::make_shared<GroupNode>(&_context, "__dirtyBuildFiles__"))
+        , _dirtyCommands(std::make_shared<GroupNode>(&_context, "__dirtyCommands__"))
         , _result(nullptr)
     {
         _dirtySources->completor().AddRaw(this, &Builder::_handleSourcesCompletion);
@@ -155,7 +156,7 @@ namespace YAM
         if (dirtyDirsAndFiles.empty()) {
             _handleSourcesCompletion(_dirtySources.get());
         } else {
-            _dirtySources->inputProducers(dirtyDirsAndFiles);
+            _dirtySources->group(dirtyDirsAndFiles);
             _dirtySources->start();
         }
     }
@@ -177,7 +178,7 @@ namespace YAM
             if (dirtyBuildFiles.empty()) {
                 _handleBuildFilesCompletion(_dirtyBuildFiles.get());
             } else {
-                _dirtyBuildFiles->inputProducers(dirtyBuildFiles);
+                _dirtyBuildFiles->group(dirtyBuildFiles);
                 _dirtyBuildFiles->start();
             }
         }
@@ -195,7 +196,7 @@ namespace YAM
             if (dirtyCommands.empty()) {
                 _handleCommandsCompletion(_dirtyCommands.get());
             } else {
-                _dirtyCommands->inputProducers(dirtyCommands);
+                _dirtyCommands->group(dirtyCommands);
                 _dirtyCommands->start();
             }
         }
@@ -220,9 +221,9 @@ namespace YAM
     // Called in main thread
     void Builder::_notifyCompletion() {
         std::vector<std::shared_ptr<Node>> emptyNodes;
-        _dirtySources->inputProducers(emptyNodes);
-        _dirtyBuildFiles->inputProducers(emptyNodes);
-        _dirtyCommands->inputProducers(emptyNodes);
+        _dirtySources->group(emptyNodes);
+        _dirtyBuildFiles->group(emptyNodes);
+        _dirtyCommands->group(emptyNodes);
         _dirtySources->setState(Node::State::Ok);
         _dirtyBuildFiles->setState(Node::State::Ok);
         _dirtyCommands->setState(Node::State::Ok);

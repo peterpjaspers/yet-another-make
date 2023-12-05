@@ -5,6 +5,7 @@
 #include "GeneratedFileNode.h"
 #include "DirectoryNode.h"
 #include "CommandNode.h"
+#include "Globber.h"
 
 #include <sstream>
 
@@ -77,40 +78,38 @@ namespace YAM {
 
     void BuildFileCompiler::addCommand(
         BuildFile::Rule const& rule,
-        std::shared_ptr<CommandNode> const& cmdNode,
         std::vector<std::shared_ptr<FileNode>> const& cmdInputs,
         std::vector<std::shared_ptr<GeneratedFileNode>> const& orderOnlyInputs,
         std::vector<std::filesystem::path> const& outputPaths
     ) {
+        std::shared_ptr<CommandNode> cmdNode = createCommand(outputPaths);
         std::vector<std::shared_ptr<GeneratedFileNode>> outputs = compileOutputs(cmdNode, outputPaths, cmdInputs);
         std::string script = compileScript(rule.script, cmdInputs, orderOnlyInputs, outputs);
+        cmdNode->cmdInputs(cmdInputs);
+        cmdNode->orderOnlyInputs(orderOnlyInputs);
         cmdNode->script(script);
-        // TODO: initialize cmdNode
+        cmdNode->outputs(outputs);
         _commands.push_back(cmdNode);
     }
 
     std::vector<std::shared_ptr<FileNode>> BuildFileCompiler::compileInput(
         BuildFile::Input const& input,
         std::vector<std::shared_ptr<FileNode>> included
-    ) const {
+    ) {
         std::vector<std::shared_ptr<FileNode>> inputNodes;
         std::shared_ptr<FileNode> fileNode;
-        // TODO: use Globber
-        std::filesystem::path fileName = _baseDir->name() / input.pathPattern;
-        std::shared_ptr<Node> node = _context->nodes().find(fileName);
-        if (node != nullptr) {
-            fileNode = dynamic_pointer_cast<FileNode>(node);
+        Globber globber(_baseDir->context(), _baseDir, input.pathPattern, false, _inputDirs);
+        for (auto const& match : globber.matches()) {
+            auto fileNode = dynamic_pointer_cast<FileNode>(match);
             if (fileNode == nullptr) throw std::runtime_error("not a file node");
-        } else {
-            fileNode = std::make_shared<SourceFileNode>(_context, fileName);
+            inputNodes.push_back(fileNode);
         }
-        inputNodes.push_back(fileNode);
         return inputNodes;
     }
 
     std::vector<std::shared_ptr<FileNode>> BuildFileCompiler::compileInputs(
         BuildFile::Inputs const& inputs
-    ) const {
+    ) {
         std::vector<std::shared_ptr<FileNode>> inputNodes;
         for (auto const& input : inputs.inputs) {
             std::vector<std::shared_ptr<FileNode>> nodes = compileInput(input, inputNodes);
@@ -163,14 +162,12 @@ namespace YAM {
         if (rule.forEach) {
             for (auto const& cmdInput : cmdInputs) {
                 std::vector<std::shared_ptr<FileNode>> cmdInputs_({ cmdInput });
-                std::vector<std::filesystem::path> outputPaths = expandOutputPaths(rule.outputs, cmdInputs_);
-                std::shared_ptr<CommandNode> cmdNode = createCommand(outputPaths);
-                addCommand(rule, cmdNode, cmdInputs_, orderOnlyInputs, outputPaths);
+                std::vector<std::filesystem::path> outputPaths = expandOutputPaths(rule.outputs, cmdInputs_);  
+                addCommand(rule, cmdInputs_, orderOnlyInputs, outputPaths);
             }
         } else {
             std::vector<std::filesystem::path> outputPaths = expandOutputPaths(rule.outputs, cmdInputs);
-            std::shared_ptr<CommandNode> cmdNode = createCommand(outputPaths);
-            addCommand(rule, cmdNode, cmdInputs, orderOnlyInputs, outputPaths);
+            addCommand(rule, cmdInputs, orderOnlyInputs, outputPaths);
         }
     }  
 }

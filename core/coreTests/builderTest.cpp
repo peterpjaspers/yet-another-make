@@ -147,7 +147,7 @@ namespace
                 {
                     std::stringstream script;
                     linkPietJan->outputs({ pietjanOut });
-                    linkPietJan->inputProducers({ ccPiet, ccJan });
+                    linkPietJan->orderOnlyInputs({ pietOut, janOut });
                     script
                         << "type " << pietOut->absolutePath().string() << " > " << pietjanOut->absolutePath().string()
                         << " & type " << janOut->absolutePath().string() << " >> " << pietjanOut->absolutePath().string() << std::endl;
@@ -167,6 +167,17 @@ namespace
                 EXPECT_EQ(Node::State::Dirty, pietOut->state());
                 EXPECT_EQ(Node::State::Dirty, janOut->state());
                 EXPECT_EQ(Node::State::Dirty, pietjanOut->state());
+            }
+        }
+
+        ~TestDriver() {
+            if (ccPiet == context->nodes().find(ccPiet->name())) {
+                context->nodes().remove(ccPiet);
+                context->nodes().remove(pietOut);
+                context->nodes().remove(ccJan);
+                context->nodes().remove(janOut);
+                context->nodes().remove(linkPietJan);
+                context->nodes().remove(pietjanOut);
             }
         }
 
@@ -323,8 +334,6 @@ namespace
         EXPECT_TRUE(inputs.end() != std::find(inputs.begin(), inputs.end(), driver.janOut));
 
         // Verify nodes started for execution 
-        // 1  command node _dirtySources (from Builder) for executing directorynode
-        // 1  command node _dirtyCommands for executing compile and link nodes
         // 4 dir nodes repo.dir, repo.dir/.yam, repo.dir/generated, repo.dir/src
         // 2 source file nodes repo.dir/src/pietCpp, repo.dir/src/pietH
         // 2 source file nodes repo.dir/src/janCpp, repo.dir/src/janH
@@ -355,8 +364,8 @@ namespace
         EXPECT_TRUE(driver.stats.started.contains(driver.pietjanOut.get()));
 
         // Verify nodes self-executed 
-        EXPECT_EQ(31, driver.stats.nSelfExecuted);
-        EXPECT_EQ(28, driver.stats.selfExecuted.size());
+        EXPECT_EQ(29, driver.stats.nSelfExecuted);
+        EXPECT_EQ(26, driver.stats.selfExecuted.size());
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.dir))));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.dir / "src"))));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietCpp))));
@@ -417,7 +426,7 @@ namespace
         EXPECT_EQ(1, driver.stats.nDirectoryUpdates); // the generated directory
         EXPECT_EQ(0, driver.stats.nRehashedFiles);
         EXPECT_EQ(2, driver.stats.started.size()); // __dirtySources__ and generated dir
-        EXPECT_EQ(2, driver.stats.selfExecuted.size()); // __dirtySources__ and generated dir
+        EXPECT_EQ(1, driver.stats.selfExecuted.size()); //  generated dir
 
         result = driver.build();
         EXPECT_TRUE(result->succeeded());
@@ -469,7 +478,7 @@ namespace
         // 4: execution of linkPietJan updates and rehashes pietjanOut
         auto srcRepo = driver.sourceRepo();
         auto janCppNode = driver.context->nodes().find(srcRepo->symbolicPathOf(driver.repo.janCpp));
-        EXPECT_EQ(8, driver.stats.selfExecuted.size());
+        EXPECT_EQ(6, driver.stats.selfExecuted.size());
         EXPECT_TRUE(driver.stats.selfExecuted.contains(janCppNode.get()));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.ccJan.get()));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.janOut.get()));
@@ -493,6 +502,7 @@ namespace
         auto janCppNode = dynamic_pointer_cast<FileNode>(driver.context->nodes().find(srcRepo->symbolicPathOf(driver.repo.janCpp)));
         auto srcDirNode = dynamic_pointer_cast<DirectoryNode>(driver.context->nodes().find(srcRepo->symbolicPathOf(driver.repo.dir / "src")));
         EXPECT_EQ(Node::State::Ok, driver.ccPiet->state());
+        EXPECT_EQ(Node::State::Dirty, srcDirNode->state());
         EXPECT_EQ(Node::State::Dirty, janCppNode->state());
         EXPECT_EQ(Node::State::Dirty, driver.ccJan->state());
         EXPECT_EQ(Node::State::Dirty, driver.linkPietJan->state());
@@ -504,6 +514,7 @@ namespace
         std::shared_ptr<BuildResult> result = driver.build();
         EXPECT_FALSE(result->succeeded());
         EXPECT_EQ(Node::State::Ok, driver.ccPiet->state());
+        EXPECT_EQ(Node::State::Ok, srcDirNode->state());
         EXPECT_EQ(Node::State::Failed, driver.ccJan->state());
         EXPECT_EQ(Node::State::Ok, janCppNode->state());
         EXPECT_EQ(Node::State::Canceled, driver.linkPietJan->state());
@@ -515,7 +526,7 @@ namespace
         EXPECT_EQ(1, driver.stats.nRehashedFiles);
         EXPECT_TRUE(driver.stats.rehashedFiles.contains(janCppNode.get()));
 
-        EXPECT_EQ(5, driver.stats.selfExecuted.size());
+        EXPECT_EQ(4, driver.stats.selfExecuted.size());
         EXPECT_TRUE(driver.stats.selfExecuted.contains(janCppNode.get()));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.ccJan.get()));;
     }

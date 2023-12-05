@@ -37,7 +37,7 @@ namespace YAM
             std::shared_ptr<DirectoryNode> const& baseDir,
             std::filesystem::path const& pattern,
             bool dirsOnly,
-            std::set<std::shared_ptr<DirectoryNode>>& inputDirs
+            std::set<std::shared_ptr<DirectoryNode>, Node::CompareName>& inputDirs
         );
         std::vector<std::shared_ptr<Node>> const& matches() { return _matches; }
 
@@ -52,7 +52,7 @@ namespace YAM
         std::shared_ptr<DirectoryNode> _baseDir;
         std::filesystem::path _pattern;
         bool _dirsOnly;
-        std::set<std::shared_ptr<DirectoryNode>>& _inputDirs;
+        std::set<std::shared_ptr<DirectoryNode>, Node::CompareName>& _inputDirs;
         std::vector<std::shared_ptr<Node>> _matches;
     };
 }

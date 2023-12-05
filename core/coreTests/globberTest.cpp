@@ -51,7 +51,7 @@ namespace
     TEST(Globber, File1) {
         GlobberSetup setup;
         std::filesystem::path pattern("File1");
-        std::set<std::shared_ptr<DirectoryNode>> inputDirs;
+        std::set<std::shared_ptr<DirectoryNode>, Node::CompareName> inputDirs;
         std::filesystem::path expectedAbsPath(setup.repoDir / pattern);
         std::filesystem::path expectedSymPath = setup.repo()->symbolicPathOf(expectedAbsPath);
 
@@ -59,12 +59,14 @@ namespace
         auto matches = globber.matches();
         ASSERT_EQ(1, matches.size());
         EXPECT_EQ(expectedSymPath, matches[0]->name());
+        ASSERT_EQ(1, inputDirs.size());
+        EXPECT_TRUE(inputDirs.contains(setup.rootDir()));
     }
 
     TEST(Globber, SubDir1File3) {
         GlobberSetup setup;
         std::filesystem::path pattern(R"(SubDir1\File3)");
-        std::set<std::shared_ptr<DirectoryNode>> inputDirs;
+        std::set<std::shared_ptr<DirectoryNode>, Node::CompareName> inputDirs;
         std::filesystem::path expectedAbsPath(setup.repoDir / pattern);
         std::filesystem::path expectedSymPath = setup.repo()->symbolicPathOf(expectedAbsPath);
 
@@ -72,12 +74,13 @@ namespace
         auto matches = globber.matches();
         ASSERT_EQ(1, matches.size());
         EXPECT_EQ(expectedSymPath, matches[0]->name());
+        EXPECT_EQ(2, inputDirs.size());
     }
 
     TEST(Globber, SubDir1SubDir2) {
         GlobberSetup setup;
         std::filesystem::path pattern(R"(SubDir1\SubDir2)");
-        std::set<std::shared_ptr<DirectoryNode>> inputDirs;
+        std::set<std::shared_ptr<DirectoryNode>, Node::CompareName> inputDirs;
         std::filesystem::path expectedAbsPath(setup.repoDir / pattern);
         std::filesystem::path expectedPath = setup.repo()->symbolicDirectory() / pattern;
 
@@ -85,12 +88,13 @@ namespace
         auto matches = globber.matches();
         ASSERT_EQ(1, matches.size());
         EXPECT_EQ(expectedPath, matches[0]->name());
+        EXPECT_EQ(2, inputDirs.size());
     }
 
     TEST(Globber, AllFilesInRoot) {
         GlobberSetup setup;
         std::filesystem::path pattern("File[123]");
-        std::set<std::shared_ptr<DirectoryNode>> inputDirs;
+        std::set<std::shared_ptr<DirectoryNode>, Node::CompareName> inputDirs;
         std::filesystem::path expected1 = setup.repo()->symbolicDirectory() / "File1";
         std::filesystem::path expected2 = setup.repo()->symbolicDirectory() / "File2";
         std::filesystem::path expected3 = setup.repo()->symbolicDirectory() / "File3";
@@ -101,55 +105,61 @@ namespace
         EXPECT_EQ(expected1, matches[0]->name());
         EXPECT_EQ(expected2, matches[1]->name());
         EXPECT_EQ(expected3, matches[2]->name());
+        EXPECT_EQ(1, inputDirs.size());
     }
 
     TEST(Globber, AllFiles12) {
         GlobberSetup setup;
         std::filesystem::path pattern(R"(**\File[12])");
-        std::set<std::shared_ptr<DirectoryNode>> inputDirs;
+        std::set<std::shared_ptr<DirectoryNode>, Node::CompareName> inputDirs;
 
         Globber globber(&(setup.context), setup.rootDir(), pattern, false, inputDirs);
         auto matches = globber.matches();
         ASSERT_EQ(80, matches.size());
+        EXPECT_EQ(40, inputDirs.size());
     }
 
     TEST(Globber, AllFiles12WithSymbolicPathPattern) {
         GlobberSetup setup;
-        std::filesystem::path pattern(R"(<repo>\**\File[12])");
-        std::set<std::shared_ptr<DirectoryNode>> inputDirs;
+        std::filesystem::path pattern(setup.rootDir()->name() / R"(**\File[12])");
+        std::set<std::shared_ptr<DirectoryNode>, Node::CompareName> inputDirs;
 
         Globber globber(&(setup.context), setup.rootDir(), pattern, false, inputDirs);
         auto matches = globber.matches();
         ASSERT_EQ(80, matches.size());
+        EXPECT_EQ(40, inputDirs.size());
     }
 
     TEST(Globber, AllFilesAndDirs) {
         GlobberSetup setup;
         std::filesystem::path pattern(R"(**)");
-        std::set<std::shared_ptr<DirectoryNode>> inputDirs;
+        std::set<std::shared_ptr<DirectoryNode>, Node::CompareName> inputDirs;
 
         Globber globber(&(setup.context), setup.rootDir(), pattern, false, inputDirs);
         auto matches = globber.matches();
         ASSERT_EQ(160, matches.size());
+        EXPECT_EQ(40, inputDirs.size());
     }
 
     TEST(Globber, AllDirs) {
         GlobberSetup setup;
         std::filesystem::path pattern(R"(**\)");
-        std::set<std::shared_ptr<DirectoryNode>> inputDirs;
+        std::set<std::shared_ptr<DirectoryNode>, Node::CompareName> inputDirs;
 
         Globber globber(&(setup.context), setup.rootDir(), pattern, false, inputDirs);
         auto matches = globber.matches();
         ASSERT_EQ(40, matches.size());
+        EXPECT_EQ(40, inputDirs.size());
     }
 
     TEST(Globber, AllDirsWithSymbolicPathPattern) {
         GlobberSetup setup;
-        std::filesystem::path pattern(R"(<repo>\**\)");
-        std::set<std::shared_ptr<DirectoryNode>> inputDirs;
+        std::filesystem::path pattern = setup.rootDir()->name() / (R"(**\)");
+        std::set<std::shared_ptr<DirectoryNode>, Node::CompareName> inputDirs;
 
         Globber globber(&(setup.context), setup.rootDir(), pattern, false, inputDirs);
         auto matches = globber.matches();
         ASSERT_EQ(40, matches.size());
+        EXPECT_EQ(40, inputDirs.size());
     }
 }

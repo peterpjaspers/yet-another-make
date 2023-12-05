@@ -49,18 +49,35 @@ namespace
             std::inserter(onlyIn2, onlyIn2.begin()));
     }
 
+    bool isGenerated(std::shared_ptr<Node> const& node) {
+        return nullptr != dynamic_cast<GeneratedFileNode*>(node.get());
+    }
+
+    void _addObserver(StateObserver* command, std::shared_ptr<Node> const& node) {
+        auto genFileNode = dynamic_cast<GeneratedFileNode*>(node.get());
+        if (genFileNode) {
+            genFileNode->producer()->addObserver(command);
+        } else {
+            node->addObserver(command);
+        }
+    }
+
+    void _removeObserver(StateObserver* command, std::shared_ptr<Node> const& node) {
+        auto genFileNode = dynamic_cast<GeneratedFileNode*>(node.get());
+        if (genFileNode) {
+            genFileNode->producer()->removeObserver(command);
+        } else {
+            node->removeObserver(command);
+        }
+    }
+
     void getOutputFileNodes(
-        std::vector<std::shared_ptr<Node>> const& producers,
+        std::unordered_set<CommandNode*> const& producers,
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>>& outputFiles
     ) {
-        for (auto const& p : producers) {
-            std::vector<std::shared_ptr<Node>> pOutputs;
-            p->getOutputs(pOutputs);
-            for (auto const& n : pOutputs) {
-                auto genFile = dynamic_pointer_cast<GeneratedFileNode>(n);
-                if (genFile != nullptr) {
-                    outputFiles.insert(std::pair{ genFile->name(), genFile });
-                }
+        for (auto const& producer : producers) {
+            for (auto const& genFile : producer->outputs()) {
+                 outputFiles.insert(std::pair{ genFile->name(), genFile });
             }
         }
     }
@@ -214,13 +231,16 @@ namespace YAM
     {}
 
     CommandNode::~CommandNode() {
-        // Clearing these collections is needed to stop observing their
-        // elements by this command node. 
-        outputs(std::vector<std::shared_ptr<GeneratedFileNode>>());
-        inputProducers(std::vector<std::shared_ptr<Node>>());
-        ExecutionResult clear;
-        for (auto const& pair : _inputs) clear._removedInputPaths.insert(pair.first);
-        setInputs(clear);
+        for (auto output : _outputs) {
+            output->removeObserver(this);
+        }
+        for (auto producer : _inputProducers) {
+            producer->removeObserver(this);
+        }
+        for (auto const& pair : _detectedInputs) {
+            auto const& node = pair.second;
+            if (!isGenerated(node)) node->removeObserver(this);
+        }
     }
 
     void CommandNode::inputAspectsName(std::string const& newName) {
@@ -228,6 +248,45 @@ namespace YAM
             _inputAspectsName = newName;
             modified(true);
             setState(State::Dirty);
+        }
+    }
+
+    void CommandNode::cmdInputs(std::vector<std::shared_ptr<FileNode>> const& newInputs) {
+        if (_cmdInputs != newInputs) {
+            _cmdInputs = newInputs;
+            updateInputProducers();
+            _executionHash = rand();
+            modified(true);
+            setState(State::Dirty);
+        }
+    }
+
+    void CommandNode::orderOnlyInputs(std::vector<std::shared_ptr<GeneratedFileNode>> const& newInputs) {
+        if (_orderOnlyInputs != newInputs) {
+            _orderOnlyInputs = newInputs;
+            updateInputProducers();
+            _executionHash = rand();
+            modified(true);
+            setState(State::Dirty);
+        }
+    }
+
+    void CommandNode::updateInputProducers() {
+        for (auto producer : _inputProducers) {
+            producer->removeObserver(this);
+        }
+        _inputProducers.clear();
+        for (auto const& node : _cmdInputs) {
+            auto genFileNode = dynamic_pointer_cast<GeneratedFileNode>(node);
+            if (genFileNode != nullptr) {
+                _inputProducers.insert(genFileNode->producer());
+            }
+        }
+        for (auto const& genFileNode : _orderOnlyInputs) {
+            _inputProducers.insert(genFileNode->producer());
+        }
+        for (auto producer : _inputProducers) {
+            producer->addObserver(this);
         }
     }
 
@@ -260,23 +319,12 @@ namespace YAM
         }
     }
 
-    void CommandNode::inputProducers(std::vector<std::shared_ptr<Node>> const& newInputProducers) {
-        if (_inputProducers != newInputProducers) {
-            for (auto i : _inputProducers) i->removeObserver(this);
-            _inputProducers = newInputProducers;
-            for (auto i : _inputProducers) i->addObserver(this);
-            _executionHash = rand();
-            modified(true);
-            setState(State::Dirty);
-        }
-    }
-
     void CommandNode::getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const {
         for (auto const& n : _outputs) outputs.push_back(dynamic_pointer_cast<Node>(n));
     }
 
     void CommandNode::getInputs(std::vector<std::shared_ptr<Node>>& inputs) const {
-        for (auto const& pair : _inputs) inputs.push_back(dynamic_pointer_cast<Node>(pair.second));
+        for (auto const& pair : _detectedInputs) inputs.push_back(dynamic_pointer_cast<Node>(pair.second));
     }
 
     // Propagate Dirty state of input producers, outputs or sourcefile inputs
@@ -294,7 +342,7 @@ namespace YAM
         auto entireFile = FileAspect::entireFileAspect().name();
         for (auto node : _outputs) hashes.push_back(node->hashOf(entireFile));
         FileAspectSet inputAspects = context()->findFileAspectSet(_inputAspectsName);
-        for (auto const& pair : _inputs) {
+        for (auto const& pair : _detectedInputs) {
             auto const& node = pair.second;
             auto& inputAspect = inputAspects.findApplicableAspect(node->name());
             hashes.push_back(node->hashOf(inputAspect.name()));
@@ -304,38 +352,37 @@ namespace YAM
     }
 
     void CommandNode::getSourceInputs(std::vector<Node*>& sourceInputs) const {
-        for (auto const& pair : _inputs) {
+        for (auto const& pair : _detectedInputs) {
             auto const& node = pair.second;
             auto file = dynamic_pointer_cast<SourceFileNode>(node);
             if (file != nullptr) sourceInputs.push_back(file.get());
         }
     }
 
-    void CommandNode::setInputs(ExecutionResult const& result) {
+    void CommandNode::setDetectedInputs(ExecutionResult const& result) {
         // Note that the producer of an input GeneratedFileNode is a requisite
         // of the command node, not the GeneratedFileNode itself. 
         // A command node therefore does not register itself as observer of an
         // input GeneratedFileNode. Instead it registers itself as observer of
         // the producer of the input GeneratedFileNode (in function 
-        // inputProducers(..)). This prevents a spurious callback to 
+        // observeInputProducers(). This prevents a spurious callback to 
         // Node::handleCompletionOf(Node* genFileNode) from the input
         // GeneratedFileNode to the command node.
         // Note: Dirty propagation in case of tampering with generated files
         // remains intact because a GeneratedFileNode propagates Dirty to its 
-        // producer (who then notifies its observers, i.e to nodes that read
-        // one or more output files of the producer).
+        // producing CommandNode who then notifies its observers, i.e to nodes
+        // that read one or more output files of the producing command node.
         // 
         for (auto const& path : result._removedInputPaths) {
-            auto it = _inputs.find(path);
-            if (it == _inputs.end()) throw std::exception("no such input");
-            auto const& genFile = dynamic_pointer_cast<GeneratedFileNode>(it->second);
-            if (genFile == nullptr) it->second->removeObserver(this);
-            _inputs.erase(it);
+            auto it = _detectedInputs.find(path);
+            if (it == _detectedInputs.end()) throw std::exception("no such input");
+            auto const& node = it->second;
+            if (!isGenerated(node)) node->removeObserver(this);
+            _detectedInputs.erase(it);
         }
         for (auto const& node : result._addedInputNodes) {
-            auto const& genFile = dynamic_pointer_cast<GeneratedFileNode>(node);
-            if (genFile == nullptr) node->addObserver(this);
-            auto result = _inputs.insert({ node->name(), node });
+            if (!isGenerated(node)) node->addObserver(this);
+            auto result = _detectedInputs.insert({ node->name(), node });
             if (!result.second) throw std::exception("attempt to add duplicate input");
         }
         modified(true);
@@ -428,7 +475,7 @@ namespace YAM
     void CommandNode::start() {
         Node::start();
         std::vector<Node*> requisites;
-        for (auto const& p : _inputProducers) requisites.push_back(p.get());
+        for (auto const& ip : _inputProducers) requisites.push_back(ip);
         getSourceInputs(requisites);
         for (auto const& n : _outputs) requisites.push_back(n.get());
         auto callback = Delegate<void, Node::State>::CreateLambda(
@@ -463,10 +510,13 @@ namespace YAM
             if (scriptResult.exitCode != 0) {
                 result->_newState = canceling() ? Node::State::Canceled : Node::State::Failed;
             } else {
-                std::set<std::filesystem::path> inputPaths;
-                for (auto const& pair : _inputs) inputPaths.insert(pair.second->absolutePath());
+                std::set<std::filesystem::path> previousInputPaths;
+                for (auto const& pair : _detectedInputs) {
+                    previousInputPaths.insert(pair.second->absolutePath());
+                }
+                std::set<std::filesystem::path>& currentInputPaths = scriptResult.readOnlyFiles;
                 computePathSetsDifference(
-                    inputPaths, scriptResult.readOnlyFiles,
+                    previousInputPaths, currentInputPaths,
                     result->_keptInputPaths,
                     result->_removedInputPaths,
                     result->_addedInputPaths);
@@ -522,7 +572,7 @@ namespace YAM
                     outputsAndNewInputs,
                     result._log);
                 if (validKeptInputs && validNewInputs) {
-                    setInputs(result);
+                    setDetectedInputs(result);
                     std::vector<Node*> rawNodes;
                     for (auto const& n : outputsAndNewInputs) rawNodes.push_back(n.get());
                     auto callback = Delegate<void, Node::State>::CreateLambda(
@@ -546,8 +596,8 @@ namespace YAM
             modified(true);
         } else {
             ExecutionResult r;
-            for (auto const& pair : _inputs) r._removedInputPaths.insert(pair.first);
-            setInputs(r);
+            for (auto const& pair : _detectedInputs) r._removedInputPaths.insert(pair.first);
+            setDetectedInputs(r);
         }
         notifyCompletion(state);
     }
@@ -615,28 +665,30 @@ namespace YAM
                 if (inputNode != nullptr && fileNode == nullptr) {
                     throw std::exception("input node not a file node");
                 }
-                auto generatedInputFile = dynamic_pointer_cast<GeneratedFileNode>(fileNode);
-                if (generatedInputFile != nullptr) {
+                auto genInputFile = dynamic_pointer_cast<GeneratedFileNode>(fileNode);
+                if (genInputFile != nullptr) {
                     if (!allowedGenInputFiles.contains(symInputPath)) {
                         valid = false;
-                        logBuildOrderNotGuaranteed(this, generatedInputFile.get(), logBook);
+                        logBuildOrderNotGuaranteed(this, genInputFile.get(), logBook);
                     } else {
                         // _inputProducers must have moved the generated inputs to Ok,
                         // Failed or Canceled state during requisite execution.
-                        auto state = generatedInputFile->state();
+                        auto state = genInputFile->state();
                         if (
                             state != Node::State::Ok
                             && state != Node::State::Failed
                             && state != Node::State::Canceled
                         ) throw std::exception("generated input node not executed");
-                        inputNodes.push_back(generatedInputFile);
+                        inputNodes.push_back(genInputFile);
                     }
                 } else {
-                    // In YAM all output (generated file) nodes must be created
-                    // before command execution starts. Hence when inputPath is
-                    // not a generated file it must be a source file.
+                    // In YAM all output (generated file) nodes are created
+                    // before commands that use them as inputs are executed.
+                    // Hence inputPath identifies a source file.
                     auto srcInputFile = dynamic_pointer_cast<SourceFileNode>(fileNode);
                     if (srcInputFile == nullptr) {
+                        // Either yam does not mirror its repositories or 
+                        // inputPath references a non-existing source file.
                         srcInputFile = std::make_shared<SourceFileNode>(context(), symInputPath);
                         nodes.add(srcInputFile);
                     }
@@ -659,18 +711,19 @@ namespace YAM
 
     void CommandNode::stream(IStreamer* streamer) {
         Node::stream(streamer);
-        streamer->streamVector(_inputProducers);
+        streamer->streamVector(_cmdInputs);
+        streamer->streamVector(_orderOnlyInputs);
         streamer->streamVector(_outputs);
         std::vector<std::shared_ptr<FileNode>> inputs;
         std::shared_ptr<DirectoryNode> wdir;
         if (streamer->writing()) {
-            for (auto const& pair : _inputs) inputs.push_back(pair.second);
+            for (auto const& pair : _detectedInputs) inputs.push_back(pair.second);
             wdir = _workingDir.lock();
         }
         streamer->streamVector(inputs);
         streamer->stream(wdir);
         if (streamer->reading()) {
-            for (auto const& n : inputs) _inputs.insert({ n->name(), n });
+            for (auto const& n : inputs) _detectedInputs.insert({ n->name(), n });
             _workingDir = wdir;
         }
         streamer->stream(_script);
@@ -681,23 +734,23 @@ namespace YAM
         Node::prepareDeserialize();
         for (auto const& i : _inputProducers) i->removeObserver(this);
         for (auto const& i : _outputs) i->removeObserver(this);
-        for (auto const& p : _inputs) {
+        for (auto const& p : _detectedInputs) {
             auto const& genFile = dynamic_pointer_cast<GeneratedFileNode>(p.second);
             if (genFile == nullptr) p.second->removeObserver(this);
         }
         _inputProducers.clear();
         _outputs.clear();
-        _inputs.clear();
+        _detectedInputs.clear();
     }
 
     void CommandNode::restore(void* context) {
         Node::restore(context);
-        for (auto const& i : _inputProducers) i->addObserver(this);
+        updateInputProducers();
         for (auto const& i : _outputs) {
             i->addObserver(this);
             i->producer(this);
         }
-        for (auto const& p : _inputs) {
+        for (auto const& p : _detectedInputs) {
             auto const& genFile = dynamic_pointer_cast<GeneratedFileNode>(p.second);
             if (genFile == nullptr) p.second->addObserver(this);
         }

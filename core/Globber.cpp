@@ -19,7 +19,7 @@ namespace YAM
         std::shared_ptr<DirectoryNode> const& baseDir,
         std::filesystem::path const& pattern,
         bool dirsOnly,
-        std::set<std::shared_ptr<DirectoryNode>>& inputDirs
+        std::set<std::shared_ptr<DirectoryNode>, Node::CompareName>& inputDirs
     )
         : _baseDir(baseDir)
         , _pattern(pattern)
@@ -68,6 +68,7 @@ namespace YAM
 
     void Globber::walk(std::shared_ptr<DirectoryNode> const& dir) {
         _matches.push_back(dir);
+        _inputDirs.insert(dir);
         for (auto const& pair : dir->getContent()) {
             auto const& child = pair.second;
             auto subDir = dynamic_pointer_cast<DirectoryNode>(child);

@@ -101,7 +101,7 @@ namespace
             {
                 std::stringstream script;
                 pietjanCmd->outputs({ pietjanOut });
-                pietjanCmd->inputProducers({ pietCmd, janCmd });
+                pietjanCmd->orderOnlyInputs({ pietOut, janOut });
                 script
                     << "type " << pietOut->absolutePath().string() << " > " << pietjanOut->absolutePath().string()
                     << " & type " << janOut->absolutePath().string() << " >> " << pietjanOut->absolutePath().string();
@@ -132,6 +132,14 @@ namespace
         }
 
         void clean() {
+            context.nodes().remove(pietCmd);
+            context.nodes().remove(janCmd);
+            context.nodes().remove(pietjanCmd);
+            context.nodes().remove(pietOut);
+            context.nodes().remove(janOut);
+            context.nodes().remove(pietjanOut);
+            context.nodes().remove(pietSrc);
+            context.nodes().remove(janSrc);
             context.removeRepository(".");
             std::filesystem::remove_all(repoDir);
         }
@@ -405,7 +413,7 @@ namespace
         // pietjanCmd reads output files of pietCmd and janCmd.
         // Execution fails because janCmd is not in input producers
         // of pietjanCmd
-        cmds.pietjanCmd->inputProducers({ cmds.pietCmd });
+        cmds.pietjanCmd->orderOnlyInputs({ cmds.pietOut });
         EXPECT_TRUE(cmds.execute());
         EXPECT_EQ(Node::State::Failed, cmds.pietjanCmd->state());
         EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Build order is not guaranteed"));
@@ -419,8 +427,8 @@ namespace
         // pietjanCmd reads output files of pietCmd and janCmd.
         // Execution warns for indirect prerequisites because pietCmd is 
         // an indirect prerequisite(via janCmd) of pietjanCmd.
-        cmds.janCmd->inputProducers({ cmds.pietCmd });
-        cmds.pietjanCmd->inputProducers({ cmds.janCmd });
+        cmds.janCmd->orderOnlyInputs({ cmds.pietOut });
+        cmds.pietjanCmd->orderOnlyInputs({ cmds.janOut });
         EXPECT_TRUE(cmds.execute());
         EXPECT_EQ(Node::State::Failed, cmds.pietjanCmd->state());
         EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Build order is not guaranteed"));

@@ -2,15 +2,16 @@
 
 #include "Glob.h"
 #include "BuildFile.h"
+#include "Node.h"
 
 #include <vector>
+#include <set>
 #include <memory>
 #include <filesystem>
 #include <regex>
 
 namespace YAM {
     class ExecutionContext;
-    class Node;
     class FileNode;
     class GeneratedFileNode;
     class DirectoryNode;
@@ -38,17 +39,16 @@ namespace YAM {
 
         void addCommand(
             BuildFile::Rule const& rule,
-            std::shared_ptr<CommandNode> const& cmdNode,
             std::vector<std::shared_ptr<FileNode>> const& cmdInputs,
             std::vector<std::shared_ptr<GeneratedFileNode>> const& orderOnlyInputs,
             std::vector<std::filesystem::path> const& outputPaths);
 
         std::vector<std::shared_ptr<FileNode>> compileInput(
             BuildFile::Input const& input,
-            std::vector<std::shared_ptr<FileNode>> included) const;
+            std::vector<std::shared_ptr<FileNode>> included);
 
         std::vector<std::shared_ptr<FileNode>> compileInputs(
-            BuildFile::Inputs const& inputs) const;
+            BuildFile::Inputs const& inputs);
 
         std::string compileScript(
             BuildFile::Script const& script,
@@ -69,6 +69,7 @@ namespace YAM {
 
         ExecutionContext* _context;
         std::shared_ptr<DirectoryNode> _baseDir;
-        std::vector<std::shared_ptr<CommandNode>> _commands;
+        std::vector<std::shared_ptr<CommandNode>> _commands; 
+        std::set<std::shared_ptr<DirectoryNode>, Node::CompareName> _inputDirs;
     };
 }
