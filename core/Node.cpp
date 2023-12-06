@@ -54,7 +54,7 @@ namespace YAM
     Node::~Node() {}
 
     std::shared_ptr<FileRepository> const& Node::repository() const {
-        auto repoName = FileRepository::repoNameFromSymbolicPath(name());
+        auto repoName = FileRepository::repoNameFromPath(name());
         return context()->findRepository(repoName);
     }
 

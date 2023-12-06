@@ -25,16 +25,22 @@ namespace {
 namespace YAM {
 
     BuildFileParser::BuildFileParser(std::filesystem::path const& buildFilePath)
-        : BuildFileParser(readFile(buildFilePath))
+        : BuildFileParser(readFile(buildFilePath), buildFilePath)
     {}
 
-    BuildFileParser::BuildFileParser(std::string const& buildFileContent)
-        : _tokenizer(buildFileContent, tokenSpecs)
+    BuildFileParser::BuildFileParser(
+        std::string const& buildFileContent, 
+        std::filesystem::path const& buildFilePath)
+        : _buildFilePath(buildFilePath)
+        , _tokenizer(buildFileContent, tokenSpecs)
         , _file(parseBuildFile())
     {}
 
-    BuildFileParser::BuildFileParser(std::string && buildFileContent)
-        :  _tokenizer(buildFileContent, tokenSpecs)
+    BuildFileParser::BuildFileParser(
+        std::string && buildFileContent,
+        std::filesystem::path const& buildFilePath)
+        : _buildFilePath(buildFilePath)
+        , _tokenizer(buildFileContent, tokenSpecs)
         , _file(parseBuildFile())
     {}
 
@@ -74,6 +80,9 @@ namespace YAM {
     std::shared_ptr<BuildFile::Rule> BuildFileParser::parseRule() {
         eat("rule"); // Return value not needed
         auto rule = std::make_shared<BuildFile::Rule>();
+        rule->buildFile = _buildFilePath;
+        rule->line = _tokenizer.tokenStartLine();
+        rule->column = _tokenizer.tokenStartColumn();
         if (_lookAhead.type == "foreach") {
             rule->forEach = true;
             eat("foreach");
@@ -85,6 +94,8 @@ namespace YAM {
     }
 
     void BuildFileParser::parseInputs(BuildFile::Inputs& inputs) {
+        inputs.line = _tokenizer.tokenStartLine();
+        inputs.column = _tokenizer.tokenStartColumn();
         while (_lookAhead.type != "script") {
             BuildFile::Input in;
             parseInput(in);
@@ -93,6 +104,8 @@ namespace YAM {
     }
 
     void BuildFileParser::parseInput(BuildFile::Input& input) {
+        input.line = _tokenizer.tokenStartLine();
+        input.column = _tokenizer.tokenStartColumn();
         input.exclude = _lookAhead.type == "not";
         if (input.exclude) eat("not");
         auto pathToken = eat("glob");
@@ -100,6 +113,8 @@ namespace YAM {
     }
 
     void BuildFileParser::parseScript(BuildFile::Script& script) {
+        script.line = _tokenizer.tokenStartLine();
+        script.column = _tokenizer.tokenStartColumn();
         Token token = eat("script");
         script.script = token.value;
     }
@@ -112,6 +127,9 @@ namespace YAM {
         }
     }
     void BuildFileParser::parseOutput(BuildFile::Output& output) {
+        output.line = _tokenizer.tokenStartLine();
+        output.column = _tokenizer.tokenStartColumn();
+        output.ignore = _lookAhead.type == "not";
         Token token = eat("glob");
         output.path = token.value;
     }

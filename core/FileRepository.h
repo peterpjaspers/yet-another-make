@@ -51,22 +51,21 @@ namespace YAM
             ExecutionContext* context);
 
         virtual ~FileRepository();
+        
+        static bool isSymbolicPath(std::filesystem::path const& path);
+        // Return empty string when !isSymbolicPath(path)
+        static std::string repoNameFromPath(std::filesystem::path const& path);
+        // Return <repoName>, e.g. when repoName="main" return "<main>"
+        static std::filesystem::path repoNameToSymbolicPath(std::string const& repoName);
 
         std::string const& name() const;
         std::filesystem::path const& directory() const;
         std::shared_ptr<DirectoryNode> directoryNode() const;
-        static std::string repositoryNameOf(std::filesystem::path const& symbolicPath);
 
         // Return repositoryNameOf(name())
         std::filesystem::path const& symbolicDirectory() const {
             return _symbolicDirectory;
         }
-
-        // Return empty string when symbolicPath has invalid format.
-        static std::string repoNameFromSymbolicPath(std::filesystem::path const& symbolicPath);
-
-        // Return <repoName>
-        static std::filesystem::path repoNameToSymbolicPath(std::string const& repoName);
 
         // Return whether 'path' is a path in the repository.
         // 'path' can be an absolute path or a symbolic path.

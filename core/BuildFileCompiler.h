@@ -29,10 +29,6 @@ namespace YAM {
         }
 
     private:
-        std::vector<std::filesystem::path> expandOutputPaths(
-            BuildFile::Outputs const& outputs,
-            std::vector<std::shared_ptr<FileNode>> const& cmdInputs
-        ) const;
 
         std::shared_ptr<CommandNode> createCommand(
             std::vector<std::filesystem::path> const& outputPaths) const;
@@ -40,12 +36,10 @@ namespace YAM {
         void addCommand(
             BuildFile::Rule const& rule,
             std::vector<std::shared_ptr<FileNode>> const& cmdInputs,
-            std::vector<std::shared_ptr<GeneratedFileNode>> const& orderOnlyInputs,
-            std::vector<std::filesystem::path> const& outputPaths);
+            std::vector<std::shared_ptr<GeneratedFileNode>> const& orderOnlyInputs);
 
         std::vector<std::shared_ptr<FileNode>> compileInput(
-            BuildFile::Input const& input,
-            std::vector<std::shared_ptr<FileNode>> included);
+            BuildFile::Input const& input);
 
         std::vector<std::shared_ptr<FileNode>> compileInputs(
             BuildFile::Inputs const& inputs);
@@ -64,6 +58,21 @@ namespace YAM {
             std::shared_ptr<CommandNode> const& cmdNode,
             std::vector<std::filesystem::path> const& outputPaths,
             std::vector<std::shared_ptr<FileNode>> const& inputs) const;
+
+        std::filesystem::path compileOutputPath(
+            BuildFile::Output const& output,
+            std::vector<std::shared_ptr<FileNode>> const& cmdInputs,
+            std::size_t defaultOffset
+        ) const;
+
+        std::vector<std::filesystem::path> compileOutputPaths(
+            BuildFile::Outputs const& outputs,
+            std::vector<std::shared_ptr<FileNode>> const& cmdInputs
+        ) const;
+
+        std::vector<std::string> compileIgnoredOutputs(
+            BuildFile::Outputs const& outputs
+        ) const;
 
         void compileRule(BuildFile::Rule const& rule);
 

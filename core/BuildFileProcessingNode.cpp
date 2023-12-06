@@ -179,7 +179,6 @@ namespace YAM
                 keptCmds,
                 newCmds,
                 removedCmds);
-            for (auto const& cmd : newCmds) context()->nodes().add(cmd);
             for (auto const& cmd : removedCmds) cmd->setState(Node::State::Deleted);
             _commands = newCommands;
         }

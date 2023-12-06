@@ -67,8 +67,8 @@ namespace YAM
     {
     public:
         BuildFileParser(std::filesystem::path const& buildFilePath);
-        BuildFileParser(std::string const& buildFileContent);
-        BuildFileParser(std::string && buildFileContent);
+        BuildFileParser(std::string const& buildFileContent, std::filesystem::path const& buildFilePath = "");
+        BuildFileParser(std::string && buildFileContent, std::filesystem::path const& buildFilePath = "");
 
         std::shared_ptr<BuildFile::File> const& file() { return _file; }
 
@@ -84,6 +84,7 @@ namespace YAM
         void parseOutputs(BuildFile::Outputs& outputs);
         void parseOutput(BuildFile::Output& output);
 
+        std::filesystem::path _buildFilePath;
         BuildFileTokenizer _tokenizer;
         Token _lookAhead;
         std::shared_ptr<BuildFile::File> _file;

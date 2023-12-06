@@ -56,10 +56,21 @@ namespace YAM
         return _directory;
     }
 
-    std::string FileRepository::repoNameFromSymbolicPath(std::filesystem::path const& symbolicPath) {
+    bool FileRepository::isSymbolicPath(std::filesystem::path const& path) {
+        auto it = path.begin();
+        if (it == path.end()) return false;
+        std::string repoComponent = (*it).string();
+        std::size_t n = repoComponent.length();
+        if (n <= 2) return false;
+        if (repoComponent[0] != '<') return false;
+        if (repoComponent[n - 1] != '>') return false;
+        return true;
+    }
+
+    std::string FileRepository::repoNameFromPath(std::filesystem::path const& path) {
         static std::string empty;
-        auto it = symbolicPath.begin();
-        if (it == symbolicPath.end()) return empty;
+        auto it = path.begin();
+        if (it == path.end()) return empty;
         std::string repoComponent = (*it).string();
         std::size_t n = repoComponent.length();
         if (n <= 2) return empty;
@@ -71,13 +82,6 @@ namespace YAM
     std::filesystem::path FileRepository::repoNameToSymbolicPath(std::string const& repoName) {
         std::filesystem::path p("<" + repoName + ">");
         return p;
-    }
-
-    std::string FileRepository::repositoryNameOf(std::filesystem::path const& symbolicPath) {
-        if (symbolicPath.is_absolute()) throw std::runtime_error("not a symbolic path");
-        auto it = symbolicPath.begin();
-        if (it == symbolicPath.end()) throw std::runtime_error("not a symbolic path");
-        return (*it).string();
     }
 
     bool FileRepository::lexicallyContains(std::filesystem::path const& path) const {
@@ -93,7 +97,7 @@ namespace YAM
             }
         } else {
             auto it = path.begin();
-            contains = (it != path.end() && repoNameFromSymbolicPath((*it).string()) == _name);
+            contains = (it != path.end() && *it == _directoryNode->name());
         }
         return contains;
     }
@@ -143,7 +147,7 @@ namespace YAM
 
     std::filesystem::path FileRepository::absolutePathOf(std::filesystem::path const& symbolicPath) const {
         std::filesystem::path absPath;
-        std::string symRepoName = repoNameFromSymbolicPath(symbolicPath);
+        std::string symRepoName = repoNameFromPath(symbolicPath);
         if (symRepoName != _name) return absPath;
         absPath = _directory;
         auto it = symbolicPath.begin();

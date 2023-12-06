@@ -303,6 +303,14 @@ namespace YAM
         }
     }
 
+    void CommandNode::ignoreOutputs(std::vector<std::string> const& newOutputs) {
+        if (_ignoredOutputs != newOutputs) {
+            _ignoredOutputs = newOutputs;
+            modified(true);
+            setState(State::Dirty);
+        }
+    }
+
     void CommandNode::script(std::string const& newScript) {
         if (newScript != _script) {
             _script = newScript;
@@ -713,7 +721,7 @@ namespace YAM
         Node::stream(streamer);
         streamer->streamVector(_cmdInputs);
         streamer->streamVector(_orderOnlyInputs);
-        streamer->streamVector(_outputs);
+
         std::vector<std::shared_ptr<FileNode>> inputs;
         std::shared_ptr<DirectoryNode> wdir;
         if (streamer->writing()) {
@@ -727,6 +735,8 @@ namespace YAM
             _workingDir = wdir;
         }
         streamer->stream(_script);
+        streamer->streamVector(_outputs);
+        streamer->streamVector(_ignoredOutputs);
         streamer->stream(_executionHash);
     }
 
@@ -738,9 +748,12 @@ namespace YAM
             auto const& genFile = dynamic_pointer_cast<GeneratedFileNode>(p.second);
             if (genFile == nullptr) p.second->removeObserver(this);
         }
+        _cmdInputs.clear();
+        _orderOnlyInputs.clear();
         _inputProducers.clear();
         _outputs.clear();
         _detectedInputs.clear();
+        _ignoredOutputs.clear();
     }
 
     void CommandNode::restore(void* context) {

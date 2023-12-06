@@ -30,6 +30,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "doc", "doc", "{37AB3F5E-F8E
 		doc\design_whenToAddSourceFileNodesToGraph.txt = doc\design_whenToAddSourceFileNodesToGraph.txt
 		doc\design_winkin.txt = doc\design_winkin.txt
 		README.md = README.md
+		doc\rule_syntax.txt = doc\rule_syntax.txt
 		doc\todo.txt = doc\todo.txt
 	EndProjectSection
 EndProject

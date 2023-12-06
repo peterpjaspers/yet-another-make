@@ -25,28 +25,32 @@ namespace
         std::shared_ptr<FileRepository> fileRepo;
         std::filesystem::path absBuildFilePath;
         std::filesystem::path cmdOutputFile;
+        std::shared_ptr<SourceFileNode> mainFile;
 
         TestSetup()
-            : repoTree(FileSystem::createUniqueDirectory("_buildFileProcessingTest"), 2, RegexSet())
+            : repoTree(FileSystem::createUniqueDirectory("_buildFileProcessingTest"), 1, RegexSet())
             , fileRepo(std::make_shared<FileRepository>("repo", repoTree.path(), &context))
             , absBuildFilePath(repoTree.path() / R"(buildfile_yam.bat)")
             , cmdOutputFile(fileRepo->directoryNode()->name() / "main.obj")
         {
-            //R"(echo : foreach *.cpp ^|^< cc %f -o %o ^|^< %B.obj)"
-
-            std::filesystem::create_directory(repoTree.path() / "outputs");
             std::ofstream stream(absBuildFilePath.string().c_str());
             EXPECT_TRUE(stream.is_open());
             stream
                 << "@echo off" << std::endl
-                << R"(echo : main.cpp ^|^> cc main.cpp -o main.obj ^|^> main.obj)"
+                << R"(echo : main.cpp ^|^> echo main ^> main.obj ^|^> main.obj)"
                 << std::endl;
             stream.close();
+
+            std::filesystem::path f1(repoTree.path() / "main.cpp");
+            std::ofstream s1(f1.string().c_str());
+            s1 << "void main() {}" << std::endl;
+            s1.close();
 
             context.addRepository(fileRepo);
             auto dirNode = fileRepo->directoryNode();
             bool completed = YAMTest::executeNode(dirNode.get());
             EXPECT_TRUE(completed);
+            mainFile = dynamic_pointer_cast<SourceFileNode>(context.nodes().find(fileRepo->symbolicPathOf(f1)));
         }
 
         std::shared_ptr<BuildFileProcessingNode> processingNode() {
@@ -73,5 +77,7 @@ namespace
 
         completed = YAMTest::executeNode(cmdNode.get());
         EXPECT_TRUE(completed);
+        EXPECT_EQ(Node::State::Ok, cmdNode->state());
+        EXPECT_TRUE(std::filesystem::exists(setup.repoTree.path() / "main.obj"));
     }
 }

@@ -64,6 +64,8 @@ Todo: core
   eplace BuildFileTokenizer approach by 'Phil' approach.
 - Adapt BuildFileParser/BuildFileContent executor to reject absolute path names.
 - add unittest for BuildFileCompiler  
+- implement ignoredOutputs in CommandNode
+- compile command script during command execution to reduce command storage size.
 
 Todo: non-core
 - build file syntax (follow tup, follow mrmake, something completely different?)

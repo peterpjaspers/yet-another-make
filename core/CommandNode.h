@@ -69,6 +69,11 @@ namespace YAM
         void outputs(std::vector<std::shared_ptr<GeneratedFileNode>> const& newOutputs);
         std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs() const { return _outputs; }
 
+        // newOutputs contains regular expression patterns. Output files that
+        // match these patterns are ignored.
+        void ignoreOutputs(std::vector<std::string> const& newOutputs);
+        std::vector<std::string> const& ignoredOutputs() const { return _ignoredOutputs; }
+
         // Override Node
         void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const override;
         void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const override;
@@ -135,6 +140,7 @@ namespace YAM
         std::string _script;
         std::weak_ptr<DirectoryNode> _workingDir;
         std::vector<std::shared_ptr<GeneratedFileNode>> _outputs;
+        std::vector<std::string> _ignoredOutputs;
 
         std::atomic<std::shared_ptr<IMonitoredProcess>> _scriptExecutor;
         
