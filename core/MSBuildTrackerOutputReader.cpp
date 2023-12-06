@@ -109,7 +109,7 @@ namespace YAM
         while (std::getline(ws, line)) {
             line.erase(line.find_last_not_of(L" \t\r") + 1);
             if (line[0] != L'#' && line[0] != L'^') {
-                dependencies.emplace(YAM::FileSystem::normalizePath(line));
+                dependencies.emplace(YAM::FileSystem::canonicalPath(line));
             }
         }    
     }

@@ -26,7 +26,7 @@ namespace YAM
         //     return lower-cased std::filesystem::canonical(path) or, if path 
         //     does not  exist return lowercased path.
         //
-        static std::filesystem::path normalizePath(std::filesystem::path const& path);
+        static std::filesystem::path canonicalPath(std::filesystem::path const& path);
     };
 }
 

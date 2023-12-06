@@ -26,15 +26,14 @@ namespace
         EXPECT_TRUE(path.filename().string().ends_with(".postfix"));
     }
 
-    TEST(FileSystem, normalizePath) {
+    TEST(FileSystem, canonicalPath) {
         std::filesystem::path dir = FileSystem::createUniqueDirectory("__TEST");
         std::filesystem::path file(dir / "file.txt");
         std::ofstream stream(file.string().c_str());
         stream.close();
         std::filesystem::path notNorm(dir / "..\\." / dir.filename() / file.filename());
-        std::filesystem::path norm = FileSystem::normalizePath(notNorm);
+        std::filesystem::path norm = FileSystem::canonicalPath(notNorm);
         EXPECT_EQ(file, norm);
-        EXPECT_TRUE(norm.parent_path().string().ends_with("__test"));
         std::filesystem::remove_all(dir);
     }
 }

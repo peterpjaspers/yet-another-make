@@ -17,7 +17,7 @@ namespace YAM
             d = uniquePath(postfix);
         }
         std::filesystem::create_directory(d);
-        return normalizePath(d);
+        return canonicalPath(d);
     }
 
     std::filesystem::path FileSystem::uniquePath(std::string const& postfix) {
@@ -30,18 +30,13 @@ namespace YAM
         return up;
     }
 
-    std::filesystem::path FileSystem::normalizePath(std::filesystem::path const& path) {
+    std::filesystem::path FileSystem::canonicalPath(std::filesystem::path const& path) {
         std::error_code ec;
         std::filesystem::path nPath = std::filesystem::canonical(path, ec);
         if (ec.value() != 0) {
             auto msg = ec.message();
             nPath = path;
         }
-#if defined( _WIN32 )
-        std::wstring str = nPath.wstring();
-        std::transform(str.begin(), str.end(), str.begin(), std::towlower);
-        nPath = str;
-#endif
         return nPath;
     }
 }
