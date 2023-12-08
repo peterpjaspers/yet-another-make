@@ -95,6 +95,7 @@ namespace {
         assertMatch("foo{bar,baaz}", "foobar", globstar);
         assertNotMatch("foo{bar,baaz}", "foobuzz", globstar);
         assertMatch("foo{bar,b*z}", "foobuzz", globstar);
+        assertMatch("foo{b*z}", "foobuzz", globstar);
 
         // More complex matches
         assertMatch("http://?o[oz].b*z.com/{*.js,*.html}",

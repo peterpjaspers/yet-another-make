@@ -72,7 +72,7 @@ namespace YAM
 
         // Find and return the node identified by 'path'.
         // Pre: 'path' is relative to name(). 
-        std::shared_ptr<Node> findChild(std::filesystem::path path);
+        std::shared_ptr<Node> findChild(std::filesystem::path const& path);
 
         std::chrono::time_point<std::chrono::utc_clock> const& lastWriteTime();
 

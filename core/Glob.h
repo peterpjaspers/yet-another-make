@@ -6,20 +6,24 @@
 
 namespace YAM {
 
+    // A glob is a simplified regular expression:
+    //  * matches 0, 1 or more characters
+    //  ? matches 1 character
+    //  ** matchs any path
+    //  [abc] match character a or b or c
+    //  {abc} group substring abc
+    //  {abc},{def} match substring abc or def
+    // 
     class __declspec(dllexport) Glob
     {
     public:
-        // When globstar is true then 
-        //     /**/ means to recurse all directories below root
-        //     B/**/ means to recurse all directories below B
-        // When globstar is false then a consecutive sequence of * symbols 
-        // collapsed to one *. E.g. B/**/C becomes B/*/C.
+        // When globstar is true then normal meaning of **, else a consecutive
+        // sequence of * symbols is collapsed to one *. E.g. ***/C becomes */C.
         //
         Glob(std::string const& globPattern, bool globstar);
         Glob(std::filesystem::path const& globPattern);
 
-        // Return whether patterns contains glob special characters.
-        // I.e. one or more of * ? [] {} ,
+        // Return whether pattern contains a glob special character.
         static bool isGlob(std::string const& pattern);
 
         bool matches(std::string const& str) const;

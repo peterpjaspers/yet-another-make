@@ -10,6 +10,21 @@ namespace
 {
     using namespace YAM;
     namespace fs = std::filesystem;
+
+    void canonicalize(std::shared_ptr<DirectoryNode>& baseDir, std::filesystem::path& pattern) {
+        std::filesystem::path patternDirPath;
+        auto it = pattern.begin();
+        for (; it != pattern.end() && !Glob::isGlob(it->string()); ++it) {
+            auto tmp = dynamic_pointer_cast<DirectoryNode>(baseDir->findChild(*it));
+            if (tmp == nullptr) break;
+            baseDir = tmp;
+        };
+        std::filesystem::path newPattern;
+        for (; it != pattern.end(); ++it) {
+            newPattern /= *it;
+        }
+        pattern = newPattern;
+    }
 }
 
 namespace YAM
@@ -26,15 +41,19 @@ namespace YAM
         , _dirsOnly(dirsOnly)
         , _inputDirs(inputDirs)
     {
-        auto repo = context->findRepositoryContaining(pattern);
-        if (repo != nullptr) {
-            _baseDir = repo->directoryNode();
-            _pattern = repo->relativePathOf(repo->absolutePathOf(pattern));
+        std::string repoName = FileRepository::repoNameFromPath(_pattern);
+        if (!repoName.empty()) {
+            auto repo = context->findRepository(repoName);
+            if (repo != nullptr) {
+                _baseDir = repo->directoryNode();
+                _pattern = repo->relativePathOf(repo->absolutePathOf(_pattern));
+            }
         }
+        canonicalize(_baseDir, _pattern);
         _inputDirs.insert(_baseDir);
 
-        std::filesystem::path dirPattern = pattern.parent_path();
-        std::filesystem::path filePattern = pattern.filename();        
+        std::filesystem::path dirPattern = _pattern.parent_path();
+        std::filesystem::path filePattern = _pattern.filename();        
         if (dirPattern.empty()) {
             if (isRecursive(filePattern)) {
                 walk(_baseDir);
@@ -96,11 +115,34 @@ namespace YAM
         }
     }
 
+    // path is a symbolic path or a path relative to _baseDir
+    std::shared_ptr<Node> Globber::findNode(std::filesystem::path const& path) {
+        std::shared_ptr<Node> node;
+        if (FileRepository::isSymbolicPath(path)) {
+            node = _baseDir->context()->nodes().find(path);
+        } else if (path.is_absolute()) {
+            std::shared_ptr<FileRepository> repo = _baseDir->context()->findRepositoryContaining(path);
+            if (repo != nullptr) {
+                std::filesystem::path abcCanonicalPath = std::filesystem::canonical(path);
+                std::filesystem::path symPath = _baseDir->repository()->symbolicPathOf(abcCanonicalPath);
+                node = _baseDir->context()->nodes().find(symPath);    
+            }
+        } else {
+            std::filesystem::path absPath(_baseDir->absolutePath() / path);
+            std::filesystem::path abcCanonicalPath = std::filesystem::canonical(absPath);
+            std::filesystem::path symPath = _baseDir->repository()->symbolicPathOf(abcCanonicalPath);
+            node = _baseDir->context()->nodes().find(symPath);
+        }
+        return node;
+    }
+
+    // path is a symbolic path or a path relative to _baseDir
     void Globber::exists(std::filesystem::path const& file) {
         if (file.empty()) {
             _matches.push_back(_baseDir);
         } else {
-            std::shared_ptr<Node> node = _baseDir->findChild(file);
+            //std::shared_ptr<Node> node = _baseDir->findChild(file);
+            std::shared_ptr<Node> node = findNode(file);
             if (node != nullptr) {
                 _matches.push_back(node);
             }
@@ -110,7 +152,8 @@ namespace YAM
     // path is a symbolic path or a path relative to _baseDir
     std::shared_ptr<DirectoryNode> Globber::findDirectory(std::filesystem::path const& path) {
         if (path == _baseDir->name()) return _baseDir;
-        std::shared_ptr<Node> node = _baseDir->findChild(path);
+        //std::shared_ptr<Node> node = _baseDir->findChild(path);
+        std::shared_ptr<Node> node = findNode(path);
         return dynamic_pointer_cast<DirectoryNode>(node);
     }
 }

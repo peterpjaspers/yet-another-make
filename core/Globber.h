@@ -48,6 +48,7 @@ namespace YAM
         void match(std::filesystem::path const& pattern);
         void exists(std::filesystem::path const& file);
         std::shared_ptr<DirectoryNode> findDirectory(std::filesystem::path const& relativeToBase);
+        std::shared_ptr<Node> findNode(std::filesystem::path const& path);
 
         std::shared_ptr<DirectoryNode> _baseDir;
         std::filesystem::path _pattern;

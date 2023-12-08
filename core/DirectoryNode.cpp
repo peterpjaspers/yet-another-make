@@ -154,7 +154,7 @@ namespace YAM
         return child;
     }
 
-    std::shared_ptr<Node> DirectoryNode::findChild(std::filesystem::path path) {
+    std::shared_ptr<Node> DirectoryNode::findChild(std::filesystem::path const& path) {
         return findChild(shared_from_this(), path.begin(), path.end());
     }
 

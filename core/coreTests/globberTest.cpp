@@ -74,7 +74,9 @@ namespace
         auto matches = globber.matches();
         ASSERT_EQ(1, matches.size());
         EXPECT_EQ(expectedSymPath, matches[0]->name());
-        EXPECT_EQ(2, inputDirs.size());
+        ASSERT_EQ(1, inputDirs.size());
+        auto inputDir = *inputDirs.begin();
+        EXPECT_EQ(setup.rootDir()->name() / pattern.parent_path(), inputDir->name());
     }
 
     TEST(Globber, SubDir1SubDir2) {
@@ -88,24 +90,31 @@ namespace
         auto matches = globber.matches();
         ASSERT_EQ(1, matches.size());
         EXPECT_EQ(expectedPath, matches[0]->name());
-        EXPECT_EQ(2, inputDirs.size());
+        ASSERT_EQ(1, inputDirs.size());
+        auto inputDir = *inputDirs.begin();
+        EXPECT_EQ(setup.rootDir()->name() / pattern, inputDir->name());
     }
 
     TEST(Globber, AllFilesInRoot) {
         GlobberSetup setup;
-        std::filesystem::path pattern("File[123]");
+        std::filesystem::path pattern("..\\File[123]");
         std::set<std::shared_ptr<DirectoryNode>, Node::CompareName> inputDirs;
         std::filesystem::path expected1 = setup.repo()->symbolicDirectory() / "File1";
         std::filesystem::path expected2 = setup.repo()->symbolicDirectory() / "File2";
         std::filesystem::path expected3 = setup.repo()->symbolicDirectory() / "File3";
 
-        Globber globber(&(setup.context), setup.rootDir(), pattern, false, inputDirs);
+        std::vector<std::shared_ptr<DirectoryNode>> subDirs;
+        setup.rootDir()->getSubDirs(subDirs);
+        auto subDir = subDirs[0];
+        Globber globber(&(setup.context), subDir, pattern, false, inputDirs);
         auto matches = globber.matches();
         ASSERT_EQ(3, matches.size());
         EXPECT_EQ(expected1, matches[0]->name());
         EXPECT_EQ(expected2, matches[1]->name());
         EXPECT_EQ(expected3, matches[2]->name());
-        EXPECT_EQ(1, inputDirs.size());
+        ASSERT_EQ(1, inputDirs.size());
+        auto inputDir = *inputDirs.begin();
+        EXPECT_EQ(setup.rootDir(), inputDir);
     }
 
     TEST(Globber, AllFiles12) {
