@@ -7,6 +7,8 @@
 #include "CommandNode.h"
 #include "FileRepository.h"
 #include "Globber.h"
+#include "Glob.h"
+#include "GlobNode.h"
 
 #include <sstream>
 #include <ctype.h>
@@ -128,10 +130,34 @@ namespace YAM {
     ) {
         std::vector<std::shared_ptr<FileNode>> inputNodes;
         std::shared_ptr<FileNode> fileNode;
-        Globber globber(_baseDir->context(), _baseDir, input.pathPattern, false, _inputDirs);
-        for (auto const& match : globber.matches()) {
-            auto fileNode = dynamic_pointer_cast<FileNode>(match);
-            if (fileNode == nullptr) throw std::runtime_error("not a file node");
+        auto optimizedBaseDir = _baseDir;
+        auto optimizedPattern = input.pathPattern;
+        Globber::optimize(optimizedBaseDir, optimizedPattern);
+        if (Glob::isGlob(optimizedPattern.string())) {
+            std::filesystem::path globName(optimizedBaseDir->name() / optimizedPattern);
+            auto globNode = dynamic_pointer_cast<GlobNode>(_context->nodes().find(globName));
+            if (globNode == nullptr) {
+                globNode = std::make_shared<GlobNode>(_context, globName);
+                globNode->baseDirectory(optimizedBaseDir);
+                globNode->pattern(optimizedPattern);
+                globNode->initialize();
+                _context->nodes().add(globNode);
+            }
+            _globs.insert({ globName, globNode });
+            for (auto const& match : globNode->matches()) {
+                fileNode = dynamic_pointer_cast<FileNode>(match);
+                if (fileNode == nullptr) throw std::runtime_error("not a file node");
+                inputNodes.push_back(fileNode);
+            }
+        } else {
+            // Non-glob inputs can refer to source or generated files.
+            // Using GlobNode is inefficient in case of source file and not 
+            // supported in case of generated file. Instead do a direct lookup 
+            // in context.
+            std::filesystem::path inputPath(optimizedBaseDir->name() / optimizedPattern);
+            auto match = _context->nodes().find(inputPath);
+            fileNode = dynamic_pointer_cast<FileNode>(match);
+            if (fileNode == nullptr) throw std::runtime_error(input.pathPattern.string() + ": no such file");
             inputNodes.push_back(fileNode);
         }
         return inputNodes;

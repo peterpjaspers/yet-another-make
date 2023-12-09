@@ -2,44 +2,16 @@ Todo: core
 - TODO: Builder::_dirtyCommands nodes must not be registered as dirty
   nor modified. Solution: only register dirty/modified node when it is
   in context::nodes().
-- decide on postrequisites
-  Non-consistent interface: executing directory node builds entire tree when
-  node is executed first time. Subsequent execution of the directory node
-  only update its children and executes its direct dirty children. Dirty children 
-  further down the tree will not be executed. To achieve full tree update the 
-  application must find all dirty nodes and then execute these. Both behaviors
-  are captured in this code:
-      vector dirtyNodes;
-      while (tree->findDirtyNodesRecursively(dirtyNodes)) {
-          execute(dirtyNodes)
-      }
-  Finding dirty nodes by iterating over all nodes is O(n). 
-  Another approach that is O(log(n) and that keeps the recursive implementation:
-  A node that is set dirty propagates dirty state to its postrequisiteParents.
-  Disadvantage: directory nodes in path from root to dirty node will self-execute even when
-  this is not necessary. Possible refinement: add hasDirtyPostRequisites flag. Nodes in state Ok
-  and hasDirtyPostRequisites only execute postRequisites that are dirty or hasDirtyPostRequisites.
 - decide on how to make finding dirty nodes O(1)
-- transaction across multiple btrees (tree of trees)
 - investigate scalability by measuring execution overhead, hashing overhead and 
   handling found file dependencies.
-- implement DotIgnoreNode
+- implement DotIgnoreNode (no longer needed?)
 - File aspects as nodes
 - aspect hashing for Dll import lib and code parts of C++ files 
-- Logging by node in thread pool to memorystream
-  Seperated thread forwards log to tcp/ip socket to client
 - Hide btree behind interface and let current file storage inherit from this interface.
 - Command node script executes in shell: user must specify which shell.
   It must also be possible to execute 'script' directly (e.g. cc -o a.obj a.cpp)
 - winkin (build cache)
-- Decide how to deal with using generated files from other repos
-    - first build in other repo using that repo's build server, then build this
-       repo versus build both repos in this repo's build server.
-       In first case generated files from other repos must be treated as source files.
-       In second case multi-repo-graph managed by this repo's build server and business
-       as usual. Disadvantage: if other repo was already build then this repo will build
-       it again.
-    - build file must tell YAM which repo's to build
 - detecting cycles in node graph: add trail argument to Node::start()
 - createFileRepositories(RepoConfigFile cfg) {
       for (repo : cfg.repos) {
@@ -65,15 +37,33 @@ Todo: core
 - Adapt BuildFileParser/BuildFileContent executor to reject absolute path names.
 - add unittest for BuildFileCompiler  
 - implement ignoredOutputs in CommandNode
-- compile command script during command execution to reduce command storage size.
+- globs in rules are executed on directory nodes in graph.
+  However, initially dir nodes do not contain generated files.
+  So globs like *.obj will not work. Executing the glob on the entire
+  graph is O(N).
+  Possible solution: add generated file nodes to directory. Directory
+  keeps track of generated file nodes seperate from source file nodes.
+  Directory does not own these nodes. Add/remove is responsibility of
+  BuidFileProcessingNode. NB: directory must exist!
+  Alternative: A BFPN collects all outputs in an anonymous GroupNode.
+  This node is also passed to Globber. Can be expanded to explict groups
+  that are persistent. Input globs are executed on all dirs plus the 
+  anonymous GroupNode. %g<groupPath>/*.obj globs only on specified group.
 
 Todo: non-core
 - build file syntax (follow tup, follow mrmake, something completely different?)
     - decide
     - implement parsers and DAG updater
 
-
 Done
+- Decide how to deal with using generated files from other repos
+    - first build in other repo using that repo's build server, then build this
+       repo versus build both repos in this repo's build server.
+       In first case generated files from other repos must be treated as source files.
+       In second case multi-repo-graph managed by this repo's build server and business
+       as usual. Disadvantage: if other repo was already build then this repo will build
+       it again.
+    - build file must tell YAM which repo's to build
 - Remove mutex from NodeSet. Instead post all NodeSet add/remove to main thread. 
   To be changed: DirectoryNode::updateContent(),
   DirectoryNode::DirectoryNode(), DotIgnoreNode::setDotIgnoreFiles()
@@ -117,6 +107,24 @@ Done
     - CommandNode::_inputAspects (std::vector<{fileNamePattern, aspectName}>) 
 - client-server interface
 
+- decide on postrequisites
+  Non-consistent interface: executing directory node builds entire tree when
+  node is executed first time. Subsequent execution of the directory node
+  only update its children and executes its direct dirty children. Dirty children 
+  further down the tree will not be executed. To achieve full tree update the 
+  application must find all dirty nodes and then execute these. Both behaviors
+  are captured in this code:
+      vector dirtyNodes;
+      while (tree->findDirtyNodesRecursively(dirtyNodes)) {
+          execute(dirtyNodes)
+      }
+  Finding dirty nodes by iterating over all nodes is O(n). 
+  Another approach that is O(log(n) and that keeps the recursive implementation:
+  A node that is set dirty propagates dirty state to its postrequisiteParents.
+  Disadvantage: directory nodes in path from root to dirty node will self-execute even when
+  this is not necessary. Possible refinement: add hasDirtyPostRequisites flag. Nodes in state Ok
+  and hasDirtyPostRequisites only execute postRequisites that are dirty or hasDirtyPostRequisites.
+
 - Command node:
     - file dependency detection
         - define dependency detection interface, e.g. dependencies = track(program)
@@ -131,9 +139,6 @@ Done
     - distinguish between modifications caused by user editing source files and tampering
       (e.g. deleting) with generated files.
       See TrackedFileRepository 
-
-
-
 
   See https://miro.com/app/board/uXjVO-7wAmU=/ 
   In this board a build file node generates all command nodes, including the command scripts.

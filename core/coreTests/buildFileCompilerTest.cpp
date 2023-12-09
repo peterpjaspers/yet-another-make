@@ -70,6 +70,11 @@ namespace
         }
     };
 
+    // TODO
+    // : a.cpp b.cpp |> cc %1f -o %1o & cc %2f -o %2o |> %1B.obj %2B.obj
+    // : foreach *.cpp |> cc %f -i %o |> %B.obj
+    //
+    // Error message tests
     TEST(BuildFileCompiler, foreach) {
         CompilerSetup setup;
         BuildFile::Input input;

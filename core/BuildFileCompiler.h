@@ -5,7 +5,7 @@
 #include "Node.h"
 
 #include <vector>
-#include <set>
+#include <map>
 #include <memory>
 #include <filesystem>
 #include <regex>
@@ -16,6 +16,7 @@ namespace YAM {
     class GeneratedFileNode;
     class DirectoryNode;
     class CommandNode;
+    class GlobNode;
 
     class __declspec(dllexport) BuildFileCompiler {
     public:
@@ -26,6 +27,10 @@ namespace YAM {
 
         std::vector<std::shared_ptr<CommandNode>> const& commands() {
             return _commands;
+        }
+
+        std::map<std::filesystem::path, std::shared_ptr<GlobNode>> const& globs() {
+            return _globs;
         }
 
     private:
@@ -79,6 +84,6 @@ namespace YAM {
         ExecutionContext* _context;
         std::shared_ptr<DirectoryNode> _baseDir;
         std::vector<std::shared_ptr<CommandNode>> _commands; 
-        std::set<std::shared_ptr<DirectoryNode>, Node::CompareName> _inputDirs;
+        std::map<std::filesystem::path, std::shared_ptr<GlobNode>> _globs;
     };
 }

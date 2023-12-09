@@ -10,66 +10,72 @@ namespace YAM
 {
     class ExecutionContext;
     class DirectoryNode;
+    class Globber;
 
-    // When executing a GlobNode it applies its glob pattern to the mirrored 
-    // repositories, i.e. to the DirectoryNodes and FileNodes in the execution
-    // context. It provides access to the matching nodes. 
-    // 
-    // A glob pattern specifies a sets of filenames with wildcard characters.
-    // E.g *.txt specifies all text files in the base directory.
-    //
-    // A glob pattern can contain the following wildcards:
-    //    *  matches any number of any characters including none 
-    //    ?  matches any single character
-    //   **  matches all files and 0 or more directories and subdirectories. 
-    //       If the pattern is followed by a /, only directories and 
-    //       subdirectories match.
-    // 
-    // Globs do not match invisible files like ., .., .git, .rc unless the
-    // dot (.) is specified in the glob pattern.
-    // 
-    // Glob examples:
-    //    *.cpp matches all visible cpp files in the anchor directory
-    //    .* matches all visible and invisible files in the anchor directory
-    //    /root/cor*/*.cpp matches all cpp files in directories whose names 
-    //    match /root/cor* 
-    //    /root/**/*.cpp matches all cpp files in all directory trees in /root
-    // 
-    // When executing a GlobNode it applies the glob pattern to the mirrored 
-    // repositories, i.e. to the DirectoryNodes and FileNodes in the execution
-    // context.
+    // A GlobNode applies a glob path pattern to mirrored directories. 
+    // The matching DirectoryNodes and/or SourceFileNodes are cached in the
+    // GlobNode. Changes in the directories visited by the glob execution
+    // will trigger re-execution of the glob node.
     //
     class __declspec(dllexport) GlobNode : public Node
     {
-        GlobNode(); // needed for deserialization
+    public:
+        GlobNode() {}; // needed for deserialization
         GlobNode(ExecutionContext* context, std::filesystem::path const& name);
+
+        // The path pattern is relative to the base directory.
+        void baseDirectory(std::shared_ptr<DirectoryNode> const& newBaseDir);
+        std::shared_ptr<DirectoryNode> const& baseDirectory() const { return _baseDir;  }
+
+        void pattern(std::filesystem::path const& newPattern);
+        std::filesystem::path const& pattern() const { return _pattern; }
+
+        std::vector<std::shared_ptr<Node>> const& matches() const { return _matches; }
 
         void start() override;
 
+        // Optional: initialize the glob node by applying pattern() to the 
+        // baseDirectory().
+        // Pre: the glob node has never been executed and has not yet been
+        // added to the context. Intended to be called immediately after 
+        // construction.
+        // Successfull initialize will move the glob to Node::State::Ok.
+        void initialize();
+
         // Return a hash of the names of the nodes that match the glob pattern.
-        // Nodes that use these names as inputs must re-execute when this hash
-        // changes.
-        XXH64_hash_t hash();
-
-        static void setStreamableType(uint32_t type);
-        // Inherited from IStreamable
-        uint32_t typeId() const override;
-        void stream(IStreamer* streamer) override;
-
-    private:
-        std::vector<std::shared_ptr<Node>> find(
-            std::filesystem::path const& inpath,
-            bool dirsOnly);
-
         XXH64_hash_t executionHash();
 
-        std::shared_ptr<DirectoryNode> _anchor;
-        std::filesystem::path const& _pattern;
+        static void setStreamableType(uint32_t type) { throw std::runtime_error("not impl"); }
+        // Inherited from IStreamable
+        uint32_t typeId() const override { throw std::runtime_error("not impl"); }
+        void stream(IStreamer* streamer) override { throw std::runtime_error("not impl"); }
 
-        std::set<std::shared_ptr<DirectoryNode>> _inputs;
-        std::set<std::shared_ptr<Node>> _matches;
+    private:
+        std::pair<std::shared_ptr<Globber>, std::string> execute();
+        void handleInputDirsCompletion(Node::State state);
+        void executeGlob();
+        void handleGlobCompletion(std::shared_ptr<Globber> const& globber, std::string const& error);
+
+        XXH64_hash_t computeExecutionHash() const;
+        XXH64_hash_t computeInputsHash() const;
+
+        std::shared_ptr<DirectoryNode> _baseDir;
+        std::filesystem::path _pattern;
+
+        // _inputDirs are the directories that were queried by glob
+        // execution.
+        std::set<std::shared_ptr<DirectoryNode>, YAM::Node::CompareName> _inputDirs;
+
+        // _inputsHash is a hash of the hashes of baseDir name, pattern and
+        // input directories. A change in _inputsHash will trigger re-execution of 
+        // the glob node.
+        XXH64_hash_t _inputsHash;
+
+        std::vector<std::shared_ptr<Node>> _matches; 
+        // _executionHash is a hash of the names of matching nodes.
+        // A change in _hash will trigger re-execution of nodes that depend
+        // on this glob node.
         XXH64_hash_t _executionHash;
-        XXH64_hash_t _hash;
     };
 }
 

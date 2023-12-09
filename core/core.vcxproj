@@ -226,7 +226,9 @@
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4251;4996</DisableSpecificWarnings>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4251;4996</DisableSpecificWarnings>
     </ClCompile>
-    <ClCompile Include="GlobNode.cpp" />
+    <ClCompile Include="GlobNode.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="LogRecord.cpp" />
     <ClCompile Include="MemoryLogBook.cpp" />
     <ClCompile Include="FileRepositoryWatcher.cpp" />

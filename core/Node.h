@@ -157,7 +157,17 @@ namespace YAM
         // logic needs execution of a collection of nodes. 
         // Note: caller is responsible to keep 'nodes' in existence during
         // execution.
-        // 
+        //
+        template <class TNode> 
+        void startNodes(
+            std::vector<std::shared_ptr<TNode>> const& nodes,
+            Delegate<void, Node::State> const& callback
+        ) {
+            std::vector<Node*> rawNodes;
+            for (auto const& n : nodes) rawNodes.push_back(n.get());
+            startNodes(rawNodes, callback);
+        }
+
         void startNodes(
             std::vector<Node*> const& nodes,
             Delegate<void, Node::State> const& callback);

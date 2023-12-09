@@ -349,6 +349,7 @@ globs. For example:
 Note that evaluating this glob is O(N) where N is number of nodes in the DAG. 
 N can be reduced by only applying the glob to generated files nodes that are in
 scope, i.e. the nodes defined in this buildfile and its buildfile dependencies.
+Also see section ---Input globs on generated files
 
 ---Dynamic outputs
 Some users of tup complain about having to declare all outputs of a rule.
@@ -435,4 +436,41 @@ file does not exists and fail the build. Else continue.
 
 Practical problems: directory references are found in Globber. This code now
 
+---Input globs on generated files.
+At time of writing input globs are executed on mirrored directory nodes by
+Globber. Initially dir nodes do not contain generated file nodes. So globs 
+like *.obj will not work. Alternative of executing the glob on the entire graph
+is not attractive because it is O(N).
+Possible solutions:
 
+1. Add generated file nodes to directory. Directory  keeps track of generated
+file nodes seperate from source file nodes. Directory does not own these nodes.
+Add/remove is responsibility of BuidFileProcessingNode. NB: directory must exist!
+
+2. Variables with substibution. E.g.
+       SRCS=*.cpp
+       OBJS=$(SRCS, output\%B.obj)
+       : foreach $(SRCS) |> cc -%f -o %O |> output\%B.obj
+       : $(OBJS) |> link %d -o %O |> program.exe
+   Redundant: output\%B.obj appears twice
+   
+3. BFPN collects all outputs in an anonymous GroupNode. This group is passed to
+Globber. Globber now searches in directories and in groups. This can be expanded
+to explicity named groups.
+  %g<groupPath> matches all nodes in specified group.
+  %g<groupPath>/*.obj matches all obj nodes in specified group.
+Note: the input groups must be passed to CommandNode as part of cmdInputs.
+Note: When a groupPath occurs in buildfile A and B the BFPN_A and BFPN_B both
+add generated file nodes to this group. Assume buildfile B uses the the group
+as input. Then B must depend in A in order for the group content to be complete.
+If not then the command that uses the group must delay execution until all
+buildfiles have been processed. Detecting missing, dependency declarations
+is not possible during buildfile processing. The problem can be avoided by,
+unlike tup, making groups global for read-access but local for write-access.
+I.e. only one buildfile can add to a group. In that sense the BFPN produces
+the group. The group name declard in producer is a string, not a path. The
+group node name is a path: <sym path of dir of buildfile>\<group name>
+Readers of the group refer to the group by the (symbolic) group node path.
+
+Note: tup does not have the buildfile dependency problem because it processes
+all buildfiles before starting command execution.

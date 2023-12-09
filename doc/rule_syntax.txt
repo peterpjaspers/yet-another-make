@@ -1,7 +1,7 @@
 YamFile syntax is a subset of Tupfile syntax.
 
 YamFile => {Rule}*
-Rule => ':' [foreach] [CmdInputs] [ '|' OrderOnlyInputs ] '|>' Script '|>' [Outputs]
+Rule => ':' [foreach] [CmdInputs] [ '|' OrderOnlyInputs ] '|>' Script '|>' [Outputs [Group]]
 CmdInputs => Inputs
 Inputs => [Input]*
 Input => Glob | '^'Glob | Path | '^'Path
@@ -10,6 +10,7 @@ Script => { String | InputPathFlag | OutputPathFlag}*
 InputPathFlag => '%f' | '%b' | '%B' | '%e' | '%D' | '%d'
 OutputPathFlag => '%o'
 Outputs => {string | InputPathFlag }*
+Group => Path
 
 %f CmdInputs when not a foreach rule
 %f current cmd input path in case of foreach rule, e.g. a/b/c/d.e
@@ -37,7 +38,19 @@ Example rules:
 : foreach *.c |> gcc -c %f -o %o |> %B.o
 
 # YamFile 4: compile all .c files except main.c into object files
+# and link them into a library hello.a
 : foreach *.c ^main.c |> gcc -c %f -o %o |> %B.o
+: *.o |> gcc -lib %f -o %o |> hello.a
+
+# YamFile 5: compile all .c files and link them into an executable
+: foreach *.c |> gcc -c %f -o %o |> %B.o
+: *.o |> gcc %f -o %o |> hello.exe
+
+# YamFile 6: compile all .c files and link them into a library
+# and executable
+: foreach *.c |> gcc -c %f -o %o |> %B.o
+: *.o ^main.o |> gcc %f -o %o |> hello.lib
+: main.o hello.lib |> gcc %f -o %o |> hello.exe
 
 
 

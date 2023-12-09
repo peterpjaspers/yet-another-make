@@ -11,7 +11,102 @@ namespace
     using namespace YAM;
     namespace fs = std::filesystem;
 
-    void canonicalize(std::shared_ptr<DirectoryNode>& baseDir, std::filesystem::path& pattern) {
+    void resolveSymbolicOrAbsolutePath(
+        std::shared_ptr<DirectoryNode>& baseDir,
+        std::filesystem::path& pattern)
+    {
+        if (pattern.is_absolute()) {
+            auto repo = baseDir->context()->findRepositoryContaining(pattern);
+            if (repo != nullptr) {
+                baseDir = repo->directoryNode();
+                pattern = repo->relativePathOf(pattern);
+            } else {
+                baseDir = nullptr;
+            }
+        } else {
+            std::string repoName = FileRepository::repoNameFromPath(pattern);
+            if (!repoName.empty()) {
+                auto repo = baseDir->context()->findRepository(repoName);
+                if (repo != nullptr) {
+                    baseDir = repo->directoryNode();
+                    pattern = repo->relativePathOf(repo->absolutePathOf(pattern));
+                } else {
+                    baseDir = nullptr;
+                }
+            }
+        }
+        if (baseDir == nullptr) {
+            throw std::runtime_error(pattern.string() + " is not a path in a known repository");
+        }
+    }
+}
+
+namespace YAM
+{
+    Globber::Globber(
+        std::shared_ptr<DirectoryNode> const& baseDir,
+        std::filesystem::path const& pattern,
+        bool dirsOnly
+    )
+        : _baseDir(baseDir)
+        , _pattern(pattern)
+        , _dirsOnly(dirsOnly)
+        , _executed(false)
+    {
+        optimize(_baseDir, _pattern);
+    }
+
+
+    std::vector<std::shared_ptr<Node>>const& Globber::matches() {
+        execute();
+        return _matches;
+    }
+
+    void Globber::execute() {
+        if (_executed) return;
+        _executed = true;
+
+        _inputDirs.insert(_baseDir);
+
+        std::filesystem::path dirPattern = _pattern.parent_path();
+        std::filesystem::path filePattern = _pattern.filename();
+        if (dirPattern.empty()) {
+            if (isRecursive(filePattern)) {
+                walk(_baseDir);
+            } else if (Glob::isGlob(filePattern.string())) {
+                match(filePattern);
+            } else {
+                exists(filePattern);
+            }
+        } else if (Glob::isGlob(dirPattern.string())) {
+            Globber finder(_baseDir, dirPattern, true);
+            if (filePattern.empty()) {
+                _matches.insert(_matches.end(), finder.matches().begin(), finder.matches().end());
+                _inputDirs.insert(finder.inputDirs().begin(), finder.inputDirs().end());
+            } else {
+                for (auto const& m : finder.matches()) {
+                    auto dirNode = dynamic_pointer_cast<DirectoryNode>(m);
+                    Globber mfinder(dirNode, filePattern, _dirsOnly);
+                    _matches.insert(_matches.end(), mfinder.matches().begin(), mfinder.matches().end());
+                    _inputDirs.insert(mfinder.inputDirs().begin(), mfinder.inputDirs().end());
+                }
+            }
+        } else {
+            auto dirNode = findDirectory(dirPattern);
+            if (dirNode != nullptr) {
+                Globber finder(dirNode, filePattern, _dirsOnly);
+                _matches = finder.matches();
+                _inputDirs = finder.inputDirs();
+            }
+        }
+    }
+
+    void Globber::optimize(
+        std::shared_ptr<DirectoryNode>& baseDir, 
+        std::filesystem::path& pattern
+    ) {
+        resolveSymbolicOrAbsolutePath(baseDir, pattern);
+
         std::filesystem::path patternDirPath;
         auto it = pattern.begin();
         for (; it != pattern.end() && !Glob::isGlob(it->string()); ++it) {
@@ -24,62 +119,6 @@ namespace
             newPattern /= *it;
         }
         pattern = newPattern;
-    }
-}
-
-namespace YAM
-{
-    Globber::Globber(
-        ExecutionContext* context,
-        std::shared_ptr<DirectoryNode> const& baseDir,
-        std::filesystem::path const& pattern,
-        bool dirsOnly,
-        std::set<std::shared_ptr<DirectoryNode>, Node::CompareName>& inputDirs
-    )
-        : _baseDir(baseDir)
-        , _pattern(pattern)
-        , _dirsOnly(dirsOnly)
-        , _inputDirs(inputDirs)
-    {
-        std::string repoName = FileRepository::repoNameFromPath(_pattern);
-        if (!repoName.empty()) {
-            auto repo = context->findRepository(repoName);
-            if (repo != nullptr) {
-                _baseDir = repo->directoryNode();
-                _pattern = repo->relativePathOf(repo->absolutePathOf(_pattern));
-            }
-        }
-        canonicalize(_baseDir, _pattern);
-        _inputDirs.insert(_baseDir);
-
-        std::filesystem::path dirPattern = _pattern.parent_path();
-        std::filesystem::path filePattern = _pattern.filename();        
-        if (dirPattern.empty()) {
-            if (isRecursive(filePattern)) {
-                walk(_baseDir);
-            } else if (Glob::isGlob(filePattern.string())) {
-                match(filePattern);
-            } else {
-                exists(filePattern);
-            }
-        } else if (Glob::isGlob(dirPattern.string())) {
-            Globber finder(context, _baseDir, dirPattern, true, _inputDirs);
-            if (filePattern.empty()) {
-                _matches.insert(_matches.end(), finder._matches.begin(), finder._matches.end());
-            } else {
-                for (auto const& m : finder._matches) {
-                    auto dirNode = dynamic_pointer_cast<DirectoryNode>(m);
-                    Globber mfinder(context, dirNode, filePattern, _dirsOnly, _inputDirs);
-                    _matches.insert(_matches.end(), mfinder._matches.begin(), mfinder._matches.end());
-                }
-            }
-        } else {
-            auto dirNode = findDirectory(dirPattern);
-            if (dirNode != nullptr) {
-                Globber finder(context, dirNode, filePattern, _dirsOnly, _inputDirs);
-                _matches = finder._matches;
-            }
-        }
     }
 
     bool Globber::isHidden(std::filesystem::path const& path) { return path.string()[0] == '.'; }
@@ -116,44 +155,20 @@ namespace YAM
     }
 
     // path is a symbolic path or a path relative to _baseDir
-    std::shared_ptr<Node> Globber::findNode(std::filesystem::path const& path) {
-        std::shared_ptr<Node> node;
-        if (FileRepository::isSymbolicPath(path)) {
-            node = _baseDir->context()->nodes().find(path);
-        } else if (path.is_absolute()) {
-            std::shared_ptr<FileRepository> repo = _baseDir->context()->findRepositoryContaining(path);
-            if (repo != nullptr) {
-                std::filesystem::path abcCanonicalPath = std::filesystem::canonical(path);
-                std::filesystem::path symPath = _baseDir->repository()->symbolicPathOf(abcCanonicalPath);
-                node = _baseDir->context()->nodes().find(symPath);    
-            }
-        } else {
-            std::filesystem::path absPath(_baseDir->absolutePath() / path);
-            std::filesystem::path abcCanonicalPath = std::filesystem::canonical(absPath);
-            std::filesystem::path symPath = _baseDir->repository()->symbolicPathOf(abcCanonicalPath);
-            node = _baseDir->context()->nodes().find(symPath);
-        }
-        return node;
-    }
-
-    // path is a symbolic path or a path relative to _baseDir
     void Globber::exists(std::filesystem::path const& file) {
         if (file.empty()) {
             _matches.push_back(_baseDir);
         } else {
-            //std::shared_ptr<Node> node = _baseDir->findChild(file);
-            std::shared_ptr<Node> node = findNode(file);
+            std::shared_ptr<Node> node = _baseDir->findChild(file);
             if (node != nullptr) {
                 _matches.push_back(node);
             }
         } 
     }
 
-    // path is a symbolic path or a path relative to _baseDir
     std::shared_ptr<DirectoryNode> Globber::findDirectory(std::filesystem::path const& path) {
         if (path == _baseDir->name()) return _baseDir;
-        //std::shared_ptr<Node> node = _baseDir->findChild(path);
-        std::shared_ptr<Node> node = findNode(path);
+        std::shared_ptr<Node> node = _baseDir->findChild(path);
         return dynamic_pointer_cast<DirectoryNode>(node);
     }
 }

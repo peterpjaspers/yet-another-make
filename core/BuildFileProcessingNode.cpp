@@ -132,14 +132,14 @@ namespace YAM
             notifyProcessingCompletion(state);
         } else if (canceling()) {
             notifyProcessingCompletion(Node::State::Canceled);
-        } else if (_buildFile->hashOf(FileAspect::entireFileAspect().name()) != _buildFileHash) {
+        } else if (_buildFile->hashOf(FileAspect::entireFileAspect().name()) == _buildFileHash) {
+            notifyProcessingCompletion(Node::State::Ok);
+        } else {
             context()->statistics().registerSelfExecuted(this);
             auto d = Delegate<void>::CreateLambda(
                 [this]() { parseBuildFile(); }
             );
             context()->threadPoolQueue().push(std::move(d));
-        } else {
-            notifyProcessingCompletion(Node::State::Canceled);
         }
     }
 

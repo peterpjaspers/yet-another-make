@@ -23,9 +23,7 @@ namespace YAM
         auto callback = Delegate<void, Node::State>::CreateLambda(
             [this](Node::State state) { handleGroupCompletion(state); }
         );
-        std::vector<Node*> group;
-        for (auto const& n : _group) group.push_back(n.get());
-        startNodes(group, std::move(callback));
+        startNodes(_group, std::move(callback));
     }
 
     void GroupNode::handleGroupCompletion(Node::State groupState) {
