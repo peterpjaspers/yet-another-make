@@ -74,6 +74,8 @@ namespace YAM
         void ignoreOutputs(std::vector<std::string> const& newOutputs);
         std::vector<std::string> const& ignoredOutputs() const { return _ignoredOutputs; }
 
+        InputNodes const& detectedInputs() const { return _detectedInputs; }
+
         // Override Node
         void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const override;
         void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const override;
@@ -88,9 +90,6 @@ namespace YAM
         // Inherited from IPersistable
         void prepareDeserialize() override;
         void restore(void* context) override;
-
-    protected:
-        void handleDirtyOf(Node* observedNode) override;
 
     private:
         struct ExecutionResult {

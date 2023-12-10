@@ -122,7 +122,7 @@ namespace YAM {
         cmdNode->script(script);
         cmdNode->outputs(outputs);
         cmdNode->ignoreOutputs(ignoredOutputs);
-        _commands.push_back(cmdNode);
+        _commands.insert(cmdNode);
     }
 
     std::vector<std::shared_ptr<FileNode>> BuildFileCompiler::compileInput(
@@ -141,9 +141,13 @@ namespace YAM {
                 globNode->baseDirectory(optimizedBaseDir);
                 globNode->pattern(optimizedPattern);
                 globNode->initialize();
+                // TODO: adding the globNode to the context allows globNodes to
+                // be used from multiple buildfiles => no clear ownership.
+                // The use case is unlikely. Consider keeping globNodes private
+                // to the buildfile.
                 _context->nodes().add(globNode);
             }
-            _globs.insert({ globName, globNode });
+            _globs.insert(globNode);
             for (auto const& match : globNode->matches()) {
                 fileNode = dynamic_pointer_cast<FileNode>(match);
                 if (fileNode == nullptr) throw std::runtime_error("not a file node");

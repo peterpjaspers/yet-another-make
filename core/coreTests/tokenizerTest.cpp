@@ -290,7 +290,7 @@ namespace {
                 gcc 
                 src\hello.c 
                -o bin\hello 
-            |> bin\hello )");
+            |> bin\%B.obj )");
 
         BuildFileTokenizer tokenizer(rule, tokenSpecs);
         Token token;
@@ -302,13 +302,12 @@ namespace {
         EXPECT_EQ("glob", token.type);
         EXPECT_EQ("src\\hello.c", token.value);
         tokenizer.readNextToken(token);
-        //EXPECT_EQ("command", token.type);
-        //EXPECT_EQ(command, token.value);
-        //tokenizer.readNextToken(token);
-        //EXPECT_EQ("glob", token.type);
-        //EXPECT_EQ("bin\\hello", token.value);
-        //tokenizer.readNextToken(token);
-        //EXPECT_EQ("eos", token.type);
-        //EXPECT_EQ("", token.value);
+        EXPECT_EQ("script", token.type);
+        EXPECT_EQ(command, token.value);
+        tokenizer.readNextToken(token);
+        EXPECT_EQ("glob", token.type);
+        EXPECT_EQ("bin\\%B.obj", token.value);
+        tokenizer.readNextToken(token);
+        EXPECT_EQ("eos", token.type);
     }
 }

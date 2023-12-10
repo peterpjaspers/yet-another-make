@@ -4,6 +4,7 @@
 #include "BuildFile.h"
 #include "Node.h"
 
+#include <set>
 #include <vector>
 #include <map>
 #include <memory>
@@ -25,11 +26,12 @@ namespace YAM {
             std::shared_ptr<DirectoryNode> const& baseDir,
             BuildFile::File const& buildFile);
 
-        std::vector<std::shared_ptr<CommandNode>> const& commands() {
+        std::set<std::shared_ptr<CommandNode>, Node::CompareName> const& commands() {
             return _commands;
         }
 
-        std::map<std::filesystem::path, std::shared_ptr<GlobNode>> const& globs() {
+        // Return the globs that were used to resolve rule inputs.
+        std::set<std::shared_ptr<GlobNode>, Node::CompareName> const& globs() {
             return _globs;
         }
 
@@ -83,7 +85,7 @@ namespace YAM {
 
         ExecutionContext* _context;
         std::shared_ptr<DirectoryNode> _baseDir;
-        std::vector<std::shared_ptr<CommandNode>> _commands; 
-        std::map<std::filesystem::path, std::shared_ptr<GlobNode>> _globs;
+        std::set<std::shared_ptr<CommandNode>, Node::CompareName> _commands; 
+        std::set<std::shared_ptr<GlobNode>, Node::CompareName> _globs;
     };
 }

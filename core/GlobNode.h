@@ -22,6 +22,7 @@ namespace YAM
     public:
         GlobNode() {}; // needed for deserialization
         GlobNode(ExecutionContext* context, std::filesystem::path const& name);
+        ~GlobNode();
 
         // The path pattern is relative to the base directory.
         void baseDirectory(std::shared_ptr<DirectoryNode> const& newBaseDir);
@@ -43,7 +44,7 @@ namespace YAM
         void initialize();
 
         // Return a hash of the names of the nodes that match the glob pattern.
-        XXH64_hash_t executionHash();
+        XXH64_hash_t executionHash() const { return _executionHash; }
 
         static void setStreamableType(uint32_t type) { throw std::runtime_error("not impl"); }
         // Inherited from IStreamable

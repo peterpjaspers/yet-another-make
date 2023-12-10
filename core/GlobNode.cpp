@@ -21,6 +21,10 @@ namespace YAM
         }
     }
 
+    GlobNode::~GlobNode() {
+        for (auto const& dir : _inputDirs) dir->removeObserver(this);
+    }
+
     void GlobNode::pattern(std::filesystem::path const& newPattern) {
         if (_pattern != newPattern) {
             _pattern = newPattern;
@@ -29,6 +33,7 @@ namespace YAM
     }
 
     void GlobNode::start() {
+        Node::start();
         auto callback = Delegate<void, Node::State>::CreateLambda(
             [this](Node::State state) { handleInputDirsCompletion(state); }
         );
@@ -94,7 +99,9 @@ namespace YAM
     void GlobNode::handleGlobCompletion(std::shared_ptr<Globber> const& globber, std::string const& error) {
         if (error.empty()) {
             _matches = globber->matches();
+            for (auto const& dir : _inputDirs) dir->removeObserver(this);
             _inputDirs = globber->inputDirs();
+            for (auto const& dir : _inputDirs) dir->addObserver(this);
             _executionHash = computeExecutionHash();
             _inputsHash = computeInputsHash();
         } else {

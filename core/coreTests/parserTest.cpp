@@ -13,7 +13,7 @@ namespace {
             |>
                 gcc hello.c -o hello
             |> 
-            hello 
+            %B.obj 
         )";
         BuildFileParser parser(rules);
 
@@ -37,7 +37,7 @@ namespace {
 
         ASSERT_EQ(1, rule->outputs.outputs.size());
         auto const& output = rule->outputs.outputs[0];
-        EXPECT_EQ("hello", output.path);
+        EXPECT_EQ("%B.obj", output.path);
     }
 
     TEST(BuildFileParser, wrongScriptDelimitersToken) {

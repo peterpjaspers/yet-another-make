@@ -11,7 +11,7 @@ namespace {
         TokenSpec(R"(^\/\*[\s\S]*?\*\/)", "skip"), // multi-line comment
         TokenSpec(R"(^:)", "rule"),
         TokenSpec(R"(^\^)", "not"),
-        TokenSpec(R"(^\\?(?:[\w\.\*\?\[\]-])+(?:\\([\w\.\*\?\[\]-])+)*)", "glob"),
+        TokenSpec(R"(^\\?(?:[\w\.\*\?\%\[\]-])+(?:\\([\w\.\*\?\%\[\]-])+)*)", "glob"),
         TokenSpec(R"(^\|>(((?!\|>)\S|\s)*)\|>)", "script", 1),
     };
 }

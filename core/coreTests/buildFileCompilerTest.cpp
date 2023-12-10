@@ -4,6 +4,7 @@
 #include "../SourceFileNode.h"
 #include "../GeneratedFileNode.h"
 #include "../CommandNode.h"
+#include "../GlobNode.h"
 #include "../ExecutionContext.h"
 #include "../FileSystem.h"
 #include "../Globber.h"
@@ -102,26 +103,34 @@ namespace
         BuildFileCompiler compiler(&setup.context, setup.repo->directoryNode(), file);
         auto const& commands = compiler.commands();
         ASSERT_EQ(2, commands.size());
+        auto command0 = *(commands.begin());
+        auto command1 = *(++commands.begin());
 
-        ASSERT_EQ(1, commands[0]->cmdInputs().size());
-        auto input00 = commands[0]->cmdInputs()[0];
+        ASSERT_EQ(1, command0->cmdInputs().size());
+        auto input00 = command0->cmdInputs()[0];
         EXPECT_EQ(setup.lib1File, input00);
-        ASSERT_EQ(rule->script.script, commands[0]->script());
-        ASSERT_EQ(1, commands[0]->outputs().size());
-        auto output00 = commands[0]->outputs()[0];
+        ASSERT_EQ(rule->script.script, command0->script());
+        ASSERT_EQ(1, command0->outputs().size());
+        auto output00 = command0->outputs()[0];
         EXPECT_EQ(std::string("<repo>\\output\\lib1.obj"), output00->name().string());
-        ASSERT_EQ(1, commands[0]->ignoredOutputs().size());
-        EXPECT_EQ(ignoredOutput.path, commands[0]->ignoredOutputs()[0]);
+        ASSERT_EQ(1, command0->ignoredOutputs().size());
+        EXPECT_EQ(ignoredOutput.path, command0->ignoredOutputs()[0]);
 
-        ASSERT_EQ(1, commands[1]->cmdInputs().size());
-        auto input10 = commands[1]->cmdInputs()[0];
+        ASSERT_EQ(1, command1->cmdInputs().size());
+        auto input10 = command1->cmdInputs()[0];
         EXPECT_EQ(setup.lib2File, input10);
-        ASSERT_EQ(rule->script.script, commands[1]->script());
-        ASSERT_EQ(1, commands[1]->outputs().size());
-        auto output1 = commands[1]->outputs()[0];
+        ASSERT_EQ(rule->script.script, command1->script());
+        ASSERT_EQ(1, command1->outputs().size());
+        auto output1 = command1->outputs()[0];
         EXPECT_EQ(std::string("<repo>\\output\\lib2.obj"), output1->name().string());
-        ASSERT_EQ(1, commands[1]->ignoredOutputs().size());
-        EXPECT_EQ(ignoredOutput.path, commands[1]->ignoredOutputs()[0]);
+        ASSERT_EQ(1, command1->ignoredOutputs().size());
+        EXPECT_EQ(ignoredOutput.path, command1->ignoredOutputs()[0]);
+
+        auto const& globs = compiler.globs();
+        ASSERT_EQ(1, globs.size());
+        auto glob0 = *(globs.begin());
+        EXPECT_EQ(input.pathPattern.filename(), glob0->pattern());
+        EXPECT_EQ(setup.repo->directoryNode()->name() / input.pathPattern.parent_path(), glob0->baseDirectory()->name());
     }
 
 
@@ -144,13 +153,14 @@ namespace
         BuildFileCompiler compiler(&setup.context, setup.repo->directoryNode(), file);
         auto const& commands = compiler.commands();
         ASSERT_EQ(1, commands.size());
+        auto command0 = *(commands.begin());
 
-        ASSERT_EQ(1, commands[0]->cmdInputs().size());
-        auto input00 = commands[0]->cmdInputs()[0];
+        ASSERT_EQ(1, command0->cmdInputs().size());
+        auto input00 = command0->cmdInputs()[0];
         EXPECT_EQ(setup.mainFile, input00);
-        ASSERT_EQ(rule->script.script, commands[0]->script());
-        ASSERT_EQ(1, commands[0]->outputs().size());
-        auto output00 = commands[0]->outputs()[0];
+        ASSERT_EQ(rule->script.script, command0->script());
+        ASSERT_EQ(1, command0->outputs().size());
+        auto output00 = command0->outputs()[0];
         EXPECT_EQ(std::string("<repo>\\output\\main.obj"), output00->name().string());
     }
 
@@ -177,7 +187,7 @@ namespace
 
         BuildFileCompiler compiler(&context, baseDir, file);
         EXPECT_EQ(1, compiler.commands().size());
-        std::shared_ptr<CommandNode> cmd = compiler.commands()[0];
+        std::shared_ptr<CommandNode> cmd = *(compiler.commands().begin());
         EXPECT_EQ(script.script, cmd->script());
     }
 }

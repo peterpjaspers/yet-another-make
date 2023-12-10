@@ -82,12 +82,21 @@ namespace YAM
                 }
             }
             _notifyingObservers = false;
+            for (auto const& pair : _addedAndRemovedObservers) {
+                if (pair.second) {
+                    addObserver(pair.first);
+                } else {
+                    removeObserver(pair.first);
+                }
+            }
+            _addedAndRemovedObservers.clear();
         }
     }
 
     void Node::addObserver(StateObserver* observer) {
         if (_notifyingObservers) {
-            throw std::runtime_error("Attempt to add state observer while notifying");;
+            _addedAndRemovedObservers.insert({ observer, true });
+            return;
         }
         auto p = _observers.insert(observer);
         if (!p.second) throw std::runtime_error("Attempt to add duplicate state observer");
@@ -95,7 +104,8 @@ namespace YAM
 
     void Node::removeObserver(StateObserver* observer) {
         if (_notifyingObservers) {
-            throw std::runtime_error("Attempt to remove state observer while notifying");;
+            _addedAndRemovedObservers.insert({ observer, false });
+            return;
         }
         if (0 == _observers.erase(observer)) throw std::runtime_error("Attempt to remove unknown state observer");
     }

@@ -335,13 +335,6 @@ namespace YAM
         for (auto const& pair : _detectedInputs) inputs.push_back(dynamic_pointer_cast<Node>(pair.second));
     }
 
-    // Propagate Dirty state of input producers, outputs or sourcefile inputs
-    // to this node. 
-    void CommandNode::handleDirtyOf(Node* observedNode) {
-        if (observedNode->state() != Node::State::Dirty) throw std::exception("observed node not dirty");
-        setState(Node::State::Dirty);
-    }
-
     XXH64_hash_t CommandNode::computeExecutionHash() const {
         std::vector<XXH64_hash_t> hashes;
         auto wdir = _workingDir.lock();

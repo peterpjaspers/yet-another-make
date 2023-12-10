@@ -8,6 +8,7 @@
 #include <functional>
 #include <memory>
 #include <vector>
+#include <map>
 #include <unordered_set>
 #include <stdexcept>
 #include <atomic>
@@ -140,7 +141,7 @@ namespace YAM
         //      sub-class specific logic
         //      Node::handleCompletionOf(observedNode)
         void handleCompletionOf(Node* observedNode) override;
-        void handleDirtyOf(Node* observedNode) override {}
+        void handleDirtyOf(Node* observedNode) override { setState(Node::State::Dirty); }
 
         // Start asynchronous execution of given set of 'nodes'.
         // On completion call callback.Execute(state), where state
@@ -207,6 +208,8 @@ namespace YAM
         MulticastDelegate<Node*> _completor;
         bool _notifyingObservers;
         std::unordered_set<StateObserver*> _observers;
+        // Observers that were added/removed while _notifyingObservers
+        std::map<StateObserver*, bool> _addedAndRemovedObservers;
 
         bool _modified;
     };
