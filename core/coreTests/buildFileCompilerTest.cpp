@@ -98,9 +98,11 @@ namespace
         rule->outputs.outputs.push_back(output);
         rule->outputs.outputs.push_back(ignoredOutput);
         BuildFile::File file;
+        file.deps.depGlobs.push_back("*.h");
         file.variablesAndRules.push_back(rule);
 
-        BuildFileCompiler compiler(&setup.context, setup.repo->directoryNode(), file);
+        std::filesystem::path globNameSpace("private");
+        BuildFileCompiler compiler(&setup.context, setup.repo->directoryNode(), file, globNameSpace);
         auto const& commands = compiler.commands();
         ASSERT_EQ(2, commands.size());
         auto command0 = *(commands.begin());
@@ -127,12 +129,26 @@ namespace
         EXPECT_EQ(ignoredOutput.path, command1->ignoredOutputs()[0]);
 
         auto const& globs = compiler.globs();
-        ASSERT_EQ(1, globs.size());
-        auto glob0 = *(globs.begin());
-        EXPECT_EQ(input.pathPattern.filename(), glob0->pattern());
-        EXPECT_EQ(setup.repo->directoryNode()->name() / input.pathPattern.parent_path(), glob0->baseDirectory()->name());
-    }
+        ASSERT_EQ(2, globs.size());
+        std::filesystem::path depGlobName(globNameSpace / setup.repo->directoryNode()->name() / "*.h");
+        std::filesystem::path ruleGlobName(globNameSpace / setup.repo->directoryNode()->name() / "src\\*.cpp");
+        std::shared_ptr<GlobNode> ruleGlob;
+        std::shared_ptr<GlobNode> depGlob;
+        for (auto const& g : globs) {
+            if (g->name() == ruleGlobName) ruleGlob = g;
+            if (g->name() == depGlobName) depGlob = g;
+        }
+        ASSERT_NE(nullptr, ruleGlob);
+        auto ruleGlobBaseDirName = setup.repo->directoryNode()->name() / "src";
+        EXPECT_EQ(ruleGlobBaseDirName, ruleGlob->baseDirectory()->name());
+        EXPECT_EQ("*.cpp", ruleGlob->pattern());
 
+
+        ASSERT_NE(nullptr, depGlob);
+        auto depGlobBaseDirName = setup.repo->directoryNode()->name();
+        EXPECT_EQ(depGlobBaseDirName, depGlob->baseDirectory()->name());
+        EXPECT_EQ("*.h", depGlob->pattern());
+    }
 
     TEST(BuildFileCompiler, singleInAndOutput) {
         CompilerSetup setup;

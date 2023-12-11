@@ -39,8 +39,9 @@ namespace
         std::size_t defaultOffset,
         std::size_t maxOffset
     ) {
-        std::size_t nChars = output.path.length();
-        char const* chars = output.path.data();
+        std::string pathStr = output.path.string();
+        std::size_t nChars = pathStr.length();
+        char const* chars = pathStr.data();
         std::size_t inputOffset = defaultOffset;
         if (isdigit(chars[i])) {
             inputOffset = 0;
@@ -76,10 +77,16 @@ namespace YAM {
     BuildFileCompiler::BuildFileCompiler(
             ExecutionContext* context,
             std::shared_ptr<DirectoryNode> const& baseDir,
-            BuildFile::File const& buildFile)
+            BuildFile::File const& buildFile,
+            std::filesystem::path const& globNameSpace)
         : _context(context)
         , _baseDir(baseDir)
+        , _globNameSpace(globNameSpace)
     {
+
+        for (auto const& glob : buildFile.deps.depGlobs) {
+            compileGlob(glob);
+        }
         for (auto const& varOrRule : buildFile.variablesAndRules) {
             auto rule = dynamic_cast<BuildFile::Rule*>(varOrRule.get());
             if (rule != nullptr) compileRule(*rule);
@@ -111,7 +118,7 @@ namespace YAM {
         std::vector<std::shared_ptr<GeneratedFileNode>> const& orderOnlyInputs
     ) {
         std::vector<std::filesystem::path> outputPaths = compileOutputPaths(rule.outputs, cmdInputs);
-        std::vector<std::string> ignoredOutputs = compileIgnoredOutputs(rule.outputs);
+        std::vector<std::filesystem::path> ignoredOutputs = compileIgnoredOutputs(rule.outputs);
 
         std::shared_ptr<CommandNode> cmdNode = createCommand(outputPaths);
         std::vector<std::shared_ptr<GeneratedFileNode>> outputs = compileOutputs(cmdNode, outputPaths, cmdInputs);
@@ -130,24 +137,8 @@ namespace YAM {
     ) {
         std::vector<std::shared_ptr<FileNode>> inputNodes;
         std::shared_ptr<FileNode> fileNode;
-        auto optimizedBaseDir = _baseDir;
-        auto optimizedPattern = input.pathPattern;
-        Globber::optimize(optimizedBaseDir, optimizedPattern);
-        if (Glob::isGlob(optimizedPattern.string())) {
-            std::filesystem::path globName(optimizedBaseDir->name() / optimizedPattern);
-            auto globNode = dynamic_pointer_cast<GlobNode>(_context->nodes().find(globName));
-            if (globNode == nullptr) {
-                globNode = std::make_shared<GlobNode>(_context, globName);
-                globNode->baseDirectory(optimizedBaseDir);
-                globNode->pattern(optimizedPattern);
-                globNode->initialize();
-                // TODO: adding the globNode to the context allows globNodes to
-                // be used from multiple buildfiles => no clear ownership.
-                // The use case is unlikely. Consider keeping globNodes private
-                // to the buildfile.
-                _context->nodes().add(globNode);
-            }
-            _globs.insert(globNode);
+        if (Glob::isGlob(input.pathPattern.string())) {
+            std::shared_ptr<GlobNode> globNode = compileGlob(input.pathPattern);
             for (auto const& match : globNode->matches()) {
                 fileNode = dynamic_pointer_cast<FileNode>(match);
                 if (fileNode == nullptr) throw std::runtime_error("not a file node");
@@ -158,6 +149,9 @@ namespace YAM {
             // Using GlobNode is inefficient in case of source file and not 
             // supported in case of generated file. Instead do a direct lookup 
             // in context.
+            auto optimizedBaseDir = _baseDir;
+            auto optimizedPattern = input.pathPattern;
+            Globber::optimize(optimizedBaseDir, optimizedPattern);
             std::filesystem::path inputPath(optimizedBaseDir->name() / optimizedPattern);
             auto match = _context->nodes().find(inputPath);
             fileNode = dynamic_pointer_cast<FileNode>(match);
@@ -165,6 +159,25 @@ namespace YAM {
             inputNodes.push_back(fileNode);
         }
         return inputNodes;
+    }
+
+    std::shared_ptr<GlobNode> BuildFileCompiler::compileGlob(
+        std::filesystem::path const& pattern
+    ) {
+        auto optimizedBaseDir = _baseDir;
+        auto optimizedPattern = pattern;
+        Globber::optimize(optimizedBaseDir, optimizedPattern);
+        std::filesystem::path globName(_globNameSpace / optimizedBaseDir->name() / optimizedPattern);
+        auto globNode = dynamic_pointer_cast<GlobNode>(_context->nodes().find(globName));
+        if (globNode == nullptr) {
+            globNode = std::make_shared<GlobNode>(_context, globName);
+            globNode->baseDirectory(optimizedBaseDir);
+            globNode->pattern(optimizedPattern);
+            globNode->initialize();
+            _context->nodes().add(globNode);
+        }
+        _globs.insert(globNode);
+        return globNode;
     }
 
     void erase(
@@ -236,8 +249,9 @@ namespace YAM {
         std::size_t defaultOffset
     ) const {
         std::vector<std::filesystem::path> outputPaths;
-        std::size_t nChars = output.path.length();
-        char const *chars = output.path.data();
+        std::string pathStr = output.path.string();
+        std::size_t nChars = pathStr.length();
+        char const* chars = pathStr.data();
         std::string outputPath;
         for (std::size_t i = 0; i < nChars; ++i) {
             if (chars[i] == '%') {
@@ -302,10 +316,10 @@ namespace YAM {
         return outputPaths;
     }
 
-    std::vector<std::string> BuildFileCompiler::compileIgnoredOutputs(
+    std::vector<std::filesystem::path> BuildFileCompiler::compileIgnoredOutputs(
         BuildFile::Outputs const& outputs
     ) const {
-        std::vector<std::string> ignoredOutputs;
+        std::vector<std::filesystem::path> ignoredOutputs;
         for (auto const& output : outputs.outputs) {
             if (output.ignore) {
                 ignoredOutputs.push_back(output.path);

@@ -181,12 +181,15 @@ namespace YAM
         void syntaxError(std::string const& tokenType);
 
         std::shared_ptr<BuildFile::File> parseBuildFile();
+        void parseDeps(BuildFile::Deps& deps);
         std::shared_ptr<BuildFile::Rule> parseRule();
         void parseInputs(BuildFile::Inputs& inputs);
         void parseInput(BuildFile::Input& input);
         void parseScript(BuildFile::Script& script);
         void parseOutputs(BuildFile::Outputs& outputs);
         void parseOutput(BuildFile::Output& output);
+        void parseGlob(std::filesystem::path& glob);
+        void parsePath(std::filesystem::path& path);
 
         std::filesystem::path _buildFilePath;
         BuildFileTokenizer _tokenizer;

@@ -303,7 +303,7 @@ namespace YAM
         }
     }
 
-    void CommandNode::ignoreOutputs(std::vector<std::string> const& newOutputs) {
+    void CommandNode::ignoreOutputs(std::vector<std::filesystem::path> const& newOutputs) {
         if (_ignoredOutputs != newOutputs) {
             _ignoredOutputs = newOutputs;
             modified(true);

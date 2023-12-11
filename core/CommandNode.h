@@ -71,8 +71,8 @@ namespace YAM
 
         // newOutputs contains regular expression patterns. Output files that
         // match these patterns are ignored.
-        void ignoreOutputs(std::vector<std::string> const& newOutputs);
-        std::vector<std::string> const& ignoredOutputs() const { return _ignoredOutputs; }
+        void ignoreOutputs(std::vector<std::filesystem::path> const& newOutputs);
+        std::vector<std::filesystem::path> const& ignoredOutputs() const { return _ignoredOutputs; }
 
         InputNodes const& detectedInputs() const { return _detectedInputs; }
 
@@ -139,7 +139,7 @@ namespace YAM
         std::string _script;
         std::weak_ptr<DirectoryNode> _workingDir;
         std::vector<std::shared_ptr<GeneratedFileNode>> _outputs;
-        std::vector<std::string> _ignoredOutputs;
+        std::vector<std::filesystem::path> _ignoredOutputs;
 
         std::atomic<std::shared_ptr<IMonitoredProcess>> _scriptExecutor;
         

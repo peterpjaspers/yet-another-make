@@ -9,6 +9,11 @@ namespace {
         TokenSpec(R"(^\s+)", "skip"), // whitespace
         TokenSpec(R"(^\/\/.*)", "skip"), // single-line comment
         TokenSpec(R"(^\/\*[\s\S]*?\*\/)", "skip"), // multi-line comment
+        TokenSpec(R"(^deps)", "deps"),
+        TokenSpec(R"(^buildfile)", "depBuildfile"),
+        TokenSpec(R"(^glob)", "depGlob"),
+        TokenSpec(R"(^\{)", "{"),
+        TokenSpec(R"(^\})", "}"),
         TokenSpec(R"(^:)", "rule"),
         TokenSpec(R"(^\^)", "not"),
         TokenSpec(R"(^\\?(?:[\w\.\*\?\%\[\]-])+(?:\\([\w\.\*\?\%\[\]-])+)*)", "glob"),

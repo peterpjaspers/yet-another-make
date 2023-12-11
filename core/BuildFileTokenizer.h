@@ -10,11 +10,13 @@ namespace YAM {
     };
 
     struct __declspec(dllexport) TokenSpec {
-        TokenSpec(std::string const& pattern, std::string const& tokenType, std::size_t groupIndex = 0)
-            : regex(pattern)
+        TokenSpec(std::string const& pattern_, std::string const& tokenType, std::size_t groupIndex = 0)
+            : pattern(pattern_)
+            , regex(pattern)
             , type(tokenType)
             , group(groupIndex)
         {}
+        std::string pattern;
         std::regex regex;
         std::string type;
         std::size_t group;

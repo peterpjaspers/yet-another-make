@@ -95,7 +95,7 @@ namespace YAM
 
     void Node::addObserver(StateObserver* observer) {
         if (_notifyingObservers) {
-            _addedAndRemovedObservers.insert({ observer, true });
+            _addedAndRemovedObservers.push_back({ observer, true });
             return;
         }
         auto p = _observers.insert(observer);
@@ -104,7 +104,7 @@ namespace YAM
 
     void Node::removeObserver(StateObserver* observer) {
         if (_notifyingObservers) {
-            _addedAndRemovedObservers.insert({ observer, false });
+            _addedAndRemovedObservers.push_back({ observer, false });
             return;
         }
         if (0 == _observers.erase(observer)) throw std::runtime_error("Attempt to remove unknown state observer");

@@ -2,6 +2,8 @@
 #include "BuildFileTokenizer.h"
 #include "BuildFile.h"
 #include "buildFileTokenSpecs.h" // defines variable tokenSpecs
+#include "Glob.h"
+
 #include <sstream>
 #include <fstream>
 #include <regex>
@@ -14,6 +16,13 @@ namespace {
         std::stringstream ss;
         ss << file.rdbuf();
         return ss.str();
+    }
+
+    TokenSpec const& findTokenSpec(std::string tokenType) {
+        for (auto const& t : tokenSpecs) {
+            if (t.type == tokenType) return t;
+        }
+        throw std::runtime_error("unknown token type " + tokenType);
     }
 }
 
@@ -29,7 +38,7 @@ namespace YAM {
     {}
 
     BuildFileParser::BuildFileParser(
-        std::string const& buildFileContent, 
+        std::string const& buildFileContent,
         std::filesystem::path const& buildFilePath)
         : _buildFilePath(buildFilePath)
         , _tokenizer(buildFileContent, tokenSpecs)
@@ -37,7 +46,7 @@ namespace YAM {
     {}
 
     BuildFileParser::BuildFileParser(
-        std::string && buildFileContent,
+        std::string&& buildFileContent,
         std::filesystem::path const& buildFilePath)
         : _buildFilePath(buildFilePath)
         , _tokenizer(buildFileContent, tokenSpecs)
@@ -54,10 +63,11 @@ namespace YAM {
     }
 
     void BuildFileParser::syntaxError(std::string const& tokenType) {
+        TokenSpec const& expectedToken = findTokenSpec(tokenType);
         std::stringstream ss;
         ss
             << "Unexpected token: " << _lookAhead.type << ", "
-            << "expected token: " << tokenType 
+            << "expected token: " << tokenType << " must match regex " << expectedToken.pattern
             << std::endl
             << "At line " << _tokenizer.tokenStartLine()
             << ", from column " << _tokenizer.tokenStartColumn()
@@ -67,14 +77,42 @@ namespace YAM {
     }
 
     std::shared_ptr<BuildFile::File> BuildFileParser::parseBuildFile() {
-        _tokenizer.readNextToken(_lookAhead);
         auto file = std::make_shared<BuildFile::File>();
+        _tokenizer.readNextToken(_lookAhead);
+        file->buildFile = _buildFilePath;
+        file->line = _tokenizer.tokenStartLine();
+        file->column = _tokenizer.tokenStartColumn();
+        if (_lookAhead.type == "deps") parseDeps(file->deps);
         while (_lookAhead.type != "eos") {
             if (_lookAhead.type == "rule") {
                 file->variablesAndRules.push_back(parseRule());
             } // else if variable, etc
         }
         return file;
+    }
+
+    void BuildFileParser::parseDeps(BuildFile::Deps& deps) {
+        deps.buildFile = _buildFilePath;
+        deps.line = _tokenizer.tokenStartLine();
+        deps.column = _tokenizer.tokenStartColumn();
+        eat("deps"); // Return value not needed
+        eat("{");
+        while (_lookAhead.type != "}") {
+            if (_lookAhead.type == "depBuildfile") {
+                eat("depBuildfile");
+                std::filesystem::path path;
+                parsePath(path);
+                deps.depBuildFiles.push_back(path);
+            } else if (_lookAhead.type == "depGlob") {
+                eat("depGlob");
+                std::filesystem::path glob;
+                parseGlob(glob);
+                deps.depGlobs.push_back(glob);
+            } else {
+                syntaxError("depBuildfile");
+            }
+        }
+        eat("}");
     }
 
     std::shared_ptr<BuildFile::Rule> BuildFileParser::parseRule() {
@@ -108,8 +146,7 @@ namespace YAM {
         input.column = _tokenizer.tokenStartColumn();
         input.exclude = _lookAhead.type == "not";
         if (input.exclude) eat("not");
-        auto pathToken = eat("glob");
-        input.pathPattern = pathToken.value;
+        parseGlob(input.pathPattern);
     }
 
     void BuildFileParser::parseScript(BuildFile::Script& script) {
@@ -120,6 +157,8 @@ namespace YAM {
     }
 
     void BuildFileParser::parseOutputs(BuildFile::Outputs& outputs) {
+        outputs.line = _tokenizer.tokenStartLine();
+        outputs.column = _tokenizer.tokenStartColumn();
         while (_lookAhead.type != "eos") {
             BuildFile::Output out;
             parseOutput(out);
@@ -130,7 +169,30 @@ namespace YAM {
         output.line = _tokenizer.tokenStartLine();
         output.column = _tokenizer.tokenStartColumn();
         output.ignore = _lookAhead.type == "not";
+        parsePath(output.path);
+    }
+
+    void BuildFileParser::parseGlob(std::filesystem::path& glob) {
         Token token = eat("glob");
-        output.path = token.value;
+        glob = token.value;
+    }
+
+    void BuildFileParser::parsePath(std::filesystem::path& path) {
+        if (_lookAhead.type == "glob") {
+            path = _lookAhead.value;
+            if (Glob::isGlob(_lookAhead.value)) {
+                std::stringstream ss;
+                ss
+                    << "Path '" << _lookAhead.value << "' is not allowed to contain glob special characters"
+                    << std::endl
+                    << "At line " << _tokenizer.tokenStartLine()
+                    << ", from column " << _tokenizer.tokenStartColumn()
+                    << " to " << _tokenizer.tokenEndColumn()
+                    << std::endl;
+                throw std::runtime_error(ss.str());
+            } else {
+                eat("glob");
+            }
+        }
     }
 }

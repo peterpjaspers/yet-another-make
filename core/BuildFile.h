@@ -30,7 +30,7 @@ namespace YAM {
 
         struct __declspec(dllexport) Output : public Node {
             bool ignore;
-            std::string path;
+            std::filesystem::path path;
         };
         struct __declspec(dllexport) Outputs : public Node {
             std::vector<Output> outputs;
@@ -42,10 +42,17 @@ namespace YAM {
             Inputs orderOnlyInputs;
             Script script;
             Outputs outputs;
+        }; 
+        
+        struct __declspec(dllexport) Deps : public Node
+        {
+            std::vector<std::filesystem::path> depBuildFiles;
+            std::vector<std::filesystem::path> depGlobs;
         };
 
-        class __declspec(dllexport) File {
+        class __declspec(dllexport) File : public Node {
         public:
+            Deps deps;
             std::vector<std::shared_ptr<Node>> variablesAndRules;
         };
     }

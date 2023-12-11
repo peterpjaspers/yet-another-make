@@ -24,7 +24,8 @@ namespace YAM {
         BuildFileCompiler(
             ExecutionContext* context,
             std::shared_ptr<DirectoryNode> const& baseDir,
-            BuildFile::File const& buildFile);
+            BuildFile::File const& buildFile,
+            std::filesystem::path const& globNameSpace = "");
 
         std::set<std::shared_ptr<CommandNode>, Node::CompareName> const& commands() {
             return _commands;
@@ -44,6 +45,9 @@ namespace YAM {
             BuildFile::Rule const& rule,
             std::vector<std::shared_ptr<FileNode>> const& cmdInputs,
             std::vector<std::shared_ptr<GeneratedFileNode>> const& orderOnlyInputs);
+
+        std::shared_ptr<GlobNode> compileGlob(
+            std::filesystem::path const& pattern);
 
         std::vector<std::shared_ptr<FileNode>> compileInput(
             BuildFile::Input const& input);
@@ -77,7 +81,7 @@ namespace YAM {
             std::vector<std::shared_ptr<FileNode>> const& cmdInputs
         ) const;
 
-        std::vector<std::string> compileIgnoredOutputs(
+        std::vector<std::filesystem::path> compileIgnoredOutputs(
             BuildFile::Outputs const& outputs
         ) const;
 
@@ -87,5 +91,6 @@ namespace YAM {
         std::shared_ptr<DirectoryNode> _baseDir;
         std::set<std::shared_ptr<CommandNode>, Node::CompareName> _commands; 
         std::set<std::shared_ptr<GlobNode>, Node::CompareName> _globs;
+        std::filesystem::path _globNameSpace;
     };
 }

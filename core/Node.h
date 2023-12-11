@@ -209,7 +209,7 @@ namespace YAM
         bool _notifyingObservers;
         std::unordered_set<StateObserver*> _observers;
         // Observers that were added/removed while _notifyingObservers
-        std::map<StateObserver*, bool> _addedAndRemovedObservers;
+        std::vector<std::pair<StateObserver*, bool>> _addedAndRemovedObservers;
 
         bool _modified;
     };
