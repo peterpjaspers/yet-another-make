@@ -14,6 +14,7 @@ namespace {
         TokenSpec(R"(^glob)", "depGlob"),
         TokenSpec(R"(^\{)", "{"),
         TokenSpec(R"(^\})", "}"),
+        TokenSpec(R"(^foreach)", "foreach"),
         TokenSpec(R"(^:)", "rule"),
         TokenSpec(R"(^\^)", "not"),
         TokenSpec(R"(^\\?(?:[\w\.\*\?\%\[\]-])+(?:\\([\w\.\*\?\%\[\]-])+)*)", "glob"),

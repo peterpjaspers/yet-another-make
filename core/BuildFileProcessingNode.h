@@ -10,6 +10,7 @@
 namespace YAM {
     class FileNode;
     class SourceFileNode;
+    class GeneratedFileNode;
     class CommandNode;
     class GlobNode;
     namespace BuildFile { class File; }
@@ -75,8 +76,9 @@ namespace YAM {
         // in these globs will case this processing node to re-execute.
         std::set<std::shared_ptr<GlobNode>, Node::CompareName> _depGlobs;
 
-        // The commands compiled from the rules in the buildfile.
+        // The commands and generate file nodes compiled from the rules in the buildfile.
         std::set<std::shared_ptr<CommandNode>, Node::CompareName> _commands;
+        std::set<std::shared_ptr<GeneratedFileNode>, Node::CompareName> _outputs;
 
         // _executionHash is the hash of the hashes of _depFiles, _depBFPNs 
         // and _depGlobs. A change in execution hash invalidates the compiled

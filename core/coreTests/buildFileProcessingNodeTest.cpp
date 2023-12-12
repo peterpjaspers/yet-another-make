@@ -38,7 +38,7 @@ namespace
             EXPECT_TRUE(stream.is_open());
             stream
                 << "@echo off" << std::endl
-                << R"(echo : *.cpp ^|^> echo main ^> main.obj ^|^> %%B.obj)"
+                << R"(echo : foreach *.cpp ^|^> echo main ^> main.obj ^|^> %%B.obj)"
                 << std::endl;
             stream.close();
 
@@ -133,5 +133,30 @@ namespace
             if ("executor" == node->name().string()) continue;
             EXPECT_NE(nullptr, dynamic_cast<GlobNode const*>(node));
         }
+    }
+
+    TEST(BuildFileProcessingNode, noReExecuteProcessingNode) {
+        TestSetup setup;
+        std::shared_ptr<BuildFileProcessingNode> processingNode = setup.processingNode();
+        ASSERT_NE(nullptr, processingNode);
+        EXPECT_EQ(Node::State::Dirty, processingNode->state());
+        bool completed = YAMTest::executeNode(processingNode.get());
+        EXPECT_TRUE(completed);
+        EXPECT_EQ(Node::State::Ok, processingNode->state());
+        std::filesystem::path cmdName = setup.fileRepo->symbolicDirectory() / "main.obj\\__cmd";
+        std::shared_ptr<Node> node = setup.context.nodes().find(cmdName);
+        ASSERT_NE(nullptr, node);
+        std::shared_ptr<CommandNode> cmdNode = dynamic_pointer_cast<CommandNode>(node);
+        ASSERT_NE(nullptr, cmdNode);
+        EXPECT_EQ(Node::State::Dirty, cmdNode->state());
+
+        processingNode->setState(Node::State::Dirty);
+
+        setup.context.statistics().registerNodes = true;
+        completed = YAMTest::executeNode(cmdNode.get());
+        EXPECT_TRUE(completed);
+        EXPECT_EQ(Node::State::Ok, cmdNode->state());
+        setup.context.statistics().reset();
+        EXPECT_EQ(0, setup.context.statistics().nSelfExecuted);
     }
 }

@@ -86,7 +86,7 @@ namespace
         excludedInput.pathPattern = "src\\main.cpp";
         BuildFile::Output output;
         output.ignore = false;
-        output.path = "output\\%B.obj";
+        output.path = "output\\%1B.obj";
         BuildFile::Output ignoredOutput;
         ignoredOutput.ignore = true;
         ignoredOutput.path = R"(.*\.dep)";
@@ -138,11 +138,11 @@ namespace
             if (g->name() == ruleGlobName) ruleGlob = g;
             if (g->name() == depGlobName) depGlob = g;
         }
+
         ASSERT_NE(nullptr, ruleGlob);
         auto ruleGlobBaseDirName = setup.repo->directoryNode()->name() / "src";
         EXPECT_EQ(ruleGlobBaseDirName, ruleGlob->baseDirectory()->name());
         EXPECT_EQ("*.cpp", ruleGlob->pattern());
-
 
         ASSERT_NE(nullptr, depGlob);
         auto depGlobBaseDirName = setup.repo->directoryNode()->name();

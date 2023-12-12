@@ -31,15 +31,30 @@ namespace YAM {
             return _commands;
         }
 
+        std::set<std::shared_ptr<GeneratedFileNode>, Node::CompareName> const& outputs() {
+            return _outputs;
+        }
+
         // Return the globs that were used to resolve rule inputs.
         std::set<std::shared_ptr<GlobNode>, Node::CompareName> const& globs() {
             return _globs;
         }
 
-    private:
+        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const& newCommands() const {
+            return _newCommands;
+        }
 
+        std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const& newOutputs() const {
+            return _newOutputs;
+        }
+
+        std::map<std::filesystem::path, std::shared_ptr<GlobNode>> const& newGlobs() const {
+            return _newGlobs;
+        }
+
+    private:
         std::shared_ptr<CommandNode> createCommand(
-            std::vector<std::filesystem::path> const& outputPaths) const;
+            std::vector<std::filesystem::path> const& outputPaths);
 
         void addCommand(
             BuildFile::Rule const& rule,
@@ -61,14 +76,13 @@ namespace YAM {
             std::vector<std::shared_ptr<GeneratedFileNode>> orderOnlyInputs,
             std::vector<std::shared_ptr<GeneratedFileNode>> outputs) const;
 
-        std::vector<std::shared_ptr<GeneratedFileNode>> compileOutput(
-            BuildFile::Output const& output,
-            std::vector<std::shared_ptr<FileNode>> const& inputs) const;
-
-        std::vector<std::shared_ptr<GeneratedFileNode>> compileOutputs(
+        std::shared_ptr<GeneratedFileNode> createGeneratedFileNode(
             std::shared_ptr<CommandNode> const& cmdNode,
-            std::vector<std::filesystem::path> const& outputPaths,
-            std::vector<std::shared_ptr<FileNode>> const& inputs) const;
+            std::filesystem::path const& outputPath);
+
+        std::vector<std::shared_ptr<GeneratedFileNode>> createGeneratedFileNodes(
+            std::shared_ptr<CommandNode> const& cmdNode,
+            std::vector<std::filesystem::path> const& outputPaths);
 
         std::filesystem::path compileOutputPath(
             BuildFile::Output const& output,
@@ -87,10 +101,17 @@ namespace YAM {
 
         void compileRule(BuildFile::Rule const& rule);
 
+    private:
         ExecutionContext* _context;
         std::shared_ptr<DirectoryNode> _baseDir;
-        std::set<std::shared_ptr<CommandNode>, Node::CompareName> _commands; 
-        std::set<std::shared_ptr<GlobNode>, Node::CompareName> _globs;
         std::filesystem::path _globNameSpace;
+
+        std::set<std::shared_ptr<CommandNode>, Node::CompareName> _commands;
+        std::set<std::shared_ptr<GeneratedFileNode>, Node::CompareName> _outputs;
+        std::set<std::shared_ptr<GlobNode>, Node::CompareName> _globs;
+
+        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> _newCommands;
+        std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _newOutputs;
+        std::map<std::filesystem::path, std::shared_ptr<GlobNode>> _newGlobs;
     };
 }

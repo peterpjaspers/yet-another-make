@@ -37,20 +37,20 @@ namespace YAM
 
         // Find and return node that matches nodeName;
         // Return null when not found.
-        std::shared_ptr<Node> find(std::filesystem::path const& nodeName);
+        std::shared_ptr<Node> find(std::filesystem::path const& nodeName) const;
 
         // Return in 'foundNodes' all nodes for which includeNode(node)==true.
         void find(
             Delegate<bool, std::shared_ptr<Node> const&> includeNode,
-            std::vector<std::shared_ptr<Node>>& foundNodes);
+            std::vector<std::shared_ptr<Node>>& foundNodes) const;
 
         // Execute action on each node in the set.
         void foreach(Delegate<void, std::shared_ptr<Node> const&> action);
 
         // Return whether the set contains a node with given 'nodeName'
-        bool contains(std::filesystem::path const& nodeName);
+        bool contains(std::filesystem::path const& nodeName) const;
 
-        std::size_t size();
+        std::size_t size() const;
 
     private:
         std::unordered_map<std::filesystem::path, std::shared_ptr<Node> > _nodes;

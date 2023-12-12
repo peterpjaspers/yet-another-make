@@ -310,4 +310,39 @@ namespace {
         tokenizer.readNextToken(token);
         EXPECT_EQ("eos", token.type);
     }
+
+    TEST(BuildFileTokenizer, foreachRule) {
+        const std::string command(R"(
+                gcc 
+                src\hello.c 
+               -o bin\hello 
+            )");
+        const std::string rule(R"(: 
+            foreach src\hello.c |>
+                gcc 
+                src\hello.c 
+               -o bin\hello 
+            |> bin\%B.obj )");
+
+        BuildFileTokenizer tokenizer(rule, tokenSpecs);
+        Token token;
+
+        tokenizer.readNextToken(token);
+        EXPECT_EQ("rule", token.type);
+        EXPECT_EQ(":", token.value);
+        tokenizer.readNextToken(token);
+        EXPECT_EQ("foreach", token.type);
+        EXPECT_EQ("foreach", token.value);
+        tokenizer.readNextToken(token);
+        EXPECT_EQ("glob", token.type);
+        EXPECT_EQ("src\\hello.c", token.value);
+        tokenizer.readNextToken(token);
+        EXPECT_EQ("script", token.type);
+        EXPECT_EQ(command, token.value);
+        tokenizer.readNextToken(token);
+        EXPECT_EQ("glob", token.type);
+        EXPECT_EQ("bin\\%B.obj", token.value);
+        tokenizer.readNextToken(token);
+        EXPECT_EQ("eos", token.type);
+    }
 }

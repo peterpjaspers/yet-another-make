@@ -2,6 +2,7 @@
 #include "SourceFileNode.h"
 #include "GeneratedFileNode.h"
 #include "DirectoryNode.h"
+#include "GeneratedFileNode.h"
 #include "CommandNode.h"
 #include "GlobNode.h"
 #include "ExecutionContext.h"
@@ -37,8 +38,36 @@ namespace
         glob->setState(Node::State::Deleted);
     }
 
+    void removeNode(std::shared_ptr<GeneratedFileNode> node) {
+        node->setState(Node::State::Deleted);
+    }
+
     template<class TNode>
-    void computeSetsDifference(
+    void computeUnorderedSetsDifference(
+        std::unordered_set<std::shared_ptr<TNode>> const& in1,
+        std::unordered_set<std::shared_ptr<TNode>> const& in2,
+        std::unordered_set<std::shared_ptr<TNode>>& inBoth,
+        std::unordered_set<std::shared_ptr<TNode>>& onlyIn1,
+        std::unordered_set<std::shared_ptr<TNode>>& onlyIn2
+    ) {
+        std::set_intersection(
+            in1.begin(), in1.end(),
+            in2.begin(), in2.end(),
+            std::inserter(inBoth, inBoth.begin()));
+        std::set_difference(
+            in1.begin(), in1.end(),
+            inBoth.begin(), inBoth.end(),
+            std::inserter(onlyIn1, onlyIn1.begin()));
+        std::set_difference(
+            in2.begin(), in2.end(),
+            inBoth.begin(), inBoth.end(),
+            std::inserter(onlyIn2, onlyIn2.begin()));
+    }
+
+    /* This implementation crashes in std::set_intersection because
+    *  it finds the input set to be not ordered.
+    template<class TNode>
+    void computeSetsDifference1(
         std::set<std::shared_ptr<TNode>, Node::CompareName> const& in1,
         std::set<std::shared_ptr<TNode>, Node::CompareName> const& in2,
         std::set<std::shared_ptr<TNode>, Node::CompareName>& inBoth,
@@ -58,9 +87,28 @@ namespace
             inBoth.begin(), inBoth.end(),
             std::inserter(onlyIn2, onlyIn2.begin()));
     }
+    */
+
+    template<class TNode>
+    void computeSetsDifference(
+        std::set<std::shared_ptr<TNode>, Node::CompareName> const& in1,
+        std::set<std::shared_ptr<TNode>, Node::CompareName> const& in2,
+        std::set<std::shared_ptr<TNode>, Node::CompareName>& inBoth,
+        std::set<std::shared_ptr<TNode>, Node::CompareName>& onlyIn1,
+        std::set<std::shared_ptr<TNode>, Node::CompareName>& onlyIn2
+    ) {
+        for (auto i1 : in1) {
+            if (in2.find(i1) != in2.end()) inBoth.insert(i1);
+            else onlyIn1.insert(i1);
+        }
+        for (auto i2 : in2) {
+            if (in1.find(i2) != in1.end()) onlyIn2.insert(i2);
+        }
+    }
 
     template <class TNode>
     void updateSet(
+        ExecutionContext* context,
         std::set<std::shared_ptr<TNode>, Node::CompareName>& toUpdate,
         std::set<std::shared_ptr<TNode>, Node::CompareName> const& newSet
     ) {
@@ -68,6 +116,7 @@ namespace
         std::set<std::shared_ptr<TNode>, Node::CompareName> added;
         std::set<std::shared_ptr<TNode>, Node::CompareName> removed;
         computeSetsDifference(newSet, toUpdate, kept, added, removed);
+        for (auto const& node : added) context->nodes().add(node);
         for (auto const& node : removed) removeNode(node);
         toUpdate = newSet;
     }
@@ -222,12 +271,18 @@ namespace YAM
         } else {
             // TODO: extract buildfile dependencies from file and execute
             // associated BFPNs first
-            BuildFileCompiler compiler(context(), _buildFileExecutor->workingDirectory(), *file);
-            updateSet<CommandNode>(_commands, compiler.commands());
-            for (auto const& glob : _depGlobs) glob->removeObserver(this);
-            updateSet<GlobNode>(_depGlobs, compiler.globs());
-            for (auto const& glob : _depGlobs) glob->addObserver(this);
-            _executionHash = computeExecutionHash();
+            try {
+                BuildFileCompiler compiler(context(), _buildFileExecutor->workingDirectory(), *file);
+                updateSet<GeneratedFileNode>(context(), _outputs, compiler.outputs());
+                updateSet<CommandNode>(context(), _commands, compiler.commands());
+                for (auto const& glob : _depGlobs) glob->removeObserver(this);
+                updateSet<GlobNode>(context(), _depGlobs, compiler.globs());
+                for (auto const& glob : _depGlobs) glob->addObserver(this);
+                _executionHash = computeExecutionHash();
+            } catch (std::runtime_error e) {
+                auto msg = e.what();
+                notifyProcessingCompletion(Node::State::Failed);
+            }
         }
         notifyProcessingCompletion(Node::State::Ok);
     }
