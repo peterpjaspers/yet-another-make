@@ -285,6 +285,9 @@
     <ClInclude Include="GroupNode.h">
       <Filter>Header Files\Node</Filter>
     </ClInclude>
+    <ClInclude Include="BuildFileDependenciesCompiler.h">
+      <Filter>Header Files\BuildFileCompiler</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -466,6 +469,9 @@
     </ClCompile>
     <ClCompile Include="GroupNode.cpp">
       <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildFileDependenciesCompiler.cpp">
+      <Filter>Source Files\BuildFileCompiler</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

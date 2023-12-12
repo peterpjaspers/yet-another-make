@@ -101,6 +101,7 @@
     <ClInclude Include="BasicOStreamLogBook.h" />
     <ClInclude Include="BuildClient.h" />
     <ClInclude Include="Builder.h" />
+    <ClInclude Include="BuildFileDependenciesCompiler.h" />
     <ClInclude Include="BuildFileProcessingNode.h" />
     <ClInclude Include="Glob.h" />
     <ClInclude Include="Globber.h" />
@@ -183,6 +184,7 @@
     <ClCompile Include="Builder.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="BuildFileDependenciesCompiler.cpp" />
     <ClCompile Include="BuildFileProcessingNode.cpp" />
     <ClCompile Include="Glob.cpp" />
     <ClCompile Include="Globber.cpp" />

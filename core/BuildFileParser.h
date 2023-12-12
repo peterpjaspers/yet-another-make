@@ -54,7 +54,11 @@ namespace YAM
     Dependency: a changed dependency triggers re-execution of the buildfile.
 
     Buildfile: buildfile A depends on buildfile B when A uses inputs that are
-    outputs of rules in B. 
+    outputs of rules in B. The buildfile path is the path of the directory that
+    contains the buildfile. This is convenient because the extension of the
+    buildfile may vary across directories and over time (because buildfile 
+    language can be changed, cause buildfile extension to change. E.g. from
+    .bat to .py).
 
     DepGlob: buildfile A depends on glob G when A produces a set of rules that
     depends on the set of files that match G. E.g. the buildfile produces a 

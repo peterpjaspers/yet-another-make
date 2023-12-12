@@ -53,7 +53,7 @@ namespace YAM {
         void handleRequisitesCompletion(Node::State state);
         void parseBuildFile();
         void handleParseBuildFileCompletion(std::string error);
-        void handleDepBFPNsCompletion(Node::State state);
+        void handleBuildFileDependenciesCompletion(Node::State state);
         XXH64_hash_t computeExecutionHash() const;
         void notifyProcessingCompletion(Node::State state);
 

@@ -58,6 +58,9 @@ namespace YAM
 
         std::shared_ptr<DirectoryNode> parent() const;
         std::shared_ptr<DotIgnoreNode> const& dotIgnoreNode() { return _dotIgnoreNode; }
+        std::shared_ptr<BuildFileProcessingNode> const& buildFileProcessingNode() {
+            return _buildFileProcessingNode;
+        }
 
         // Query the directory content, vector content is sorted by node name.
         void getFiles(std::vector<std::shared_ptr<FileNode>>& filesInDir);

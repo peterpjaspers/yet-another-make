@@ -1,15 +1,11 @@
 #pragma once
 
-#include "Glob.h"
 #include "BuildFile.h"
-#include "Node.h"
 
-#include <set>
 #include <vector>
 #include <map>
 #include <memory>
 #include <filesystem>
-#include <regex>
 
 namespace YAM {
     class ExecutionContext;

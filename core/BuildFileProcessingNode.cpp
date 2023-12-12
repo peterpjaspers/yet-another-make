@@ -9,6 +9,7 @@
 #include "FileSystem.h"
 #include "FileAspect.h"
 #include "BuildFileParser.h"
+#include "BuildFileDependenciesCompiler.h"
 #include "BuildFileCompiler.h"
 
 #include <vector>
@@ -20,6 +21,19 @@ namespace
     using namespace YAM;
 
     uint32_t streamableTypeId = 0;
+
+
+    void addNode(std::shared_ptr<CommandNode> node) {
+        node->context()->nodes().add(node);
+    }
+    void addNode(std::shared_ptr<GlobNode> node) {
+        node->context()->nodes().add(node);
+    }
+    void addNode(std::shared_ptr<GeneratedFileNode> node) {
+        node->context()->nodes().add(node);
+    }
+    void addNode(std::shared_ptr<BuildFileProcessingNode> glob) {
+    }
 
     void removeNode(std::shared_ptr<CommandNode> cmd) {
         static std::vector<std::shared_ptr<GeneratedFileNode>> emptyOutputs;
@@ -42,26 +56,7 @@ namespace
         node->setState(Node::State::Deleted);
     }
 
-    template<class TNode>
-    void computeUnorderedSetsDifference(
-        std::unordered_set<std::shared_ptr<TNode>> const& in1,
-        std::unordered_set<std::shared_ptr<TNode>> const& in2,
-        std::unordered_set<std::shared_ptr<TNode>>& inBoth,
-        std::unordered_set<std::shared_ptr<TNode>>& onlyIn1,
-        std::unordered_set<std::shared_ptr<TNode>>& onlyIn2
-    ) {
-        std::set_intersection(
-            in1.begin(), in1.end(),
-            in2.begin(), in2.end(),
-            std::inserter(inBoth, inBoth.begin()));
-        std::set_difference(
-            in1.begin(), in1.end(),
-            inBoth.begin(), inBoth.end(),
-            std::inserter(onlyIn1, onlyIn1.begin()));
-        std::set_difference(
-            in2.begin(), in2.end(),
-            inBoth.begin(), inBoth.end(),
-            std::inserter(onlyIn2, onlyIn2.begin()));
+    void removeNode(std::shared_ptr<BuildFileProcessingNode> node) {
     }
 
     template<class TNode>
@@ -77,7 +72,7 @@ namespace
             else onlyIn1.insert(i1);
         }
         for (auto i2 : in2) {
-            if (in1.find(i2.first) != in1.end()) onlyIn2.insert(i2);
+            if (in1.find(i2.first) == in1.end()) onlyIn2.insert(i2);
         }
     }
 
@@ -91,7 +86,7 @@ namespace
         std::map<std::filesystem::path, std::shared_ptr<TNode>> added;
         std::map<std::filesystem::path, std::shared_ptr<TNode>> removed;
         computeMapsDifference(newSet, toUpdate, kept, added, removed);
-        for (auto const& pair : added) context->nodes().add(pair.second);
+        for (auto const& pair : added) addNode(pair.second);
         for (auto const& pair : removed) removeNode(pair.second);
         toUpdate = newSet;
     }
@@ -181,10 +176,10 @@ namespace YAM
         // 3. Execute _buildFileExecutor, redirect output to tmp file
         //    _depFiles = _buildFileExecutor.getInputFiles() 
         // 4. parse temp file => BuildFile::File
-        // 3. TODO: 
-        //    Extract from parse result the deps on buildfiles and globs.
-        //    Execute these dependencies, update _depBFPNs and _depGlobs.
-        // 5. compile BuildFile::File => update _commands and _ruleGlobs
+        // 5. Extract from parse result the deps on buildfiles and globs.
+        //    update _depBFPNs and _depGlobs from extracted deps
+        //    execute _depBFPNs and _depGlobs
+        // 6. compile BuildFile::File => update _commands and _ruleGlobs
 
         setupBuildFileExecutor();
         std::vector<std::shared_ptr<Node>> requisites;
@@ -243,36 +238,39 @@ namespace YAM
             // TODO: extract buildfile dependencies from file and execute
             // associated BFPNs first
             try {
-                BuildFileCompiler compiler(context(), _buildFileExecutor->workingDirectory(), *_parseTree);
-                updateMap<GeneratedFileNode>(context(), _outputs, compiler.outputs());
-                updateMap<CommandNode>(context(), _commands, compiler.commands());
+                BuildFileDependenciesCompiler compiler(context(), _buildFileExecutor->workingDirectory(), *_parseTree);
+
+                for (auto const& pair : _depBFPNs) pair.second->removeObserver(this);
+                updateMap<BuildFileProcessingNode>(context(), _depBFPNs, compiler.processingNodes());
+                for (auto const& pair : _depBFPNs) pair.second->addObserver(this);
 
                 for (auto const& pair : _depGlobs) pair.second->removeObserver(this);
                 updateMap<GlobNode>(context(), _depGlobs, compiler.globs());
                 for (auto const& pair : _depGlobs) pair.second->addObserver(this);
 
-                _executionHash = computeExecutionHash();
+                auto d = Delegate<void, Node::State>::CreateLambda(
+                    [this](Node::State state) { handleBuildFileDependenciesCompletion(state); }
+                );
+                std::vector<Node*> deps;
+                for (auto const& pair : _depBFPNs) deps.push_back(pair.second.get());
+                for (auto const& pair : _depGlobs) deps.push_back(pair.second.get());
+                Node::startNodes(deps, std::move(d));
+
             } catch (std::runtime_error e) {
                 auto msg = e.what();
                 notifyProcessingCompletion(Node::State::Failed);
             }
         }
-        notifyProcessingCompletion(Node::State::Ok);
     }
 
-    void BuildFileProcessingNode::handleDepBFPNsCompletion(Node::State state) {
-        if (state == Node::State::Failed) {
-            notifyProcessingCompletion(Node::State::Failed);
+    void BuildFileProcessingNode::handleBuildFileDependenciesCompletion(Node::State state) {
+        if (state != Node::State::Ok) {
+            notifyProcessingCompletion(state);
         } else {
             try {
                 BuildFileCompiler compiler(context(), _buildFileExecutor->workingDirectory(), *_parseTree);
                 updateMap<GeneratedFileNode>(context(), _outputs, compiler.outputs());
                 updateMap<CommandNode>(context(), _commands, compiler.commands());
-
-                for (auto const& pair : _depGlobs) pair.second->removeObserver(this);
-                updateMap<GlobNode>(context(), _depGlobs, compiler.globs());
-                for (auto const& pair : _depGlobs) pair.second->addObserver(this);
-
                 _executionHash = computeExecutionHash();
             } catch (std::runtime_error e) {
                 auto msg = e.what();
