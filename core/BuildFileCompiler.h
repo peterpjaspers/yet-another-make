@@ -27,16 +27,16 @@ namespace YAM {
             BuildFile::File const& buildFile,
             std::filesystem::path const& globNameSpace = "");
 
-        std::set<std::shared_ptr<CommandNode>, Node::CompareName> const& commands() {
+        std::map<std::filesystem::path, std::shared_ptr<CommandNode>>  const& commands() {
             return _commands;
         }
 
-        std::set<std::shared_ptr<GeneratedFileNode>, Node::CompareName> const& outputs() {
+        std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const& outputs() {
             return _outputs;
         }
 
         // Return the globs that were used to resolve rule inputs.
-        std::set<std::shared_ptr<GlobNode>, Node::CompareName> const& globs() {
+        std::map<std::filesystem::path, std::shared_ptr<GlobNode>> const& globs() {
             return _globs;
         }
 
@@ -106,9 +106,9 @@ namespace YAM {
         std::shared_ptr<DirectoryNode> _baseDir;
         std::filesystem::path _globNameSpace;
 
-        std::set<std::shared_ptr<CommandNode>, Node::CompareName> _commands;
-        std::set<std::shared_ptr<GeneratedFileNode>, Node::CompareName> _outputs;
-        std::set<std::shared_ptr<GlobNode>, Node::CompareName> _globs;
+        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> _commands;
+        std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _outputs;
+        std::map<std::filesystem::path, std::shared_ptr<GlobNode>> _globs;
 
         std::map<std::filesystem::path, std::shared_ptr<CommandNode>> _newCommands;
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _newOutputs;

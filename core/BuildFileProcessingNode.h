@@ -5,7 +5,7 @@
 
 #include <memory>
 #include <vector>
-#include <set>
+#include <map>
 
 namespace YAM {
     class FileNode;
@@ -52,8 +52,8 @@ namespace YAM {
         void teardownBuildFileExecutor();
         void handleRequisitesCompletion(Node::State state);
         void parseBuildFile();
-        void handleParseBuildFileCompletion(std::shared_ptr<BuildFile::File> tree, std::string error);
-        void compile(std::shared_ptr<BuildFile::File> const& file);
+        void handleParseBuildFileCompletion(std::string error);
+        void handleDepBFPNsCompletion(Node::State state);
         XXH64_hash_t computeExecutionHash() const;
         void notifyProcessingCompletion(Node::State state);
 
@@ -62,23 +62,23 @@ namespace YAM {
         std::shared_ptr<SourceFileNode> _buildFile;
 
         // _depFiles represent the input files of the buildfile.
-        std::set<std::shared_ptr<FileNode>, Node::CompareName> _depFiles;
+        std::map<std::filesystem::path, std::shared_ptr<FileNode>> _depFiles;
 
         // _depBFPN represent the buildfile dependencies declared in _buildFile.
         // These dependencies are extracted from the parsed buildfile. These
         // processing nodes must be executed before the parse result can be 
         // compiled in order to make sure that all input generated files  
         // referenced by _buildFile exist.
-        std::set<std::shared_ptr<BuildFileProcessingNode>, Node::CompareName> _depBFPNs;
+        std::map<std::filesystem::path, std::shared_ptr<BuildFileProcessingNode>> _depBFPNs;
 
         // _depGlobs represent the glob dependencies declared in _buildFile.
         // These dependencies are extracted from the parsed buildfile. A change
         // in these globs will case this processing node to re-execute.
-        std::set<std::shared_ptr<GlobNode>, Node::CompareName> _depGlobs;
+        std::map<std::filesystem::path, std::shared_ptr<GlobNode>> _depGlobs;
 
         // The commands and generate file nodes compiled from the rules in the buildfile.
-        std::set<std::shared_ptr<CommandNode>, Node::CompareName> _commands;
-        std::set<std::shared_ptr<GeneratedFileNode>, Node::CompareName> _outputs;
+        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> _commands;
+        std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _outputs;
 
         // _executionHash is the hash of the hashes of _depFiles, _depBFPNs 
         // and _depGlobs. A change in execution hash invalidates the compiled
@@ -90,6 +90,9 @@ namespace YAM {
 
         // The output of running the _buildFile is redirected to this file.
         std::filesystem::path _tmpRulesFile;
+
+        // The parse tree of the buildfile ouput
+        std::shared_ptr<BuildFile::File> _parseTree;
     };
 }
 

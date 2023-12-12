@@ -64,60 +64,35 @@ namespace
             std::inserter(onlyIn2, onlyIn2.begin()));
     }
 
-    /* This implementation crashes in std::set_intersection because
-    *  it finds the input set to be not ordered.
     template<class TNode>
-    void computeSetsDifference1(
-        std::set<std::shared_ptr<TNode>, Node::CompareName> const& in1,
-        std::set<std::shared_ptr<TNode>, Node::CompareName> const& in2,
-        std::set<std::shared_ptr<TNode>, Node::CompareName>& inBoth,
-        std::set<std::shared_ptr<TNode>, Node::CompareName>& onlyIn1,
-        std::set<std::shared_ptr<TNode>, Node::CompareName>& onlyIn2
-    ) {
-        std::set_intersection(
-            in1.begin(), in1.end(),
-            in2.begin(), in2.end(),
-            std::inserter(inBoth, inBoth.begin()));
-        std::set_difference(
-            in1.begin(), in1.end(),
-            inBoth.begin(), inBoth.end(),
-            std::inserter(onlyIn1, onlyIn1.begin()));
-        std::set_difference(
-            in2.begin(), in2.end(),
-            inBoth.begin(), inBoth.end(),
-            std::inserter(onlyIn2, onlyIn2.begin()));
-    }
-    */
-
-    template<class TNode>
-    void computeSetsDifference(
-        std::set<std::shared_ptr<TNode>, Node::CompareName> const& in1,
-        std::set<std::shared_ptr<TNode>, Node::CompareName> const& in2,
-        std::set<std::shared_ptr<TNode>, Node::CompareName>& inBoth,
-        std::set<std::shared_ptr<TNode>, Node::CompareName>& onlyIn1,
-        std::set<std::shared_ptr<TNode>, Node::CompareName>& onlyIn2
+    void computeMapsDifference(
+        std::map<std::filesystem::path, std::shared_ptr<TNode>> const& in1,
+        std::map<std::filesystem::path, std::shared_ptr<TNode>> const& in2,
+        std::map<std::filesystem::path, std::shared_ptr<TNode>>& inBoth,
+        std::map<std::filesystem::path, std::shared_ptr<TNode>>& onlyIn1,
+        std::map<std::filesystem::path, std::shared_ptr<TNode>>& onlyIn2
     ) {
         for (auto i1 : in1) {
-            if (in2.find(i1) != in2.end()) inBoth.insert(i1);
+            if (in2.find(i1.first) != in2.end()) inBoth.insert(i1);
             else onlyIn1.insert(i1);
         }
         for (auto i2 : in2) {
-            if (in1.find(i2) != in1.end()) onlyIn2.insert(i2);
+            if (in1.find(i2.first) != in1.end()) onlyIn2.insert(i2);
         }
     }
 
     template <class TNode>
-    void updateSet(
+    void updateMap(
         ExecutionContext* context,
-        std::set<std::shared_ptr<TNode>, Node::CompareName>& toUpdate,
-        std::set<std::shared_ptr<TNode>, Node::CompareName> const& newSet
+        std::map<std::filesystem::path, std::shared_ptr<TNode>>& toUpdate,
+        std::map<std::filesystem::path, std::shared_ptr<TNode>> const& newSet
     ) {
-        std::set<std::shared_ptr<TNode>, Node::CompareName> kept;
-        std::set<std::shared_ptr<TNode>, Node::CompareName> added;
-        std::set<std::shared_ptr<TNode>, Node::CompareName> removed;
-        computeSetsDifference(newSet, toUpdate, kept, added, removed);
-        for (auto const& node : added) context->nodes().add(node);
-        for (auto const& node : removed) removeNode(node);
+        std::map<std::filesystem::path, std::shared_ptr<TNode>> kept;
+        std::map<std::filesystem::path, std::shared_ptr<TNode>> added;
+        std::map<std::filesystem::path, std::shared_ptr<TNode>> removed;
+        computeMapsDifference(newSet, toUpdate, kept, added, removed);
+        for (auto const& pair : added) context->nodes().add(pair.second);
+        for (auto const& pair : removed) removeNode(pair.second);
         toUpdate = newSet;
     }
 }
@@ -135,19 +110,19 @@ namespace YAM
     }
 
     BuildFileProcessingNode::~BuildFileProcessingNode() {
-        for (auto const& file : _depFiles) file->removeObserver(this);
-        for (auto const& bfpn : _depBFPNs) bfpn->removeObserver(this);
-        for (auto const& glob : _depGlobs) glob->removeObserver(this);
+        for (auto const& pair : _depFiles) pair.second->removeObserver(this);
+        for (auto const& pair : _depBFPNs) pair.second->removeObserver(this);
+        for (auto const& pair : _depGlobs) pair.second->removeObserver(this);
     }
 
     void BuildFileProcessingNode::buildFile(std::shared_ptr<SourceFileNode> const& newFile) {
         if (_buildFile != newFile) {
             if (_buildFile != nullptr) {
-                for (auto const& file : _depFiles) file->removeObserver(this);
-                for (auto const& bfpn : _depBFPNs) bfpn->removeObserver(this);
-                for (auto const& glob : _depGlobs) glob->removeObserver(this);
-                for (auto cmd : _commands) removeNode(cmd);
-                for (auto glob : _depGlobs) removeNode(glob);
+                for (auto const& pair : _depFiles) pair.second->removeObserver(this);
+                for (auto const& pair : _depBFPNs) pair.second->removeObserver(this);
+                for (auto const& pair : _depGlobs) pair.second->removeObserver(this);
+                for (auto pair : _commands) removeNode(pair.second);
+                for (auto pair : _depGlobs) removeNode(pair.second);
                 _commands.clear();
                 _depFiles.clear();
                 _depBFPNs.clear();
@@ -186,9 +161,9 @@ namespace YAM
 
     XXH64_hash_t BuildFileProcessingNode::computeExecutionHash() const {
         std::vector<XXH64_hash_t> hashes;
-        for (auto file : _depFiles) hashes.push_back(file->hashOf(FileAspect::entireFileAspect().name()));
-        for (auto bfpn : _depBFPNs) hashes.push_back(bfpn->_executionHash);
-        for (auto glob : _depGlobs) hashes.push_back(glob->executionHash());
+        for (auto pair : _depFiles) hashes.push_back(pair.second->hashOf(FileAspect::entireFileAspect().name()));
+        for (auto pair : _depBFPNs) hashes.push_back(pair.second->_executionHash);
+        for (auto pair : _depGlobs) hashes.push_back(pair.second->executionHash());
         XXH64_hash_t hash = XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
         return hash;
     }
@@ -228,13 +203,10 @@ namespace YAM
         } else if (canceling()) {
             notifyProcessingCompletion(Node::State::Canceled);
         } else {
-            for (auto const& file : _depFiles) file->removeObserver(this);
-            std::map<std::filesystem::path, std::shared_ptr<FileNode>> depFiles = _buildFileExecutor->detectedInputs();
-            _depFiles.clear();
-            for (auto const& pair : depFiles) {
-                pair.second->addObserver(this);
-                _depFiles.insert(pair.second);
-            }
+            for (auto const& pair : _depFiles) pair.second->removeObserver(this);
+            _depFiles = _buildFileExecutor->detectedInputs();
+            for (auto const& pair : _depFiles) pair.second->addObserver(this);
+
             if (_executionHash == computeExecutionHash()) {
                 notifyProcessingCompletion(Node::State::Ok);
             } else {
@@ -249,21 +221,20 @@ namespace YAM
 
     // threadpool
     void BuildFileProcessingNode::parseBuildFile() {
-        std::shared_ptr<BuildFile::File> buildFile;
         std::string errorMsg;
         try {
             BuildFileParser parser(_tmpRulesFile);
-            buildFile = parser.file();
+            _parseTree = parser.file();
         } catch (std::runtime_error ex) {
             errorMsg = ex.what();
         }
         auto d = Delegate<void>::CreateLambda(
-            [this, buildFile, errorMsg]() { handleParseBuildFileCompletion(buildFile, errorMsg); }
+            [this, errorMsg]() { handleParseBuildFileCompletion(errorMsg); }
         );
         context()->mainThreadQueue().push(std::move(d));
     }
 
-    void BuildFileProcessingNode::handleParseBuildFileCompletion(std::shared_ptr<BuildFile::File> file, std::string error) {
+    void BuildFileProcessingNode::handleParseBuildFileCompletion(std::string error) {
         if (!error.empty()) {
             LogRecord record(LogRecord::Aspect::Error, error);
             context()->logBook()->add(record);
@@ -272,12 +243,14 @@ namespace YAM
             // TODO: extract buildfile dependencies from file and execute
             // associated BFPNs first
             try {
-                BuildFileCompiler compiler(context(), _buildFileExecutor->workingDirectory(), *file);
-                updateSet<GeneratedFileNode>(context(), _outputs, compiler.outputs());
-                updateSet<CommandNode>(context(), _commands, compiler.commands());
-                for (auto const& glob : _depGlobs) glob->removeObserver(this);
-                updateSet<GlobNode>(context(), _depGlobs, compiler.globs());
-                for (auto const& glob : _depGlobs) glob->addObserver(this);
+                BuildFileCompiler compiler(context(), _buildFileExecutor->workingDirectory(), *_parseTree);
+                updateMap<GeneratedFileNode>(context(), _outputs, compiler.outputs());
+                updateMap<CommandNode>(context(), _commands, compiler.commands());
+
+                for (auto const& pair : _depGlobs) pair.second->removeObserver(this);
+                updateMap<GlobNode>(context(), _depGlobs, compiler.globs());
+                for (auto const& pair : _depGlobs) pair.second->addObserver(this);
+
                 _executionHash = computeExecutionHash();
             } catch (std::runtime_error e) {
                 auto msg = e.what();
@@ -287,25 +260,43 @@ namespace YAM
         notifyProcessingCompletion(Node::State::Ok);
     }
 
-    void BuildFileProcessingNode::compile(std::shared_ptr<BuildFile::File> const& file) {
+    void BuildFileProcessingNode::handleDepBFPNsCompletion(Node::State state) {
+        if (state == Node::State::Failed) {
+            notifyProcessingCompletion(Node::State::Failed);
+        } else {
+            try {
+                BuildFileCompiler compiler(context(), _buildFileExecutor->workingDirectory(), *_parseTree);
+                updateMap<GeneratedFileNode>(context(), _outputs, compiler.outputs());
+                updateMap<CommandNode>(context(), _commands, compiler.commands());
+
+                for (auto const& pair : _depGlobs) pair.second->removeObserver(this);
+                updateMap<GlobNode>(context(), _depGlobs, compiler.globs());
+                for (auto const& pair : _depGlobs) pair.second->addObserver(this);
+
+                _executionHash = computeExecutionHash();
+            } catch (std::runtime_error e) {
+                auto msg = e.what();
+                notifyProcessingCompletion(Node::State::Failed);
+            }
+        }
+        notifyProcessingCompletion(Node::State::Ok);
     }
 
     void BuildFileProcessingNode::notifyProcessingCompletion(Node::State state) {
         teardownBuildFileExecutor();
+        _parseTree = nullptr;
         Node::notifyCompletion(state);
 
     }
 
     void BuildFileProcessingNode::getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const {
-        for (auto const& cmd : _commands) {
-            outputs.push_back(cmd);
-        }
+        for (auto const& pair : _commands) outputs.push_back(pair.second);
     }
 
     void BuildFileProcessingNode::getInputs(std::vector<std::shared_ptr<Node>>& inputs) const {
-        inputs.insert(inputs.end(), _depFiles.begin(), _depFiles.end());
-        inputs.insert(inputs.end(), _depBFPNs.begin(), _depBFPNs.end());
-        inputs.insert(inputs.end(), _depGlobs.begin(), _depGlobs.end());
+        for (auto const& pair : _depFiles) inputs.push_back(pair.second);
+        for (auto const& pair : _depBFPNs) inputs.push_back(pair.second);
+        for (auto const& pair : _depGlobs) inputs.push_back(pair.second);
     }
 
     void BuildFileProcessingNode::setStreamableType(uint32_t type) {

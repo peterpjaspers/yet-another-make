@@ -105,8 +105,8 @@ namespace
         BuildFileCompiler compiler(&setup.context, setup.repo->directoryNode(), file, globNameSpace);
         auto const& commands = compiler.commands();
         ASSERT_EQ(2, commands.size());
-        auto command0 = *(commands.begin());
-        auto command1 = *(++commands.begin());
+        auto command0 = (commands.begin())->second;
+        auto command1 = (++commands.begin())->second;
 
         ASSERT_EQ(1, command0->cmdInputs().size());
         auto input00 = command0->cmdInputs()[0];
@@ -132,12 +132,12 @@ namespace
         ASSERT_EQ(2, globs.size());
         std::filesystem::path depGlobName(globNameSpace / setup.repo->directoryNode()->name() / "*.h");
         std::filesystem::path ruleGlobName(globNameSpace / setup.repo->directoryNode()->name() / "src\\*.cpp");
-        std::shared_ptr<GlobNode> ruleGlob;
-        std::shared_ptr<GlobNode> depGlob;
-        for (auto const& g : globs) {
-            if (g->name() == ruleGlobName) ruleGlob = g;
-            if (g->name() == depGlobName) depGlob = g;
-        }
+        auto const& depGlobIt = globs.find(depGlobName);
+        auto const& ruleGlobIt = globs.find(ruleGlobName);
+        ASSERT_TRUE(globs.end() != depGlobIt);
+        ASSERT_TRUE(globs.end() != ruleGlobIt);
+        std::shared_ptr<GlobNode> depGlob = globs.find(depGlobName)->second;
+        std::shared_ptr<GlobNode> ruleGlob = globs.find(ruleGlobName)->second;
 
         ASSERT_NE(nullptr, ruleGlob);
         auto ruleGlobBaseDirName = setup.repo->directoryNode()->name() / "src";
@@ -169,7 +169,7 @@ namespace
         BuildFileCompiler compiler(&setup.context, setup.repo->directoryNode(), file);
         auto const& commands = compiler.commands();
         ASSERT_EQ(1, commands.size());
-        auto command0 = *(commands.begin());
+        auto command0 = (commands.begin())->second;
 
         ASSERT_EQ(1, command0->cmdInputs().size());
         auto input00 = command0->cmdInputs()[0];
@@ -203,7 +203,7 @@ namespace
 
         BuildFileCompiler compiler(&context, baseDir, file);
         EXPECT_EQ(1, compiler.commands().size());
-        std::shared_ptr<CommandNode> cmd = *(compiler.commands().begin());
+        std::shared_ptr<CommandNode> cmd = compiler.commands().begin()->second;
         EXPECT_EQ(script.script, cmd->script());
     }
 }

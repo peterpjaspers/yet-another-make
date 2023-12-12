@@ -155,7 +155,6 @@ namespace YAM {
         , _baseDir(baseDir)
         , _globNameSpace(globNameSpace)
     {
-
         for (auto const& glob : buildFile.deps.depGlobs) {
             compileGlob(glob);
         }
@@ -201,7 +200,7 @@ namespace YAM {
         cmdNode->script(script);
         cmdNode->outputs(outputs);
         cmdNode->ignoreOutputs(ignoredOutputs);
-        _commands.insert(cmdNode);
+        _commands.insert({ cmdNode->name(), cmdNode });
     }
 
     std::vector<std::shared_ptr<FileNode>> BuildFileCompiler::compileInput(
@@ -241,6 +240,10 @@ namespace YAM {
         Globber::optimize(optimizedBaseDir, optimizedPattern);
         std::filesystem::path globName(_globNameSpace / optimizedBaseDir->name() / optimizedPattern);
         auto globNode = dynamic_pointer_cast<GlobNode>(_context->nodes().find(globName));
+        if (globNode == nullptr) {  
+            auto it = _newGlobs.find(globName);
+            if (it != _newGlobs.end()) globNode = it->second;
+        }
         if (globNode == nullptr) {
             globNode = std::make_shared<GlobNode>(_context, globName);
             globNode->baseDirectory(optimizedBaseDir);
@@ -248,7 +251,7 @@ namespace YAM {
             globNode->initialize();
             _newGlobs.insert({ globNode->name(), globNode });
         }
-        _globs.insert(globNode);
+        _globs.insert({ globNode->name(), globNode });
         return globNode;
     }
 
@@ -306,7 +309,7 @@ namespace YAM {
             outputNode = std::make_shared<GeneratedFileNode>(_context, outputPath, cmdNode.get());
             _newOutputs.insert({ outputPath, outputNode });
         }
-        _outputs.insert(outputNode);
+        _outputs.insert({ outputNode->name(), outputNode });
         return outputNode;
     }
 

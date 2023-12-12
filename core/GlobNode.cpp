@@ -79,18 +79,10 @@ namespace YAM
     }
 
     void GlobNode::executeGlob() {
-        auto globber = std::make_shared<Globber>(_baseDir, _pattern, false);
-        std::string error;
-        try {
-            globber->execute();
-        } catch (std::runtime_error e) {
-            error = e.what();
-        } catch (...) {
-            error = "unknown glob error";
-        }
-        auto d = Delegate<void>::CreateLambda([this, globber, error]() {
-            Node::State newState = error.empty() ? Node::State::Ok : Node::State::Failed;
-            handleGlobCompletion(globber, error);
+        auto result = execute();
+        auto d = Delegate<void>::CreateLambda([this, result]() {
+            Node::State newState = result.second.empty() ? Node::State::Ok : Node::State::Failed;
+            handleGlobCompletion(result.first, result.second);
             notifyCompletion(newState); 
         });
         context()->threadPoolQueue().push(std::move(d));
