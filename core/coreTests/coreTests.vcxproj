@@ -47,6 +47,7 @@
     <ClCompile Include="builderTest.cpp" />
     <ClCompile Include="buildFileCompilerTest.cpp" />
     <ClCompile Include="buildFileDependenciesCompilerTest.cpp" />
+    <ClCompile Include="buildFileParserTest.cpp" />
     <ClCompile Include="buildFileProcessingNodeTest.cpp" />
     <ClCompile Include="buildServicePortRegistryTest.cpp" />
     <ClCompile Include="buildServiceProtocolTest.cpp" />
@@ -73,7 +74,6 @@
     <ClCompile Include="monitoredProcessWin32Test.cpp" />
     <ClCompile Include="msBuildTrackerOutputReaderTest.cpp" />
     <ClCompile Include="nodeSetTest.cpp" />
-    <ClCompile Include="parserTest.cpp" />
     <ClCompile Include="persistentBuildStateTest.cpp" />
     <ClCompile Include="regexSetTest.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
