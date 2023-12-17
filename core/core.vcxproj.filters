@@ -288,6 +288,12 @@
     <ClInclude Include="BuildFileDependenciesCompiler.h">
       <Filter>Header Files\BuildFileCompiler</Filter>
     </ClInclude>
+    <ClInclude Include="BuildFileCompilerNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildFileParserNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -472,6 +478,12 @@
     </ClCompile>
     <ClCompile Include="BuildFileDependenciesCompiler.cpp">
       <Filter>Source Files\BuildFileCompiler</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildFileCompilerNode.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildFileParserNode.cpp">
+      <Filter>Source Files\Node</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -91,6 +91,23 @@ namespace YAM
         void prepareDeserialize() override;
         void restore(void* context) override;
 
+    protected:
+        struct PostProcessResult {
+            virtual ~PostProcessResult() {}
+            Node::State newState;
+        };
+
+        // Called, in threadpool context, only after successfull completion of 
+        // script execution.
+        // Todo: pass stdout of the script.
+        // Returned result->newState will be used as result state of script
+        // execution.
+        virtual std::shared_ptr<PostProcessResult> postProcess(std::string const& stdOut) { return nullptr; }
+
+        // Called, in mainthread context. 
+        // Called just before Node::notifyCompletion is called.
+        virtual void commitPostProcessResult(std::shared_ptr<PostProcessResult>& result) {}
+
     private:
         struct ExecutionResult {
             MemoryLogBook _log;
@@ -100,13 +117,15 @@ namespace YAM
             std::set<std::filesystem::path> _removedInputPaths;
             std::set<std::filesystem::path> _addedInputPaths;
             std::vector<std::shared_ptr<FileNode>> _addedInputNodes;
+            std::shared_ptr<PostProcessResult> _postResult;
         };
 
         void handleRequisitesCompletion(Node::State state);
         void executeScript();
-        void handleExecuteScriptCompletion(ExecutionResult& result);
-        void handleOutputAndNewInputFilesCompletion(Node::State state);
+        void handleExecuteScriptCompletion(std::shared_ptr<ExecutionResult> result);
+        void handleOutputAndNewInputFilesCompletion(Node::State newState, std::shared_ptr<ExecutionResult> result);
         void updateInputProducers();
+        void notifyCommandCompletion(std::shared_ptr<ExecutionResult> result);
 
         MonitoredProcessResult executeMonitoredScript(MemoryLogBook& logBook);
         void getSourceInputs(std::vector<Node*>& sourceInputs) const;

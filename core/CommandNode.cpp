@@ -523,15 +523,20 @@ namespace YAM
                     result->_addedInputPaths);
                 result->_outputPaths = scriptResult.writtenFiles;
                 result->_newState = Node::State::Ok;
+                result->_postResult = postProcess(scriptResult.stdOut);
+                if (result->_postResult != nullptr) {
+                    result->_newState = result->_postResult->newState;
+                }
             }
         }
         auto d = Delegate<void>::CreateLambda(
-            [this, result]() { handleExecuteScriptCompletion(*result); }
+            [this, result]() { handleExecuteScriptCompletion(result); }
         );
         context()->mainThreadQueue().push(std::move(d));
     }
 
-    void CommandNode::handleExecuteScriptCompletion(ExecutionResult& result) {
+    void CommandNode::handleExecuteScriptCompletion(std::shared_ptr<ExecutionResult> sresult) {
+        ExecutionResult& result = *sresult;
         if (result._newState != Node::State::Ok) {
         } else if (canceling()) {
             result._newState = Node::State::Canceled;
@@ -577,7 +582,8 @@ namespace YAM
                     std::vector<Node*> rawNodes;
                     for (auto const& n : outputsAndNewInputs) rawNodes.push_back(n.get());
                     auto callback = Delegate<void, Node::State>::CreateLambda(
-                        [this](Node::State s) { handleOutputAndNewInputFilesCompletion(s); }
+                        [this, sresult](Node::State state) { 
+                            handleOutputAndNewInputFilesCompletion(state, sresult); }
                     );
                     startNodes(rawNodes, std::move(callback));
                 } else {
@@ -587,12 +593,14 @@ namespace YAM
         }
         result._log.forwardTo(*(context()->logBook()));
         if (result._newState != Node::State::Ok) {
-            notifyCompletion(result._newState);
+            notifyCommandCompletion(sresult);
         }
     }
 
-    void CommandNode::handleOutputAndNewInputFilesCompletion(Node::State state) {
-        if (state == Node::State::Ok) {
+    void CommandNode::handleOutputAndNewInputFilesCompletion(Node::State newState, std::shared_ptr<ExecutionResult> sresult) {
+        ExecutionResult& result = *sresult;
+        result._newState = newState;
+        if (result._newState == Node::State::Ok) {
             _executionHash = computeExecutionHash();
             modified(true);
         } else {
@@ -600,7 +608,16 @@ namespace YAM
             for (auto const& pair : _detectedInputs) r._removedInputPaths.insert(pair.first);
             setDetectedInputs(r);
         }
-        notifyCompletion(state);
+        notifyCommandCompletion(sresult);
+    }
+
+    void CommandNode::notifyCommandCompletion(std::shared_ptr<ExecutionResult> sresult) {
+        ExecutionResult& result = *sresult;
+        if (result._postResult != nullptr) {
+            result._postResult->newState = result._newState;
+        }
+        commitPostProcessResult(result._postResult);
+        Node::notifyCompletion(result._newState);
     }
 
     // threadpool

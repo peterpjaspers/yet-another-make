@@ -86,7 +86,9 @@ namespace YAM {
         while (_lookAhead.type != "eos") {
             if (_lookAhead.type == "rule") {
                 file->variablesAndRules.push_back(parseRule());
-            } // else if variable, etc
+            } else {
+                eat(_lookAhead.type);
+            }
         }
         return file;
     }
