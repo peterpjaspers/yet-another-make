@@ -98,6 +98,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="AcyclicTrail.h" />
     <ClInclude Include="BasicOStreamLogBook.h" />
     <ClInclude Include="BuildClient.h" />
     <ClInclude Include="Builder.h" />
@@ -189,9 +190,13 @@
     <ClCompile Include="BuildFileCompilerNode.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="BuildFileDependenciesCompiler.cpp" />
+    <ClCompile Include="BuildFileDependenciesCompiler.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="BuildFileParserNode.cpp" />
-    <ClCompile Include="BuildFileProcessingNode.cpp" />
+    <ClCompile Include="BuildFileProcessingNode.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="Glob.cpp" />
     <ClCompile Include="Globber.cpp" />
     <ClCompile Include="BuildFileParser.cpp" />
@@ -263,7 +268,9 @@
     </ClCompile>
     <ClCompile Include="SourceFileNode.cpp" />
     <ClCompile Include="FileRepository.cpp" />
-    <ClCompile Include="BuildFileCompiler.cpp" />
+    <ClCompile Include="BuildFileCompiler.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="TcpStream.cpp" />
     <ClCompile Include="Thread.cpp" />
     <ClCompile Include="ThreadPool.cpp" />

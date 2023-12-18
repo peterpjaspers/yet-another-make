@@ -5,7 +5,7 @@
 #include "../DirectoryNode.h"
 #include "../SourceFileNode.h"
 #include "../ExecutionContext.h"
-#include "../BuildFileProcessingNode.h"
+#include "../BuildFileParserNode.h"
 #include "../../xxhash/xxhash.h"
 
 #include <chrono>
@@ -161,7 +161,7 @@ namespace
         }
     }
 
-    TEST(DirectoryNode, buildFileProcessingNode) {
+    TEST(DirectoryNode, buildFileParserNode) {
         std::string tmpDir(std::tmpnam(nullptr));
         std::filesystem::path rootDir(std::string(tmpDir + "_dirNodeTest"));
         std::filesystem::path buildFilePath(rootDir / R"(buildfile_yam.cmd)");
@@ -184,11 +184,12 @@ namespace
         auto buildFile = dirNode->findChild(buildFilePath.filename());
         EXPECT_NE(nullptr, buildFile);
         EXPECT_EQ(buildFile, context.nodes().find(symBuildFilePath));
-        std::filesystem::path buildFileProcessingPath = dirNode->name() / "__buildfile";
-        auto node = context.nodes().find(buildFileProcessingPath);
-        ASSERT_NE(nullptr, node); 
-        auto buildFileProcessingNode = dynamic_pointer_cast<BuildFileProcessingNode>(node);
-        ASSERT_NE(nullptr, buildFileProcessingNode);
-        EXPECT_EQ(buildFilePath, buildFileProcessingNode->buildFile()->absolutePath());
+        std::filesystem::path buildFileParserNodeName = dirNode->name() / "__bfParser";
+        auto node = context.nodes().find(buildFileParserNodeName);
+        ASSERT_NE(nullptr, node);
+        auto buildFileParserNode = dynamic_pointer_cast<BuildFileParserNode>(node);
+        ASSERT_NE(nullptr, buildFileParserNode);
+        EXPECT_EQ(dirNode->buildFileParserNode(), buildFileParserNode);
+        EXPECT_EQ(buildFilePath, buildFileParserNode->buildFile()->absolutePath());
     }
 }

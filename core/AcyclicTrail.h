@@ -19,35 +19,40 @@ namespace YAM
     public:
         AcyclicTrail() {}
 
-        // Add the node to the trail iff it does not cause a cycle.
-        // Return whether the node was added, i.e. return whether
+        // Add object to the trail iff it does not cause a cycle.
+        // Return whether the object was added, i.e. return whether
         // the trail is without cycle.
         bool add(T object) {
-            if (_trail.contains(object)) return false;
-            auto it = _orderedTrail.insert(_orderedTrail.end(), object);
-            _trail.insert({ object, it });
+            if (_visited.contains(object)) return false;
+            auto it = _trail.insert(_trail.end(), object);
+            _visited.insert({ object, it });
             return true;
         }
 
-        // Remove the node from the trail.
+        // Remove the object from the trail.
         void remove(T object) {
-            auto it = _trail.find(object);
-            if (it == _trail.end()) {
+            auto it = _visited.find(object);
+            if (it == _visited.end()) {
                 throw std::runtime_error("trail does not contain object");
             }
-            _orderedTrail.erase(it->second);
-            _trail.erase(it);
+            _trail.erase(it->second);
+            _visited.erase(it);
         }
 
         // Return the trail. Iterating the list returns the objects
         // in order of addition.
-        std::list<T>const& trail() { return _orderedTrail; }
+        std::list<T>const& trail() { return _trail; }
 
-        bool empty() const { return _trail.empty(); }
+        bool empty() const { return _visited.empty(); }
+
+        void clear() {
+            _visited.clear();
+            _trail.clear();
+        }
 
     private:
-        std::unordered_map<T, typename std::list<T>::iterator> _trail;
-        std::list<T> _orderedTrail;
+        std::unordered_map<T, typename std::list<T>::iterator> _visited;
+        std::list<T> _trail;
     };
 }
 

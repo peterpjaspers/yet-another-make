@@ -3,7 +3,7 @@
 #include "SourceFileNode.h"
 #include "ExecutionContext.h"
 #include "DotIgnoreNode.h"
-#include "BuildFileProcessingNode.h"
+#include "BuildFileParserNode.h"
 #include "IStreamer.h"
 
 #include <regex>
@@ -371,7 +371,7 @@ namespace YAM
         for (auto const& n : result._removed) {
             _removeChildRecursively(n);
         }
-        updateBuildFileProcessingNode();
+        updateBuildFileParserNode();
 
         modified(true);
         context()->statistics().registerUpdatedDirectory(this);
@@ -381,20 +381,20 @@ namespace YAM
         }
     }
     
-    void DirectoryNode::updateBuildFileProcessingNode() {
+    void DirectoryNode::updateBuildFileParserNode() {
         std::shared_ptr<SourceFileNode> buildFile = findBuildFile(_content);
         if (buildFile != nullptr) {
-            if (_buildFileProcessingNode == nullptr) {
-                std::filesystem::path bfpName(name() / "__buildfile");
-                _buildFileProcessingNode = std::make_shared<BuildFileProcessingNode>(context(), bfpName);
-                context()->nodes().add(_buildFileProcessingNode);
+            if (_buildFileParserNode == nullptr) {
+                std::filesystem::path bfpName(name() / "__bfParser");
+                _buildFileParserNode = std::make_shared<BuildFileParserNode>(context(), bfpName);
+                context()->nodes().add(_buildFileParserNode);
             }
-            _buildFileProcessingNode->buildFile(buildFile);
+            _buildFileParserNode->buildFile(buildFile);
         } else {
-            if (_buildFileProcessingNode != nullptr) {
-                _buildFileProcessingNode->buildFile(nullptr);
-                context()->nodes().remove(_buildFileProcessingNode);
-                _buildFileProcessingNode = nullptr;
+            if (_buildFileParserNode != nullptr) {
+                _buildFileParserNode->buildFile(nullptr);
+                context()->nodes().remove(_buildFileParserNode);
+                _buildFileParserNode = nullptr;
             }
         }
     }

@@ -6,10 +6,11 @@
 
 #include <memory>
 #include <vector>
-#include <map>
 
 namespace YAM {
     class SourceFileNode;
+    class DirectoryNode;
+    template<typename T> class AcyclicTrail;
     namespace BuildFile { class File; }
 
     // Excuting a BuildFileParserNode:
@@ -29,6 +30,11 @@ namespace YAM {
 
         BuildFile::File const& parseTree() const; 
         XXH64_hash_t parseTreeHash() const;
+        std::vector<BuildFileParserNode*> const& dependencies() const;
+
+        // Walk the dependency graph. Return whether no cycle was detected in
+        // the dependency graph.
+        bool walkDependencies(AcyclicTrail<const BuildFileParserNode*>& trail) const;
 
         static void setStreamableType(uint32_t type);
         // Inherited from IStreamer (via IPersistable)
@@ -50,9 +56,15 @@ namespace YAM {
         void commitPostProcessResult(std::shared_ptr<CommandNode::PostProcessResult>& result) override;
 
     private:
+        void composeDependencies();
+        BuildFileParserNode* findDependency(std::shared_ptr<DirectoryNode> const& baseDir, std::filesystem::path const& depPath);
+
         std::shared_ptr<SourceFileNode> _buildFile;
         BuildFile::File _parseTree;
         XXH64_hash_t _parseTreeHash;
+        // The (non-recursive_ dependencies on other buildfiles as declared in 
+        // _parseTree->deps, expressed by their parser nodes.
+        std::vector<BuildFileParserNode*> _dependencies;
     };
 }
 

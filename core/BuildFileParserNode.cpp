@@ -1,9 +1,12 @@
 #include "BuildFileParserNode.h"
+#include "DirectoryNode.h"
 #include "SourceFileNode.h"
 #include "ExecutionContext.h"
 #include "FileSystem.h"
 #include "FileAspect.h"
 #include "BuildFileParser.h"
+#include "Globber.h"
+#include "AcyclicTrail.h"
 
 namespace
 {
@@ -55,6 +58,11 @@ namespace YAM
         return _parseTreeHash;
     }
 
+    std::vector<BuildFileParserNode*> const& BuildFileParserNode::dependencies() const {
+        if (state() != Node::State::Ok) throw std::runtime_error("illegal state");
+        return _dependencies;
+    }
+
     std::shared_ptr<CommandNode::PostProcessResult> BuildFileParserNode::postProcess(std::string const& stdOut) {
         auto result = std::make_shared<ParseResult>();
         result->newState = Node::State::Ok;
@@ -77,6 +85,7 @@ namespace YAM
     }
 
     void BuildFileParserNode::commitPostProcessResult(std::shared_ptr<CommandNode::PostProcessResult>& sresult) {
+        _dependencies.clear();
         auto result = dynamic_pointer_cast<ParseResult>(sresult);
         if (result->newState != Node::State::Ok) {
             if (!result->parseErrors.empty()) {
@@ -86,7 +95,49 @@ namespace YAM
         } else {
             _parseTree = *(result->parseTree);
             _parseTreeHash = result->parseTreeHash;
+            composeDependencies();
         }
+    }
+
+    void BuildFileParserNode::composeDependencies() {
+        _dependencies.clear();
+        auto node = context()->nodes().find(_buildFile->name().parent_path());
+        auto baseDir = dynamic_pointer_cast<DirectoryNode>(node);
+        if (baseDir == nullptr) {
+            throw std::runtime_error("No such directory: " + _buildFile->name().parent_path().string());
+        }
+        for (auto const& buildFile : _parseTree.deps.depBuildFiles) {
+            auto dep = findDependency(baseDir, buildFile);
+            _dependencies.push_back(dep);
+        }
+    }
+    
+    BuildFileParserNode* BuildFileParserNode::findDependency(
+        std::shared_ptr<DirectoryNode> const& baseDir,
+        std::filesystem::path const& buildFileOrDirPath
+    ) {
+        auto buildFileDir = baseDir;
+        auto optimizedPath = buildFileOrDirPath;
+        Globber::optimize(buildFileDir, optimizedPath);
+        auto bfDirNode = dynamic_pointer_cast<DirectoryNode>(context()->nodes().find(buildFileDir->name()));
+        if (bfDirNode == nullptr) {
+            throw std::runtime_error("No such directory: " + buildFileDir->name().string());
+        }
+        std::shared_ptr<BuildFileParserNode> bfpn = bfDirNode->buildFileParserNode();
+        if (bfpn == nullptr) {
+            throw std::runtime_error("No buildfile found in directory " + buildFileDir->name().string());
+        }
+        return bfpn.get();
+    }
+
+    bool BuildFileParserNode::walkDependencies(AcyclicTrail<const BuildFileParserNode*>& trail) const {
+        if (state() != Node::State::Ok) throw std::runtime_error("illegal state");
+        if (!trail.add(this)) return false;
+        for (auto const* dep : _dependencies) {
+            if (!dep->walkDependencies(trail)) return false;
+        }
+        trail.remove(this);
+        return true;
     }
 
     void BuildFileParserNode::setStreamableType(uint32_t type) {

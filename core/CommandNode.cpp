@@ -504,6 +504,7 @@ namespace YAM
     // threadpool
     void CommandNode::executeScript() {
         auto result = std::make_shared<ExecutionResult>();
+        result->_newState = Node::State::Ok;
         if (canceling()) {
             result->_newState = Node::State::Canceled;
         } else {

@@ -14,7 +14,7 @@ namespace YAM
     class FileNode;
     class DotIgnoreNode;
     class FileRepository;
-    class BuildFileProcessingNode;
+    class BuildFileParserNode;
 
     // Executing a DirectoryNode caches the content of a directory as
     //    - a Source or Generated FileNode for each file in the directory.
@@ -58,8 +58,8 @@ namespace YAM
 
         std::shared_ptr<DirectoryNode> parent() const;
         std::shared_ptr<DotIgnoreNode> const& dotIgnoreNode() { return _dotIgnoreNode; }
-        std::shared_ptr<BuildFileProcessingNode> const& buildFileProcessingNode() {
-            return _buildFileProcessingNode;
+        std::shared_ptr<BuildFileParserNode> const& buildFileParserNode() {
+            return _buildFileParserNode;
         }
 
         // Query the directory content, vector content is sorted by node name.
@@ -125,7 +125,7 @@ namespace YAM
         void handleRetrieveContentCompletion(RetrieveResult& result);
         void startSubDirs();
         void commitResult(YAM::DirectoryNode::RetrieveResult& result);
-        void updateBuildFileProcessingNode();
+        void updateBuildFileParserNode();
         void _removeChildRecursively(std::shared_ptr<Node> const& child);
 
         // Next 3 functions execute in a threadpool thread
@@ -143,7 +143,7 @@ namespace YAM
 
         DirectoryNode* _parent;
         std::shared_ptr<DotIgnoreNode> _dotIgnoreNode;
-        std::shared_ptr<BuildFileProcessingNode> _buildFileProcessingNode;
+        std::shared_ptr<BuildFileParserNode> _buildFileParserNode;
         std::chrono::time_point<std::chrono::utc_clock> _lastWriteTime;
         std::map<std::filesystem::path, std::shared_ptr<Node>> _content;
         XXH64_hash_t _executionHash;
