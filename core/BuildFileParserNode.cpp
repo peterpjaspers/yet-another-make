@@ -28,22 +28,14 @@ namespace YAM
             }
             _buildFile = newFile;
             if (_buildFile != nullptr) {
-                std::string script;
-                if (_buildFile->name().extension() == ".txt") {
-                    // a script is needed to establish a dependency on _buildFile
-                    std::stringstream ss;
-                    ss
-                        << "@echo off" << std::endl
-                        << "type " << _buildFile->absolutePath().string() << std::endl;
-                    script = ss.str();
-                } else {
-                    // Execution is done with working directory being the build file
-                    // directory. So use filename().
-                    // TODO: find interpreter needed to run the stript
-                    // For now: only .bat files are supported.
-                    script = _buildFile->name().filename().string();
+                if (_buildFile->name().extension() != ".txt") {
+                // Execution is done with working directory being the build file
+                // directory. So use filename().
+                // TODO: find interpreter needed to run the stript
+                // For now: only .bat files are supported.
+                    std::string script = _buildFile->name().filename().string();
+                    CommandNode::script(script);
                 }
-                CommandNode::script(script);
             }
             _buildFile->setState(Node::State::Dirty);
         }
@@ -67,9 +59,16 @@ namespace YAM
         auto result = std::make_shared<ParseResult>();
         result->newState = Node::State::Ok;
         try {
-            BuildFileParser parser(stdOut, _buildFile->absolutePath());
-            result->parseTree = parser.file();
+            std::filesystem::path absBuildFilePath = _buildFile->absolutePath();
+            if (_buildFile->name().extension() == ".txt") {
+                BuildFileParser parser(absBuildFilePath);
+                result->parseTree = parser.file();
+            } else {
+                BuildFileParser parser(stdOut, absBuildFilePath);
+                result->parseTree = parser.file();
+            }
             result->parseTreeHash = result->parseTree->computeHash();
+            result->readOnlyFiles.insert(absBuildFilePath);
         } catch (std::runtime_error ex) {
             result->parseErrors = ex.what();
             result->newState = Node::State::Failed;

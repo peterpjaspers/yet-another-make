@@ -94,7 +94,11 @@ namespace YAM
     protected:
         struct PostProcessResult {
             virtual ~PostProcessResult() {}
+
             Node::State newState;
+            std::set<std::filesystem::path> readFiles;     // read-accessed files
+            std::set<std::filesystem::path> writtenFiles;  // write-accessed files
+            std::set<std::filesystem::path> readOnlyFiles; // readFiles except writtenFiles 
         };
 
         // Called, in threadpool context, only after successfull completion of 

@@ -62,6 +62,8 @@ namespace
         bool completed = YAMTest::executeNode(parser.get());
         EXPECT_TRUE(completed);
         ASSERT_EQ(Node::State::Ok, parser->state());
+        ASSERT_EQ(1, parser->detectedInputs().size());
+        EXPECT_NE(parser->detectedInputs().end(), parser->detectedInputs().find(parser->buildFile()->name()));
         BuildFile::File const& parseTree = parser->parseTree();
         ASSERT_EQ(1, parseTree.variablesAndRules.size());
         auto const& rule = *dynamic_pointer_cast<BuildFile::Rule>(parseTree.variablesAndRules[0]);
@@ -76,7 +78,7 @@ namespace
         bool completed = YAMTest::executeNode(parser.get());
         EXPECT_TRUE(completed);
         ASSERT_EQ(Node::State::Failed, parser->state());
-        EXPECT_ANY_THROW(BuildFile::File const& parseTree = parser->parseTree());
+        EXPECT_ANY_THROW(parser->parseTree());
     }
     TEST(BuildFileParserNode, reParse) {
         TestSetup setup;

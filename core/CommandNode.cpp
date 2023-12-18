@@ -511,21 +511,27 @@ namespace YAM
             if (scriptResult.exitCode != 0) {
                 result->_newState = canceling() ? Node::State::Canceled : Node::State::Failed;
             } else {
-                std::set<std::filesystem::path> previousInputPaths;
-                for (auto const& pair : _detectedInputs) {
-                    previousInputPaths.insert(pair.second->absolutePath());
+                auto postResult = postProcess(scriptResult.stdOut);
+                if (postResult != nullptr) {
+                    result->_postResult = postResult;
+                    result->_newState = postResult->newState;
+                    scriptResult.readFiles.insert(postResult->readFiles.begin(), postResult->readFiles.end());
+                    scriptResult.writtenFiles.insert(postResult->writtenFiles.begin(), postResult->writtenFiles.end());
+                    scriptResult.readOnlyFiles.insert(postResult->readOnlyFiles.begin(), postResult->readOnlyFiles.end());
                 }
-                std::set<std::filesystem::path>& currentInputPaths = scriptResult.readOnlyFiles;
-                computePathSetsDifference(
-                    previousInputPaths, currentInputPaths,
-                    result->_keptInputPaths,
-                    result->_removedInputPaths,
-                    result->_addedInputPaths);
-                result->_outputPaths = scriptResult.writtenFiles;
-                result->_newState = Node::State::Ok;
-                result->_postResult = postProcess(scriptResult.stdOut);
-                if (result->_postResult != nullptr) {
-                    result->_newState = result->_postResult->newState;
+                if (result->_newState == Node::State::Ok) {
+                    std::set<std::filesystem::path> previousInputPaths;
+                    for (auto const& pair : _detectedInputs) {
+                        previousInputPaths.insert(pair.second->absolutePath());
+                    }
+                    std::set<std::filesystem::path>& currentInputPaths = scriptResult.readOnlyFiles;
+                    computePathSetsDifference(
+                        previousInputPaths, currentInputPaths,
+                        result->_keptInputPaths,
+                        result->_removedInputPaths,
+                        result->_addedInputPaths);
+                    result->_outputPaths = scriptResult.writtenFiles;
+                    result->_newState = Node::State::Ok;
                 }
             }
         }
@@ -615,14 +621,14 @@ namespace YAM
         ExecutionResult& result = *sresult;
         if (result._postResult != nullptr) {
             result._postResult->newState = result._newState;
+            commitPostProcessResult(result._postResult);
         }
-        commitPostProcessResult(result._postResult);
         Node::notifyCompletion(result._newState);
     }
 
     // threadpool
     MonitoredProcessResult CommandNode::executeMonitoredScript(MemoryLogBook& logBook) {
-        if (_script.empty()) return MonitoredProcessResult();
+        if (_script.empty()) return MonitoredProcessResult{ 0 };
 
         std::filesystem::path tmpDir = FileSystem::createUniqueDirectory();
         auto scriptFilePath = std::filesystem::path(tmpDir / "cmdscript.cmd");
