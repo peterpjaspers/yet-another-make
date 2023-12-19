@@ -2,7 +2,7 @@
 #include "ExecutionContext.h"
 #include "NodeSet.h"
 #include "DirectoryNode.h"
-#include "BuildFileProcessingNode.h"
+#include "BuildFileCompilerNode.h"
 #include "GlobNode.h"
 #include "Globber.h"
 #include "Glob.h"
@@ -31,9 +31,8 @@ namespace YAM {
             compileGlob(glob);
         }
         for (auto const& buildFile : buildFile.deps.depBuildFiles) {
-            compileBFPN(buildFile);
+            compileBuildFile(buildFile);
         }
-
         for (auto const& varOrRule : buildFile.variablesAndRules) {
             auto rule = dynamic_cast<BuildFile::Rule*>(varOrRule.get());
             if (rule != nullptr) compileInputs(rule->cmdInputs);
@@ -59,7 +58,7 @@ namespace YAM {
         _globs.insert({ globNode->name(), globNode });
     }
 
-    void BuildFileDependenciesCompiler::compileBFPN(std::filesystem::path const& buildFileDirectoryPath) {
+    void BuildFileDependenciesCompiler::compileBuildFile(std::filesystem::path const& buildFileDirectoryPath) {
         auto optimizedBaseDir = _baseDir;
         auto optimizedPath = buildFileDirectoryPath;
         Globber::optimize(optimizedBaseDir, optimizedPath);
@@ -68,12 +67,11 @@ namespace YAM {
         if (bfDirNode == nullptr) {
             throw std::runtime_error("No such directory: " + bfDirName.string());
         }
-        std::shared_ptr<BuildFileProcessingNode> bfpn = bfDirNode->buildFileProcessingNode();
-        if (bfpn == nullptr) {
+        std::shared_ptr<BuildFileCompilerNode> bfcn = bfDirNode->buildFileCompilerNode();
+        if (bfcn == nullptr) {
             throw std::runtime_error("No buildfile found in directory " + bfDirName.string());
         }
-        _processingNodes.insert({ bfpn->name(), bfpn });
-
+        _compilers.insert({ bfcn->name(), bfcn });
     }
 
     void BuildFileDependenciesCompiler::compileInputs(BuildFile::Inputs const& inputs) {

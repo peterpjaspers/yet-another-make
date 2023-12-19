@@ -5,6 +5,7 @@
 #include "../BuildRequest.h"
 #include "../BuildResult.h"
 #include "../Dispatcher.h"
+#include "../BuildService.h"
 
 #include <thread>
 #include <filesystem>
@@ -110,12 +111,28 @@ bool startServer(
     return success;
 }
 
+class InProcessServer {
+private:
+    BuildService _service;
+
+public:
+    InProcessServer(
+        ILogBook& logBook,
+        std::filesystem::path const& startDir,
+        boost::asio::ip::port_type& port
+    ) {
+        port = _service.port();
+    }
+};
+
 int main(int argc, char argv[]) {
     ConsoleLogBook logBook;
     std::filesystem::path dotYamDir = DotYamDirectory::initialize(std::filesystem::current_path(), &logBook);
     std::filesystem::path repoDir = dotYamDir.parent_path();
     boost::asio::ip::port_type port;
+
     if (!startServer(logBook, repoDir, port)) return 1;
+    //InProcessServer service(logBook, repoDir, port);
 
     BuildClient client(logBook, port);
     auto request = std::make_shared<BuildRequest>();

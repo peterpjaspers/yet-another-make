@@ -634,6 +634,7 @@ namespace YAM
         std::filesystem::path tmpDir = FileSystem::createUniqueDirectory();
         auto scriptFilePath = std::filesystem::path(tmpDir / "cmdscript.cmd");
         std::ofstream scriptFile(scriptFilePath.string());
+        scriptFile << "@echo off" << std::endl;
         scriptFile << _script << std::endl;
         scriptFile.close();
 

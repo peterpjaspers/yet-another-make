@@ -6,9 +6,12 @@
 #include "SourceFileNode.h"
 #include "GeneratedFileNode.h"
 #include "DirectoryNode.h"
+#include "BuildFileParserNode.h"
+#include "BuildFileCompilerNode.h"
 #include "FileRepository.h"
 #include "DotGitDirectory.h"
 #include "DotYamDirectory.h"
+#include "AcyclicTrail.h"
 
 #include <iostream>
 #include <map>
@@ -23,7 +26,7 @@ namespace
 {
     using namespace YAM;
 
-    void appendDirtyFileAndDirectoryNodes(
+    void appendDirtyDirectoryNodes(
         std::shared_ptr<DirectoryNode> directory,
         std::vector<std::shared_ptr<Node>>& dirtyNodes
     ) {
@@ -32,9 +35,35 @@ namespace
             auto child = pair.second;
             auto sourceDir = dynamic_pointer_cast<DirectoryNode>(child);
             if (sourceDir != nullptr) {
-                appendDirtyFileAndDirectoryNodes(sourceDir, dirtyNodes);
-            } else {
-                if (child->state() == Node::State::Dirty) dirtyNodes.push_back(child);
+                appendDirtyDirectoryNodes(sourceDir, dirtyNodes);
+            } 
+        }
+    }
+
+    void appendDirtyBuildFileParserNodes(
+        std::shared_ptr<DirectoryNode> directory,
+        std::vector<std::shared_ptr<Node>>& dirtyNodes
+    ) {
+        auto parser= directory->buildFileParserNode();
+        if (parser!= nullptr && parser->state() == Node::State::Dirty) dirtyNodes.push_back(parser);
+        for (auto const& pair : directory->getContent()) {
+            auto sourceDir = dynamic_pointer_cast<DirectoryNode>(pair.second);
+            if (sourceDir != nullptr) {
+                appendDirtyBuildFileParserNodes(sourceDir, dirtyNodes);
+            }
+        }
+    }
+
+    void appendDirtyBuildFileCompilerNodes(
+        std::shared_ptr<DirectoryNode> directory,
+        std::vector<std::shared_ptr<Node>>& dirtyNodes
+    ) {
+        auto compiler = directory->buildFileCompilerNode();
+        if (compiler != nullptr && compiler->state() == Node::State::Dirty) dirtyNodes.push_back(compiler);
+        for (auto const& pair : directory->getContent()) {
+            auto sourceDir = dynamic_pointer_cast<DirectoryNode>(pair.second);
+            if (sourceDir != nullptr) {
+                appendDirtyBuildFileCompilerNodes(sourceDir, dirtyNodes);
             }
         }
     }
@@ -63,22 +92,42 @@ namespace
     void appendDirtyCommands(NodeSet& nodes, std::vector<std::shared_ptr<Node>>& dirtyCommands) {
         nodes.find(includeNode, dirtyCommands);
     }
+
+    void logBuildFileCycle(
+        std::shared_ptr<ILogBook> const& logBook, 
+        std::shared_ptr<BuildFileParserNode> root, 
+        std::list<const BuildFileParserNode*>const& trail
+    ) {
+        std::stringstream ss;
+        ss << "Detected cycle in the buildfile dependency graph: " << std::endl;
+        for (auto bfpn : trail) {
+            ss << bfpn->absolutePath() << std::endl;
+        }
+        ss << root->absolutePath() << std::endl;
+        ss << "Cycles in the buildfile dependency graph are not allowed." << std::endl;
+        ss << "Refactor your buildfiles to remove the cycle." << std::endl;
+        LogRecord error(LogRecord::Error, ss.str());
+        logBook->add(error);
+    }
 }
 
 namespace YAM
 {
     // Called in any thread
     Builder::Builder()
-        : _dirtySources(std::make_shared<GroupNode>(&_context, "__dirtySources__"))
-        , _dirtyBuildFiles(std::make_shared<GroupNode>(&_context, "__dirtyBuildFiles__"))
+        : _dirtyDirectories(std::make_shared<GroupNode>(&_context, "__dirtyDirectories__"))
+        , _dirtyBuildFileParsers(std::make_shared<GroupNode>(&_context, "__dirtyBuildFileParsers__"))
+        , _dirtyBuildFileCompilers(std::make_shared<GroupNode>(&_context, "__dirtyBuildFileCompilers__"))
         , _dirtyCommands(std::make_shared<GroupNode>(&_context, "__dirtyCommands__"))
         , _result(nullptr)
     {
-        _dirtySources->completor().AddRaw(this, &Builder::_handleSourcesCompletion);
-        _dirtyBuildFiles->completor().AddRaw(this, &Builder::_handleBuildFilesCompletion);
+        _dirtyDirectories->completor().AddRaw(this, &Builder::_handleDirectoriesCompletion);
+        _dirtyBuildFileParsers->completor().AddRaw(this, &Builder::_handleBuildFileParsersCompletion);
+        _dirtyBuildFileCompilers->completor().AddRaw(this, &Builder::_handleBuildFileCompilersCompletion);
         _dirtyCommands->completor().AddRaw(this, &Builder::_handleCommandsCompletion);
-        _dirtySources->setState(Node::State::Ok);
-        _dirtyBuildFiles->setState(Node::State::Ok);
+        _dirtyDirectories->setState(Node::State::Ok);
+        _dirtyBuildFileParsers->setState(Node::State::Ok);
+        _dirtyBuildFileCompilers->setState(Node::State::Ok);
         _dirtyCommands->setState(Node::State::Ok);
     }
 
@@ -142,33 +191,54 @@ namespace YAM
         _result->succeeded(nFailures==0);
     }
 
-    // Called in main thread
-    void Builder::_start() {
-        std::vector<std::shared_ptr<Node>> dirtyDirsAndFiles;        
-        for (auto const& pair : _context.repositories()) {
-            auto repo = pair.second;
-            if (repo != nullptr) {
-                auto dirNode = repo->directoryNode();
-                repo->consumeChanges();
-                appendDirtyFileAndDirectoryNodes(dirNode, dirtyDirsAndFiles);
+    bool Builder::containsCycles(std::vector<std::shared_ptr<Node>> const& buildFileParserNodes) const {
+        bool cycling = false;
+        std::unordered_set<const Node*> visited;
+        for (auto const& node : buildFileParserNodes) {
+            bool notVisited = visited.insert(node.get()).second;
+            if (notVisited) {
+                auto bfpNode = dynamic_pointer_cast<BuildFileParserNode>(node);
+                AcyclicTrail<const BuildFileParserNode*> trail;
+                bool notCycling = bfpNode->walkDependencies(trail);
+                if (!notCycling) {
+                    cycling = true;
+                    logBuildFileCycle(bfpNode->context()->logBook(), bfpNode, trail.trail());
+                }
             }
         }
-        if (dirtyDirsAndFiles.empty()) {
-            _handleSourcesCompletion(_dirtySources.get());
+        return cycling;
+    }
+
+    // Called in main thread
+    void Builder::_start() {
+        std::vector<std::shared_ptr<Node>> dirtyDirs;        
+        for (auto const& pair : _context.repositories()) {
+            auto repo = pair.second;
+            auto dirNode = repo->directoryNode();
+            repo->consumeChanges();
+            appendDirtyDirectoryNodes(dirNode, dirtyDirs);
+        }
+        if (dirtyDirs.empty()) {
+            _handleDirectoriesCompletion(_dirtyDirectories.get());
         } else {
-            _dirtySources->group(dirtyDirsAndFiles);
-            _dirtySources->start();
+            _dirtyDirectories->group(dirtyDirs);
+            _dirtyDirectories->start();
         }
     }
 
     // Called in main thread
-    void Builder::_handleSourcesCompletion(Node* n) {
-        if (n != _dirtySources.get()) throw std::exception("unexpected node");
-        if (_dirtySources->state() != Node::State::Ok) {
-            _dirtyBuildFiles->setState(_dirtySources->state());
-            _handleBuildFilesCompletion(_dirtyBuildFiles.get());
+    void Builder::_handleDirectoriesCompletion(Node* n) {
+        if (n != _dirtyDirectories.get()) throw std::exception("unexpected node");
+        if (_dirtyDirectories->state() != Node::State::Ok) {
+            _dirtyBuildFileParsers->setState(_dirtyDirectories->state());
+            _handleBuildFileParsersCompletion(_dirtyBuildFileParsers.get());
         } else {
             std::vector<std::shared_ptr<Node>> dirtyBuildFiles;
+            for (auto const& pair : _context.repositories()) {
+                auto repo = pair.second;
+                auto dirNode = repo->directoryNode();
+                appendDirtyBuildFileParserNodes(dirNode, dirtyBuildFiles);                
+            }
             // TODO: find dirty build files
             // TODO: update set of BuildFileParserNodes to be in sync with
             // buildFiles. Then request dirty BuildFileParserNodes to suspend 
@@ -176,19 +246,43 @@ namespace YAM
             // Then execute the dirty BuildFileParserNodes and the Dirty command nodes
             // as per design in Miro board.
             if (dirtyBuildFiles.empty()) {
-                _handleBuildFilesCompletion(_dirtyBuildFiles.get());
+                _handleBuildFileParsersCompletion(_dirtyBuildFileParsers.get());
             } else {
-                _dirtyBuildFiles->group(dirtyBuildFiles);
-                _dirtyBuildFiles->start();
+                _dirtyBuildFileParsers->group(dirtyBuildFiles);
+                _dirtyBuildFileParsers->start();
             }
         }
     }
 
     // Called in main thread
-    void Builder::_handleBuildFilesCompletion(Node* n) {
-        if (n != _dirtyBuildFiles.get()) throw std::exception("unexpected node");
-        if (_dirtyBuildFiles->state() != Node::State::Ok) {
-            _dirtyCommands->setState(_dirtyCommands->state());
+    void Builder::_handleBuildFileParsersCompletion(Node* n) {
+        if (n != _dirtyBuildFileParsers.get()) throw std::exception("unexpected node");
+        if (_dirtyBuildFileParsers->state() != Node::State::Ok) {
+            _dirtyBuildFileCompilers->setState(_dirtyBuildFileParsers->state());
+            _handleBuildFileCompilersCompletion(_dirtyBuildFileCompilers.get());
+        } else if (containsCycles(_dirtyBuildFileParsers->group())) {
+            _dirtyCommands->setState(Node::State::Failed);
+            _handleBuildFileCompilersCompletion(_dirtyBuildFileCompilers.get());
+        } else {
+            std::vector<std::shared_ptr<Node>> dirtyBuildFileCompilers;
+            for (auto const& pair : _context.repositories()) {
+                auto repo = pair.second;
+                auto dirNode = repo->directoryNode();
+                appendDirtyBuildFileCompilerNodes(dirNode, dirtyBuildFileCompilers);
+            }
+            if (dirtyBuildFileCompilers.empty()) {
+                _handleBuildFileCompilersCompletion(_dirtyBuildFileCompilers.get());
+            } else {
+                _dirtyBuildFileCompilers->group(dirtyBuildFileCompilers);
+                _dirtyBuildFileCompilers->start();
+            }
+        }
+    }
+
+    void Builder::_handleBuildFileCompilersCompletion(Node* n) {
+        if (n != _dirtyBuildFileCompilers.get()) throw std::exception("unexpected node");
+        if (_dirtyBuildFileCompilers->state() != Node::State::Ok) {
+            _dirtyCommands->setState(_dirtyBuildFileCompilers->state());
             _handleCommandsCompletion(_dirtyCommands.get());
         } else {
             std::vector<std::shared_ptr<Node>> dirtyCommands;
@@ -221,11 +315,11 @@ namespace YAM
     // Called in main thread
     void Builder::_notifyCompletion() {
         std::vector<std::shared_ptr<Node>> emptyNodes;
-        _dirtySources->group(emptyNodes);
-        _dirtyBuildFiles->group(emptyNodes);
+        _dirtyDirectories->group(emptyNodes);
+        _dirtyBuildFileParsers->group(emptyNodes);
         _dirtyCommands->group(emptyNodes);
-        _dirtySources->setState(Node::State::Ok);
-        _dirtyBuildFiles->setState(Node::State::Ok);
+        _dirtyDirectories->setState(Node::State::Ok);
+        _dirtyBuildFileParsers->setState(Node::State::Ok);
         _dirtyCommands->setState(Node::State::Ok);
 
         auto result = _result;
@@ -241,8 +335,8 @@ namespace YAM
 
     void Builder::stop() {
         ASSERT_MAIN_THREAD(_context);
-        _dirtySources->cancel();
-        _dirtyBuildFiles->cancel();
+        _dirtyDirectories->cancel();
+        _dirtyBuildFileParsers->cancel();
         _dirtyCommands->cancel();
     }
 

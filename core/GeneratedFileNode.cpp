@@ -23,7 +23,7 @@ namespace YAM
     bool GeneratedFileNode::deleteFile() {
         std::error_code ok;
         std::error_code ec;
-        bool deleted = std::filesystem::remove(name(), ec);
+        bool deleted = std::filesystem::remove(absolutePath(), ec);
         if (deleted) {
             setState(Node::State::Dirty);
         }

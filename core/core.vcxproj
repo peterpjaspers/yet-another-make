@@ -105,7 +105,6 @@
     <ClInclude Include="BuildFileCompilerNode.h" />
     <ClInclude Include="BuildFileDependenciesCompiler.h" />
     <ClInclude Include="BuildFileParserNode.h" />
-    <ClInclude Include="BuildFileProcessingNode.h" />
     <ClInclude Include="Glob.h" />
     <ClInclude Include="Globber.h" />
     <ClInclude Include="BuildFileParser.h" />
@@ -187,16 +186,9 @@
     <ClCompile Include="Builder.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="BuildFileCompilerNode.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="BuildFileDependenciesCompiler.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClCompile>
+    <ClCompile Include="BuildFileCompilerNode.cpp" />
+    <ClCompile Include="BuildFileDependenciesCompiler.cpp" />
     <ClCompile Include="BuildFileParserNode.cpp" />
-    <ClCompile Include="BuildFileProcessingNode.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClCompile>
     <ClCompile Include="Glob.cpp" />
     <ClCompile Include="Globber.cpp" />
     <ClCompile Include="BuildFileParser.cpp" />
@@ -268,9 +260,7 @@
     </ClCompile>
     <ClCompile Include="SourceFileNode.cpp" />
     <ClCompile Include="FileRepository.cpp" />
-    <ClCompile Include="BuildFileCompiler.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClCompile>
+    <ClCompile Include="BuildFileCompiler.cpp" />
     <ClCompile Include="TcpStream.cpp" />
     <ClCompile Include="Thread.cpp" />
     <ClCompile Include="ThreadPool.cpp" />

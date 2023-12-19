@@ -46,16 +46,10 @@
     <ClCompile Include="buidFileParserNodeTest.cpp" />
     <ClCompile Include="buildClientServiceTest.cpp" />
     <ClCompile Include="builderTest.cpp" />
-    <ClCompile Include="buildFileCompilerTest.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="buildFileDependenciesCompilerTest.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClCompile>
+    <ClCompile Include="buildFileCompilerTest.cpp" />
+    <ClCompile Include="buildFileDependenciesCompilerTest.cpp" />
     <ClCompile Include="buildFileParserTest.cpp" />
-    <ClCompile Include="buildFileProcessingNodeTest.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClCompile>
+    <ClCompile Include="buildFileCompilerNodeTest.cpp" />
     <ClCompile Include="buildServicePortRegistryTest.cpp" />
     <ClCompile Include="buildServiceProtocolTest.cpp" />
     <ClCompile Include="collapsedFileChangesTest.cpp" />

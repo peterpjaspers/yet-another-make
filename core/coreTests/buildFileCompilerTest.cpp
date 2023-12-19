@@ -94,7 +94,7 @@ namespace
         rule->forEach = true;
         rule->cmdInputs.inputs.push_back(input);
         rule->cmdInputs.inputs.push_back(excludedInput);
-        rule->script.script = "echo hello world";
+        rule->script.script = "type %f > %o";
         rule->outputs.outputs.push_back(output);
         rule->outputs.outputs.push_back(ignoredOutput);
         BuildFile::File file;
@@ -111,7 +111,7 @@ namespace
         ASSERT_EQ(1, command0->cmdInputs().size());
         auto input00 = command0->cmdInputs()[0];
         EXPECT_EQ(setup.lib1File, input00);
-        ASSERT_EQ(rule->script.script, command0->script());
+        EXPECT_EQ("type src\\lib1.cpp > output\\lib1.obj", command0->script());
         ASSERT_EQ(1, command0->outputs().size());
         auto output00 = command0->outputs()[0];
         EXPECT_EQ(std::string("<repo>\\output\\lib1.obj"), output00->name().string());
@@ -121,7 +121,7 @@ namespace
         ASSERT_EQ(1, command1->cmdInputs().size());
         auto input10 = command1->cmdInputs()[0];
         EXPECT_EQ(setup.lib2File, input10);
-        ASSERT_EQ(rule->script.script, command1->script());
+        EXPECT_EQ("type src\\lib2.cpp > output\\lib2.obj", command1->script());
         ASSERT_EQ(1, command1->outputs().size());
         auto output1 = command1->outputs()[0];
         EXPECT_EQ(std::string("<repo>\\output\\lib2.obj"), output1->name().string());

@@ -43,20 +43,19 @@ namespace YAM
         void _init(std::filesystem::path directory);
         void _start();
         void _clean(std::shared_ptr<BuildRequest> request);
-        void _handleSourcesCompletion(Node* n);
-        void _handleBuildFilesCompletion(Node* n);
+        void _handleDirectoriesCompletion(Node* n);
+        void _handleBuildFileParsersCompletion(Node* n);
+        void _handleBuildFileCompilersCompletion(Node* n);
+        bool containsCycles(std::vector<std::shared_ptr<Node>> const& buildFileParserNodes) const;
         void _handleCommandsCompletion(Node* n);
         void _notifyCompletion();
 
         ExecutionContext _context;
         MulticastDelegate<std::shared_ptr<BuildResult>> _completor;
 
-        // Dirty source directory and source file nodes, dirty build file 
-        // nodes and dirty command nodes are collected as the input producers
-        // of command nodes. This avoids duplicating execution logic already 
-        // present in CommandNode (and its baseclass Node).
-        std::shared_ptr<GroupNode> _dirtySources;
-        std::shared_ptr<GroupNode> _dirtyBuildFiles;
+        std::shared_ptr<GroupNode> _dirtyDirectories;
+        std::shared_ptr<GroupNode> _dirtyBuildFileParsers;
+        std::shared_ptr<GroupNode> _dirtyBuildFileCompilers;
         std::shared_ptr<GroupNode> _dirtyCommands;
         std::shared_ptr<BuildResult> _result;
     };

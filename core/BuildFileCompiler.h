@@ -66,11 +66,12 @@ namespace YAM {
         std::vector<std::shared_ptr<FileNode>> compileInputs(
             BuildFile::Inputs const& inputs);
 
-        std::string compileScript(
+        static std::string compileScript(
             BuildFile::Script const& script,
+            DirectoryNode const* baseDir,
             std::vector<std::shared_ptr<FileNode>> cmdInputs,
             std::vector<std::shared_ptr<GeneratedFileNode>> orderOnlyInputs,
-            std::vector<std::shared_ptr<GeneratedFileNode>> outputs) const;
+            std::vector<std::shared_ptr<GeneratedFileNode>> outputs);
 
         std::shared_ptr<GeneratedFileNode> createGeneratedFileNode(
             std::shared_ptr<CommandNode> const& cmdNode,

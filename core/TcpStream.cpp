@@ -44,6 +44,6 @@ namespace YAM
 
     void TcpStream::closeSocket() {
         _eos = true;
-        _socket.close();
+        //_socket.close();
     }
 }

@@ -49,6 +49,7 @@ Todo: core
   This node is also passed to Globber. Can be expanded to explict groups
   that are persistent. Input globs are executed on all dirs plus the 
   anonymous GroupNode. %g<groupPath>/*.obj globs only on specified group.
+- comprehensive test of compiling rule script
 
 Todo: non-core
 - build file syntax (follow tup, follow mrmake, something completely different?)

@@ -85,7 +85,7 @@ namespace YAM
             handleGlobCompletion(result.first, result.second);
             notifyCompletion(newState); 
         });
-        context()->threadPoolQueue().push(std::move(d));
+        context()->mainThreadQueue().push(std::move(d));
     }
 
     void GlobNode::handleGlobCompletion(std::shared_ptr<Globber> const& globber, std::string const& error) {

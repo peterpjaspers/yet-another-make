@@ -1,7 +1,7 @@
 #include "../BuildFileDependenciesCompiler.h"
 #include "../FileRepository.h"
 #include "../DirectoryNode.h"
-#include "../BuildFileProcessingNode.h"
+#include "../BuildFileCompilerNode.h"
 #include "../GlobNode.h"
 #include "../ExecutionContext.h"
 #include "../FileSystem.h"
@@ -23,8 +23,8 @@ namespace
         DirectoryTree repoTree;
         ExecutionContext context;
         std::shared_ptr<FileRepository> fileRepo;
-        std::shared_ptr<BuildFileProcessingNode> bfpn1;
-        std::shared_ptr<BuildFileProcessingNode> bfpn2;
+        std::shared_ptr<BuildFileCompilerNode> bfcn1;
+        std::shared_ptr<BuildFileCompilerNode> bfcn2;
 
         TestSetup()
             : repoTree(FileSystem::createUniqueDirectory("_buildFileDepenciesCompilerTest"), 1, RegexSet())
@@ -46,10 +46,10 @@ namespace
             auto dirNode = fileRepo->directoryNode();
             bool completed = YAMTest::executeNode(dirNode.get());
             EXPECT_TRUE(completed);
-            auto bfpn1Dir = dynamic_pointer_cast<DirectoryNode>(context.nodes().find(dirNode->name() / "src1"));
-            auto bfpn2Dir = dynamic_pointer_cast<DirectoryNode>(context.nodes().find(dirNode->name() / "src2"));
-            bfpn1 = bfpn1Dir->buildFileProcessingNode();
-            bfpn2 = bfpn2Dir->buildFileProcessingNode();
+            auto bfcn1Dir = dynamic_pointer_cast<DirectoryNode>(context.nodes().find(dirNode->name() / "src1"));
+            auto bfcn2Dir = dynamic_pointer_cast<DirectoryNode>(context.nodes().find(dirNode->name() / "src2"));
+            bfcn1 = bfcn1Dir->buildFileCompilerNode();
+            bfcn2 = bfcn2Dir->buildFileCompilerNode();
         }
     };
 
@@ -75,14 +75,14 @@ namespace
         std::filesystem::path globNameSpace("private");
         BuildFileDependenciesCompiler compiler(&setup.context, setup.fileRepo->directoryNode(), file, globNameSpace);
 
-        auto const& bfpns = compiler.processingNodes();
-        ASSERT_EQ(2, bfpns.size());
-        auto const& bfpn1It = bfpns.find(setup.bfpn1->name());
-        auto const& bfpn2It = bfpns.find(setup.bfpn2->name());
-        ASSERT_NE(bfpns.end(), bfpn1It);
-        ASSERT_NE(bfpns.end(), bfpn1It);
-        EXPECT_EQ(setup.bfpn1, bfpn1It->second);
-        EXPECT_EQ(setup.bfpn2, bfpn2It->second);
+        auto const& bfcns = compiler.compilers();
+        ASSERT_EQ(2, bfcns.size());
+        auto const& bfcn1It = bfcns.find(setup.bfcn1->name());
+        auto const& bfcn2It = bfcns.find(setup.bfcn2->name());
+        ASSERT_NE(bfcns.end(), bfcn1It);
+        ASSERT_NE(bfcns.end(), bfcn1It);
+        EXPECT_EQ(setup.bfcn1, bfcn1It->second);
+        EXPECT_EQ(setup.bfcn2, bfcn2It->second);
 
         auto const& globs = compiler.globs();
         ASSERT_EQ(3, globs.size());

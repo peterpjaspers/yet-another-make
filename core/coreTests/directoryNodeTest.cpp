@@ -6,6 +6,7 @@
 #include "../SourceFileNode.h"
 #include "../ExecutionContext.h"
 #include "../BuildFileParserNode.h"
+#include "../BuildFileCompilerNode.h"
 #include "../../xxhash/xxhash.h"
 
 #include <chrono>
@@ -191,5 +192,14 @@ namespace
         ASSERT_NE(nullptr, buildFileParserNode);
         EXPECT_EQ(dirNode->buildFileParserNode(), buildFileParserNode);
         EXPECT_EQ(buildFilePath, buildFileParserNode->buildFile()->absolutePath());
+
+
+        std::filesystem::path buildFileCompilerNodeName = dirNode->name() / "__bfCompiler";
+        node = context.nodes().find(buildFileCompilerNodeName);
+        ASSERT_NE(nullptr, node);
+        auto buildFileCompilerNode = dynamic_pointer_cast<BuildFileCompilerNode>(node);
+        ASSERT_NE(nullptr, buildFileCompilerNode);
+        EXPECT_EQ(dirNode->buildFileCompilerNode(), buildFileCompilerNode);
+        EXPECT_EQ(buildFileParserNode, buildFileCompilerNode->buildFileParser());
     }
 }

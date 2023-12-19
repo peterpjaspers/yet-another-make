@@ -1,9 +1,11 @@
 #include "DirectoryNode.h"
 #include "FileRepository.h"
 #include "SourceFileNode.h"
+#include "GeneratedFileNode.h"
 #include "ExecutionContext.h"
 #include "DotIgnoreNode.h"
 #include "BuildFileParserNode.h"
+#include "BuildFileCompilerNode.h"
 #include "IStreamer.h"
 
 #include <regex>
@@ -242,6 +244,10 @@ namespace YAM
                 _removeChildRecursively(child);
             }
         }
+        if (_buildFileParserNode != nullptr) {
+            context()->nodes().remove(_buildFileParserNode);
+            context()->nodes().remove(_buildFileCompilerNode);
+        }
         _content.clear();
         modified(true);
     }
@@ -359,14 +365,17 @@ namespace YAM
             // A node with name n->name() may already exist in buildstate.
             // If so, use that one instead of n.
             auto node = context()->nodes().find(n->name());
-            if (node == nullptr) {
-                node = n;
-                context()->nodes().add(node);
+            auto generatedNode = dynamic_pointer_cast<GeneratedFileNode>(node);
+            if (generatedNode == nullptr) {
+                if (node == nullptr) {
+                    node = n;
+                    context()->nodes().add(node);
+                }
+                node->addObserver(this);
+                _content.insert({ node->name(), node });
+                auto dir = dynamic_pointer_cast<DirectoryNode>(node);
+                if (dir != nullptr) dir->addPrerequisitesToContext();
             }
-            node->addObserver(this);
-            _content.insert({ node->name(), node });
-            auto dir = dynamic_pointer_cast<DirectoryNode>(node);
-            if (dir != nullptr) dir->addPrerequisitesToContext();
         }
         for (auto const& n : result._removed) {
             _removeChildRecursively(n);
@@ -388,13 +397,16 @@ namespace YAM
                 std::filesystem::path bfpName(name() / "__bfParser");
                 _buildFileParserNode = std::make_shared<BuildFileParserNode>(context(), bfpName);
                 context()->nodes().add(_buildFileParserNode);
+                std::filesystem::path bfcName(name() / "__bfCompiler");
+                _buildFileCompilerNode = std::make_shared<BuildFileCompilerNode>(context(), bfcName);
+                context()->nodes().add(_buildFileCompilerNode);
             }
             _buildFileParserNode->buildFile(buildFile);
+            _buildFileCompilerNode->buildFileParser(_buildFileParserNode);
         } else {
             if (_buildFileParserNode != nullptr) {
                 _buildFileParserNode->buildFile(nullptr);
-                context()->nodes().remove(_buildFileParserNode);
-                _buildFileParserNode = nullptr;
+                _buildFileCompilerNode->buildFileParser(nullptr);
             }
         }
     }

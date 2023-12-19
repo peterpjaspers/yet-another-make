@@ -121,6 +121,7 @@ namespace YAM
             std::vector<Node*> const& nodes,
             Delegate<void, Node::State> const& callback
     ) {
+        ASSERT_MAIN_THREAD(_context);
         if (_state != Node::State::Executing) throw std::runtime_error("Attempt to start nodes while not in executing state");
         if (_nExecutingNodes != 0) throw std::runtime_error("Attempt to start nodes while already executing nodes");
         bool stop = false;
@@ -210,13 +211,19 @@ namespace YAM
 #ifdef _DEBUG
         _executingNodes.clear();
 #endif
+        Node::State state;
         if (_canceling) {
-            _callback.Execute(State::Canceled);
+            state = State::Canceled;
         } else if (allOk) {
-            _callback.Execute(State::Ok);
+            state = State::Ok;
         } else {
-            _callback.Execute(State::Failed);
+            state = State::Failed;
         }
+        auto d = Delegate<void>::CreateLambda([this, state]()
+        {
+            _callback.Execute(state);
+        });
+        _context->mainThreadQueue().push(std::move(d));
     }
 
     void Node::postCompletion(Node::State newState) {
@@ -228,6 +235,7 @@ namespace YAM
     }
 
     void Node::notifyCompletion(Node::State newState) {
+        ASSERT_MAIN_THREAD(_context);
         if (_state != Node::State::Executing) throw std::exception("cannot complete when not executing");
         if (0 < _nExecutingNodes) throw std::exception("cannot complete when executing nodes");
         if (!_nodesToExecute.empty()) throw std::exception("_nodesToExecute must be empty");
@@ -235,6 +243,10 @@ namespace YAM
         if (_nExecutingNodes != _executingNodes.size()) throw std::exception("_nExecutingNodes != _executingNodes.size()");
 #endif
         _canceling = false;
+        std::stringstream ss;
+        ss << _name.string() << " completed with state " << static_cast<int>(newState);
+        LogRecord progress(LogRecord::Progress, ss.str());
+        _context->logBook()->add(progress);
         setState(newState);
         _completor.Broadcast(this);
     }

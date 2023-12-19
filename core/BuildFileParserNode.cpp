@@ -22,20 +22,23 @@ namespace YAM
 
     BuildFileParserNode::BuildFileParserNode(ExecutionContext* context, std::filesystem::path const& name)
         : CommandNode(context, name)
+        , _parseTreeHash(rand())
     {}
 
     void BuildFileParserNode::buildFile(std::shared_ptr<SourceFileNode> const& newFile) {
         if (_buildFile != newFile) {
             if (_buildFile != nullptr) {
                 CommandNode::script("");
+                CommandNode::workingDirectory(nullptr);
             }
             _buildFile = newFile;
             if (_buildFile != nullptr) {
+                auto node = context()->nodes().find(_buildFile->name().parent_path());
+                auto workingDir = dynamic_pointer_cast<DirectoryNode>(node);
+                CommandNode::workingDirectory(workingDir);
                 if (_buildFile->name().extension() != ".txt") {
-                // Execution is done with working directory being the build file
-                // directory. So use filename().
-                // TODO: find interpreter needed to run the stript
-                // For now: only .bat files are supported.
+                    // TODO: find interpreter needed to run the stript
+                    // For now: only .bat files are supported.
                     std::string script = _buildFile->name().filename().string();
                     CommandNode::script(script);
                 }

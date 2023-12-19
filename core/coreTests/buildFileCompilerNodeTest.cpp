@@ -1,7 +1,8 @@
 
 #include "executeNode.h"
 #include "DirectoryTree.h"
-#include "../BuildFileProcessingNode.h"
+#include "../BuildFileParserNode.h"
+#include "../BuildFileCompilerNode.h"
 #include "../FileRepository.h"
 #include "../DirectoryNode.h"
 #include "../SourceFileNode.h"
@@ -19,6 +20,12 @@ namespace
     using namespace YAM;
     using namespace YAMTest;
 
+    void writeFile(std::filesystem::path const& p, std::string const& content) {
+        std::ofstream stream(p.string().c_str());
+        stream << content;
+        stream.close();
+    }
+
     class TestSetup {
     public:
         DirectoryTree repoTree;
@@ -29,46 +36,44 @@ namespace
         std::shared_ptr<SourceFileNode> mainFile;
 
         TestSetup()
-            : repoTree(FileSystem::createUniqueDirectory("_buildFileProcessingTest"), 1, RegexSet())
+            : repoTree(FileSystem::createUniqueDirectory("_buildFileCompilingTest"), 1, RegexSet())
             , fileRepo(std::make_shared<FileRepository>("repo", repoTree.path(), &context))
             , absBuildFilePath(repoTree.path() / R"(buildfile_yam.bat)")
             , cmdOutputFile(fileRepo->directoryNode()->name() / "main.obj")
         {
-            std::ofstream stream(absBuildFilePath.string().c_str());
-            EXPECT_TRUE(stream.is_open());
-            stream
+            std::stringstream ss;
+            ss
                 << "@echo off" << std::endl
                 << R"(echo : foreach *.cpp ^|^> echo main ^> main.obj ^|^> %%B.obj)"
                 << std::endl;
-            stream.close();
+            std::string script = ss.str();
+            writeFile(absBuildFilePath, script);
 
             std::filesystem::path f1(repoTree.path() / "main.cpp");
-            std::ofstream s1(f1.string().c_str());
-            s1 << "void main() {}" << std::endl;
-            s1.close();
+            writeFile(f1, "void main() {}");
 
             context.addRepository(fileRepo);
             auto dirNode = fileRepo->directoryNode();
             bool completed = YAMTest::executeNode(dirNode.get());
             EXPECT_TRUE(completed);
+            completed = YAMTest::executeNode(dirNode->buildFileParserNode().get());
+            EXPECT_TRUE(completed);
             mainFile = dynamic_pointer_cast<SourceFileNode>(context.nodes().find(fileRepo->symbolicPathOf(f1)));
         }
 
-        std::shared_ptr<BuildFileProcessingNode> processingNode() {
-            auto nodeName = fileRepo->directoryNode()->name() / "__buildfile";
-            auto node = context.nodes().find(nodeName);
-            return dynamic_pointer_cast<BuildFileProcessingNode>(node);
+        std::shared_ptr<BuildFileCompilerNode> compilerNode() {
+            return fileRepo->directoryNode()->buildFileCompilerNode();
         }
     };
 
-    TEST(BuildFileProcessingNode, executeProcessingNode) {
+    TEST(BuildFileCompilerNode, execute) {
         TestSetup setup;
-        std::shared_ptr<BuildFileProcessingNode> processingNode = setup.processingNode();
-        ASSERT_NE(nullptr, processingNode);
-        EXPECT_EQ(Node::State::Dirty, processingNode->state());
-        bool completed = YAMTest::executeNode(processingNode.get());
+        std::shared_ptr<BuildFileCompilerNode> compilerNode = setup.compilerNode();
+        ASSERT_NE(nullptr, compilerNode);
+        EXPECT_EQ(Node::State::Dirty, compilerNode->state());
+        bool completed = YAMTest::executeNode(compilerNode.get());
         EXPECT_TRUE(completed);
-        EXPECT_EQ(Node::State::Ok, processingNode->state());
+        EXPECT_EQ(Node::State::Ok, compilerNode->state());
         std::filesystem::path cmdName = setup.fileRepo->symbolicDirectory() / "main.obj\\__cmd";
         std::shared_ptr<Node> node = setup.context.nodes().find(cmdName);
         ASSERT_NE(nullptr, node);
@@ -82,21 +87,19 @@ namespace
         EXPECT_TRUE(std::filesystem::exists(setup.repoTree.path() / "main.obj"));
     }
 
-    TEST(BuildFileProcessingNode, reExecuteProcessingNode) {
+    TEST(BuildFileCompilerNode, reExecuteAfterGlobChange) {
         TestSetup setup;
-        std::shared_ptr<BuildFileProcessingNode> processingNode = setup.processingNode();
-        ASSERT_NE(nullptr, processingNode);
-        EXPECT_EQ(Node::State::Dirty, processingNode->state());
-        bool completed = YAMTest::executeNode(processingNode.get());
+        std::shared_ptr<BuildFileCompilerNode> compilerNode = setup.compilerNode();
+        ASSERT_NE(nullptr, compilerNode);
+        EXPECT_EQ(Node::State::Dirty, compilerNode->state());
+        bool completed = YAMTest::executeNode(compilerNode.get());
         ASSERT_TRUE(completed);
-        ASSERT_EQ(Node::State::Ok, processingNode->state());
+        ASSERT_EQ(Node::State::Ok, compilerNode->state());
 
         std::filesystem::path f1(setup.repoTree.path() / "lib.cpp");
-        std::ofstream s1(f1.string().c_str());
-        s1 << "void lib() {}" << std::endl;
-        s1.close();
+        writeFile(f1, "void lib() {}");
 
-        // Wait until file change events have resulted in processingNode to
+        // Wait until file change events have resulted in compilerNode to
         // become dirty. Take care: node states are updated in main thread.
         // Hence getting node state in test thread is not reliable. Therefore
         // retrieve node state in main thread.
@@ -105,7 +108,7 @@ namespace
         auto fillDirtyNodes = Delegate<void>::CreateLambda(
             [&]() {
             setup.fileRepo->consumeChanges();
-            dirty = processingNode->state() == Node::State::Dirty;
+            dirty = compilerNode->state() == Node::State::Dirty;
             dispatcher.stop();
         });
         const auto retryInterval = std::chrono::milliseconds(1000);
@@ -123,26 +126,25 @@ namespace
         
         setup.context.statistics().reset();
         setup.context.statistics().registerNodes = true;
-        completed = YAMTest::executeNode(processingNode.get());
+        completed = YAMTest::executeNode(compilerNode.get());
         EXPECT_TRUE(completed);
-        EXPECT_EQ(Node::State::Ok, processingNode->state());
-        EXPECT_EQ(4, setup.context.statistics().nSelfExecuted);
+        EXPECT_EQ(Node::State::Ok, compilerNode->state());
+        EXPECT_EQ(3, setup.context.statistics().nSelfExecuted);
         for (auto node : setup.context.statistics().selfExecuted) {
-            if (node == processingNode.get()) continue;
+            if (node == compilerNode.get()) continue;
             if (node == setup.fileRepo->directoryNode().get()) continue;
-            if ("executor" == node->name().string()) continue;
             EXPECT_NE(nullptr, dynamic_cast<GlobNode const*>(node));
         }
     }
 
-    TEST(BuildFileProcessingNode, noReExecuteProcessingNode) {
+    TEST(BuildFileCompilerNode, noReExecuteAfterDirtyWithoutChanges) {
         TestSetup setup;
-        std::shared_ptr<BuildFileProcessingNode> processingNode = setup.processingNode();
-        ASSERT_NE(nullptr, processingNode);
-        EXPECT_EQ(Node::State::Dirty, processingNode->state());
-        bool completed = YAMTest::executeNode(processingNode.get());
+        std::shared_ptr<BuildFileCompilerNode> compilerNode = setup.compilerNode();
+        ASSERT_NE(nullptr, compilerNode);
+        EXPECT_EQ(Node::State::Dirty, compilerNode->state());
+        bool completed = YAMTest::executeNode(compilerNode.get());
         EXPECT_TRUE(completed);
-        EXPECT_EQ(Node::State::Ok, processingNode->state());
+        EXPECT_EQ(Node::State::Ok, compilerNode->state());
         std::filesystem::path cmdName = setup.fileRepo->symbolicDirectory() / "main.obj\\__cmd";
         std::shared_ptr<Node> node = setup.context.nodes().find(cmdName);
         ASSERT_NE(nullptr, node);
@@ -150,7 +152,7 @@ namespace
         ASSERT_NE(nullptr, cmdNode);
         EXPECT_EQ(Node::State::Dirty, cmdNode->state());
 
-        processingNode->setState(Node::State::Dirty);
+        compilerNode->setState(Node::State::Dirty);
 
         setup.context.statistics().registerNodes = true;
         completed = YAMTest::executeNode(cmdNode.get());
