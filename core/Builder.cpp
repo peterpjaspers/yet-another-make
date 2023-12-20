@@ -30,7 +30,10 @@ namespace
         std::shared_ptr<DirectoryNode> directory,
         std::vector<std::shared_ptr<Node>>& dirtyNodes
     ) {
-        if (directory->state() == Node::State::Dirty) dirtyNodes.push_back(directory);
+        if (directory->state() != Node::State::Ok) {
+            directory->setState(Node::State::Dirty);
+            dirtyNodes.push_back(directory);
+        }
         for (auto const& pair : directory->getContent()) {
             auto child = pair.second;
             auto sourceDir = dynamic_pointer_cast<DirectoryNode>(child);
@@ -45,7 +48,10 @@ namespace
         std::vector<std::shared_ptr<Node>>& dirtyNodes
     ) {
         auto parser= directory->buildFileParserNode();
-        if (parser!= nullptr && parser->state() == Node::State::Dirty) dirtyNodes.push_back(parser);
+        if (parser != nullptr && parser->state() != Node::State::Ok) {
+            parser->setState(Node::State::Dirty);
+            dirtyNodes.push_back(parser);
+        }
         for (auto const& pair : directory->getContent()) {
             auto sourceDir = dynamic_pointer_cast<DirectoryNode>(pair.second);
             if (sourceDir != nullptr) {
@@ -59,7 +65,10 @@ namespace
         std::vector<std::shared_ptr<Node>>& dirtyNodes
     ) {
         auto compiler = directory->buildFileCompilerNode();
-        if (compiler != nullptr && compiler->state() == Node::State::Dirty) dirtyNodes.push_back(compiler);
+        if (compiler != nullptr && compiler->state() != Node::State::Ok) {
+            compiler->setState(Node::State::Dirty);
+            dirtyNodes.push_back(compiler);
+        }
         for (auto const& pair : directory->getContent()) {
             auto sourceDir = dynamic_pointer_cast<DirectoryNode>(pair.second);
             if (sourceDir != nullptr) {
@@ -73,24 +82,15 @@ namespace
         return filePath.filename() == buildFileName;
     }
 
-    //TODO
-    void appendDirtyBuildFileNodes(
-        std::shared_ptr<DirectoryNode> directory,
-        std::vector<std::shared_ptr<Node>>& dirtyBuildFiles
-    ) {
-        //Take care: buildFileNode is NOT a source file node.
-        //A BuildFileNode references one or more build files and
-        //creates command nodes from the definitions in these files.
-    }
-
     auto includeNode = Delegate<bool, std::shared_ptr<Node> const&>::CreateLambda(
         [](std::shared_ptr<Node> const& node) {
             auto cmd = dynamic_pointer_cast<CommandNode>(node);
-            return (cmd != nullptr && cmd->state() == Node::State::Dirty);
+            return (cmd != nullptr && cmd->state() != Node::State::Ok);
         });
 
     void appendDirtyCommands(NodeSet& nodes, std::vector<std::shared_ptr<Node>>& dirtyCommands) {
         nodes.find(includeNode, dirtyCommands);
+        for (auto& cmd : dirtyCommands) cmd->setState(Node::State::Dirty);
     }
 
     void logBuildFileCycle(
@@ -320,6 +320,7 @@ namespace YAM
         _dirtyCommands->group(emptyNodes);
         _dirtyDirectories->setState(Node::State::Ok);
         _dirtyBuildFileParsers->setState(Node::State::Ok);
+        _dirtyBuildFileCompilers->setState(Node::State::Ok);
         _dirtyCommands->setState(Node::State::Ok);
 
         auto result = _result;
@@ -337,6 +338,7 @@ namespace YAM
         ASSERT_MAIN_THREAD(_context);
         _dirtyDirectories->cancel();
         _dirtyBuildFileParsers->cancel();
+        _dirtyBuildFileCompilers->cancel();
         _dirtyCommands->cancel();
     }
 

@@ -161,7 +161,7 @@ namespace YAM {
     void BuildFileParser::parseOutputs(BuildFile::Outputs& outputs) {
         outputs.line = _tokenizer.tokenStartLine();
         outputs.column = _tokenizer.tokenStartColumn();
-        while (_lookAhead.type != "eos") {
+        while (_lookAhead.type == "glob") {
             BuildFile::Output out;
             parseOutput(out);
             outputs.outputs.push_back(out);

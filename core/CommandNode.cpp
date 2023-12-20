@@ -334,6 +334,24 @@ namespace YAM
     void CommandNode::getInputs(std::vector<std::shared_ptr<Node>>& inputs) const {
         for (auto const& pair : _detectedInputs) inputs.push_back(dynamic_pointer_cast<Node>(pair.second));
     }
+    void CommandNode::buildFile(SourceFileNode* buildFile) {
+        if (_buildFile != buildFile) {
+            _buildFile = buildFile;
+            modified(true);
+        }
+    }
+    void CommandNode::ruleLineNr(std::size_t ruleLineNr) {
+        if (_ruleLineNr != ruleLineNr) {
+            _ruleLineNr = ruleLineNr;
+            modified(true);
+        }
+    }
+    SourceFileNode const* CommandNode::buildFile() const {
+        return _buildFile;
+    }
+    std::size_t CommandNode::ruleLineNr() const {
+        return _ruleLineNr;
+    }
 
     XXH64_hash_t CommandNode::computeExecutionHash() const {
         std::vector<XXH64_hash_t> hashes;
@@ -737,6 +755,7 @@ namespace YAM
 
     void CommandNode::stream(IStreamer* streamer) {
         Node::stream(streamer);
+        streamer->stream(_ruleLineNr);
         streamer->streamVector(_cmdInputs);
         streamer->streamVector(_orderOnlyInputs);
 

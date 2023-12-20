@@ -74,10 +74,12 @@ namespace YAM {
             std::vector<std::shared_ptr<GeneratedFileNode>> outputs);
 
         std::shared_ptr<GeneratedFileNode> createGeneratedFileNode(
+            BuildFile::Rule const& rule,
             std::shared_ptr<CommandNode> const& cmdNode,
             std::filesystem::path const& outputPath);
 
         std::vector<std::shared_ptr<GeneratedFileNode>> createGeneratedFileNodes(
+            BuildFile::Rule const& rule,
             std::shared_ptr<CommandNode> const& cmdNode,
             std::vector<std::filesystem::path> const& outputPaths);
 

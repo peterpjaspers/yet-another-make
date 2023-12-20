@@ -14,6 +14,7 @@ namespace YAM
     class GeneratedFileNode;
     class DirectoryNode;
     class FileRepository;
+    class SourceFileNode;
 
     // CommandNode is capable of:
     //    - executing a shell script with a given set of output files.
@@ -82,6 +83,11 @@ namespace YAM
 
         void start() override;
         void cancel() override;
+
+        void buildFile(SourceFileNode* buildFile);
+        void ruleLineNr(std::size_t ruleLineNr);
+        SourceFileNode const* buildFile() const;
+        std::size_t ruleLineNr() const;
 
         static void setStreamableType(uint32_t type);
         // Inherited from IStreamable
@@ -154,6 +160,10 @@ namespace YAM
             std::vector<std::shared_ptr<Node>>& srcInputNodes,
             ILogBook& logBook
         );
+
+        // buildFile that contains the rule from which this node is created
+        SourceFileNode* _buildFile;
+        std::size_t _ruleLineNr;
 
         std::string _inputAspectsName;
         std::vector<std::shared_ptr<FileNode>> _cmdInputs;

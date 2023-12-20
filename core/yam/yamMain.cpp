@@ -67,61 +67,78 @@ void logCannotFindYamServer(ILogBook& logBook) {
     logBook.add(progress);
 }
 
-// Start yamServer (which hosts the BuildService), iff not yet running.
-// Get build service port at which build service is listening.
-// Return whether port could be determined, return port in 'port'.
-bool startServer(
-    ILogBook& logBook, 
-    std::filesystem::path const& startDir,
-    boost::asio::ip::port_type& port
-) {
-    const auto pollInterval = 1000ms;
-    bool success = true;
-    bool startedServer = false;
-    BuildServicePortRegistry reader;
-    if (!reader.serverRunning()) {
-        logStartingServer(logBook);
-        auto server = boost::process::search_path("yamServer");
-        success = !server.empty();
-        if (!success) {
-            logCannotFindYamServer(logBook);
-        } else {
-            startedServer = true;
-            boost::process::spawn(server, boost::process::start_dir(startDir.string()));
-            std::this_thread::sleep_for(pollInterval);
-            reader.read();
-        }
-    }
-    if (success) {
-        const int maxRetries = 5;
-        int nRetries = 0;
-        while (nRetries < maxRetries && !reader.serverRunning()) {
-            nRetries += 1;
-            std::this_thread::sleep_for(pollInterval);
-            reader.read();
-        }
-        success = reader.serverRunning();
-        if (!success) {
-            logFailStartServer(logBook);
-        } else {
-            if (startedServer) logServerStarted(logBook);
-            port = reader.port();
-        }
-    }
-    return success;
-}
+class ServerAccess {
+    protected:
+        std::shared_ptr<BuildClient> _client;
+        bool _connected;
 
-class InProcessServer {
+public:
+    BuildClient& client() { return *_client; }
+    bool connected() { return _connected; }
+};
+
+class OutProcessServer : public ServerAccess 
+{
+public:
+    OutProcessServer(
+        ILogBook& logBook,
+        std::filesystem::path const& startDir        
+    ) {
+        boost::asio::ip::port_type port;
+        const auto pollInterval = 1000ms;
+        bool success = true;
+        bool startedServer = false;
+        BuildServicePortRegistry portReader;
+        if (!portReader.serverRunning()) {
+            logStartingServer(logBook);
+            auto server = boost::process::search_path("yamServer");
+            success = !server.empty();
+            if (!success) {
+                logCannotFindYamServer(logBook);
+            } else {
+                startedServer = true;
+                boost::process::spawn(server, boost::process::start_dir(startDir.string()));
+                std::this_thread::sleep_for(pollInterval);
+                portReader.read();
+            }
+        }
+        if (success) {
+            const int maxRetries = 5;
+            int nRetries = 0;
+            while (nRetries < maxRetries && !portReader.serverRunning()) {
+                nRetries += 1;
+                std::this_thread::sleep_for(pollInterval);
+                portReader.read();
+            }
+            success = portReader.serverRunning();
+            if (!success) {
+                logFailStartServer(logBook);
+            } else {
+                if (startedServer) logServerStarted(logBook);
+                port = portReader.port();
+                _client = std::make_shared<BuildClient>(logBook, port);
+            }
+        }
+        _connected = success;
+    }
+};
+
+class InProcessServer : public ServerAccess {
 private:
     BuildService _service;
 
 public:
     InProcessServer(
         ILogBook& logBook,
-        std::filesystem::path const& startDir,
-        boost::asio::ip::port_type& port
+        std::filesystem::path const& startDir
     ) {
-        port = _service.port();
+        boost::asio::ip::port_type port = _service.port(); 
+        _client = std::make_shared<BuildClient>(logBook, port);
+        _connected = true;
+    }
+
+    ~InProcessServer() {
+        _service.join();
     }
 };
 
@@ -129,22 +146,28 @@ int main(int argc, char argv[]) {
     ConsoleLogBook logBook;
     std::filesystem::path dotYamDir = DotYamDirectory::initialize(std::filesystem::current_path(), &logBook);
     std::filesystem::path repoDir = dotYamDir.parent_path();
-    boost::asio::ip::port_type port;
+    bool inProcess = false;
+    std::shared_ptr<ServerAccess> server;
 
-    if (!startServer(logBook, repoDir, port)) return 1;
-    //InProcessServer service(logBook, repoDir, port);
+    if (inProcess) {
+        server = std::make_shared<InProcessServer>(logBook, repoDir);
+    } else {
+        server = std::make_shared<OutProcessServer>(logBook, repoDir);
+    }
+    if (!server->connected()) return 1;
 
-    BuildClient client(logBook, port);
     auto request = std::make_shared<BuildRequest>();
     request->directory(repoDir);
     std::shared_ptr<BuildResult> result;
     Dispatcher dispatcher;
+    BuildClient& client = server->client();
     client.completor().AddLambda([&](std::shared_ptr<BuildResult> r) {
         result = r;
         dispatcher.push(Delegate<void>::CreateLambda([&dispatcher]() { dispatcher.stop(); }));
     });
     client.startBuild(request);
     dispatcher.run();
+    if (inProcess) client.startShutdown();
     logResult(logBook, *result);
     return result->succeeded() ? 0 : 1;
 }

@@ -72,7 +72,7 @@ namespace {
         )";
         BuildFileParser parser(rules);
 
-        auto const buildFile = dynamic_pointer_cast<BuildFile::File>(parser.file());
+        auto const buildFile = parser.file();
         ASSERT_NE(nullptr, buildFile);
         EXPECT_EQ(2, buildFile->deps.depBuildFiles.size());
         EXPECT_EQ(R"(..\comp1\buildfile_yam.rb)", buildFile->deps.depBuildFiles[0]);
@@ -144,4 +144,18 @@ namespace {
             EXPECT_EQ(expected, actual);
         }
     }
+
+    TEST(BuildFileParser, twoRules) {
+        const std::string file = R"(
+: foreach *.dll |> echo %f > %o |> generated\%B.txt
+: foreach *.dll |> echo %f > %o |> generated\%B.txt
+)";
+        BuildFileParser parser(file, "test");
+        auto const buildFile = parser.file();
+        ASSERT_NE(nullptr, buildFile);
+        EXPECT_EQ(0, buildFile->deps.depBuildFiles.size());
+        EXPECT_EQ(0, buildFile->deps.depGlobs.size());
+        ASSERT_EQ(2, buildFile->variablesAndRules.size());
+    }
+
 }

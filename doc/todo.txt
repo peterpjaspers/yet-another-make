@@ -50,6 +50,8 @@ Todo: core
   that are persistent. Input globs are executed on all dirs plus the 
   anonymous GroupNode. %g<groupPath>/*.obj globs only on specified group.
 - comprehensive test of compiling rule script
+- add ref to BuildFileCompilerNode from CommandNode + line nr of rule from
+  which command node was created. 
 
 Todo: non-core
 - build file syntax (follow tup, follow mrmake, something completely different?)

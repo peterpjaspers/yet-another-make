@@ -209,13 +209,17 @@ namespace YAM
                 _buildFileParser->parseTree());
             updateMap<GeneratedFileNode>(context(), _outputs, compiler.outputs());
             updateMap<CommandNode>(context(), _commands, compiler.commands());
+            SourceFileNode* buildFileNode = _buildFileParser->buildFile().get();
+            for (auto const& pair : _commands) {
+                pair.second->buildFile(buildFileNode);
+            }
             _executionHash = computeExecutionHash();
+            notifyProcessingCompletion(Node::State::Ok);
         } catch (std::runtime_error e) {
             LogRecord error(LogRecord::Error, e.what());
             context()->logBook()->add(error);
             notifyProcessingCompletion(Node::State::Failed);
         }
-        notifyProcessingCompletion(Node::State::Ok);
     }
 
     void BuildFileCompilerNode::notifyProcessingCompletion(Node::State state) {
