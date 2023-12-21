@@ -787,18 +787,18 @@ namespace BTree {
                 // Look for sufficient room to left and/or right.
                 // Must be able to shift at least one key-value to left or right
                 // If there is room try to balance available room over all three pages.
+                PageSize leftRoom = 0;
+                PageSize rightRoom = 0;
                 auto leftTrail = Trail( trail );
                 auto leftPage = previousPage<VT>( leftTrail );
-                if (leftPage) {
-                    auto ancestor = node( trail, trail.match() );
-                    PageSize leftRoom = (pool.pageCapacity() - leftPage->filling());
-                }
+                if (leftPage) leftRoom = (pool.pageCapacity() - leftPage->filling());
                 auto rightTrail = Trail( trail );
                 auto rightPage = nextPage<VT>( rightTrail );
-                if (rightPage) {
-                    PageSize rightRoom = (pool.pageCapacity() - rightPage->filling());
-
+                if (rightPage) rightRoom = (pool.pageCapacity() - rightPage->filling());
+                if (amount < (leftRoom + rightRoom)) {
+                    // Shifting left and/or right may create sufficient room
                 }
+
 */
                 grow<VT>( trail );
             }
@@ -938,7 +938,7 @@ namespace BTree {
                 }
                 recoverUpdatedPage( parent->header, parentCopy->header );
             } else {
-                // Need to allocate additional room in ancestor node to accomodate increased key size
+                // Need to reserve additional room in ancestor node to accomodate increased key size
                 while (!ancestor->entryFit( src.keySize( index ) )) {
                     grow<PageLink>( trail.popToMatch() );
                     lookUp<KT>( src.key( index ), src.keySize( index ), trail.clear(), src.header.depth );

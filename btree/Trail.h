@@ -126,13 +126,6 @@ namespace BTree {
             if (height < (offset + 1)) throw std::string( signature ) + " - Invalid offset.";
             return isSplit(stack[height - offset - 1].position);
         }
-        // Determine if trail is positioned on a split.
-        // Returns true if positioned on a spilt, false otherwise.
-        inline bool onSplit(PageDepth offset = 0) const {
-            static const char* signature("bool Trail::onSplit( PageDepth offset ) const");
-            if (height < (offset + 1)) throw std::string( signature ) + " - Invalid offset.";
-            return (stack[height - offset - 1].position == OnSplit);
-        }
         // Determine if trail is positioned at a key-value index.
         // Returns true if positioned on or after an index, false otherwise.
         inline bool atIndex(PageDepth offset = 0) const {
