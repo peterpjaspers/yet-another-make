@@ -58,14 +58,14 @@ namespace YAM
         DirectoryNode* parent)
         : Node(context, dirName)
         , _parent(parent)
-        , _dotIgnoreNode(std::make_shared<DotIgnoreNode>(context, dirName / ".dotignore", this))
+        //, _dotIgnoreNode(std::make_shared<DotIgnoreNode>(context, dirName / ".dotignore", this))
         , _executionHash(rand())
     {}
 
     void DirectoryNode::addPrerequisitesToContext() {
-        context()->nodes().add(_dotIgnoreNode);
-        _dotIgnoreNode->addObserver(this);
-        _dotIgnoreNode->addPrerequisitesToContext();
+        //context()->nodes().add(_dotIgnoreNode);
+        //_dotIgnoreNode->addObserver(this);
+        //_dotIgnoreNode->addPrerequisitesToContext();
     }
     
     DirectoryNode::~DirectoryNode() {
@@ -108,7 +108,7 @@ namespace YAM
     }
 
     void DirectoryNode::getInputs(std::vector<std::shared_ptr<Node>>& inputs) const {
-        inputs.push_back(dynamic_pointer_cast<Node>(_dotIgnoreNode));
+        //inputs.push_back(dynamic_pointer_cast<Node>(_dotIgnoreNode));
     }
 
     std::shared_ptr<Node> DirectoryNode::findChild(
@@ -179,7 +179,8 @@ namespace YAM
     ) {
         std::shared_ptr<Node> child = nullptr;
         auto const& absPath = dirEntry.path();
-        if (!_dotIgnoreNode->ignore(absPath)) {
+        if (true) {
+        //if (!_dotIgnoreNode->ignore(absPath)) {
             auto symPath = repo->symbolicPathOf(absPath);
             auto it = _content.find(symPath);
             if (it != _content.end()) {
@@ -266,16 +267,16 @@ namespace YAM
     }
 
     void DirectoryNode::handleDirtyOf(Node* observedNode) {
-        if (observedNode == _dotIgnoreNode.get()) {
-            if (_dotIgnoreNode->state() != Node::State::Dirty) throw std::exception("Unexpected state of _dotIgnoreNode");
-            setState(Node::State::Dirty);
-        }
+        //if (observedNode == _dotIgnoreNode.get()) {
+        //    if (_dotIgnoreNode->state() != Node::State::Dirty) throw std::exception("Unexpected state of _dotIgnoreNode");
+        //    setState(Node::State::Dirty);
+        //}
     }
 
     void DirectoryNode::start() {
         Node::start();
         std::vector<Node*> requisites;
-        requisites.push_back(_dotIgnoreNode.get());
+        //requisites.push_back(_dotIgnoreNode.get());
         auto callback = Delegate<void, Node::State>::CreateLambda(
             [this](Node::State s) { handleRequisitesCompletion(s); }
         );
@@ -302,13 +303,13 @@ namespace YAM
         bool success = true;
         try {
             result->_lastWriteTime = retrieveLastWriteTime();
-            result->_executionHash = computeExecutionHash(_dotIgnoreNode->hash(), result->_content);
+            result->_executionHash = computeExecutionHash(/*_dotIgnoreNode->hash()*/0, result->_content);
             if (
                 result->_lastWriteTime != _lastWriteTime 
                 || result->_executionHash != _executionHash // because _dotIgnoreNode changed
             ) {
                 retrieveContent(result->_content, result->_added, result->_removed, result->_kept);
-                result->_executionHash = computeExecutionHash(_dotIgnoreNode->hash(), result->_content);
+                result->_executionHash = computeExecutionHash(/*_dotIgnoreNode->hash()*/0, result->_content);
             }
         } catch (std::filesystem::filesystem_error) {
             success = false;
@@ -423,7 +424,7 @@ namespace YAM
         Node::stream(streamer);
         streamer->stream(_lastWriteTime);
         streamer->stream(_executionHash);
-        streamer->stream(_dotIgnoreNode);
+        //streamer->stream(_dotIgnoreNode);
         std::vector<std::shared_ptr<Node>> nodes;
         if (streamer->writing()) {
             for (auto const& p : _content) nodes.push_back(p.second);
@@ -452,8 +453,8 @@ namespace YAM
 
     void DirectoryNode::restore(void* context) {
         Node::restore(context);
-        _dotIgnoreNode->directory(this);
-        _dotIgnoreNode->addObserver(this);
+        //_dotIgnoreNode->directory(this);
+        //_dotIgnoreNode->addObserver(this);
         std::vector<std::shared_ptr<Node>> nodes;
         for (auto const& p : _content) {
             nodes.push_back(p.second);

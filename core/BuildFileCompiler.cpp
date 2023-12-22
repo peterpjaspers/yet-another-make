@@ -43,21 +43,7 @@ namespace
         std::filesystem::path const& root,
         std::filesystem::path const& p
     ) {
-        std::filesystem::path relPath;
-        auto pit = p.begin();
-        auto rit = root.begin();
-        bool contains = true;
-        for (;
-            pit != p.end() && rit != root.end() && contains;
-            pit++, rit++
-        ) {
-            contains = *pit == *rit;
-        }
-        if (contains) {
-            for (; pit != p.end(); pit++) {
-                relPath /= *pit;
-            }
-        }
+        auto relPath = p.lexically_relative(root);
         return relPath;
     }
 
@@ -278,7 +264,20 @@ namespace YAM {
             std::filesystem::path inputPath(optimizedBaseDir->name() / optimizedPattern);
             auto match = _context->nodes().find(inputPath);
             fileNode = dynamic_pointer_cast<FileNode>(match);
-            if (fileNode == nullptr) throw std::runtime_error(input.pathPattern.string() + ": no such file");
+            if (fileNode == nullptr) {
+                std::stringstream ss;
+                ss << input.pathPattern.string() << ": no such input file." << std::endl;
+                ss << "In rule at line " << input.line << " in buildfile " << input.buildFile.string() << std::endl;
+                ss << "Possible causes:" << std::endl;
+                ss << "Reference to a non-exiting source file, or" << std::endl;
+                ss << "Misspelled name of a source file or generated file, or" << std::endl;
+                ss << "Reference to a generated file that has not yet been defined." << std::endl;
+                ss << "If the generated file is defined in a rule in this buildfile " << std::endl;
+                ss << "then move that rule to a line above the offending rule." << std::endl;
+                ss << "If the generated file is defined in a rule in another buildfile" << std::endl;
+                ss << "then declare the dependency on that other buildfile in this buildfile." << std::endl;
+                throw std::runtime_error(ss.str());
+            }
             inputNodes.push_back(fileNode);
         }
         return inputNodes;

@@ -52,6 +52,7 @@ namespace YAM {
         void compileBuildFile();
         void handleBuildFileDependenciesCompletion(Node::State state);
         XXH64_hash_t computeExecutionHash() const;
+        bool validGeneratedInputs() const;
         void notifyProcessingCompletion(Node::State state);
 
 

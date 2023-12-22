@@ -147,7 +147,7 @@ namespace YAM
     void BuildFileCompilerNode::start() {
         Node::start();
         if (
-            _buildFileParser == nullptr 
+            _buildFileParser == nullptr
             || !updateBuildFileDependencies()
         ) {
             postCompletion(Node::State::Ok);
@@ -162,10 +162,10 @@ namespace YAM
     }
 
     bool BuildFileCompilerNode::updateBuildFileDependencies() {
-        bool updated; 
+        bool updated;
         try {
             BuildFileDependenciesCompiler compiler(
-                context(), 
+                context(),
                 _buildFileParser->workingDirectory(),
                 _buildFileParser->parseTree());
 
@@ -204,8 +204,8 @@ namespace YAM
     void BuildFileCompilerNode::compileBuildFile() {
         try {
             BuildFileCompiler compiler(
-                context(), 
-                _buildFileParser->workingDirectory(), 
+                context(),
+                _buildFileParser->workingDirectory(),
                 _buildFileParser->parseTree());
             updateMap<GeneratedFileNode>(context(), _outputs, compiler.outputs());
             updateMap<CommandNode>(context(), _commands, compiler.commands());
@@ -213,13 +213,53 @@ namespace YAM
             for (auto const& pair : _commands) {
                 pair.second->buildFile(buildFileNode);
             }
-            _executionHash = computeExecutionHash();
-            notifyProcessingCompletion(Node::State::Ok);
+            if (validGeneratedInputs()) {
+                _executionHash = computeExecutionHash();
+                notifyProcessingCompletion(Node::State::Ok);
+            } else {
+                notifyProcessingCompletion(Node::State::Failed);
+            }
         } catch (std::runtime_error e) {
+            _executionHash = rand();
             LogRecord error(LogRecord::Error, e.what());
             context()->logBook()->add(error);
             notifyProcessingCompletion(Node::State::Failed);
         }
+    }
+
+    bool containsParser(std::vector<BuildFileParserNode*> const& parsers, SourceFileNode const* buildFile) {
+        for (auto parser : parsers) {
+            if (parser->buildFile().get() == buildFile) return true;
+        }
+        return false;
+    }
+
+    bool BuildFileCompilerNode::validGeneratedInputs() const {
+        bool valid = true;
+        auto thisBuildFile = _buildFileParser->buildFile().get();
+        for (auto const& pair : _commands) {
+            for (auto const& input : pair.second->cmdInputs()) {
+                auto genFile = dynamic_pointer_cast<GeneratedFileNode>(input);
+                if (genFile != nullptr) {
+                    SourceFileNode const* buildFile = genFile->producer()->buildFile();
+                    if (
+                        (thisBuildFile != buildFile)
+                        && !containsParser(_buildFileParser->dependencies(), buildFile)
+                    ) {
+                        valid = false;
+                        std::stringstream ss;
+                        ss << "Buildfile " << _buildFileParser->buildFile()->name()
+                            << " references generated input file " << genFile->name() << std::endl;
+                        ss << "which is defined in buildfile " << buildFile->name() << std::endl;
+                        ss << "which is not declared as dependency in buildfile " << _buildFileParser->buildFile()->name();
+                        ss << std::endl;
+                        LogRecord error(LogRecord::Error, ss.str());
+                        context()->logBook()->add(error);
+                    }
+                }
+            }
+        }
+        return valid;
     }
 
     void BuildFileCompilerNode::notifyProcessingCompletion(Node::State state) {

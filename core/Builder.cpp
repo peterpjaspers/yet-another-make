@@ -194,6 +194,7 @@ namespace YAM
     bool Builder::containsCycles(std::vector<std::shared_ptr<Node>> const& buildFileParserNodes) const {
         bool cycling = false;
         std::unordered_set<const Node*> visited;
+        std::vector<BuildFileParserNode*> inCycle;
         for (auto const& node : buildFileParserNodes) {
             bool notVisited = visited.insert(node.get()).second;
             if (notVisited) {
@@ -202,9 +203,14 @@ namespace YAM
                 bool notCycling = bfpNode->walkDependencies(trail);
                 if (!notCycling) {
                     cycling = true;
+                    inCycle.push_back(bfpNode.get());
                     logBuildFileCycle(bfpNode->context()->logBook(), bfpNode, trail.trail());
                 }
             }
+        }
+        for (auto n : inCycle) {
+            n->buildFile()->setState(Node::State::Dirty);
+            n->setState(Node::State::Failed);
         }
         return cycling;
     }
@@ -261,7 +267,7 @@ namespace YAM
             _dirtyBuildFileCompilers->setState(_dirtyBuildFileParsers->state());
             _handleBuildFileCompilersCompletion(_dirtyBuildFileCompilers.get());
         } else if (containsCycles(_dirtyBuildFileParsers->group())) {
-            _dirtyCommands->setState(Node::State::Failed);
+            _dirtyBuildFileCompilers->setState(Node::State::Failed);
             _handleBuildFileCompilersCompletion(_dirtyBuildFileCompilers.get());
         } else {
             std::vector<std::shared_ptr<Node>> dirtyBuildFileCompilers;

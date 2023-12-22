@@ -243,10 +243,10 @@ namespace YAM
         if (_nExecutingNodes != _executingNodes.size()) throw std::exception("_nExecutingNodes != _executingNodes.size()");
 #endif
         _canceling = false;
-        std::stringstream ss;
-        ss << _name.string() << " completed with state " << static_cast<int>(newState);
-        LogRecord progress(LogRecord::Progress, ss.str());
-        _context->logBook()->add(progress);
+        //std::stringstream ss;
+        //ss << _name.string() << " completed with state " << static_cast<int>(newState);
+        //LogRecord progress(LogRecord::Progress, ss.str());
+        //_context->logBook()->add(progress);
         setState(newState);
         _completor.Broadcast(this);
     }
