@@ -61,6 +61,7 @@ namespace
     }
 
     std::size_t parseOffset(
+        std::filesystem::path const& buildFile,
         BuildFile::Node const& node,
         std::string string,
         std::size_t& i,
@@ -82,7 +83,7 @@ namespace
                 ss <<
                     "Unexpected end after '%" << offset << "' in " << string
                     << " at line " << node.line << " at column " << node.column
-                    << " in build file " << node.buildFile.string()
+                    << " in build file " << buildFile.string()
                     << std::endl;
                 throw std::runtime_error(ss.str());
             }
@@ -91,7 +92,7 @@ namespace
                 ss <<
                     "Offset must >= 1 " << offset << "after '%' " << "in " << string
                     << " at line " << node.line << " at column " << node.column
-                    << " in build file " << node.buildFile.string()
+                    << " in build file " << buildFile.string()
                     << std::endl;
                 throw std::runtime_error(ss.str());
             }
@@ -100,7 +101,7 @@ namespace
                 ss <<
                     "Too large offset " << offset << "after '%' " << "in " << string
                     << " at line " << node.line << " at column " << node.column
-                    << " in build file " << node.buildFile.string()
+                    << " in build file " << buildFile.string()
                     << std::endl;
                 throw std::runtime_error(ss.str());
             }
@@ -109,6 +110,7 @@ namespace
     }
 
     std::string compilePercentageFlags(
+        std::filesystem::path const& buildFile,
         BuildFile::Node const& node,
         DirectoryNode const* baseDir,
         std::string const& string,
@@ -128,7 +130,7 @@ namespace
                     ss <<
                         "Unexpected '%' at end of " << string
                         << " at line " << node.line << " at column " << node.column
-                        << " in build file " << node.buildFile.string()
+                        << " in build file " << buildFile.string()
                         << std::endl;
                     throw std::runtime_error(ss.str());
                 }
@@ -137,13 +139,13 @@ namespace
                     break;
                 } 
                 if (allowOutputFlag && chars[i] == 'o') {
-                    std::size_t offset = parseOffset(node, string, i, 1, cmdOutputs.size());
+                    std::size_t offset = parseOffset(buildFile, node, string, i, 1, cmdOutputs.size());
                     result.append(resolvePath(baseDir, cmdOutputs[offset].get()).string());
                 } else if (chars[i] == 'i') {
-                    std::size_t offset = parseOffset(node, string, i, 1, orderOnlyInputs.size());
+                    std::size_t offset = parseOffset(buildFile, node, string, i, 1, orderOnlyInputs.size());
                     result.append(resolvePath(baseDir, orderOnlyInputs[offset].get()).string());
                 } else {
-                    std::size_t offset = parseOffset(node, string, i, defaultCmdInputOffset, cmdInputs.size());
+                    std::size_t offset = parseOffset(buildFile, node, string, i, defaultCmdInputOffset, cmdInputs.size());
                     std::filesystem::path inputPath = resolvePath(baseDir, cmdInputs[offset].get()).string();
                     if (chars[i] == 'f') {
                         result.append(inputPath.string());
@@ -163,7 +165,7 @@ namespace
                         ss <<
                             "Unkown flag %" << chars[i] << " in " << string
                             << " at line " << node.line << " at column " << node.column
-                            << " in build file " << node.buildFile.string()
+                            << " in build file " << buildFile.string()
                             << std::endl;
                         throw std::runtime_error(ss.str());
                     }
@@ -174,6 +176,17 @@ namespace
         }
         return result;
     }
+
+    SourceFileNode* findBuildFileNode(ExecutionContext* context, std::filesystem::path const& buildFile) {
+        auto repo = context->findRepositoryContaining(buildFile);
+        if (repo != nullptr) {
+            auto symBuildFilePath = repo->symbolicPathOf(buildFile);
+            auto node = context->nodes().find(symBuildFilePath);
+            return dynamic_cast<SourceFileNode*>(node.get());
+        }
+        return nullptr;
+    }
+
 }
 
 namespace YAM {
@@ -185,6 +198,7 @@ namespace YAM {
         : _context(context)
         , _baseDir(baseDir)
         , _globNameSpace(globNameSpace)
+        , _buildFile(buildFile.buildFile)
     {
         for (auto const& glob : buildFile.deps.depGlobs) {
             compileGlob(glob);
@@ -220,17 +234,13 @@ namespace YAM {
         std::vector<std::shared_ptr<FileNode>> const& cmdInputs,
         std::vector<std::shared_ptr<GeneratedFileNode>> const& orderOnlyInputs
     ) {
-        auto repo = _context->findRepositoryContaining(rule.buildFile);
-        auto symBuildFilePath = repo->symbolicPathOf(rule.buildFile);
-        auto buildFileNode = dynamic_pointer_cast<SourceFileNode>(_context->nodes().find(symBuildFilePath));
-
         std::vector<std::filesystem::path> outputPaths = compileOutputPaths(rule.outputs, cmdInputs);
         std::vector<std::filesystem::path> ignoredOutputs = compileIgnoredOutputs(rule.outputs);
 
         std::shared_ptr<CommandNode> cmdNode = createCommand(outputPaths);
         std::vector<std::shared_ptr<GeneratedFileNode>> outputs = createGeneratedFileNodes(rule, cmdNode, outputPaths);
-        std::string script = compileScript(rule.script, _baseDir.get(), cmdInputs, orderOnlyInputs, outputs);
-        cmdNode->buildFile(buildFileNode.get());
+        std::string script = compileScript(_buildFile, rule.script, _baseDir.get(), cmdInputs, orderOnlyInputs, outputs);
+        cmdNode->buildFile(findBuildFileNode(_context, _buildFile));
         cmdNode->ruleLineNr(rule.line);
         cmdNode->workingDirectory(_baseDir);
         cmdNode->cmdInputs(cmdInputs);
@@ -267,9 +277,9 @@ namespace YAM {
             if (fileNode == nullptr) {
                 std::stringstream ss;
                 ss << input.pathPattern.string() << ": no such input file." << std::endl;
-                ss << "In rule at line " << input.line << " in buildfile " << input.buildFile.string() << std::endl;
+                ss << "In rule at line " << input.line << " in buildfile " << _buildFile.string() << std::endl;
                 ss << "Possible causes:" << std::endl;
-                ss << "Reference to a non-exiting source file, or" << std::endl;
+                ss << "Reference to a non-existing source file, or" << std::endl;
                 ss << "Misspelled name of a source file or generated file, or" << std::endl;
                 ss << "Reference to a generated file that has not yet been defined." << std::endl;
                 ss << "If the generated file is defined in a rule in this buildfile " << std::endl;
@@ -332,6 +342,7 @@ namespace YAM {
     }
 
     std::string BuildFileCompiler::compileScript(
+        std::filesystem::path const& buildFile,
         BuildFile::Script const& script,
         DirectoryNode const* baseDir,
         std::vector<std::shared_ptr<FileNode>> cmdInputs,
@@ -340,7 +351,7 @@ namespace YAM {
     ) {
         std::string compiledScript =
             compilePercentageFlags(
-                script, baseDir, script.script,
+                buildFile, script, baseDir, script.script,
                 cmdInputs, 1, orderOnlyInputs,
                 outputs, true);
         return compiledScript;
@@ -367,7 +378,7 @@ namespace YAM {
                     throw std::runtime_error("No such file node: " + node->name().string());
                 } else {
                     std::stringstream ss;
-                    ss << "In rule at line " << rule.line << " in buildfile " << rule.buildFile.string() << ":" << std::endl;
+                    ss << "In rule at line " << rule.line << " in buildfile " << _buildFile.string() << ":" << std::endl;
                     ss << "Output file is either a source file or a stale output file: " << node->name().string() << std::endl;
                     ss << "If a source file: fix the rule definition." << std::endl;
                     ss << "If a stale output file: delete it." << std::endl;
@@ -380,7 +391,7 @@ namespace YAM {
             if (outputNode->producer() != cmdNode.get()) {
                 auto producer = outputNode->producer();
                 std::stringstream ss;
-                ss << "In rule at line " << rule.line << " in buildfile " << rule.buildFile.string() << ":" << std::endl;
+                ss << "In rule at line " << rule.line << " in buildfile " << _buildFile.string() << ":" << std::endl;
                 ss << "Output file " << outputNode->name().string()
                     << " already defined at rule at line " << producer->ruleLineNr() 
                     << " in buildfile " << producer->buildFile()->absolutePath() << std::endl;
@@ -415,11 +426,13 @@ namespace YAM {
     ) const {
         static std::vector<std::shared_ptr<GeneratedFileNode>> emptyOutputs; 
         std::vector<std::shared_ptr<GeneratedFileNode>> emptyOrderOnlyInputs;
-        std::filesystem::path outputPath =
-            compilePercentageFlags(
-                output, _baseDir.get(), output.path.string(),
-                cmdInputs, defaultInputOffset, emptyOrderOnlyInputs,
-                emptyOutputs, false);
+        auto base = _baseDir;
+        std::filesystem::path pattern = output.path;
+        Globber::optimize(base, pattern);
+        std::filesystem::path outputPath = compilePercentageFlags(
+            _buildFile, output, _baseDir.get(), (base->name() / pattern).string(),
+            cmdInputs, defaultInputOffset, emptyOrderOnlyInputs,
+            emptyOutputs, false);
         if (!FileRepository::isSymbolicPath(outputPath)) return _baseDir->name() / outputPath;
         return std::filesystem::path(outputPath);
     }

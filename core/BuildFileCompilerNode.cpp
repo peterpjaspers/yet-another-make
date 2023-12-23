@@ -92,6 +92,36 @@ namespace
         for (auto const& pair : removed) removeNode(pair.second);
         toUpdate = newSet;
     }
+
+    BuildFileParserNode const* findParser(
+        std::vector<BuildFileParserNode const*> const& parsers,
+        SourceFileNode const* buildFile
+     ) {
+        for (auto parser : parsers) {
+            if (parser->buildFile().get() == buildFile) return parser;
+        }
+        return nullptr;
+    }
+
+    bool containsParser(
+        std::vector<BuildFileParserNode const*> const& parsers, 
+        SourceFileNode const* buildFile
+    ) {
+        return nullptr != findParser(parsers, buildFile);
+    }
+
+
+    void findNotUsedParsers(
+        std::vector<BuildFileParserNode const*> const& allParsers,
+        std::unordered_set<BuildFileParserNode const*> const& usedParsers,
+        std::vector<BuildFileParserNode const*>& notUsedParsers
+    ) {
+        for (auto p : allParsers) {
+            if (usedParsers.find(p) == usedParsers.end()) {
+                notUsedParsers.push_back(p);
+            }
+        }
+    }
 }
 
 namespace YAM
@@ -226,40 +256,71 @@ namespace YAM
             notifyProcessingCompletion(Node::State::Failed);
         }
     }
-
-    bool containsParser(std::vector<BuildFileParserNode*> const& parsers, SourceFileNode const* buildFile) {
-        for (auto parser : parsers) {
-            if (parser->buildFile().get() == buildFile) return true;
+    BuildFileParserNode const* BuildFileCompilerNode::findDefiningParser(GeneratedFileNode const* genFile) const {
+        auto thisBuildFile = _buildFileParser->buildFile().get();
+        SourceFileNode const* definingBuildFile = genFile->producer()->buildFile();
+        auto const& parsers = _buildFileParser->dependencies();
+        BuildFileParserNode const* definingParser = _buildFileParser.get();
+        if (thisBuildFile != definingBuildFile) {
+            definingParser = findParser(parsers, definingBuildFile);
         }
-        return false;
+        if (definingParser == nullptr) {
+            std::stringstream ss;
+            ss << "Buildfile " << thisBuildFile->name()
+                << " references generated input file " << genFile->name() << std::endl;
+            ss << "which is defined in buildfile " << definingBuildFile->name() << std::endl;
+            ss << definingBuildFile->name() << " must be declared as buildfile dependency in buildfile " << _buildFileParser->buildFile()->name();
+            ss << std::endl;
+            LogRecord error(LogRecord::Error, ss.str());
+            context()->logBook()->add(error);
+        }
+        return definingParser;
     }
 
     bool BuildFileCompilerNode::validGeneratedInputs() const {
+        std::unordered_set<BuildFileParserNode const*> usedParsers;
         bool valid = true;
         auto thisBuildFile = _buildFileParser->buildFile().get();
         for (auto const& pair : _commands) {
             for (auto const& input : pair.second->cmdInputs()) {
-                auto genFile = dynamic_pointer_cast<GeneratedFileNode>(input);
+                auto genFile = dynamic_cast<GeneratedFileNode const*>(input.get());
                 if (genFile != nullptr) {
-                    SourceFileNode const* buildFile = genFile->producer()->buildFile();
-                    if (
-                        (thisBuildFile != buildFile)
-                        && !containsParser(_buildFileParser->dependencies(), buildFile)
-                    ) {
-                        valid = false;
-                        std::stringstream ss;
-                        ss << "Buildfile " << _buildFileParser->buildFile()->name()
-                            << " references generated input file " << genFile->name() << std::endl;
-                        ss << "which is defined in buildfile " << buildFile->name() << std::endl;
-                        ss << "which is not declared as dependency in buildfile " << _buildFileParser->buildFile()->name();
-                        ss << std::endl;
-                        LogRecord error(LogRecord::Error, ss.str());
-                        context()->logBook()->add(error);
-                    }
+                    auto parser = findDefiningParser(genFile);
+                    valid = nullptr != parser;
+                    if (valid && parser != _buildFileParser.get()) usedParsers.insert(parser);
                 }
             }
+            for (auto const& genFile : pair.second->orderOnlyInputs()) {
+                auto parser = findDefiningParser(genFile.get());
+                valid = nullptr != parser;
+                if (valid && parser != _buildFileParser.get()) usedParsers.insert(parser);
+            }
         }
+        reportNotUsedParsers(usedParsers);
         return valid;
+    }
+
+    void BuildFileCompilerNode::reportNotUsedParsers(
+        std::unordered_set<BuildFileParserNode const*> const& usedParsers
+    ) const {
+        std::vector<BuildFileParserNode const*> notUsedParsers;
+        findNotUsedParsers(_buildFileParser->dependencies(), usedParsers, notUsedParsers); 
+        if (!notUsedParsers.empty()) {
+            auto thisBuildFile = _buildFileParser->buildFile().get();
+            std::stringstream ss;
+            ss << "Buildfile " << thisBuildFile->name() << std::endl;
+            if (notUsedParsers.size() == 1) {
+                auto p = *(notUsedParsers.begin());
+                ss << "declares a not-used buildfile dependency on: " << p->buildFile()->name() << std::endl;
+            } else {
+                ss << "declares not-used buildfile dependencies on: " << std::endl;
+                for (auto nu : notUsedParsers) ss << "\t" << nu->name() << std::endl;
+            }
+            ss << "Not-used buildfile dependencies may slowdown your build." << std::endl;
+            ss << "It is highly recommended to remove them." << std::endl;
+            LogRecord warning(LogRecord::Warning, ss.str());
+            context()->logBook()->add(warning);
+        }
     }
 
     void BuildFileCompilerNode::notifyProcessingCompletion(Node::State state) {

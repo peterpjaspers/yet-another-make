@@ -98,6 +98,7 @@ namespace
         rule->outputs.outputs.push_back(output);
         rule->outputs.outputs.push_back(ignoredOutput);
         BuildFile::File file;
+        file.buildFile = "buildFile_yam.txt";
         file.deps.depGlobs.push_back("*.h");
         file.variablesAndRules.push_back(rule);
 
@@ -164,6 +165,7 @@ namespace
         rule->script.script = "cc main.cpp -o main.obj";
         rule->outputs.outputs.push_back(output);
         BuildFile::File file;
+        file.buildFile = "buildFile_yam.txt";
         file.variablesAndRules.push_back(rule);
 
         BuildFileCompiler compiler(&setup.context, setup.repo->directoryNode(), file);

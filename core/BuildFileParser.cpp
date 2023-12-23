@@ -94,7 +94,6 @@ namespace YAM {
     }
 
     void BuildFileParser::parseDeps(BuildFile::Deps& deps) {
-        deps.buildFile = _buildFilePath;
         deps.line = _tokenizer.tokenStartLine();
         deps.column = _tokenizer.tokenStartColumn();
         eat("deps"); // Return value not needed
@@ -120,7 +119,6 @@ namespace YAM {
     std::shared_ptr<BuildFile::Rule> BuildFileParser::parseRule() {
         eat("rule"); // Return value not needed
         auto rule = std::make_shared<BuildFile::Rule>();
-        rule->buildFile = _buildFilePath;
         rule->line = _tokenizer.tokenStartLine();
         rule->column = _tokenizer.tokenStartColumn();
         if (_lookAhead.type == "foreach") {

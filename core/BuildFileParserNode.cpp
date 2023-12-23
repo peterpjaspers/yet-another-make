@@ -61,7 +61,7 @@ namespace YAM
         return _parseTreeHash;
     }
 
-    std::vector<BuildFileParserNode*> const& BuildFileParserNode::dependencies() const {
+    std::vector<BuildFileParserNode const*> const& BuildFileParserNode::dependencies() const {
         if (state() != Node::State::Ok) throw std::runtime_error("illegal state");
         return _dependencies;
     }
@@ -133,7 +133,7 @@ namespace YAM
         return bfpn.get();
     }
 
-    bool BuildFileParserNode::walkDependencies(AcyclicTrail<const BuildFileParserNode*>& trail) const {
+    bool BuildFileParserNode::walkDependencies(AcyclicTrail<BuildFileParserNode const*>& trail) const {
         if (state() != Node::State::Ok) throw std::runtime_error("illegal state");
         if (!trail.add(this)) return false;
         for (auto const* dep : _dependencies) {

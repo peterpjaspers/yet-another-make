@@ -13,12 +13,10 @@ namespace YAM {
         struct __declspec(dllexport) Node {
             virtual ~Node() {}
             Node() : line(0), column(0) {}
-            std::filesystem::path buildFile;
             std::size_t line;
             std::size_t column;
 
             virtual void addHashes(std::vector<XXH64_hash_t>& hashes) {
-                hashes.push_back(XXH64_string(buildFile.string()));
                 hashes.push_back(line);
                 hashes.push_back(column);
             }
@@ -110,11 +108,13 @@ namespace YAM {
 
         class __declspec(dllexport) File : public Node {
         public:
+            std::filesystem::path buildFile;
             Deps deps;
             std::vector<std::shared_ptr<Node>> variablesAndRules;
 
             XXH64_hash_t computeHash() {                
                 std::vector<XXH64_hash_t> hashes;
+                hashes.push_back(XXH64_string(buildFile.string()));
                 Node::addHashes(hashes);
                 deps.addHashes(hashes);
                 for (auto & varOrRule : variablesAndRules) {

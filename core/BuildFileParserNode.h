@@ -30,11 +30,12 @@ namespace YAM {
 
         BuildFile::File const& parseTree() const; 
         XXH64_hash_t parseTreeHash() const;
-        std::vector<BuildFileParserNode*> const& dependencies() const;
+
+        std::vector<BuildFileParserNode const*> const& dependencies() const;
 
         // Walk the dependency graph. Return whether no cycle was detected in
         // the dependency graph.
-        bool walkDependencies(AcyclicTrail<const BuildFileParserNode*>& trail) const;
+        bool walkDependencies(AcyclicTrail<BuildFileParserNode const*>& trail) const;
 
         static void setStreamableType(uint32_t type);
         // Inherited from IStreamer (via IPersistable)
@@ -64,7 +65,7 @@ namespace YAM {
         XXH64_hash_t _parseTreeHash;
         // The (non-recursive_ dependencies on other buildfiles as declared in 
         // _parseTree->deps, expressed by their parser nodes.
-        std::vector<BuildFileParserNode*> _dependencies;
+        std::vector<BuildFileParserNode const*> _dependencies;
     };
 }
 

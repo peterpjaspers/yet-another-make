@@ -67,6 +67,7 @@ namespace YAM {
             BuildFile::Inputs const& inputs);
 
         static std::string compileScript(
+            std::filesystem::path const& buildFile,
             BuildFile::Script const& script,
             DirectoryNode const* baseDir,
             std::vector<std::shared_ptr<FileNode>> cmdInputs,
@@ -104,6 +105,7 @@ namespace YAM {
         ExecutionContext* _context;
         std::shared_ptr<DirectoryNode> _baseDir;
         std::filesystem::path _globNameSpace;
+        std::filesystem::path _buildFile;
 
         std::map<std::filesystem::path, std::shared_ptr<CommandNode>> _commands;
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _outputs;

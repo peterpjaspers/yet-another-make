@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <vector>
+#include <unordered_set>
 #include <map>
 
 namespace YAM {
@@ -53,6 +54,8 @@ namespace YAM {
         void handleBuildFileDependenciesCompletion(Node::State state);
         XXH64_hash_t computeExecutionHash() const;
         bool validGeneratedInputs() const;
+        BuildFileParserNode const* findDefiningParser(GeneratedFileNode const* genFile) const;
+        void reportNotUsedParsers(std::unordered_set<BuildFileParserNode const*> const& usedParsers) const;
         void notifyProcessingCompletion(Node::State state);
 
 
