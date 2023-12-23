@@ -314,7 +314,7 @@ namespace YAM
                 ss << "declares a not-used buildfile dependency on: " << p->buildFile()->name() << std::endl;
             } else {
                 ss << "declares not-used buildfile dependencies on: " << std::endl;
-                for (auto nu : notUsedParsers) ss << "\t" << nu->name() << std::endl;
+                for (auto nu : notUsedParsers) ss << "\t" << nu->buildFile()->name() << std::endl;
             }
             ss << "Not-used buildfile dependencies may slowdown your build." << std::endl;
             ss << "It is highly recommended to remove them." << std::endl;

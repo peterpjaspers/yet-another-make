@@ -9,13 +9,10 @@ namespace {
         TokenSpec(R"(^\s+)", "skip"), // whitespace
         TokenSpec(R"(^\/\/.*)", "skip"), // single-line comment
         TokenSpec(R"(^\/\*[\s\S]*?\*\/)", "skip"), // multi-line comment
-        TokenSpec(R"(^deps)", "deps"),
-        TokenSpec(R"(^buildfile)", "depBuildfile"),
+        TokenSpec(R"(^buildfile)", "depBuildFile"),
         TokenSpec(R"(^glob)", "depGlob"),
-        TokenSpec(R"(^\{)", "{"),
-        TokenSpec(R"(^\})", "}"),
-        TokenSpec(R"(^foreach)", "foreach"),
         TokenSpec(R"(^:)", "rule"),
+        TokenSpec(R"(^foreach)", "foreach"),
         TokenSpec(R"(^\^)", "not"),
         TokenSpec(R"(^\\?(?:[\w\.\*\?\%\[\]-])+(?:\\([\w\.\*\?\%\[\]-])+)*)", "glob"),
         TokenSpec(R"(^\|>(((?!\|>)\S|\s)*)\|>)", "script", 1),

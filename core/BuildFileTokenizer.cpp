@@ -5,8 +5,12 @@
 
 
 namespace YAM {
-    BuildFileTokenizer::BuildFileTokenizer(std::string const& content, std::vector<TokenSpec> const& specs)
-        : _content(content)
+    BuildFileTokenizer::BuildFileTokenizer(
+        std::filesystem::path const& filePath, 
+        std::string const& content, 
+        std::vector<TokenSpec> const& specs)
+        : _filePath(filePath)
+        , _content(content)
         , _specs(specs)
         , _tokenStartOffset(0)
         , _tokenEndOffset(0)
@@ -86,7 +90,7 @@ namespace YAM {
         std::stringstream ss;
         ss
             << "Unexpected token at line " << _line
-            << ", column " << _column
+            << ", column " << _column << " in file " << _filePath.string()
             << std::endl;
         throw std::runtime_error(ss.str());
     }

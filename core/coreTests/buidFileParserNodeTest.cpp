@@ -55,9 +55,9 @@ namespace
                 ruleSD1 = rule;
                 ruleSD2 = rule;
             } else {
-                rule = R"(deps { buildfile SubDir1 buildfile SubDir2 } : foreach *.cpp |> echo main > main.obj |> %%B.obj)";
-                ruleSD1 = R"(deps { buildfile .. } : foreach *.cpp |> echo main > main.obj |> %%B.obj )";
-                ruleSD2 = R"(deps { buildfile ..\SubDir1 } : foreach *.cpp |> echo main > main.obj |> %%B.obj )";
+                rule = R"(buildfile SubDir1 buildfile SubDir2 : foreach *.cpp |> echo main > main.obj |> %%B.obj)";
+                ruleSD1 = R"(buildfile .. : foreach *.cpp |> echo main > main.obj |> %%B.obj )";
+                ruleSD2 = R"(buildfile ..\SubDir1 : foreach *.cpp |> echo main > main.obj |> %%B.obj )";
             }
             writeFile(absBuildFilePath, rule);
             writeFile(absBuildFilePathSD1, ruleSD1);

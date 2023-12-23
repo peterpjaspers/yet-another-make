@@ -1,6 +1,7 @@
 #pragma once
 
 #include <regex>
+#include <filesystem>
 
 namespace YAM {
     struct __declspec(dllexport) Token {
@@ -24,7 +25,10 @@ namespace YAM {
 
     class __declspec(dllexport) BuildFileTokenizer {
     public:
-        BuildFileTokenizer(std::string const& content, std::vector<TokenSpec> const& specs);
+        BuildFileTokenizer(
+            std::filesystem::path const& filePath,
+            std::string const& content, 
+            std::vector<TokenSpec> const& specs);
         void readNextToken(Token& token);
 
         std::size_t tokenStartOffset() const { return _tokenStartOffset; }
@@ -45,6 +49,7 @@ namespace YAM {
         void captureLocation(std::string const& matched);
         void throwUnexpectedToken();
 
+        std::filesystem::path const& _filePath;
         std::string const& _content; 
         std::vector<TokenSpec> const& _specs;
 

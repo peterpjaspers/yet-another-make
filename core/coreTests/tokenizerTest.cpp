@@ -76,7 +76,7 @@ namespace {
 
     TEST(BuildFileTokenizer, whiteSpace) {
         const std::string whitespace(R"(    )");
-        BuildFileTokenizer tokenizer(whitespace, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", whitespace, tokenSpecs);
         Token token;
         tokenizer.readNextToken(token);
         EXPECT_EQ("eos", token.type);
@@ -87,7 +87,7 @@ namespace {
         const std::string rule(R"(
   : 
   )");
-        BuildFileTokenizer tokenizer(rule, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", rule, tokenSpecs);
         Token token;
         tokenizer.readNextToken(token);
         EXPECT_EQ("rule", token.type);
@@ -109,7 +109,7 @@ namespace {
     TEST(BuildFileTokenizer, commentLine) {
         const std::string commentLine(R"(  : // comment  :  
   : )");
-        BuildFileTokenizer tokenizer(commentLine, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", commentLine, tokenSpecs);
         Token token;
         tokenizer.readNextToken(token);
         EXPECT_EQ("rule", token.type);
@@ -138,7 +138,7 @@ namespace {
         c3
         c4 
   */  :)");
-        BuildFileTokenizer tokenizer(commentLines, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", commentLines, tokenSpecs);
         Token token;
         tokenizer.readNextToken(token);
         EXPECT_EQ("rule", token.type);
@@ -159,7 +159,7 @@ namespace {
 
     TEST(BuildFileTokenizer, not) {
         const std::string whitespace(R"(^aap.c)");
-        BuildFileTokenizer tokenizer(whitespace, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", whitespace, tokenSpecs);
         Token token;
         tokenizer.readNextToken(token);
         EXPECT_EQ("not", token.type);
@@ -174,7 +174,7 @@ namespace {
 
     TEST(BuildFileTokenizer, relativePath3) {
         const std::string path(R"(aap\noot\mies.txt)");
-        BuildFileTokenizer tokenizer(path, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", path, tokenSpecs);
         Token token;
         tokenizer.readNextToken(token);
         EXPECT_EQ("glob", token.type);
@@ -186,7 +186,7 @@ namespace {
 
     TEST(BuildFileTokenizer, relativePath1) {
         const std::string path(R"(mies.txt)");
-        BuildFileTokenizer tokenizer(path, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", path, tokenSpecs);
         Token token;
         tokenizer.readNextToken(token);
         EXPECT_EQ("glob", token.type);
@@ -198,7 +198,7 @@ namespace {
 
     TEST(BuildFileTokenizer, absolutePath3) {
         const std::string path(R"(\aap\noot\mies.txt)");
-        BuildFileTokenizer tokenizer(path, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", path, tokenSpecs);
         Token token;
         tokenizer.readNextToken(token);
         EXPECT_EQ("glob", token.type);
@@ -210,7 +210,7 @@ namespace {
 
     TEST(BuildFileTokenizer, absolutePath1) {
         const std::string path(R"(mies.txt)");
-        BuildFileTokenizer tokenizer(path, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", path, tokenSpecs);
         Token token;
         tokenizer.readNextToken(token);
         EXPECT_EQ("glob", token.type);
@@ -222,7 +222,7 @@ namespace {
 
     TEST(BuildFileTokenizer, relativeGlob1) {
         const std::string glob(R"(aap\a?b?[cde]*.txt)");
-        BuildFileTokenizer tokenizer(glob, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", glob, tokenSpecs);
         Token token;
         tokenizer.readNextToken(token);
         EXPECT_EQ("glob", token.type);
@@ -234,7 +234,7 @@ namespace {
 
     TEST(BuildFileTokenizer, absoluteGlob1) {
         const std::string glob(R"(\aap\a?b?[cde]*.txt)");
-        BuildFileTokenizer tokenizer(glob, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", glob, tokenSpecs);
         Token token;
         tokenizer.readNextToken(token);
         EXPECT_EQ("glob", token.type);
@@ -248,7 +248,7 @@ namespace {
         const std::string group(R"(gcc src\hello.c -o bin\hello)");
         const std::string script = R"(|>gcc src\hello.c -o bin\hello|> )";
 
-        BuildFileTokenizer tokenizer(script, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", script, tokenSpecs);
         Token token;
 
         tokenizer.readNextToken(token);
@@ -269,7 +269,7 @@ namespace {
                 src\hello.c 
                -o bin\hello|> )";
 
-        BuildFileTokenizer tokenizer(script, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", script, tokenSpecs);
         Token token;
 
         tokenizer.readNextToken(token);
@@ -292,7 +292,7 @@ namespace {
                -o bin\hello 
             |> bin\%B.obj )");
 
-        BuildFileTokenizer tokenizer(rule, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", rule, tokenSpecs);
         Token token;
 
         tokenizer.readNextToken(token);
@@ -324,7 +324,7 @@ namespace {
                -o bin\hello 
             |> bin\%B.obj )");
 
-        BuildFileTokenizer tokenizer(rule, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", rule, tokenSpecs);
         Token token;
 
         tokenizer.readNextToken(token);

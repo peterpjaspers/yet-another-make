@@ -41,7 +41,7 @@ namespace YAM {
         std::string const& buildFileContent,
         std::filesystem::path const& buildFilePath)
         : _buildFilePath(buildFilePath)
-        , _tokenizer(buildFileContent, tokenSpecs)
+        , _tokenizer(buildFilePath, buildFileContent, tokenSpecs)
         , _file(parseBuildFile())
     {}
 
@@ -49,7 +49,7 @@ namespace YAM {
         std::string&& buildFileContent,
         std::filesystem::path const& buildFilePath)
         : _buildFilePath(buildFilePath)
-        , _tokenizer(buildFileContent, tokenSpecs)
+        , _tokenizer(buildFilePath, buildFileContent, tokenSpecs)
         , _file(parseBuildFile())
     {}
 
@@ -82,7 +82,9 @@ namespace YAM {
         file->buildFile = _buildFilePath;
         file->line = _tokenizer.tokenStartLine();
         file->column = _tokenizer.tokenStartColumn();
-        if (_lookAhead.type == "deps") parseDeps(file->deps);
+        if (_lookAhead.type == "depBuildFile" || _lookAhead.type == "depGlob") {
+            parseDeps(file->deps);
+        }
         while (_lookAhead.type != "eos") {
             if (_lookAhead.type == "rule") {
                 file->variablesAndRules.push_back(parseRule());
@@ -96,11 +98,12 @@ namespace YAM {
     void BuildFileParser::parseDeps(BuildFile::Deps& deps) {
         deps.line = _tokenizer.tokenStartLine();
         deps.column = _tokenizer.tokenStartColumn();
-        eat("deps"); // Return value not needed
-        eat("{");
-        while (_lookAhead.type != "}") {
-            if (_lookAhead.type == "depBuildfile") {
-                eat("depBuildfile");
+        while (
+            _lookAhead.type == "depBuildFile"
+            || _lookAhead.type == "depGlob"
+        ) {
+            if (_lookAhead.type == "depBuildFile") {
+                eat("depBuildFile");
                 std::filesystem::path path;
                 parsePath(path);
                 deps.depBuildFiles.push_back(path);
@@ -109,11 +112,8 @@ namespace YAM {
                 std::filesystem::path glob;
                 parseGlob(glob);
                 deps.depGlobs.push_back(glob);
-            } else {
-                syntaxError("depBuildfile");
             }
         }
-        eat("}");
     }
 
     std::shared_ptr<BuildFile::Rule> BuildFileParser::parseRule() {
