@@ -59,7 +59,9 @@ namespace {
             glob *.cpp
             glob src\*.cpp
         : 
-            foreach hello.c { someGroup } | { someOtherGroup }
+            foreach 
+                hello.c { someGroup } 
+                | hi.obj { someOtherGroup }
             |>
                 gcc hello.c -o hello
             |> 
@@ -93,11 +95,15 @@ namespace {
         EXPECT_TRUE(input1.isGroup);
         EXPECT_EQ("someGroup", input1.pathPattern);
 
-        ASSERT_EQ(1, rule->orderOnlyInputs.inputs.size());
+        ASSERT_EQ(2, rule->orderOnlyInputs.inputs.size());
         auto const& ooinput0 = rule->orderOnlyInputs.inputs[0];
         EXPECT_FALSE(ooinput0.exclude);
-        EXPECT_TRUE(ooinput0.isGroup);
-        EXPECT_EQ("someOtherGroup", ooinput0.pathPattern);
+        EXPECT_FALSE(ooinput0.isGroup);
+        EXPECT_EQ("hi.obj", ooinput0.pathPattern);
+        auto const& ooinput1 = rule->orderOnlyInputs.inputs[1];
+        EXPECT_FALSE(ooinput1.exclude);
+        EXPECT_TRUE(ooinput1.isGroup);
+        EXPECT_EQ("someOtherGroup", ooinput1.pathPattern);
 
         std::string expectedScript(R"(
                 gcc hello.c -o hello

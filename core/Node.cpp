@@ -99,7 +99,9 @@ namespace YAM
             return;
         }
         auto p = _observers.insert(observer);
-        if (!p.second) throw std::runtime_error("Attempt to add duplicate state observer");
+        if (!p.second) {
+            throw std::runtime_error("Attempt to add duplicate state observer");
+        }
     }
 
     void Node::removeObserver(StateObserver* observer) {

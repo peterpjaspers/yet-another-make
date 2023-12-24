@@ -80,9 +80,12 @@ namespace
         CompilerSetup setup;
         BuildFile::Input input;
         input.exclude = false;
+        input.isGroup = false;
         input.pathPattern = "src\\*.cpp";
         BuildFile::Input excludedInput;
         excludedInput.exclude = true;
+        excludedInput.isGroup = false;
+        input.isGroup = false;
         excludedInput.pathPattern = "src\\main.cpp";
         BuildFile::Output output;
         output.ignore = false;
@@ -94,6 +97,7 @@ namespace
         rule->forEach = true;
         rule->cmdInputs.inputs.push_back(input);
         rule->cmdInputs.inputs.push_back(excludedInput);
+        rule->orderOnlyInputs.inputs.push_back(input);
         rule->script.script = "type %f > %o";
         rule->outputs.outputs.push_back(output);
         rule->outputs.outputs.push_back(ignoredOutput);
@@ -118,6 +122,7 @@ namespace
         EXPECT_EQ(std::string("<repo>\\output\\lib1.obj"), output00->name().string());
         ASSERT_EQ(1, command0->ignoredOutputs().size());
         EXPECT_EQ(ignoredOutput.path, command0->ignoredOutputs()[0]);
+        EXPECT_EQ(0, command0->orderOnlyInputs().size());
 
         ASSERT_EQ(1, command1->cmdInputs().size());
         auto input10 = command1->cmdInputs()[0];
@@ -155,6 +160,7 @@ namespace
         CompilerSetup setup;
         BuildFile::Input input;
         input.exclude = false;
+        input.isGroup = false;
         input.pathPattern = "src\\main.cpp";
         BuildFile::Output output;
         output.ignore = false;

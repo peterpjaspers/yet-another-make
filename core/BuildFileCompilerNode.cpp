@@ -6,6 +6,7 @@
 #include "GeneratedFileNode.h"
 #include "CommandNode.h"
 #include "GlobNode.h"
+#include "GroupNode.h"
 #include "ExecutionContext.h"
 #include "FileSystem.h"
 #include "FileAspect.h"
@@ -23,7 +24,6 @@ namespace
 
     uint32_t streamableTypeId = 0;
 
-
     void addNode(std::shared_ptr<CommandNode> node) {
         node->context()->nodes().add(node);
     }
@@ -34,6 +34,9 @@ namespace
         node->context()->nodes().add(node);
     }
     void addNode(std::shared_ptr<BuildFileCompilerNode> glob) {
+    }
+    void addNode(std::shared_ptr<GroupNode> group) {
+        group->context()->nodes().add(group);
     }
 
     void removeNode(std::shared_ptr<CommandNode> cmd) {
@@ -59,6 +62,9 @@ namespace
     }
 
     void removeNode(std::shared_ptr<BuildFileCompilerNode> node) {
+    }
+
+    void removeNode(std::shared_ptr<GroupNode> node) {
     }
 
     template<class TNode>
@@ -239,10 +245,12 @@ namespace YAM
                 _buildFileParser->parseTree());
             updateMap<GeneratedFileNode>(context(), _outputs, compiler.outputs());
             updateMap<CommandNode>(context(), _commands, compiler.commands());
+            updateMap<GroupNode>(context(), _outputGroups, compiler.groups());
             SourceFileNode* buildFileNode = _buildFileParser->buildFile().get();
             for (auto const& pair : _commands) {
                 pair.second->buildFile(buildFileNode);
             }
+
             if (validGeneratedInputs()) {
                 _executionHash = computeExecutionHash();
                 notifyProcessingCompletion(Node::State::Ok);
