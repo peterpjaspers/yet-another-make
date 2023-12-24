@@ -14,7 +14,10 @@ namespace {
         TokenSpec(R"(^:)", "rule"),
         TokenSpec(R"(^foreach)", "foreach"),
         TokenSpec(R"(^\^)", "not"),
-        TokenSpec(R"(^\\?(?:[\w\.\*\?\%\[\]-])+(?:\\([\w\.\*\?\%\[\]-])+)*)", "glob"),
+        TokenSpec(R"(^\{)", "{"),
+        TokenSpec(R"(^\})", "}"),
         TokenSpec(R"(^\|>(((?!\|>)\S|\s)*)\|>)", "script", 1),
+        TokenSpec(R"(^\|[^>])", "|"),
+        TokenSpec(R"(^[^\{\}\|]\\?(?:[\w\.\*\?\%\[\]-])+(?:\\([\w\.\*\?\%\[\]-])+)*)", "glob"),
     };
 }

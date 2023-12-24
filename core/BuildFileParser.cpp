@@ -126,15 +126,21 @@ namespace YAM {
             eat("foreach");
         }
         parseInputs(rule->cmdInputs);
+        parseOrderOnlyInputs(rule->orderOnlyInputs);
         parseScript(rule->script);
         parseOutputs(rule->outputs);
+        parseGroup(rule->outputGroup);
         return rule;
     }
 
     void BuildFileParser::parseInputs(BuildFile::Inputs& inputs) {
         inputs.line = _tokenizer.tokenStartLine();
         inputs.column = _tokenizer.tokenStartColumn();
-        while (_lookAhead.type != "script") {
+        while (
+            _lookAhead.type == "{" 
+            || _lookAhead.type == "not" 
+            || _lookAhead.type == "glob"
+        ) {
             BuildFile::Input in;
             parseInput(in);
             inputs.inputs.push_back(in);
@@ -144,10 +150,33 @@ namespace YAM {
     void BuildFileParser::parseInput(BuildFile::Input& input) {
         input.line = _tokenizer.tokenStartLine();
         input.column = _tokenizer.tokenStartColumn();
-        input.exclude = _lookAhead.type == "not";
-        if (input.exclude) eat("not");
-        parseGlob(input.pathPattern);
+        if (_lookAhead.type == "{") {
+            eat("{");
+            input.exclude = false;
+            input.isGroup = true;
+            parsePath(input.pathPattern);
+            eat("}");
+        } else if (_lookAhead.type == "not") {
+            input.isGroup = false;
+            input.exclude = true;
+            eat("not");
+            parseGlob(input.pathPattern);
+        } else if (_lookAhead.type == "glob") {
+            input.isGroup = false;
+            input.exclude = false;
+            parseGlob(input.pathPattern);
+        }
     }
+
+    void BuildFileParser::parseOrderOnlyInputs(BuildFile::Inputs& inputs) {
+        inputs.line = _tokenizer.tokenStartLine();
+        inputs.column = _tokenizer.tokenStartColumn();
+        if (_lookAhead.type == "|") {
+            eat("|");
+            parseInputs(inputs);
+        }
+    }
+
 
     void BuildFileParser::parseScript(BuildFile::Script& script) {
         script.line = _tokenizer.tokenStartLine();
@@ -170,6 +199,14 @@ namespace YAM {
         output.column = _tokenizer.tokenStartColumn();
         output.ignore = _lookAhead.type == "not";
         parsePath(output.path);
+    }
+
+    void BuildFileParser::parseGroup(std::filesystem::path& groupName) {
+        if (_lookAhead.type == "{") {
+            eat("{");
+            parsePath(groupName);
+            eat("}");
+        }
     }
 
     void BuildFileParser::parseGlob(std::filesystem::path& glob) {

@@ -188,11 +188,13 @@ namespace YAM
         std::shared_ptr<BuildFile::Rule> parseRule();
         void parseInputs(BuildFile::Inputs& inputs);
         void parseInput(BuildFile::Input& input);
+        void parseOrderOnlyInputs(BuildFile::Inputs& inputs);
         void parseScript(BuildFile::Script& script);
         void parseOutputs(BuildFile::Outputs& outputs);
         void parseOutput(BuildFile::Output& output);
         void parseGlob(std::filesystem::path& glob);
         void parsePath(std::filesystem::path& path);
+        void parseGroup(std::filesystem::path& groupName);
 
         std::filesystem::path _buildFilePath;
         BuildFileTokenizer _tokenizer;

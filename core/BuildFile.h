@@ -25,10 +25,12 @@ namespace YAM {
         struct __declspec(dllexport) Input : public Node {
             bool exclude;
             std::filesystem::path pathPattern;
+            bool isGroup;
 
             void addHashes(std::vector<XXH64_hash_t>& hashes) override {
                 Node::addHashes(hashes);
                 hashes.push_back(exclude);
+                hashes.push_back(isGroup);
                 hashes.push_back(XXH64_string(pathPattern.string()));
             }
         };
@@ -73,12 +75,14 @@ namespace YAM {
             }
         };
 
+
         struct __declspec(dllexport) Rule : public Node {
             bool forEach;
             Inputs cmdInputs;
             Inputs orderOnlyInputs;
             Script script;
             Outputs outputs;
+            std::filesystem::path outputGroup;
 
             void addHashes(std::vector<XXH64_hash_t>& hashes) override {
                 Node::addHashes(hashes);
