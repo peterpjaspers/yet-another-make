@@ -31,7 +31,7 @@ namespace AccessMonitor {
     // ToDo: Do not allow (un)registration while libraries are patched
     void registerPatch( std::string name, PatchFunction function ) {
         static const char* signature = "void registerPatch( std::string name, PatchFunction function )";
-        if (0 < registeredPatches.count( name )) throw signature + string( " - Function " ) + name + string( " already registred!" );
+        if (0 < registeredPatches.count( name )) throw signature + string( " - Function " ) + name + string( " already registered!" );
         registeredPatches[ name ] = function;
         if(logging( Normal )) { log() << L"Registered function " << widen( name ) << endLine; };
 

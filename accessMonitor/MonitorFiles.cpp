@@ -2,11 +2,12 @@
 #include "Monitor.h"
 #include "Patch.h"
 #include "Log.h"
+#include "FileAccessEvents.h"
 
 #include <windows.h>
-#include <filesystem>
-#include <chrono>
 #include <map>
+#include <chrono>
+#include <mutex>
 
 // ToDo: Multi-thread safe implementation (in particular accessedFiles map)
 // Not sure if we can tolerate a synchronization mutex on the map
@@ -24,35 +25,13 @@ using namespace filesystem;
 
 namespace AccessMonitor {
 
-    FileAccessState::FileAccessState() : accessedModes( AccessNone ) {}
-
     namespace {
 
-        thread_local map< wstring, FileAccessState > accessedFiles;
-
-        struct FileAccess {
-            const wstring& fileName;
-            FileAccessState& state;
-            FileAccess() = delete;
-            FileAccess( const wstring& f, FileAccessState& s ) : fileName( f ), state( s ) {}
-        };
-
         FileAccessMode requestedAccessMode( DWORD desiredAccess );
-        wstring modeString( FileAccessMode mode );
-        FileAccessMode accessModes( HANDLE handle );
 
-        wstring widen( const string& fileName );
-        wstring fullName( HANDLE handle );
-        wstring fullName( const char* fileName );
-        wstring fullName( const wchar_t* fileName );
-        wstring fullName( const wstring& fileName );
-
-        FileAccess fileAccess( const string& fileName, FileAccessMode mode );
-        FileAccess fileAccess( const wstring& fileName, FileAccessMode mode );
-
-        void getLastWriteTime( HANDLE handle, FileTime& timePoint );
-        void getLastWriteTime( const wstring& fileName, FileTime& timePoint );
-        void getLastWriteTime( const wstring& fileName );
+        wstring fileAccess( const string& fileName, FileAccessMode mode );
+        wstring fileAccess( const wstring& fileName, FileAccessMode mode );
+        wstring fileAccess( HANDLE handle, FileAccessMode mode = AccessNone );
 
         typedef BOOL(*TypeCreateDirectoryA)(LPCSTR,LPSECURITY_ATTRIBUTES);
         BOOL PatchCreateDirectoryA(
@@ -133,9 +112,7 @@ namespace AccessMonitor {
             auto function = reinterpret_cast<TypeCreateFileA>(original( (PatchFunction)PatchCreateFileA ));
             HANDLE handle = function( fileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile );
             if (logging( Terse )) log() << L"MonitorFiles - CreateFileA( " << fileName << L", ... ) -> " << handle << endLine;
-            auto mode = requestedAccessMode( dwDesiredAccess );
-            auto access = fileAccess( fileName, mode );
-            if ( mode == AccessRead ) getLastWriteTime( access.fileName );
+            fileAccess( handle, requestedAccessMode( dwDesiredAccess ) );
             return handle;
         }
         typedef HANDLE(*TypeCreateFileW)(LPCWSTR,DWORD,DWORD,LPSECURITY_ATTRIBUTES,DWORD,DWORD,HANDLE);
@@ -151,7 +128,7 @@ namespace AccessMonitor {
             auto function = reinterpret_cast<TypeCreateFileW>(original( (PatchFunction)PatchCreateFileW ));
             HANDLE handle = function( fileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile );
             if (logging( Terse )) log() << L"MonitorFiles - CreateFileW( " << fileName << L", ... ) -> " << handle << endLine;
-            fileAccess( fileName, requestedAccessMode( dwDesiredAccess ) );
+            fileAccess( handle, requestedAccessMode( dwDesiredAccess ) );
             return handle;
         }
         typedef HANDLE(*TypeCreateFile2)(LPCWSTR,DWORD,DWORD,DWORD,LPCREATEFILE2_EXTENDED_PARAMETERS);
@@ -165,7 +142,7 @@ namespace AccessMonitor {
             auto function = reinterpret_cast<TypeCreateFile2>(original( (PatchFunction)PatchCreateFile2 ));
             HANDLE handle = function( fileName, dwDesiredAccess, dwShareMode, dwCreationDisposition, pCreateExParams );
             if (logging( Terse )) log() << L"MonitorFiles - CreateFile2( " << fileName << L", ... ) -> " << handle << endLine;
-            fileAccess( fileName, requestedAccessMode( dwDesiredAccess ) );
+            fileAccess( handle, requestedAccessMode( dwDesiredAccess ) );
             return handle;
         }
         typedef BOOL(*TypeDeleteFIleA)(LPCSTR);
@@ -194,8 +171,7 @@ namespace AccessMonitor {
             BOOL copied = function( existingFileName, newFileName, failIfExists );
             if (logging( Terse )) log() << L"MonitorFiles - CopyFileA( " << existingFileName << L", " << newFileName << L", ... ) -> " << copied << endLine;
             fileAccess( existingFileName, AccessRead );
-            auto access = fileAccess( newFileName, AccessWrite );
-            getLastWriteTime( access.fileName, access.state.lastWriteTime );
+            fileAccess( newFileName, AccessWrite );
             return copied;
         }
         typedef BOOL(*TypeCopyFileW)(LPCWSTR,LPCWSTR,BOOL);
@@ -208,8 +184,7 @@ namespace AccessMonitor {
             BOOL copied = function( existingFileName, newFileName, failIfExists );
             if (logging( Terse )) log() << L"MonitorFiles - CopyFileW( " << existingFileName << L", " << newFileName << L", ... ) -> " << copied << endLine;
             fileAccess( existingFileName, (AccessRead | AccessDelete) );
-            auto access = fileAccess( newFileName, AccessWrite );
-            getLastWriteTime( access.fileName, access.state.lastWriteTime );
+            fileAccess( newFileName, AccessWrite );
             return copied;
         }
         typedef BOOL(*TypeCopyFileExA)(LPCSTR,LPCSTR,LPPROGRESS_ROUTINE,LPVOID,LPBOOL,DWORD);
@@ -225,8 +200,7 @@ namespace AccessMonitor {
             BOOL copied = function( existingFileName, newFileName, lpProgressRoutine, lpData, pbCancel, dwCopyFlags );
             if (logging( Terse )) log() << L"MonitorFiles - CopyFileExA( " << existingFileName << L", " << newFileName << L", ... ) -> " << copied << endLine;
             fileAccess( existingFileName, AccessRead );
-            auto access = fileAccess( newFileName, AccessWrite );
-            getLastWriteTime( access.fileName, access.state.lastWriteTime );
+            fileAccess( newFileName, AccessWrite );
             return copied;
         }
         typedef BOOL(*TypeCopyFileExW)(LPCWSTR,LPCWSTR,LPPROGRESS_ROUTINE,LPVOID,LPBOOL,DWORD);
@@ -242,8 +216,7 @@ namespace AccessMonitor {
             BOOL copied = function( existingFileName, newFileName, lpProgressRoutine, lpData, pbCancel, dwCopyFlags );
             if (logging( Terse )) log() << L"MonitorFiles - CopyFileExW( " << existingFileName << L", " << newFileName << L", ... ) -> " << copied << endLine;
             fileAccess( existingFileName, AccessRead );
-            auto access = fileAccess( newFileName, AccessWrite );
-            getLastWriteTime( access.fileName, access.state.lastWriteTime );
+            fileAccess( newFileName, AccessWrite );
             return copied;
         }
         typedef HRESULT(*TypeCopyFile2)(PCWSTR,PCWSTR,COPYFILE2_EXTENDED_PARAMETERS*);
@@ -256,8 +229,7 @@ namespace AccessMonitor {
             BOOL copied = function( existingFileName, newFileName, pExtendedParameters );
             if (logging( Terse )) log() << L"MonitorFiles - CopyFile2( " << existingFileName << L", " << newFileName << L", ... ) -> " << copied << endLine;
             fileAccess( existingFileName, AccessRead );
-            auto access = fileAccess( newFileName, AccessWrite );
-            getLastWriteTime( access.fileName, access.state.lastWriteTime );
+            fileAccess( newFileName, AccessWrite );
             return copied;
         }
         typedef BOOL(*TypeMoveFileA)(LPCSTR,LPCSTR);
@@ -269,8 +241,7 @@ namespace AccessMonitor {
             BOOL moved = function( existingFileName, newFileName );
             if (logging( Terse )) log() << L"MonitorFiles - MoveFileA( " << existingFileName << L", " << newFileName << L", ... ) -> " << moved << endLine;
             fileAccess( existingFileName, AccessDelete );
-            auto access = fileAccess( newFileName, AccessWrite );
-            getLastWriteTime( access.fileName, access.state.lastWriteTime );
+            fileAccess( newFileName, AccessWrite );
             return moved;
         }       
         typedef BOOL(*TypeMoveFileW)(LPCWSTR,LPCWSTR);
@@ -282,8 +253,7 @@ namespace AccessMonitor {
             BOOL moved = function( existingFileName, newFileName );
             if (logging( Terse )) log() << L"MonitorFiles - MoveFileW( " << existingFileName << L", " << newFileName << L", ... ) -> " << moved << endLine;
             fileAccess( existingFileName, AccessDelete );
-            auto access = fileAccess( newFileName, AccessWrite );
-            getLastWriteTime( access.fileName, access.state.lastWriteTime );
+            fileAccess( newFileName, AccessWrite );
             return moved;
         }
         typedef BOOL(*TypeMoveFileWithProgressA)(LPCSTR,LPCSTR,LPPROGRESS_ROUTINE,LPVOID,DWORD);
@@ -298,8 +268,7 @@ namespace AccessMonitor {
             BOOL moved = function( existingFileName, newFileName, lpProgressRoutine, lpData, dwFlags );
             if (logging( Terse )) log() << L"MonitorFiles - MoveFileWithProgressA( " << existingFileName << L", " << newFileName << L", ... ) -> " << moved << endLine;
             fileAccess( existingFileName, AccessDelete );
-            auto access = fileAccess( newFileName, AccessWrite );
-            getLastWriteTime( access.fileName, access.state.lastWriteTime );
+            fileAccess( newFileName, AccessWrite );
             // ToDo: Record last write time on newFileName (wait until copy coplete!)
             return moved;
         }
@@ -315,8 +284,7 @@ namespace AccessMonitor {
             BOOL moved = function( existingFileName, newFileName, lpProgressRoutine, lpData, dwFlags );
             if (logging( Terse )) log() << L"MonitorFiles - MoveFileWithProgressW( " << existingFileName << L", " << newFileName << L", ... ) -> " << moved << endLine;
             fileAccess( existingFileName, AccessDelete );
-            auto access = fileAccess( newFileName, AccessWrite );
-            getLastWriteTime( access.fileName, access.state.lastWriteTime );
+            fileAccess( newFileName, AccessWrite );
             // ToDo: Record last write time on newFileName (wait until copy complete!)
             return moved;
         }
@@ -438,22 +406,15 @@ namespace AccessMonitor {
             fileAccess( fileName, AccessWrite );
             return set;
         }
-
         typedef BOOL(*TypeCloseHandle)(HANDLE);
         BOOL PatchCloseHandle( HANDLE handle ) {
             auto function = reinterpret_cast<TypeCloseHandle>(original( (PatchFunction)PatchCloseHandle ));
             // Record last write time when closing file opened for write
-            wstring fileName = fullName( handle );
-            auto entry = accessedFiles.find( fileName );
-            if ((entry != accessedFiles.end()) && ((accessModes( handle ) & AccessWrite) != 0)) {
-                getLastWriteTime( handle, entry->second.lastWriteTime );
-                if (logging( Verbose )) log() << L"MonitorFiles - Last write time " << entry->second.lastWriteTime << L" for write access on " << fileName.c_str() << endLine;
-            }
+            wstring fileName = fileAccess( handle );
             BOOL closed = function( handle );
             if (logging( Terse )) log() << L"MonitorFiles - CloseHandle( " << fileName.c_str() << L", ... ) -> " << closed << endLine;
             return closed;
         }
-
         // Convert Windows access mode value to FileAccessMode value
         FileAccessMode requestedAccessMode( DWORD desiredAccess ) {
             FileAccessMode mode = 0;
@@ -465,32 +426,28 @@ namespace AccessMonitor {
         }
 
         // Determine access modes to opened file
-        FileAccessMode accessModes( HANDLE handle ) {
+        FileAccessMode accessMode( HANDLE handle ) {
             FileAccessMode mode( AccessNone );
             uint32_t flags;
-            DWORD error = GetLastError();
             DWORD infoError = GetFileInformationByHandleEx( handle, (FILE_INFO_BY_HANDLE_CLASS)8, &flags, sizeof( flags ) );
             if (infoError == ERROR_SUCCESS) {
                 if ((FILE_READ_DATA & flags) != 0) mode |= AccessRead;
                 if ((FILE_WRITE_DATA & flags) != 0) mode |= AccessWrite;
                 if ((FILE_APPEND_DATA & flags) != 0) mode |= AccessWrite;
             }
-            SetLastError( error );
             return mode;
         }
 
-
-        // Convert FileAccessMode value to string
-        wstring modeString( FileAccessMode mode ) {
-            auto s = wstring( L"" );
-            if ((mode & AccessRead) != 0) s += L"Read ";
-            if ((mode & AccessWrite) != 0) s += L"Write ";
-            if ((mode & AccessDelete) != 0) s += L"Delete ";
-            if ((mode & AccessVariable) != 0) s += L"Variable ";
-            return s;
+        inline wstring widen( const string& fileName ) {
+        if (fileName.empty()) return {};
+        int len = MultiByteToWideChar( CP_UTF8, 0, &fileName[0], fileName.size(), NULL, 0 );
+        wstring wideFileName( len, 0 );
+        MultiByteToWideChar( CP_UTF8, 0, &fileName[0], fileName.size(), &wideFileName[0], len );
+        return wideFileName;
         }
 
-        // File name from Windows handle
+        // Extract file name from handle to opened file
+        // Will return null string if handle does not refer to a file
         wstring fullName( HANDLE handle ) {
             wchar_t fileNameString[ MaxFileName ];
             wstring fileName;
@@ -501,28 +458,16 @@ namespace AccessMonitor {
             }
             return fileName;
         }
-
-        inline wstring widen( const string& fileName ) {
-        if (fileName.empty()) return {};
-        int len = MultiByteToWideChar( CP_UTF8, 0, &fileName[0], fileName.size(), NULL, 0 );
-        wstring wideFileName( len, 0 );
-        MultiByteToWideChar( CP_UTF8, 0, &fileName[0], fileName.size(), &wideFileName[0], len );
-        return wideFileName;
-        }
-        // ToDo: Remove use of GetFullPathName as this makes use of of the current directory global
-        // and is therefore not thread safe.
-        // Expand file name to full path (according to Windows)
-        wstring fullName( const char* fileName ) {
-            return fullName( widen( string( fileName ) ) );
-        }
+        // Expand file name to full path (according to Windows semantics)
         wstring fullName( const wchar_t* fileName ) {
             wchar_t filePath[ MaxFileName ];
             wchar_t* fileNameAddress;
-            DWORD error = GetLastError();
             DWORD length = GetFullPathNameW( fileName, MaxFileName, filePath, &fileNameAddress );
-            SetLastError( error );
             if (length == 0) return wstring( fileName );
             return wstring( filePath );
+        }
+        wstring fullName( const char* fileName ) {
+            return fullName( widen( string( fileName ) ).c_str() );
         }
         wstring fullName( const wstring& fileName ) {
             return fullName( fileName.c_str() );
@@ -530,64 +475,68 @@ namespace AccessMonitor {
 
         // Retrieve last write time on a file (handle)
         // Note that Windows file times have (limited) millisecond resolution
-        void getLastWriteTime( HANDLE handle, FileTime& timePoint ) {
+        // Will return default time (i.e., 1970-01-01) if handle does not refer to a file.
+        FileTime getLastWriteTime( HANDLE handle ) {
+            FileTime time;
             FILETIME fileTime;
-            DWORD error = GetLastError();
             if (GetFileTime( handle, nullptr, nullptr, &fileTime )) {
                 // Convert Windows FILETIME to C++ chrono::time_point as system clock time
                 SYSTEMTIME systemFileTime;
                 if (FileTimeToSystemTime( &fileTime, &systemFileTime )) {
-                    tm time;
-                    time.tm_year = (systemFileTime.wYear - 1900);
-                    time.tm_mon = (systemFileTime.wMonth - 1);
-                    time.tm_mday = systemFileTime.wDay;
-                    time.tm_hour = systemFileTime.wHour;
-                    time.tm_min = systemFileTime.wMinute;
-                    time.tm_sec = systemFileTime.wSecond;
-                    time.tm_isdst = 0;
-                    timePoint = chrono::system_clock::from_time_t( mktime( &time ) );
-                    timePoint += (systemFileTime.wMilliseconds * chrono::milliseconds(1) );
+                    tm t;
+                    t.tm_year = (systemFileTime.wYear - 1900);
+                    t.tm_mon = (systemFileTime.wMonth - 1);
+                    t.tm_mday = systemFileTime.wDay;
+                    t.tm_hour = systemFileTime.wHour;
+                    t.tm_min = systemFileTime.wMinute;
+                    t.tm_sec = systemFileTime.wSecond;
+                    t.tm_isdst = 0;
+                    time = chrono::system_clock::from_time_t( mktime( &t ) );
+                    time += (systemFileTime.wMilliseconds * chrono::milliseconds(1) );
                 }
             }
-            SetLastError( error );
+            return time;
         }
 
         // Get last write time of a (named) file
-        void getLastWriteTime( const wstring& fileName, FileTime& timePoint ) {
-            wstring fullFileName = fullName( fileName );
-            DWORD error = GetLastError();
+        FileTime getLastWriteTime( const wstring& fileName ) {
+            FileTime time;
+            wstring fullFileName = fullName( fileName.c_str() );
             auto createFile = reinterpret_cast<TypeCreateFileW>(original( (PatchFunction)PatchCreateFileW ));
             HANDLE handle = createFile( fullFileName.c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr );
             DWORD createError = GetLastError();
             if (createError == ERROR_SUCCESS) {
-                getLastWriteTime( handle, timePoint );
-                if (logging( Verbose )) log() << L"MonitorFiles - Last write time " << timePoint << L" for access on " << fileName << endLine;
+                time = getLastWriteTime( handle );
+                if (logging( Verbose )) log() << L"MonitorFiles - Last write time " << time << L" for access on " << fileName << endLine;
                 auto closeFile = reinterpret_cast<TypeCloseHandle>(original( (PatchFunction)PatchCloseHandle ));
                 closeFile( handle );
             }
-            SetLastError( error );
+            return time;
         }
-        void getLastWriteTime( const wstring& fileName ) {
-            wstring fullFileName = fullName( fileName.c_str() );
-            auto access = accessedFiles.find( fullFileName );
-            if (access != accessedFiles.end()) getLastWriteTime( fullFileName, access->second.lastWriteTime );
+        FileTime getLastWriteTime( const string& fileName ) {
+            return getLastWriteTime( widen( fileName ) );
         }
 
         // Register file access mode on file (path)
-        FileAccess fileAccess( const wstring& fileName, FileAccessMode mode ) {
-            auto fullFileName = fullName( fileName );
-            if (logging( Terse )) log() << L"MonitorFiles - " << modeString( mode ) << L"access on file " << fullFileName << endLine;
-            auto insertion = accessedFiles.insert( pair{ fullFileName, FileAccessState() } );
-            FileAccessState& fileAccessData = insertion.first->second;
-            if ( insertion.second && (mode == AccessRead) ) {
-                // First access on file is read, record last write time...
-                getLastWriteTime( insertion.first->first, fileAccessData.lastWriteTime );
-            }
-            fileAccessData.accessedModes |= mode;
-            return { fullFileName, fileAccessData };
+        wstring fileAccess( const wstring& fileName, FileAccessMode mode ) {
+            DWORD error = GetLastError();
+            auto fullFileName = fullName( fileName.c_str() );
+            if (logging( Terse )) log() << L"MonitorFiles - " << modeString( mode ) << L"access by name on file " << fullFileName << endLine;
+            if (fullFileName != L"") recordFileEvent( fullFileName, mode, getLastWriteTime( fileName ) );
+            SetLastError( error );
+            return fullFileName;
         }
-        FileAccess fileAccess( const string& fileName, FileAccessMode mode ) {
+        wstring fileAccess( const string& fileName, FileAccessMode mode ) {
             return fileAccess( widen( fileName ), mode );
+        }
+        wstring fileAccess( HANDLE handle, FileAccessMode mode ) {
+            DWORD error = GetLastError();
+            auto fullFileName = fullName( handle );
+            if (mode == AccessNone) mode = accessMode( handle );
+            if (logging( Terse )) log() << L"MonitorFiles - " << modeString( mode ) << L"access by handle on file " << fullFileName << endLine;
+            if (fullFileName != L"") recordFileEvent( fullFileName, mode, getLastWriteTime( handle ) );
+            SetLastError( error );
+            return fullFileName;
         }
 
     }
@@ -654,13 +603,5 @@ namespace AccessMonitor {
         unregisterPatch( "SetFileAttributesW" );
         unregisterPatch( "CloseHandle" );
     }
-
-    void streamAccessedFiles( wostream& stream ) {
-        for ( auto access : accessedFiles ) {
-            const wstring& file = access.first;
-            const FileAccessState& data = access.second;
-            stream << file << " [ " << data.lastWriteTime << " ] " << modeString( data.accessedModes ) << "\n";
-        }
-    };
 
 } // namespace AccessMonitor

@@ -11,7 +11,6 @@ namespace AccessMonitor {
 
     // Start monitoring file access in identified process.
     // Processes and threads spawned by the process will also be monitored.
-    // Behavior is undefined if process is not in suspend state and is not the current process.
     void startMonitoring( ProcessId process );
 
     // Stop monitoring file access.

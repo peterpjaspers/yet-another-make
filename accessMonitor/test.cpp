@@ -1,5 +1,6 @@
 #include "Monitor.h"
 #include "MonitorFiles.h"
+#include "FileAccessEvents.h"
 #include "Log.h"
 
 #include <windows.h>
@@ -25,7 +26,7 @@ void worker( const path directoryPath ) {
     ofstream file( directoryPath / "junk.txt" );
     file << "Hello world!\n";
     file.close();
-    this_thread::sleep_for(chrono::milliseconds(100));;
+    this_thread::sleep_for(chrono::milliseconds(rand() % 17));;
     ofstream anotherFile( directoryPath / "moreJunk.txt" );
     anotherFile << "Hello again!\n";
     anotherFile.close();
@@ -35,33 +36,34 @@ void worker( const path directoryPath ) {
     remove_all( directoryPath );
 }
 
-void doFileAccess( bool multithreaded ) {
-    worker( path( "./fileAccessTest" ) );
+void doFileAccess( bool multithreaded = true ) {
     if (multithreaded) {
+        auto t = jthread( worker, path( "./fileAccessTest" ) );
         auto t0 = jthread( worker, path( "./fileAccessTest0" ) );
         auto t1 = jthread( worker, path( "./fileAccessTest1" ) );
         auto t2 = jthread( worker, path( "./fileAccessTest2" ) );
         auto t3 = jthread( worker, path( "./fileAccessTest3" ) );
+    } else {
+        worker( path( "./fileAccessTest" ) );
     }
 }
 
 int main() {
-    bool multithreaded = true;
     try {
-        enableLog( "testLog.txt", Terse );
+        enableLog( "testLog.txt", Verbose );
         log() << "Performing file access without monitoring..." << endLine;
-        doFileAccess( multithreaded );
+        doFileAccess();
         log() << "Start monitoring..." << endLine;
         startMonitoring();
         log() << "Performing file access with monitoring..." << endLine;
-        doFileAccess( multithreaded );
+        doFileAccess();
         log() << "Stop monitoring..." << endLine;
         stopMonitoring();
         wofstream files( "./accessedFiles.txt" );
         streamAccessedFiles( files );
         files.close();
         log() << "Performing file access without monitoring..." << endLine;
-        doFileAccess( multithreaded );
+        doFileAccess();
         log() << "Done..." << endLine;
     }
     catch ( string message ) {

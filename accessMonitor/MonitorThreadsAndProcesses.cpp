@@ -9,7 +9,7 @@
 
 #pragma comment(lib, "Advapi32")
 
-// ToDo: Process adminstration for use by application
+// ToDo: Inter-process file event queue
 
 using namespace std;
 
@@ -147,22 +147,6 @@ namespace AccessMonitor {
             return result;
             
         }
-        typedef void(*TypeExitThread)(DWORD);
-        void PatchExitThread(
-            DWORD dwExitCode
-        ) {
-            TypeExitThread function = reinterpret_cast<TypeExitThread>(original( (PatchFunction)PatchExitThread));
-            if (logging( Terse )) log() << "MonitorProcessesAndThreads - ExitThread( " << dwExitCode << " )" << endLine;
-            function( dwExitCode );
-        }
-        typedef void(*TypeExitProcess)(DWORD);
-        void PatchExitProcess(
-            UINT uExitCode
-        ) {
-            TypeExitProcess function = reinterpret_cast<TypeExitProcess>(original( (PatchFunction)PatchExitProcess));
-            if (logging( Terse )) log() << "MonitorProcessesAndThreads - ExitProcess( " << uExitCode << " )" << endLine;
-            function( uExitCode );
-        }
     }
 
     void registerProcessesAndThreads() {
@@ -173,8 +157,6 @@ namespace AccessMonitor {
         registerPatch( "CreateProcessWithLogonW", (PatchFunction)PatchCreateProcessWithLogonW );
         registerPatch( "CreateProcessWithTokenW", (PatchFunction)PatchCreateProcessWithTokenW );
         registerPatch( "NtCreateUserProcess", (PatchFunction)PatchNtCreateUserProcess );
-        registerPatch( "ExitThread", (PatchFunction)PatchExitThread );
-        registerPatch( "ExitProcess", (PatchFunction)PatchExitProcess );
     }
     void unregisterProcessCreation() {
         unregisterPatch( "CreateProcessA" );
@@ -184,7 +166,5 @@ namespace AccessMonitor {
         unregisterPatch( "CreateProcessWithLogonW" );
         unregisterPatch( "CreateProcessWithTokenW" );
         unregisterPatch( "NtCreateUserProcess" );
-        unregisterPatch( "ExitThread" );
-        unregisterPatch( "ExitProcess" );
     }
 }

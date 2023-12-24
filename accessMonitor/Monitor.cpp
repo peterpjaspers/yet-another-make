@@ -9,7 +9,6 @@ namespace AccessMonitor {
 
     namespace {
         static bool monitoring = false;
-        static bool monitoringProcessesAndThreads = false;
     }
 
     void startMonitoring() {
