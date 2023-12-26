@@ -27,14 +27,14 @@ namespace
     }
 
     std::filesystem::path uniqueCmdName(
-        NodeSet& nodes, 
+        NodeSet& nodes,
         std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const& newCommands
     ) {
         std::filesystem::path uid = uidPath();
         while (
             (nodes.find(uid) != nullptr)
             && (newCommands.find(uid) != newCommands.end())
-        )  {
+        ) {
             uid = uidPath();
         }
         return uid;
@@ -61,17 +61,16 @@ namespace
         return resolved;
     }
 
+    // Return -1 if stringWithFlags[i] is not a digit
     std::size_t parseOffset(
         std::filesystem::path const& buildFile,
         BuildFile::Node const& node,
-        std::string string,
-        std::size_t& i,
-        std::size_t defaultOffset,
-        std::size_t maxOffset
+        std::string stringWithFlags,
+        std::size_t& i
     ) {
-        std::size_t nChars = string.length();
-        char const* chars = string.data();
-        std::size_t offset = defaultOffset;
+        std::size_t nChars = stringWithFlags.length();
+        char const* chars = stringWithFlags.data();
+        std::size_t offset = -1;
         if (isdigit(chars[i])) {
             offset = 0;
             std::size_t mul = 1;
@@ -82,7 +81,7 @@ namespace
             if (i >= nChars) {
                 std::stringstream ss;
                 ss <<
-                    "Unexpected end after '%" << offset << "' in " << string
+                    "Unexpected end after '%" << offset << "' in " << stringWithFlags
                     << " at line " << node.line << " at column " << node.column
                     << " in build file " << buildFile.string()
                     << std::endl;
@@ -91,45 +90,116 @@ namespace
             if (offset == 0) {
                 std::stringstream ss;
                 ss <<
-                    "Offset must >= 1 " << offset << "after '%' " << "in " << string
+                    "Offset must >= 1 " << offset << "after '%' " << "in " << stringWithFlags
                     << " at line " << node.line << " at column " << node.column
                     << " in build file " << buildFile.string()
                     << std::endl;
                 throw std::runtime_error(ss.str());
             }
-            if (offset > maxOffset) {
-                std::stringstream ss;
-                ss <<
-                    "Too large offset " << offset << "after '%' " << "in " << string
-                    << " at line " << node.line << " at column " << node.column
-                    << " in build file " << buildFile.string()
-                    << std::endl;
-                throw std::runtime_error(ss.str());
-            }
+            offset -= 1;
         }
-        return offset-1;
+        return offset;
+    }
+
+    void assertOffset(
+        std::filesystem::path const& buildFile,
+        BuildFile::Node const& node,
+        std::string stringWithFlags,
+        std::size_t offset,
+        std::size_t maxOffset
+    ) {
+        if (offset == -1) return;
+        if (offset > maxOffset) {
+            std::stringstream ss;
+            ss <<
+                "Too large offset " << offset << "after '%' " << "in " << stringWithFlags
+                << " at line " << node.line << " at column " << node.column
+                << " in build file " << buildFile.string()
+                << std::endl;
+            throw std::runtime_error(ss.str());
+        }
+    }
+
+    std::string compileFlag1(
+        std::filesystem::path const& buildFile,
+        BuildFile::Node const& node,
+        std::string const& stringWithFlags,
+        DirectoryNode const* baseDir,
+        FileNode const* fileNode,
+        char flag
+    ) {
+        std::filesystem::path inputPath = resolvePath(baseDir, fileNode);
+        if (flag == 'f') {
+            return inputPath.string();
+        } else if (flag == 'b') {
+            return inputPath.filename().string();
+        } else if (flag == 'B') {
+            return inputPath.stem().string();
+        } else if (flag == 'e') {
+            return inputPath.extension().string();
+        } else if (flag == 'd') {
+            return inputPath.parent_path().string();
+        } else if (flag == 'D') {
+            std::filesystem::path dir = inputPath.parent_path().filename();
+            return dir.string();
+        } else if (flag == 'o') {
+            return inputPath.string();
+        } else if (flag == 'i') {
+            return inputPath.string();
+        } else {
+            std::stringstream ss;
+            ss <<
+                "Unkown flag %" << flag << " in " << stringWithFlags
+                << " at line " << node.line << " at column " << node.column
+                << " in build file " << buildFile.string()
+                << std::endl;
+            throw std::runtime_error(ss.str());
+        }
+    }
+
+    template<typename T>
+    void compileFlagN(
+        std::filesystem::path const& buildFile,
+        BuildFile::Node const& node,
+        std::string const& stringWithFlags,
+        DirectoryNode const* baseDir,
+        std::size_t offset,
+        std::vector<std::shared_ptr<T>> const& fileNodes,
+        char flag,
+        std::string& result
+     ) {
+        if (offset == -1) {
+            for (auto const& fileNode : fileNodes) {
+                auto path = compileFlag1(buildFile, node, stringWithFlags, baseDir, fileNode.get(), flag);
+                result.append(path);
+            }
+        } else {
+            FileNode const* fileNode = fileNodes[offset].get();
+            auto path = compileFlag1(buildFile, node, stringWithFlags, baseDir, fileNode, flag);
+            result.append(path);
+        }
     }
 
     std::string compilePercentageFlags(
         std::filesystem::path const& buildFile,
         BuildFile::Node const& node,
         DirectoryNode const* baseDir,
-        std::string const& string,
+        std::string const& stringWithFlags,
         std::vector<std::shared_ptr<FileNode>> const& cmdInputs,
         std::size_t defaultCmdInputOffset,
         std::vector<std::shared_ptr<GeneratedFileNode>> orderOnlyInputs,
         std::vector<std::shared_ptr<GeneratedFileNode>> const& cmdOutputs,
         bool allowOutputFlag // %o
     ) {
-        std::size_t nChars = string.length();
-        char const* chars = string.data();
+        std::size_t nChars = stringWithFlags.length();
+        char const* chars = stringWithFlags.data();
         std::string result;
         for (std::size_t i = 0; i < nChars; ++i) {
             if (chars[i] == '%') {
                 if (++i >= nChars) {
                     std::stringstream ss;
                     ss <<
-                        "Unexpected '%' at end of " << string
+                        "Unexpected '%' at end of " << stringWithFlags
                         << " at line " << node.line << " at column " << node.column
                         << " in build file " << buildFile.string()
                         << std::endl;
@@ -138,39 +208,19 @@ namespace
                 if (chars[i] == '%') {
                     result.insert(result.end(), '%');
                     break;
-                } 
-                if (allowOutputFlag && chars[i] == 'o') {
-                    std::size_t offset = parseOffset(buildFile, node, string, i, 1, cmdOutputs.size());
-                    result.append(resolvePath(baseDir, cmdOutputs[offset].get()).string());
-                } else if (chars[i] == 'i') {
-                    std::size_t offset = parseOffset(buildFile, node, string, i, 1, orderOnlyInputs.size());
-                    result.append(resolvePath(baseDir, orderOnlyInputs[offset].get()).string());
-                } else {
-                    std::size_t offset = parseOffset(buildFile, node, string, i, defaultCmdInputOffset, cmdInputs.size());
-                    std::filesystem::path inputPath = resolvePath(baseDir, cmdInputs[offset].get()).string();
-                    if (chars[i] == 'f') {
-                        result.append(inputPath.string());
-                    } else if (chars[i] == 'b') {
-                        result.append(inputPath.filename().string());
-                    } else if (chars[i] == 'B') {
-                        result.append(inputPath.stem().string());
-                    } else if (chars[i] == 'e') {
-                        result.append(inputPath.extension().string());
-                    } else if (chars[i] == 'd') {
-                        result.append(inputPath.parent_path().string());
-                    } else if (chars[i] == 'D') {
-                        std::filesystem::path dir = inputPath.parent_path().filename();
-                        result.append(dir.string());
-                    } else {
-                        std::stringstream ss;
-                        ss <<
-                            "Unkown flag %" << chars[i] << " in " << string
-                            << " at line " << node.line << " at column " << node.column
-                            << " in build file " << buildFile.string()
-                            << std::endl;
-                        throw std::runtime_error(ss.str());
-                    }
                 }
+                std::size_t offset = parseOffset(buildFile, node, stringWithFlags, i);
+                if (allowOutputFlag && chars[i] == 'o') {
+                    assertOffset(buildFile, node, stringWithFlags, offset, cmdOutputs.size());
+                    compileFlagN(buildFile, node, stringWithFlags, baseDir, offset, cmdOutputs, chars[i], result);
+                } else if (chars[i] == 'i') {
+                    assertOffset(buildFile, node, stringWithFlags, offset, orderOnlyInputs.size());
+                    compileFlagN(buildFile, node, stringWithFlags, baseDir, offset, orderOnlyInputs, chars[i], result);
+                } else {
+                    assertOffset(buildFile, node, stringWithFlags, offset, cmdInputs.size()); 
+                    if (offset == -1) offset = defaultCmdInputOffset;
+                    compileFlagN(buildFile, node, stringWithFlags, baseDir, offset, cmdInputs, chars[i], result);
+                } 
             } else {
                 result.insert(result.end(), chars[i]);
             }
@@ -357,7 +407,7 @@ namespace YAM {
         std::string compiledScript =
             compilePercentageFlags(
                 buildFile, script, baseDir, script.script,
-                cmdInputs, 1, orderOnlyInputs,
+                cmdInputs, -1, orderOnlyInputs,
                 outputs, true);
         return compiledScript;
     }
@@ -450,7 +500,7 @@ namespace YAM {
         for (auto const& output : outputs.outputs) {
             if (!output.ignore) {
                 for (std::size_t i = 0; i < cmdInputs.size(); ++i) {
-                    std::filesystem::path outputPath = compileOutputPath(output, cmdInputs, i+1);
+                    std::filesystem::path outputPath = compileOutputPath(output, cmdInputs, i);
                     // When output does not contain %-flags then duplicate outputPaths will
                     // be generated when there are multiple cmdInputs. 
                     // E.g. if output==main.exe and inputs are a.obj and b.obj

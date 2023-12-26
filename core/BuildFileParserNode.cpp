@@ -43,7 +43,7 @@ namespace YAM
                     CommandNode::script(script);
                 }
             }
-            _buildFile->setState(Node::State::Dirty);
+            setState(Node::State::Dirty);
         }
     }
 
