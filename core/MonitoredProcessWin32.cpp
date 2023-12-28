@@ -80,7 +80,13 @@ namespace YAM
             _result.readFiles = reader.readFiles();
             _result.writtenFiles = reader.writtenFiles();
             _result.readOnlyFiles = reader.readOnlyFiles();
-            std::filesystem::remove_all(_tempDir);
+            std::error_code ec;
+            std::filesystem::remove_all(_tempDir, ec);
+            if (ec) {
+                // Sometimes directory is still in use. Why?
+                // Ignore error
+                auto msg = ec.message();
+            }
         }
         return _result;
     }

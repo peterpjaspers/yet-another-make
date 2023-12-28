@@ -24,47 +24,62 @@ namespace
 
     uint32_t streamableTypeId = 0;
 
-    void addNode(std::shared_ptr<CommandNode> node) {
-        node->context()->nodes().add(node);
+    void addNode(std::shared_ptr<BuildFileCompilerNode> compiler, StateObserver* observer) {
+        // owned and added to context by DirectoryNode
+        compiler->addObserver(observer);
     }
-    void addNode(std::shared_ptr<GlobNode> node) {
-        node->context()->nodes().add(node);
-    }
-    void addNode(std::shared_ptr<GeneratedFileNode> node) {
-        node->context()->nodes().add(node);
-    }
-    void addNode(std::shared_ptr<BuildFileCompilerNode> glob) {
-    }
-    void addNode(std::shared_ptr<GroupNode> group) {
-        group->context()->nodes().add(group);
+    void addNode(std::shared_ptr<GlobNode> glob, StateObserver* observer) {
+        // A glob node can be shared by multiple compilers.
+        glob->context()->nodes().addIfAbsent(glob);
+        glob->addObserver(observer);
     }
 
-    void removeNode(std::shared_ptr<CommandNode> cmd) {
+    void addNode(std::shared_ptr<CommandNode> node, StateObserver* observer) {
+        node->context()->nodes().add(node);
+    }
+    void addNode(std::shared_ptr<GeneratedFileNode> node, StateObserver* observer) {
+        node->context()->nodes().add(node);
+    }
+    void addNode(std::shared_ptr<GroupNode> group, StateObserver* observer) {
+        // A group node can be shared by multiple compilers.
+        group->context()->nodes().addIfAbsent(group);
+    }
+
+    void removeNode(std::shared_ptr<BuildFileCompilerNode> compiler, StateObserver* observer) {
+        // owned by DirectoryNode
+        compiler->removeObserver(observer);
+    }
+    void removeNode(std::shared_ptr<GlobNode> glob, StateObserver* observer) {
+        // A glob node can be shared by multiple compilers.
+        glob->removeObserver(observer);
+        if (glob->observers().empty()) {
+            glob->context()->nodes().remove(glob);
+        }
+    }
+
+    void removeNode(std::shared_ptr<CommandNode> cmd, StateObserver* observer) {
         static std::vector<std::shared_ptr<GeneratedFileNode>> emptyOutputs;
-
+        static std::vector<std::shared_ptr<FileNode>> emptyCmdInputs;
+        static std::vector<std::shared_ptr<GeneratedFileNode>> emptyOrderOnlyInputs;
         ExecutionContext* context = cmd->context();
         std::vector<std::shared_ptr<GeneratedFileNode>> outputs = cmd->outputs();
         cmd->outputs(emptyOutputs);
+        cmd->cmdInputs(emptyCmdInputs);
+        cmd->orderOnlyInputs(emptyOrderOnlyInputs);
         cmd->setState(Node::State::Deleted);
-        //context->nodes().remove(cmd); // TODO: fix mem mgt
+        context->nodes().remove(cmd);
     }
-
-    void removeNode(std::shared_ptr<GlobNode> glob) {
-        ExecutionContext* context = glob->context();
-        glob->setState(Node::State::Deleted);
-        context->nodes().remove(glob);
-    }
-
-    void removeNode(std::shared_ptr<GeneratedFileNode> node) {
+    void removeNode(std::shared_ptr<GeneratedFileNode> node, StateObserver* observer) {
         ExecutionContext* context = node->context();
         node->setState(Node::State::Deleted);
+        if (!node->observers().empty()) throw std::runtime_error("generated file node still being observed");
         context->nodes().remove(node);
     }
-
-    void removeNode(std::shared_ptr<BuildFileCompilerNode> node) {
-    }
-
-    void removeNode(std::shared_ptr<GroupNode> node) {
+    void removeNode(std::shared_ptr<GroupNode> group, StateObserver* observer) {
+        // owned by all compiler nodes that contribute to the group
+        if (group->observers().empty()) {
+            group->context()->nodes().remove(group);
+        }
     }
 
     template<class TNode>
@@ -87,6 +102,7 @@ namespace
     template <class TNode>
     void updateMap(
         ExecutionContext* context,
+        StateObserver* observer,
         std::map<std::filesystem::path, std::shared_ptr<TNode>>& toUpdate,
         std::map<std::filesystem::path, std::shared_ptr<TNode>> const& newSet
     ) {
@@ -94,8 +110,28 @@ namespace
         std::map<std::filesystem::path, std::shared_ptr<TNode>> added;
         std::map<std::filesystem::path, std::shared_ptr<TNode>> removed;
         computeMapsDifference(newSet, toUpdate, kept, added, removed);
-        for (auto const& pair : added) addNode(pair.second);
-        for (auto const& pair : removed) removeNode(pair.second);
+        for (auto const& pair : added) addNode(pair.second, observer);
+        for (auto const& pair : removed) removeNode(pair.second, observer);
+        toUpdate = newSet;
+    }
+
+    void updateCommands(
+        ExecutionContext* context,
+        StateObserver* observer,
+        std::map<std::filesystem::path, std::shared_ptr<CommandNode>>& toUpdate,
+        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const& newSet
+    ) {
+        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> kept;
+        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> added;
+        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> removed;
+        computeMapsDifference(newSet, toUpdate, kept, added, removed);
+        for (auto const& pair : added) addNode(pair.second, observer);
+        for (auto const& pair : removed) removeNode(pair.second, observer);
+        for (auto const& pair : removed) {
+            auto cmd = pair.second;
+            if (!cmd->observers().empty()) throw std::runtime_error("command node still being observed");
+            context->nodes().remove(cmd);
+        }
         toUpdate = newSet;
     }
 
@@ -148,16 +184,17 @@ namespace YAM
     }
 
     void BuildFileCompilerNode::buildFileParser(std::shared_ptr<BuildFileParserNode> const& newParser) {
+        static std::map<std::filesystem::path, std::shared_ptr<CommandNode>> emptyCmds;
+        static std::map<std::filesystem::path, std::shared_ptr<GroupNode>> emptyGroups;
+        static std::map<std::filesystem::path, std::shared_ptr<BuildFileCompilerNode>> emptyCompilers;
+        static std::map<std::filesystem::path, std::shared_ptr<GlobNode>> emptyGlobs;
         if (_buildFileParser != newParser) {
             if (_buildFileParser != nullptr) {
                 _buildFileParser->removeObserver(this);
-                for (auto const& pair : _depCompilers) pair.second->removeObserver(this);
-                for (auto const& pair : _depGlobs) pair.second->removeObserver(this);
-                for (auto pair : _commands) removeNode(pair.second);
-                for (auto pair : _depGlobs) removeNode(pair.second);
-                _commands.clear();
-                _depCompilers.clear();
-                _depGlobs.clear();
+                updateCommands(context(), this, _commands, emptyCmds);
+                updateMap(context(), this, _outputGroups, emptyGroups);
+                updateMap(context(), this, _depCompilers, emptyCompilers);
+                updateMap(context(), this, _depGlobs, emptyGlobs);
             }
             _buildFileParser = newParser;
             if (_buildFileParser != nullptr) {
@@ -205,13 +242,8 @@ namespace YAM
                 _buildFileParser->workingDirectory(),
                 _buildFileParser->parseTree());
 
-            for (auto const& pair : _depCompilers) pair.second->removeObserver(this);
-            updateMap<BuildFileCompilerNode>(context(), _depCompilers, compiler.compilers());
-            for (auto const& pair : _depCompilers) pair.second->addObserver(this);
-
-            for (auto const& pair : _depGlobs) pair.second->removeObserver(this);
-            updateMap<GlobNode>(context(), _depGlobs, compiler.globs());
-            for (auto const& pair : _depGlobs) pair.second->addObserver(this);
+            updateMap<BuildFileCompilerNode>(context(), this, _depCompilers, compiler.compilers());
+            updateMap<GlobNode>(context(), this, _depGlobs, compiler.globs());
 
             updated = true;
         } catch (std::runtime_error e) {
@@ -257,12 +289,11 @@ namespace YAM
                 context(),
                 _buildFileParser->workingDirectory(),
                 _buildFileParser->parseTree());
-            updateMap<GeneratedFileNode>(context(), _outputs, compiler.outputs());
-            updateMap<CommandNode>(context(), _commands, compiler.commands());
-            updateMap<GroupNode>(context(), _outputGroups, compiler.groups());
-            SourceFileNode* buildFileNode = _buildFileParser->buildFile().get();
+            updateMap<CommandNode>(context(), this, _commands, compiler.commands());
+            updateMap<GroupNode>(context(), this, _outputGroups, compiler.groups());
+            updateMap<GeneratedFileNode>(context(), this, _outputs, compiler.outputs());
             for (auto const& pair : _commands) {
-                pair.second->buildFile(buildFileNode);
+                pair.second->buildFile(_buildFileParser->buildFile().get());
             }
 
             if (validGeneratedInputs()) {
@@ -300,6 +331,7 @@ namespace YAM
     }
 
     bool BuildFileCompilerNode::validGeneratedInputs() const {
+        if (_buildFileParser->buildFile() == nullptr) return true;
         std::unordered_set<BuildFileParserNode const*> usedParsers;
         bool valid = true;
         auto thisBuildFile = _buildFileParser->buildFile().get();

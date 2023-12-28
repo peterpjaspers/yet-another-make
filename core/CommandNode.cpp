@@ -392,12 +392,26 @@ namespace YAM
         // producing CommandNode who then notifies its observers, i.e to nodes
         // that read one or more output files of the producing command node.
         // 
+        std::vector<FileNode*> inRemovedRepo;
+        for (auto const& pair : _detectedInputs) {
+            auto const& node = pair.second;
+            if (node->repository() == nullptr) {
+                inRemovedRepo.push_back(node.get());
+            }
+        }
+        for (auto const& node : inRemovedRepo) {
+            _detectedInputs.erase(node->name());
+        }
         for (auto const& path : result._removedInputPaths) {
-            auto it = _detectedInputs.find(path);
-            if (it == _detectedInputs.end()) throw std::exception("no such input");
-            auto const& node = it->second;
-            if (!isGenerated(node)) node->removeObserver(this);
-            _detectedInputs.erase(it);
+            auto repo = context()->findRepositoryContaining(path);
+            if (repo != nullptr) {
+                auto symPath = repo->symbolicPathOf(path);
+                auto it = _detectedInputs.find(symPath);
+                if (it == _detectedInputs.end()) throw std::exception("no such input");
+                auto const& node = it->second;
+                if (!isGenerated(node)) node->removeObserver(this);
+                _detectedInputs.erase(it);
+            }
         }
         for (auto const& node : result._addedInputNodes) {
             if (!isGenerated(node)) node->addObserver(this);

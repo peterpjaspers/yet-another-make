@@ -42,6 +42,9 @@ namespace YAM
                     std::string script = _buildFile->name().filename().string();
                     CommandNode::script(script);
                 }
+            } else {
+                CommandNode::script("");
+                CommandNode::workingDirectory(nullptr);
             }
             setState(Node::State::Dirty);
         }
@@ -69,20 +72,25 @@ namespace YAM
     std::shared_ptr<CommandNode::PostProcessResult> BuildFileParserNode::postProcess(std::string const& stdOut) {
         auto result = std::make_shared<ParseResult>();
         result->newState = Node::State::Ok;
-        try {
-            std::filesystem::path absBuildFilePath = _buildFile->absolutePath();
-            if (_buildFile->name().extension() == ".txt") {
-                BuildFileParser parser(absBuildFilePath);
-                result->parseTree = parser.file();
-            } else {
-                BuildFileParser parser(stdOut, absBuildFilePath);
-                result->parseTree = parser.file();
+        if (_buildFile != nullptr) {
+            try {
+                std::filesystem::path absBuildFilePath = _buildFile->absolutePath();
+                if (_buildFile->name().extension() == ".txt") {
+                    BuildFileParser parser(absBuildFilePath);
+                    result->parseTree = parser.file();
+                } else {
+                    BuildFileParser parser(stdOut, absBuildFilePath);
+                    result->parseTree = parser.file();
+                }
+                result->parseTreeHash = result->parseTree->computeHash();
+                result->readOnlyFiles.insert(absBuildFilePath);
+            } catch (std::runtime_error ex) {
+                result->parseErrors = ex.what();
+                result->newState = Node::State::Failed;
             }
-            result->parseTreeHash = result->parseTree->computeHash();
-            result->readOnlyFiles.insert(absBuildFilePath);
-        } catch (std::runtime_error ex) {
-            result->parseErrors = ex.what();
-            result->newState = Node::State::Failed;
+        } else {
+            result->parseTree = std::make_shared<BuildFile::File>();
+            result->parseTreeHash = rand();
         }
         return result;
     }
@@ -95,10 +103,13 @@ namespace YAM
                 LogRecord error(LogRecord::Error, result->parseErrors);
                 context()->logBook()->add(error);
             }
-        } else {
+        } else if (_buildFile != nullptr) {
             _parseTree = *(result->parseTree);
             _parseTreeHash = result->parseTreeHash;
             composeDependencies();
+        } else {
+            _parseTree = *(result->parseTree);
+            _parseTreeHash = result->parseTreeHash;
         }
     }
 
