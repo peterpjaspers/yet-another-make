@@ -52,6 +52,12 @@ Todo: core
 - comprehensive test of compiling rule script
 - add ref to BuildFileCompilerNode from CommandNode + line nr of rule from
   which command node was created. 
+- new class OutputGroup : public GroupNode
+  Keeps track of compiler nodes that contributed to group content.
+  If emtpy: remove group cq give better error message when used as input 
+  group.
+- remove permanent observation of children in DirectoryNode. Only observe
+  child dir nodes during their execution.
 
 Todo: non-core
 - build file syntax (follow tup, follow mrmake, something completely different?)

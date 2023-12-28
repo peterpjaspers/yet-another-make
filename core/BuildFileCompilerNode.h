@@ -52,11 +52,12 @@ namespace YAM {
         bool updateBuildFileDependencies();
         void handleRequisitesCompletion(Node::State state);
         void compileBuildFile();
-        void handleBuildFileDependenciesCompletion(Node::State state);
+        void handleBuildFileDependenciesCompletion(Node::State state); 
+        void cleanOutputGroup(GroupNode* group);
         XXH64_hash_t computeExecutionHash() const;
         bool validGeneratedInputs() const;
         BuildFileParserNode const* findDefiningParser(GeneratedFileNode const* genFile) const;
-        void reportNotUsedParsers(std::unordered_set<BuildFileParserNode const*> const& usedParsers) const;
+        bool validParserDependencies(std::unordered_set<BuildFileParserNode const*> const& usedParsers) const;
         void notifyProcessingCompletion(Node::State state);
 
 

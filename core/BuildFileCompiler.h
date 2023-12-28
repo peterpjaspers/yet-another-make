@@ -116,8 +116,11 @@ namespace YAM {
 
         void compileOutputGroup(
             BuildFile::Rule const& rule,
-            std::vector<std::shared_ptr<GeneratedFileNode>> const& oldOutputs,
-            std::vector<std::shared_ptr<GeneratedFileNode>> const& newOutputs);
+            std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs);
+
+        void assertScriptHasNoCmdInputFlag(BuildFile::Rule const& rule) const;
+        void assertScriptHasNoOrderOnlyInputFlag(BuildFile::Rule const& rule) const;
+        void assertScriptHasNoOutputFlag(BuildFile::Rule const& rule) const;
 
         void compileRule(BuildFile::Rule const& rule);
 

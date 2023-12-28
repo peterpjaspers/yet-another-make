@@ -91,6 +91,7 @@ namespace YAM {
                 orderOnlyInputs.addHashes(hashes);
                 script.addHashes(hashes);
                 outputs.addHashes(hashes);
+                hashes.push_back(XXH64_string(outputGroup.string()));
             }
         }; 
         

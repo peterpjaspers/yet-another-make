@@ -46,7 +46,7 @@ namespace
         std::vector<std::shared_ptr<GeneratedFileNode>> outputs = cmd->outputs();
         cmd->outputs(emptyOutputs);
         cmd->setState(Node::State::Deleted);
-        context->nodes().remove(cmd);
+        //context->nodes().remove(cmd); // TODO: fix mem mgt
     }
 
     void removeNode(std::shared_ptr<GlobNode> glob) {
@@ -237,8 +237,22 @@ namespace YAM
         }
     }
 
+    void BuildFileCompilerNode::cleanOutputGroup(GroupNode* group) {
+        bool updated = false;
+        std::vector<std::shared_ptr<Node>> content = group->group();
+        for (auto const& pair : _outputs) {
+            auto it = std::find(content.begin(), content.end(), pair.second);
+            if (it != content.end()) {
+                content.erase(it);
+                updated = true;
+            }
+        }
+        if (updated) group->group(content);
+    }
+
     void BuildFileCompilerNode::compileBuildFile() {
         try {
+            for (auto const& pair : _outputGroups) cleanOutputGroup(pair.second.get());
             BuildFileCompiler compiler(
                 context(),
                 _buildFileParser->workingDirectory(),
@@ -304,16 +318,18 @@ namespace YAM
                 if (valid && parser != _buildFileParser.get()) usedParsers.insert(parser);
             }
         }
-        reportNotUsedParsers(usedParsers);
+        if (!validParserDependencies(usedParsers)) valid = false;
         return valid;
     }
 
-    void BuildFileCompilerNode::reportNotUsedParsers(
+    bool BuildFileCompilerNode::validParserDependencies(
         std::unordered_set<BuildFileParserNode const*> const& usedParsers
     ) const {
+        bool valid = true;
         std::vector<BuildFileParserNode const*> notUsedParsers;
         findNotUsedParsers(_buildFileParser->dependencies(), usedParsers, notUsedParsers); 
-        if (!notUsedParsers.empty()) {
+        valid = notUsedParsers.empty();
+        if (!valid) {
             auto thisBuildFile = _buildFileParser->buildFile().get();
             std::stringstream ss;
             ss << "Buildfile " << thisBuildFile->name() << std::endl;
@@ -325,10 +341,11 @@ namespace YAM
                 for (auto nu : notUsedParsers) ss << "\t" << nu->buildFile()->name() << std::endl;
             }
             ss << "Not-used buildfile dependencies may slowdown your build." << std::endl;
-            ss << "It is highly recommended to remove them." << std::endl;
-            LogRecord warning(LogRecord::Warning, ss.str());
-            context()->logBook()->add(warning);
+            ss << "Please remove them." << std::endl;
+            LogRecord error(LogRecord::Error, ss.str());
+            context()->logBook()->add(error);
         }
+        return valid;
     }
 
     void BuildFileCompilerNode::notifyProcessingCompletion(Node::State state) {
