@@ -172,6 +172,7 @@ namespace
             for (auto const& fileNode : fileNodes) {
                 auto path = compileFlag1(buildFile, node, stringWithFlags, baseDir, fileNode.get(), flag);
                 result.append(path);
+                result.append(" ");
             }
         } else {
             FileNode const* fileNode = fileNodes[offset].get();
