@@ -169,10 +169,11 @@ namespace
         std::string& result
      ) {
         if (offset == -1) {
-            for (auto const& fileNode : fileNodes) {
-                auto path = compileFlag1(buildFile, node, stringWithFlags, baseDir, fileNode.get(), flag);
+            std::size_t nFiles = fileNodes.size();
+            for (std::size_t i = 0; i < nFiles; ++i) {
+                auto path = compileFlag1(buildFile, node, stringWithFlags, baseDir, fileNodes[i].get(), flag);
                 result.append(path);
-                result.append(" ");
+                if (i < nFiles-1) result.append(" ");
             }
         } else {
             FileNode const* fileNode = fileNodes[offset].get();

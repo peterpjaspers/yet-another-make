@@ -221,12 +221,14 @@ namespace YAM
     } 
 
     void DirectoryNode::_removeChildRecursively(std::shared_ptr<Node> const& child) {
-        child->removeObserver(this);
         // removeIfPresent because a parent directory may already have removed
         // this directory recursively
         context()->nodes().removeIfPresent(child);
         auto dirChild = dynamic_pointer_cast<DirectoryNode>(child);
         if (dirChild != nullptr) {
+            if (dirChild->observers().contains(this)) {
+                dirChild->removeObserver(this);
+            }
             dirChild->clear();
         }
     }
@@ -371,10 +373,12 @@ namespace YAM
                     node = n;
                     context()->nodes().add(node);
                 }
-                node->addObserver(this);
                 _content.insert({ node->name(), node });
-                auto dir = dynamic_pointer_cast<DirectoryNode>(node);
-                if (dir != nullptr) dir->addPrerequisitesToContext();
+                auto dir = dynamic_pointer_cast<DirectoryNode>(node); 
+                if (dir != nullptr) {
+                    dir->addObserver(this);
+                    dir->addPrerequisitesToContext();
+                }
             }
         }
         for (auto const& n : result._removed) {
@@ -445,7 +449,10 @@ namespace YAM
     void DirectoryNode::prepareDeserialize() {
         Node::prepareDeserialize();
         if (_dotIgnoreNode != nullptr) _dotIgnoreNode->removeObserver(this);
-        for (auto const& p : _content) p.second->removeObserver(this);
+        for (auto const& p : _content) {
+            auto const& pdir = dynamic_pointer_cast<DirectoryNode>(p.second);
+            if (pdir != nullptr) pdir->removeObserver(this);
+        }
         _dotIgnoreNode = nullptr;
         _content.clear();
     }
@@ -457,9 +464,11 @@ namespace YAM
         std::vector<std::shared_ptr<Node>> nodes;
         for (auto const& p : _content) {
             nodes.push_back(p.second);
-            p.second->addObserver(this);
             auto dir = dynamic_cast<DirectoryNode*>(p.second.get());
-            if (dir != nullptr) dir->parent(this);
+            if (dir != nullptr) {
+                dir->addObserver(this);
+                dir->parent(this);
+            }
         }
         _content.clear();
         for (auto const& n : nodes) _content.insert({ n->name(), n });
