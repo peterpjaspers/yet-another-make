@@ -1,4 +1,4 @@
 
-: foreach *.cpp |> copy %f %o |> bin\%B.obj { objectFiles }
-: { objectFiles } |> echo %f > %o |> bin\core.txt { dlls }
-: { dlls } |> type %f > %o |> bin\core.dll
+//: foreach *.cpp |> copy %f %o |> bin\%B.obj { objectFiles }
+//: { objectFiles } |> echo %f > %o |> bin\core.txt { dlls }
+//: { dlls } |> type %f > %o |> bin\core.dll

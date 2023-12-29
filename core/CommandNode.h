@@ -130,6 +130,8 @@ namespace YAM
             std::shared_ptr<PostProcessResult> _postResult;
         };
 
+        std::filesystem::path convertToSymbolicPath(std::filesystem::path const& absPath, MemoryLogBook& logBook);
+        std::set<std::filesystem::path> convertToSymbolicPaths(std::set<std::filesystem::path> const& absPaths, MemoryLogBook& logBook);
         void handleRequisitesCompletion(Node::State state);
         void executeScript();
         void handleExecuteScriptCompletion(std::shared_ptr<ExecutionResult> result);
@@ -139,15 +141,15 @@ namespace YAM
 
         MonitoredProcessResult executeMonitoredScript(MemoryLogBook& logBook);
         void getSourceInputs(std::vector<Node*>& sourceInputs) const;
+        void clearDetectedInputs();
         void setDetectedInputs(ExecutionResult const& result);
         XXH64_hash_t computeExecutionHash() const;
 
         std::shared_ptr<GeneratedFileNode> findOutputNode(
-            std::shared_ptr<FileRepository> repo,
-            std::filesystem::path const& output,
+            std::filesystem::path const& outputSymPath,
             MemoryLogBook& logBook);
         bool findOutputNodes(
-            std::set<std::filesystem::path> const& outputPaths,
+            std::set<std::filesystem::path> const& outputSymPaths,
             std::vector<std::shared_ptr<GeneratedFileNode>>& outputNodes,
             MemoryLogBook& logBook);
         bool verifyOutputNodes(
@@ -155,7 +157,7 @@ namespace YAM
             MemoryLogBook& logBook);
         bool findInputNodes(
             std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const& allowedGenInputFiles,
-            std::set<std::filesystem::path>const& inputPaths,
+            std::set<std::filesystem::path>const& inputSymPaths,
             std::vector<std::shared_ptr<FileNode>>& inputNodes,
             std::vector<std::shared_ptr<Node>>& srcInputNodes,
             ILogBook& logBook
