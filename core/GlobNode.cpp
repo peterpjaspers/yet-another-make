@@ -2,8 +2,39 @@
 #include "Globber.h"
 #include "DirectoryNode.h"
 #include "ExecutionContext.h"
+#include "IStreamer.h"
 
 #include <set>
+
+namespace
+{
+    uint32_t streamableTypeId = 0;
+
+    void streamInputDirs(
+        IStreamer* streamer, 
+        std::set<std::shared_ptr<DirectoryNode>, YAM::Node::CompareName>& inputDirs
+    ) {
+        uint32_t nItems;
+        if (streamer->writing()) {
+            const std::size_t length = inputDirs.size();
+            if (length > UINT_MAX) throw std::exception("map too large");
+            nItems = static_cast<uint32_t>(length);
+        }
+        streamer->stream(nItems);
+        if (streamer->writing()) {
+            for (auto const& dir : inputDirs) {
+                std::shared_ptr<DirectoryNode> d = dir;
+                streamer->stream(d);
+            }
+        } else {
+            for (std::size_t i = 0; i < nItems; ++i) {
+                std::shared_ptr<DirectoryNode> dir;
+                streamer->stream(dir);
+                inputDirs.insert(dir);
+            }
+        }
+    }
+}
 
 namespace YAM
 {
@@ -116,6 +147,35 @@ namespace YAM
         for (auto const& dir : _inputDirs) hashes.push_back(dir->executionHash());
         XXH64_hash_t hash = XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
         return hash;
+    }
+
+    void GlobNode::setStreamableType(uint32_t type) {
+        streamableTypeId = type;
+    }
+
+    uint32_t GlobNode::typeId() const {
+        return streamableTypeId;
+    }
+
+    void GlobNode::stream(IStreamer* streamer) {
+        Node::stream(streamer);
+        streamer->stream(_baseDir);
+        streamer->stream(_pattern);
+        streamInputDirs(streamer, _inputDirs);
+        streamer->stream(_inputsHash);
+        streamer->streamVector(_matches);
+        streamer->stream(_executionHash);
+    }
+
+    void GlobNode::prepareDeserialize() {
+        Node::prepareDeserialize();
+        for (auto const& dir : _inputDirs) dir->removeObserver(this);
+        _inputDirs.clear();
+
+    }
+    void GlobNode::restore(void* context) {
+        Node::restore(context);
+        for (auto const& dir : _inputDirs) dir->addObserver(this);
     }
 
 }

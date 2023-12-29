@@ -46,10 +46,13 @@ namespace YAM
         // Return a hash of the names of the nodes that match the glob pattern.
         XXH64_hash_t executionHash() const { return _executionHash; }
 
-        static void setStreamableType(uint32_t type) { throw std::runtime_error("not impl"); }
-        // Inherited from IStreamable
-        uint32_t typeId() const override { throw std::runtime_error("not impl"); }
-        void stream(IStreamer* streamer) override { throw std::runtime_error("not impl"); }
+        static void setStreamableType(uint32_t type);
+        // Inherited from IStreamable (via IPersistable)
+        uint32_t typeId() const override;
+        void stream(IStreamer* streamer) override;
+        // Inherited from IPersistable
+        void prepareDeserialize() override;
+        void restore(void* context) override;
 
     private:
         std::pair<std::shared_ptr<Globber>, std::string> execute();

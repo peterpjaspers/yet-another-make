@@ -1,5 +1,7 @@
 #pragma once
 
+#include "IStreamer.h"
+#include "IStreamable.h"
 #include "../xxHash/xxhash.h"
 
 #include <vector>
@@ -7,10 +9,33 @@
 #include <filesystem>
 #include <regex>
 
+namespace
+{
+    template<typename T>
+    void streamVector(IStreamer* streamer, std::vector<T>& items) {
+        uint32_t nItems;
+        if (streamer->writing()) {
+            const std::size_t length = items.size();
+            if (length > UINT_MAX) throw std::exception("map too large");
+            nItems = static_cast<uint32_t>(length);
+        }
+        streamer->stream(nItems);
+        if (streamer->writing()) {
+            for (std::size_t i = 0; i < nItems; ++i) {
+                items[i].stream(streamer);
+            }
+        } else {
+            T item;
+            for (std::size_t i = 0; i < nItems; ++i) {
+                item.stream(streamer);
+                items.push_back(item);
+            }
+        }
+    }
+}
 namespace YAM {
-
     namespace BuildFile {
-        struct __declspec(dllexport) Node {
+        struct __declspec(dllexport) Node : public IStreamable {
             virtual ~Node() {}
             Node() : line(0), column(0) {}
             std::size_t line;
@@ -19,6 +44,13 @@ namespace YAM {
             virtual void addHashes(std::vector<XXH64_hash_t>& hashes) {
                 hashes.push_back(line);
                 hashes.push_back(column);
+            }
+
+            uint32_t typeId() const override { throw std::runtime_error("not supported"); }
+            // Inherited from IStreamable
+            void stream(IStreamer* streamer) override {
+                streamer->stream(line);
+                streamer->stream(column);
             }
         };
         
@@ -33,6 +65,13 @@ namespace YAM {
                 hashes.push_back(isGroup);
                 hashes.push_back(XXH64_string(pathPattern.string()));
             }
+
+            void stream(IStreamer* streamer) override {
+                Node::stream(streamer);
+                streamer->stream(exclude);
+                streamer->stream(pathPattern);
+                streamer->stream(isGroup);
+            }
         };
         struct __declspec(dllexport) Inputs : public Node {
             std::vector<Input> inputs;
@@ -43,6 +82,12 @@ namespace YAM {
                     input.addHashes(hashes);
                 }
             }
+
+            void stream(IStreamer* streamer) override {
+                Node::stream(streamer);
+                uint32_t length = static_cast<uint32_t>(inputs.size());
+                streamVector(streamer, inputs);
+            }
         };
 
         struct __declspec(dllexport) Script: public Node {
@@ -51,6 +96,11 @@ namespace YAM {
             void addHashes(std::vector<XXH64_hash_t>& hashes) override {
                 Node::addHashes(hashes);
                 hashes.push_back(XXH64_string(script));
+            }
+
+            void stream(IStreamer* streamer) override {
+                Node::stream(streamer);
+                streamer->stream(script);
             }
         };
 
@@ -63,6 +113,12 @@ namespace YAM {
                 hashes.push_back(ignore);
                 hashes.push_back(XXH64_string(path.string()));
             }
+
+            void stream(IStreamer* streamer) override {
+                Node::stream(streamer);
+                streamer->stream(ignore);
+                streamer->stream(path);
+            }
         };
         struct __declspec(dllexport) Outputs : public Node {
             std::vector<Output> outputs;
@@ -72,6 +128,11 @@ namespace YAM {
                 for (auto &output : outputs) {
                     output.addHashes(hashes);
                 }
+            }
+
+            void stream(IStreamer* streamer) override {
+                Node::stream(streamer);
+                streamVector(streamer, outputs);
             }
         };
 
@@ -93,6 +154,16 @@ namespace YAM {
                 outputs.addHashes(hashes);
                 hashes.push_back(XXH64_string(outputGroup.string()));
             }
+
+            uint32_t typeId() const override { throw std::runtime_error("not supported"); }
+            void stream(IStreamer* streamer) override {
+                Node::stream(streamer);
+                cmdInputs.stream(streamer);
+                orderOnlyInputs.stream(streamer);
+                script.stream(streamer);
+                outputs.stream(streamer);
+                streamer->stream(outputGroup);
+            }
         }; 
         
         struct __declspec(dllexport) Deps : public Node
@@ -108,6 +179,12 @@ namespace YAM {
                 for (auto const& path : depGlobs) {
                     hashes.push_back(XXH64_string(path.string()));
                 }
+            }
+
+            void stream(IStreamer* streamer) override {
+                Node::stream(streamer);
+                streamer->streamVector(depBuildFiles);
+                streamer->streamVector(depGlobs);
             }
         };
 
@@ -126,6 +203,13 @@ namespace YAM {
                     varOrRule->addHashes(hashes);
                 }
                 return XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
+            }
+
+            void stream(IStreamer* streamer) override {
+                Node::stream(streamer);
+                streamer->stream(buildFile);
+                deps.stream(streamer);
+                streamer->streamVector(variablesAndRules);
             }
         };
     }

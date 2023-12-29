@@ -20,12 +20,13 @@ namespace YAM
         // Override Node
         void start() override;
 
-        // Inherited from IStreamer (via IPersistable)
-        uint32_t typeId() const override { return -1; }
-        void stream(IStreamer* streamer) override {}
+        static void setStreamableType(uint32_t type);
+        // Inherited from IStreamable (via IPersistable)
+        uint32_t typeId() const override;
+        void stream(IStreamer* streamer) override;
         // Inherited from IPersistable
-        void prepareDeserialize() override {}
-        void restore(void* context) override {}
+        void prepareDeserialize() override;
+        void restore(void* context) override;
 
     private:
         void handleGroupCompletion(Node::State groupState);

@@ -1,15 +1,18 @@
+#include "ExecutionContext.h"
 #include "PersistentBuildState.h"
-#include "SourceFileNode.h"
-#include "GeneratedFileNode.h"
+#include "BuildFileCompilerNode.h"
+#include "BuildFileParserNode.h"
+#include "CommandNode.h"
 #include "DirectoryNode.h"
 #include "DotIgnoreNode.h"
-#include "CommandNode.h"
-#include "Streamer.h"
+#include "GeneratedFileNode.h"
+#include "GlobNode.h"
+#include "GroupNode.h"
+#include "SourceFileNode.h"
+#include "FileRepository.h"
 #include "BinaryValueStreamer.h"
 #include "ISharedObjectStreamer.h"
-#include "ExecutionContext.h"
-#include "NodeSet.h"
-#include "FileRepository.h"
+#include "Streamer.h"
 
 #include <memory>
 #include <filesystem>
@@ -17,46 +20,50 @@
 
 namespace YAM
 {
+    PersistentBuildState::Key nullPtrKey = UINT64_MAX;
+
     // Class that allocates unique type ids to the node classes. 
     class BuildStateTypes
     {
     public:
         enum TypeId : BTree::TreeIndex {
             Min = 0,
-            CommandNode = 1,
-            DotIgnoreNode = 2,
-            GeneratedFileNode = 3,
+            BuildFileCompilerNode = 1,
+            BuildFileParserNode = 2,
+            CommandNode = 3,
             DirectoryNode = 4,
-            SourceFileNode = 5,
-            FileRepository = 6,
-            Max = 7
+            DotIgnoreNode = 5,
+            GeneratedFileNode = 6,
+            GlobNode = 7,
+            GroupNode = 8,
+            SourceFileNode = 9,
+            FileRepository = 10,
+            Max = 11
         };
         std::vector<TypeId> ids;
 
         BuildStateTypes() {
+            YAM::BuildFileCompilerNode::setStreamableType(static_cast<uint32_t>(BuildFileCompilerNode));
+            YAM::BuildFileParserNode::setStreamableType(static_cast<uint32_t>(BuildFileParserNode));
             YAM::CommandNode::setStreamableType(static_cast<uint32_t>(CommandNode));
+            YAM::DirectoryNode::setStreamableType(static_cast<uint32_t>(DirectoryNode));
             YAM::DotIgnoreNode::setStreamableType(static_cast<uint32_t>(DotIgnoreNode));
             YAM::GeneratedFileNode::setStreamableType(static_cast<uint32_t>(GeneratedFileNode));
-            YAM::DirectoryNode::setStreamableType(static_cast<uint32_t>(DirectoryNode));
+            YAM::GlobNode::setStreamableType(static_cast<uint32_t>(GlobNode));
+            YAM::GroupNode::setStreamableType(static_cast<uint32_t>(GroupNode));
             YAM::SourceFileNode::setStreamableType(static_cast<uint32_t>(SourceFileNode));
             YAM::FileRepository::setStreamableType(static_cast<uint32_t>(FileRepository));
 
+            ids.push_back(BuildFileCompilerNode);
+            ids.push_back(BuildFileParserNode);
             ids.push_back(CommandNode);
+            ids.push_back(DirectoryNode);
             ids.push_back(DotIgnoreNode);
             ids.push_back(GeneratedFileNode);
-            ids.push_back(DirectoryNode);
+            ids.push_back(GlobNode);
+            ids.push_back(GroupNode);
             ids.push_back(SourceFileNode);
             ids.push_back(FileRepository);
-        }
-
-        bool isNode(IPersistable* object) {
-            auto tid = object->typeId();
-            return ((TypeId::Min < tid) && (tid < TypeId::FileRepository));
-        }
-
-        bool isFileRepo(IPersistable* object) {
-            auto tid = object->typeId();
-            return TypeId::FileRepository == tid;
         }
 
         uint32_t getTypeId(IPersistable* object) {
@@ -68,10 +75,14 @@ namespace YAM
         IPersistable* instantiate(uint32_t typeId) {
             auto tid = static_cast<TypeId>(typeId);
             switch (tid) {
+            case TypeId::BuildFileCompilerNode: return new YAM::BuildFileCompilerNode();
+            case TypeId::BuildFileParserNode: return new YAM::BuildFileParserNode();
             case TypeId::CommandNode: return new YAM::CommandNode();
+            case TypeId::DirectoryNode: return new YAM::DirectoryNode();
             case TypeId::DotIgnoreNode: return new YAM::DotIgnoreNode();
             case TypeId::GeneratedFileNode: return new YAM::GeneratedFileNode();
-            case TypeId::DirectoryNode: return new YAM::DirectoryNode();
+            case TypeId::GlobNode: return new YAM::GlobNode();
+            case TypeId::GroupNode: return new YAM::GroupNode();
             case TypeId::SourceFileNode: return new YAM::SourceFileNode();
             case TypeId::FileRepository: return new YAM::FileRepository();
             default: throw std::exception("unknown node type");
@@ -125,9 +136,13 @@ namespace YAM
         {}
 
         void stream(IStreamer* writer, std::shared_ptr<IStreamable>& object) {
-            auto persistable = dynamic_pointer_cast<IPersistable>(object);
-            PersistentBuildState::Key key = _buildState.store(persistable);
-            writer->stream(key);
+            if (object == nullptr) {
+                writer->stream(nullPtrKey);                
+            } else {
+                auto persistable = dynamic_pointer_cast<IPersistable>(object);
+                PersistentBuildState::Key key = _buildState.store(persistable);
+                writer->stream(key);
+            }
         }
 
     private:
@@ -144,8 +159,10 @@ namespace YAM
         void stream(IStreamer* reader, std::shared_ptr<IStreamable>& object) {
             PersistentBuildState::Key key;
             reader->stream(key);
-            std::shared_ptr<YAM::IPersistable> node = _buildState.retrieve(key);
-            object = dynamic_pointer_cast<IStreamable>(node);
+            if (key != nullPtrKey) {
+                std::shared_ptr<YAM::IPersistable> node = _buildState.retrieve(key);
+                object = dynamic_pointer_cast<IStreamable>(node);
+            }
         }
 
     private:

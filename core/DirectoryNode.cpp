@@ -444,6 +444,8 @@ namespace YAM
                 _content.insert({ std::filesystem::path(ss.str()), n });
             }
         }
+        streamer->stream(_buildFileParserNode);
+        streamer->stream(_buildFileCompilerNode);
     }
 
     void DirectoryNode::prepareDeserialize() {

@@ -1,4 +1,10 @@
 #include "GroupNode.h"
+#include "IStreamer.h"
+
+namespace
+{
+    uint32_t streamableTypeId = 0;
+}
 
 namespace YAM
 {
@@ -28,6 +34,27 @@ namespace YAM
 
     void GroupNode::handleGroupCompletion(Node::State groupState) {
         Node::notifyCompletion(groupState);
+    }
+
+    void GroupNode::setStreamableType(uint32_t type) {
+        streamableTypeId = type;
+    }
+
+    uint32_t GroupNode::typeId() const {
+        return streamableTypeId;
+    }
+    void GroupNode::stream(IStreamer* streamer) {
+        Node::stream(streamer);
+        streamer->streamVector(_group);
+    }
+    void GroupNode::prepareDeserialize() {
+        Node::prepareDeserialize();
+        for (auto const& node : _group) node->removeObserver(this);
+        _group.clear();
+    }
+    void GroupNode::restore(void* context) {
+        Node::restore(context);
+        for (auto const& node : _group) node->addObserver(this);
     }
 }
 

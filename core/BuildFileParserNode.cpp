@@ -7,6 +7,7 @@
 #include "BuildFileParser.h"
 #include "Globber.h"
 #include "AcyclicTrail.h"
+#include "IStreamer.h"
 
 namespace
 {
@@ -115,10 +116,11 @@ namespace YAM
 
     void BuildFileParserNode::composeDependencies() {
         _dependencies.clear();
-        auto node = context()->nodes().find(_buildFile->name().parent_path());
+        std::filesystem::path buildFileDirName = _buildFile->name().parent_path();
+        auto node = context()->nodes().find(buildFileDirName);
         auto baseDir = dynamic_pointer_cast<DirectoryNode>(node);
         if (baseDir == nullptr) {
-            throw std::runtime_error("No such directory: " + _buildFile->name().parent_path().string());
+            throw std::runtime_error("No such directory: " + buildFileDirName.string());
         }
         for (auto const& buildFile : _parseTree.deps.depBuildFiles) {
             auto dep = findDependency(baseDir, buildFile);
@@ -165,16 +167,19 @@ namespace YAM
     void BuildFileParserNode::stream(IStreamer* streamer) {
         throw std::runtime_error("not implemented");
         Node::stream(streamer);
+        streamer->stream(_buildFile);
+        _parseTree.stream(streamer);
+        streamer->stream(_parseTreeHash);
     }
 
     void BuildFileParserNode::prepareDeserialize() {
-        throw std::runtime_error("not implemented");
         Node::prepareDeserialize();
-
+        _dependencies.clear();
     }
+
     void BuildFileParserNode::restore(void* context) {
-        throw std::runtime_error("not implemented");
         Node::restore(context);
+        composeDependencies();
     }
 
 }

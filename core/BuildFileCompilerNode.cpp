@@ -13,6 +13,7 @@
 #include "BuildFileParser.h"
 #include "BuildFileDependenciesCompiler.h"
 #include "BuildFileCompiler.h"
+#include "IStreamer.h"
 
 #include <vector>
 #include <unordered_set>
@@ -161,6 +162,32 @@ namespace
         for (auto p : allParsers) {
             if (usedParsers.find(p) == usedParsers.end()) {
                 notUsedParsers.push_back(p);
+            }
+        }
+    }
+
+    template<typename TNode>
+    void streamMap(
+        IStreamer* streamer,
+        std::map<std::filesystem::path, std::shared_ptr<TNode>>& map
+    ) {
+        uint32_t nItems;
+        if (streamer->writing()) {
+            const std::size_t length = map.size();
+            if (length > UINT_MAX) throw std::exception("map too large");
+            nItems = static_cast<uint32_t>(length);
+        }
+        streamer->stream(nItems);
+        if (streamer->writing()) {
+            for (auto const& pair : map) {
+                std::shared_ptr<TNode> node = pair.second;
+                streamer->stream(node);
+            }
+        } else {
+            for (uint32_t i = 0; i < nItems; ++i) {
+                std::shared_ptr<TNode> node;
+                streamer->stream(node);
+                map.insert({ node->name(), node });
             }
         }
     }
@@ -402,18 +429,33 @@ namespace YAM
     }
 
     void BuildFileCompilerNode::stream(IStreamer* streamer) {
-        throw std::runtime_error("not implemented");
         Node::stream(streamer);
+        streamer->stream(_buildFileParser);
+        streamMap(streamer, _depCompilers);
+        streamMap(streamer, _depGlobs);
+        streamMap(streamer, _commands);
+        streamMap(streamer, _outputs);
+        streamMap(streamer, _outputGroups);
+        streamer->stream(_executionHash);
     }
 
     void BuildFileCompilerNode::prepareDeserialize() {
-        throw std::runtime_error("not implemented");
         Node::prepareDeserialize();
+        _buildFileParser->removeObserver(this);
+        for (auto const& i : _depCompilers) i.second->removeObserver(this);
+        for (auto const& i : _depGlobs) i.second->removeObserver(this);
+        _depCompilers.clear();
+        _depGlobs.clear();
+        _commands.clear();
+        _outputs.clear();
+        _outputGroups.clear();
 
     }
     void BuildFileCompilerNode::restore(void* context) {
-        throw std::runtime_error("not implemented");
         Node::restore(context);
+        _buildFileParser->addObserver(this);
+        for (auto const& i : _depCompilers) i.second->addObserver(this);
+        for (auto const& i : _depGlobs) i.second->addObserver(this);
     }
 
 }
