@@ -75,6 +75,9 @@ namespace YAM
 
     void FileNode::stream(IStreamer* streamer) {
         Node::stream(streamer);
+        if (name().filename() == "core.txt") {
+            bool stop = true;
+        }
         streamer->stream(_lastWriteTime);
         streamer->streamMap(_hashes);
     }

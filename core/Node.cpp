@@ -278,17 +278,17 @@ namespace YAM
 
     void Node::stream(IStreamer* streamer) {
         streamer->stream(_name);
-        int s;
-        if (streamer->writing()) s = static_cast<int>(_state);
-        streamer->stream(s);
-        if (streamer->reading()) _state = static_cast<Node::State>(s);
     }
 
     void Node::prepareDeserialize() {
     }
 
-    void Node::restore(void* context) {
-        _context = reinterpret_cast<ExecutionContext*>(context);
-        _modified = false;
+    bool Node::restore(void* context, std::unordered_set<IPersistable const*>& restored) {
+        bool inserted = restored.insert(this).second;
+        if (inserted) {
+            _context = reinterpret_cast<ExecutionContext*>(context);
+            _modified = false;
+        }
+        return inserted;
     }
 }

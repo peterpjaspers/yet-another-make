@@ -9,9 +9,9 @@
 #include "BuildFileParserNode.h"
 #include "BuildFileCompilerNode.h"
 #include "FileRepository.h"
-#include "DotGitDirectory.h"
 #include "DotYamDirectory.h"
 #include "AcyclicTrail.h"
+#include "PersistentBuildState.h"
 
 #include <iostream>
 #include <map>
@@ -165,14 +165,22 @@ namespace YAM
     void Builder::_init(std::filesystem::path directory) {
         std::filesystem::path yamDir = DotYamDirectory::initialize(directory, _context.logBook().get());
         _result->succeeded(!yamDir.empty());
-        if (_result->succeeded()) {
-            if (_context.findRepository(".") == nullptr) {
-                std::filesystem::path repoPath = yamDir.parent_path();
-                auto repo = std::make_shared<FileRepository>(
-                    ".",
-                    repoPath,
-                    &_context);
-                _context.addRepository(repo);
+        if (!_result->succeeded()) return;
+
+        if (_buildState == nullptr) {
+            if (_result->succeeded()) {
+                auto buildStateDir = yamDir / ".buildstate";
+                std::filesystem::create_directories(buildStateDir);
+                _buildState = std::make_shared<PersistentBuildState>(buildStateDir, &_context);
+                _buildState->retrieve();
+                if (_context.findRepository(".") == nullptr) {
+                    std::filesystem::path repoPath = yamDir.parent_path();
+                    auto repo = std::make_shared<FileRepository>(
+                        ".",
+                        repoPath,
+                        &_context);
+                    _context.addRepository(repo);
+                }
             }
         }
     }
@@ -239,6 +247,7 @@ namespace YAM
             _dirtyBuildFileParsers->setState(_dirtyDirectories->state());
             _handleBuildFileParsersCompletion(_dirtyBuildFileParsers.get());
         } else {
+            if (!_dirtyDirectories->group().empty()) _buildState->store();
             std::vector<std::shared_ptr<Node>> dirtyBuildFiles;
             for (auto const& pair : _context.repositories()) {
                 auto repo = pair.second;
@@ -270,6 +279,7 @@ namespace YAM
             _dirtyBuildFileCompilers->setState(Node::State::Failed);
             _handleBuildFileCompilersCompletion(_dirtyBuildFileCompilers.get());
         } else {
+            if (!_dirtyBuildFileParsers->group().empty()) _buildState->store();
             std::vector<std::shared_ptr<Node>> dirtyBuildFileCompilers;
             for (auto const& pair : _context.repositories()) {
                 auto repo = pair.second;
@@ -291,6 +301,7 @@ namespace YAM
             _dirtyCommands->setState(_dirtyBuildFileCompilers->state());
             _handleCommandsCompletion(_dirtyCommands.get());
         } else {
+            if (!_dirtyBuildFileCompilers->group().empty()) _buildState->store();
             std::vector<std::shared_ptr<Node>> dirtyCommands;
             appendDirtyCommands(_context.nodes(), dirtyCommands);
             if (dirtyCommands.empty()) {
@@ -305,6 +316,7 @@ namespace YAM
     // Called in main thread
     void Builder::_handleCommandsCompletion(Node* n) {
         if (n != _dirtyCommands.get()) throw std::exception("unexpected node");
+        if (!_dirtyCommands->group().empty()) _buildState->store();
 
         _result->succeeded(_dirtyCommands->state() == Node::State::Ok);
         _result->nDirectoryUpdates(_context.statistics().nDirectoryUpdates);

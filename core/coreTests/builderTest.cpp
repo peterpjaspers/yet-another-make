@@ -115,9 +115,9 @@ namespace
             , ccPiet(std::make_shared<CommandNode>(context, R"(<.>\ccpiet)"))
             , ccJan(std::make_shared<CommandNode>(context, R"(<.>\ccjan)"))
             , linkPietJan(std::make_shared<CommandNode>(context, R"(<.>\linkpietjan)"))
-            , pietOut(std::make_shared<GeneratedFileNode>(context, R"(<.>\generated\pietout.obj)", ccPiet.get()))
-            , janOut(std::make_shared<GeneratedFileNode>(context, R"(<.>\generated\janout.obj)", ccJan.get()))
-            , pietjanOut(std::make_shared<GeneratedFileNode>(context, R"(<.>\generated\pietjanout.dll)", linkPietJan.get()))
+            , pietOut(std::make_shared<GeneratedFileNode>(context, R"(<.>\generated\pietout.obj)", ccPiet))
+            , janOut(std::make_shared<GeneratedFileNode>(context, R"(<.>\generated\janout.obj)", ccJan))
+            , pietjanOut(std::make_shared<GeneratedFileNode>(context, R"(<.>\generated\pietjanout.dll)", linkPietJan))
             , stats(context->statistics())
         {
             stats.registerNodes = true;
@@ -340,15 +340,15 @@ namespace
         // 3 generated file nodes pietOut, janOut, pietjanOut before script exec
         // 3 generated file nodes pietOut, janOut, pietjanOut after script exec
         // 3 commandNodes ccPiet, ccJan, linkPietjan
-        // 12 root, .yam, generated and src dir each have .ignore, .gitignore and .yamignore
-        // 31 total
-        EXPECT_EQ(31, driver.stats.nStarted); 
+        // 16 root, .yam, .yam\.buildstate, generated and src dir each have .ignore, .gitignore and .yamignore
+        // 35 total
+        EXPECT_EQ(35, driver.stats.nStarted); 
         // pietOut, janOut, pietjanOut are started twice
-        EXPECT_EQ(28, driver.stats.started.size());
-        EXPECT_EQ(4, driver.stats.nDirectoryUpdates);
+        EXPECT_EQ(32, driver.stats.started.size());
+        EXPECT_EQ(5, driver.stats.nDirectoryUpdates);
         // 4 source + 3 generated (before cmd exec) + 3 generated (after cmd exec)
         // + 4 .gitignore + 4 .yamignore
-        EXPECT_EQ(18, driver.stats.nRehashedFiles); 
+        EXPECT_EQ(20, driver.stats.nRehashedFiles); 
 
         EXPECT_TRUE(driver.stats.started.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.dir))));
         EXPECT_TRUE(driver.stats.started.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.dir / "src"))));
@@ -364,8 +364,8 @@ namespace
         EXPECT_TRUE(driver.stats.started.contains(driver.pietjanOut.get()));
 
         // Verify nodes self-executed 
-        EXPECT_EQ(29, driver.stats.nSelfExecuted);
-        EXPECT_EQ(26, driver.stats.selfExecuted.size());
+        EXPECT_EQ(33, driver.stats.nSelfExecuted);
+        EXPECT_EQ(30, driver.stats.selfExecuted.size());
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.dir))));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.dir / "src"))));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietCpp))));
@@ -423,10 +423,10 @@ namespace
         // Incremental build while no modifications
         std::shared_ptr<BuildResult> result = driver.build();
         EXPECT_TRUE(result->succeeded());
-        EXPECT_EQ(1, driver.stats.nDirectoryUpdates); // the generated directory
+        EXPECT_EQ(2, driver.stats.nDirectoryUpdates); // the generated directory
         EXPECT_EQ(0, driver.stats.nRehashedFiles);
-        EXPECT_EQ(2, driver.stats.started.size()); // __dirtySources__ and generated dir
-        EXPECT_EQ(1, driver.stats.selfExecuted.size()); //  generated dir
+        EXPECT_EQ(3, driver.stats.started.size()); // __dirtySources__ and generated dir
+        EXPECT_EQ(2, driver.stats.selfExecuted.size()); //  generated dir
 
         result = driver.build();
         EXPECT_TRUE(result->succeeded());
@@ -468,9 +468,9 @@ namespace
 
         // selfStarted and selfExecuted also contains 
         // _dirtyCommands from Builder.
-        EXPECT_EQ(1, driver.stats.nDirectoryUpdates); // generated dir
+        EXPECT_EQ(2, driver.stats.nDirectoryUpdates); // .buildstate, generated dir
         EXPECT_EQ(3, driver.stats.nRehashedFiles);
-        EXPECT_EQ(8, driver.stats.started.size());
+        EXPECT_EQ(9, driver.stats.started.size());
 
         // 1: pendingStartSelf of ccJan sees changed hash of janCpp
         // 2: self-execution of ccJan => updates and rehashes janOut 
@@ -478,7 +478,7 @@ namespace
         // 4: execution of linkPietJan updates and rehashes pietjanOut
         auto srcRepo = driver.sourceRepo();
         auto janCppNode = driver.context->nodes().find(srcRepo->symbolicPathOf(driver.repo.janCpp));
-        EXPECT_EQ(6, driver.stats.selfExecuted.size());
+        EXPECT_EQ(7, driver.stats.selfExecuted.size());
         EXPECT_TRUE(driver.stats.selfExecuted.contains(janCppNode.get()));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.ccJan.get()));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.janOut.get()));
@@ -522,11 +522,11 @@ namespace
         EXPECT_EQ(Node::State::Ok, driver.janOut->state());
         EXPECT_EQ(Node::State::Ok, driver.pietjanOut->state());
 
-        EXPECT_EQ(2, driver.stats.nDirectoryUpdates);
+        EXPECT_EQ(3, driver.stats.nDirectoryUpdates);
         EXPECT_EQ(1, driver.stats.nRehashedFiles);
         EXPECT_TRUE(driver.stats.rehashedFiles.contains(janCppNode.get()));
 
-        EXPECT_EQ(4, driver.stats.selfExecuted.size());
+        EXPECT_EQ(5, driver.stats.selfExecuted.size());
         EXPECT_TRUE(driver.stats.selfExecuted.contains(janCppNode.get()));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.ccJan.get()));;
     }

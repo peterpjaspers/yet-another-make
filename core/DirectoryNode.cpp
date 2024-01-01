@@ -459,12 +459,14 @@ namespace YAM
         _content.clear();
     }
 
-    void DirectoryNode::restore(void* context) {
-        Node::restore(context);
+    bool DirectoryNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
+        if (!Node::restore(context, restored)) return false;
         _dotIgnoreNode->directory(this);
         _dotIgnoreNode->addObserver(this);
+        _dotIgnoreNode->restore(context, restored);
         std::vector<std::shared_ptr<Node>> nodes;
         for (auto const& p : _content) {
+            p.second->restore(context, restored);
             nodes.push_back(p.second);
             auto dir = dynamic_cast<DirectoryNode*>(p.second.get());
             if (dir != nullptr) {
@@ -474,5 +476,6 @@ namespace YAM
         }
         _content.clear();
         for (auto const& n : nodes) _content.insert({ n->name(), n });
+        return true;
     }
 }

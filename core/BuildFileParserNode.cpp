@@ -11,7 +11,7 @@
 
 namespace
 {
-    using namespace YAM;
+    using namespace YAM; 
 
     uint32_t streamableTypeId = 0;
 }
@@ -112,6 +112,7 @@ namespace YAM
             _parseTree = *(result->parseTree);
             _parseTreeHash = result->parseTreeHash;
         }
+        modified(true);
     }
 
     void BuildFileParserNode::composeDependencies() {
@@ -165,21 +166,22 @@ namespace YAM
     }
 
     void BuildFileParserNode::stream(IStreamer* streamer) {
-        throw std::runtime_error("not implemented");
-        Node::stream(streamer);
+        CommandNode::stream(streamer);
         streamer->stream(_buildFile);
         _parseTree.stream(streamer);
         streamer->stream(_parseTreeHash);
     }
 
     void BuildFileParserNode::prepareDeserialize() {
-        Node::prepareDeserialize();
+        CommandNode::prepareDeserialize();
         _dependencies.clear();
     }
 
-    void BuildFileParserNode::restore(void* context) {
-        Node::restore(context);
+    bool BuildFileParserNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
+        if (!CommandNode::restore(context, restored)) return false;
+        _buildFile->restore(context, restored);
         composeDependencies();
+        return true;
     }
 
 }

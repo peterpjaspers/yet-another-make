@@ -294,6 +294,12 @@
     <ClInclude Include="AcyclicTrail.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="BuildState.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="NodeMapStreamer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -481,6 +487,12 @@
     </ClCompile>
     <ClCompile Include="BuildFileParserNode.cpp">
       <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildState.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildFile.cpp">
+      <Filter>Source Files\BuildFileCompiler</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

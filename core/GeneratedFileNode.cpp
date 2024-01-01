@@ -1,5 +1,7 @@
 #include "GeneratedFileNode.h"
 #include "ExecutionContext.h"
+#include "CommandNode.h"
+#include "IStreamer.h"
 
 namespace
 {
@@ -11,13 +13,13 @@ namespace YAM
     GeneratedFileNode::GeneratedFileNode(
         ExecutionContext* context,
         std::filesystem::path const& name,
-        CommandNode* producer)
+        std::shared_ptr<CommandNode> const& producer)
         : FileNode(context, name)
         , _producer(producer) 
     {}
 
     CommandNode* GeneratedFileNode::producer() const {
-        return _producer;
+        return _producer.get();
     }
 
     bool GeneratedFileNode::deleteFile() {
@@ -38,7 +40,8 @@ namespace YAM
         return streamableTypeId;
     }
 
-    void GeneratedFileNode::producer(CommandNode* producer) {
-        _producer = producer;
+    void GeneratedFileNode::stream(IStreamer* streamer) {
+        FileNode::stream(streamer); 
+        streamer->stream(_producer);
     }
 }

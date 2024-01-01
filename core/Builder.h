@@ -11,6 +11,7 @@ namespace YAM
     class BuildRequest;
     class BuildResult;
     class GroupNode;
+    class PersistentBuildState;
 
     class __declspec(dllexport) Builder
     {
@@ -51,6 +52,7 @@ namespace YAM
         void _notifyCompletion();
 
         ExecutionContext _context;
+        std::shared_ptr<PersistentBuildState> _buildState;
         MulticastDelegate<std::shared_ptr<BuildResult>> _completor;
 
         std::shared_ptr<GroupNode> _dirtyDirectories;

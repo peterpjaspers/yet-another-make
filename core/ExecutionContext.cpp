@@ -161,8 +161,8 @@ namespace YAM
     }
 
     void ExecutionContext::clearBuildState() {
-        _nodes.clear();
         _repositories.clear();
+        _nodes.clear();
     }
 
     void ExecutionContext::computeStorageNeed(
@@ -184,7 +184,7 @@ namespace YAM
             if (!buildState.contains(p)) {
                 toRemove.insert(p);
                 // p may have been modified before it was remooved
-                if (p->modified()) toReplace.insert(p);
+                if (p->modified()) toReplace.erase(p);
             }
         }
     }

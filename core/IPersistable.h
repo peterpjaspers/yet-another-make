@@ -2,6 +2,7 @@
 
 #include "IStreamable.h"
 
+#include <unordered_set>
 #include <cstdint>
 
 namespace YAM
@@ -37,6 +38,14 @@ namespace YAM
         // stream these back-references (because redundant).
         // During restore the command node sets the back-references on its
         // input nodes. 
-        virtual void restore(void* context) = 0;
+        // Avoids duplicate restore by keeping track of restored objects
+        // in 'restored'.
+        // Post: restored.contains(this)
+        // Return whether this object was added to restored, i.e was not already 
+        // contained in restored.
+        virtual bool restore(
+            void* context,
+            std::unordered_set<IPersistable const*>& restored
+        ) = 0;
     };
 }

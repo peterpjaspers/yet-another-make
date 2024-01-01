@@ -487,7 +487,7 @@ namespace YAM {
                 throw std::runtime_error(ss.str());
             }
         } else {
-            outputNode = std::make_shared<GeneratedFileNode>(_context, outputPath, cmdNode.get());
+            outputNode = std::make_shared<GeneratedFileNode>(_context, outputPath, cmdNode);
             _newOutputs.insert({ outputPath, outputNode });
         }
         _outputs.insert({ outputNode->name(), outputNode });

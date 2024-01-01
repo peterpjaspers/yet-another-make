@@ -202,11 +202,13 @@ namespace YAM
     void FileRepository::prepareDeserialize() {
     }
 
-    void FileRepository::restore(void* context) {
+    bool FileRepository::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
+        if (!restored.insert(this).second) return false;
         _context = reinterpret_cast<ExecutionContext*>(context);
         if (_watcher == nullptr || _watcher->directory() != _directory) {
             _watcher = std::make_shared<FileRepositoryWatcher>(this, _context);
         }
         _symbolicDirectory = repoNameToSymbolicPath(_name);
+        return true;
     }
 }

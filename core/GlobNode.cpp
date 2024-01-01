@@ -173,9 +173,13 @@ namespace YAM
         _inputDirs.clear();
 
     }
-    void GlobNode::restore(void* context) {
-        Node::restore(context);
-        for (auto const& dir : _inputDirs) dir->addObserver(this);
+    bool GlobNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
+        if (!Node::restore(context, restored)) return false;
+        for (auto const& dir : _inputDirs) {
+            dir->restore(context, restored);
+            dir->addObserver(this);
+        }
+        return true;
     }
 
 }

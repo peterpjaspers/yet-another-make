@@ -100,7 +100,7 @@ namespace YAM
         void stream(IStreamer* streamer) override;
         // Inherited from IPersistable
         void prepareDeserialize() override;
-        void restore(void* context) override;
+        bool restore(void* context, std::unordered_set<IPersistable const*>& restored) override;
 
     protected:
         void handleDirtyOf(Node* observedNode) override;

@@ -14,6 +14,7 @@
 #include "BuildFileDependenciesCompiler.h"
 #include "BuildFileCompiler.h"
 #include "IStreamer.h"
+#include "NodeMapStreamer.h"
 
 #include <vector>
 #include <unordered_set>
@@ -165,32 +166,6 @@ namespace
             }
         }
     }
-
-    template<typename TNode>
-    void streamMap(
-        IStreamer* streamer,
-        std::map<std::filesystem::path, std::shared_ptr<TNode>>& map
-    ) {
-        uint32_t nItems;
-        if (streamer->writing()) {
-            const std::size_t length = map.size();
-            if (length > UINT_MAX) throw std::exception("map too large");
-            nItems = static_cast<uint32_t>(length);
-        }
-        streamer->stream(nItems);
-        if (streamer->writing()) {
-            for (auto const& pair : map) {
-                std::shared_ptr<TNode> node = pair.second;
-                streamer->stream(node);
-            }
-        } else {
-            for (uint32_t i = 0; i < nItems; ++i) {
-                std::shared_ptr<TNode> node;
-                streamer->stream(node);
-                map.insert({ node->name(), node });
-            }
-        }
-    }
 }
 
 namespace YAM
@@ -336,6 +311,7 @@ namespace YAM
             notifyProcessingCompletion(Node::State::Failed);
         }
     }
+
     BuildFileParserNode const* BuildFileCompilerNode::findDefiningParser(GeneratedFileNode const* genFile) const {
         auto thisBuildFile = _buildFileParser->buildFile().get();
         SourceFileNode const* definingBuildFile = genFile->producer()->buildFile();
@@ -408,6 +384,7 @@ namespace YAM
     }
 
     void BuildFileCompilerNode::notifyProcessingCompletion(Node::State state) {
+        modified(true);
         Node::notifyCompletion(state);
     }
 
@@ -431,11 +408,11 @@ namespace YAM
     void BuildFileCompilerNode::stream(IStreamer* streamer) {
         Node::stream(streamer);
         streamer->stream(_buildFileParser);
-        streamMap(streamer, _depCompilers);
-        streamMap(streamer, _depGlobs);
-        streamMap(streamer, _commands);
-        streamMap(streamer, _outputs);
-        streamMap(streamer, _outputGroups);
+        NodeMapStreamer::stream(streamer, _depCompilers);
+        NodeMapStreamer::stream(streamer, _depGlobs);
+        NodeMapStreamer::stream(streamer, _commands);
+        NodeMapStreamer::stream(streamer, _outputs);
+        NodeMapStreamer::stream(streamer, _outputGroups);
         streamer->stream(_executionHash);
     }
 
@@ -451,11 +428,28 @@ namespace YAM
         _outputGroups.clear();
 
     }
-    void BuildFileCompilerNode::restore(void* context) {
-        Node::restore(context);
+    bool BuildFileCompilerNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
+        if (!Node::restore(context, restored)) return false;
+        _buildFileParser->restore(context, restored);
         _buildFileParser->addObserver(this);
-        for (auto const& i : _depCompilers) i.second->addObserver(this);
-        for (auto const& i : _depGlobs) i.second->addObserver(this);
+        NodeMapStreamer::restore(_depCompilers);
+        NodeMapStreamer::restore(_depGlobs);
+        NodeMapStreamer::restore(_commands);
+        NodeMapStreamer::restore(_outputs);
+        NodeMapStreamer::restore(_outputGroups);
+        for (auto const& i : _depCompilers) {
+            i.second->restore(context, restored);
+            i.second->addObserver(this);
+        }
+        for (auto const& i : _depGlobs) {
+            i.second->restore(context, restored);
+            i.second->addObserver(this);
+        }
+        for (auto const& i : _commands) {
+            i.second->restore(context, restored);
+            i.second->buildFile(_buildFileParser->buildFile().get());
+        }
+        return true;
     }
 
 }

@@ -14,6 +14,9 @@
 #include "ISharedObjectStreamer.h"
 #include "Streamer.h"
 
+#include "../btree/Forest.h"
+#include "../btree/PersistentPagePool.h"
+
 #include <memory>
 #include <filesystem>
 #include <set>
@@ -72,19 +75,19 @@ namespace YAM
             throw std::exception("unknown node type");
         }
 
-        IPersistable* instantiate(uint32_t typeId) {
+        std::shared_ptr<IPersistable> instantiate(uint32_t typeId) {
             auto tid = static_cast<TypeId>(typeId);
             switch (tid) {
-            case TypeId::BuildFileCompilerNode: return new YAM::BuildFileCompilerNode();
-            case TypeId::BuildFileParserNode: return new YAM::BuildFileParserNode();
-            case TypeId::CommandNode: return new YAM::CommandNode();
-            case TypeId::DirectoryNode: return new YAM::DirectoryNode();
-            case TypeId::DotIgnoreNode: return new YAM::DotIgnoreNode();
-            case TypeId::GeneratedFileNode: return new YAM::GeneratedFileNode();
-            case TypeId::GlobNode: return new YAM::GlobNode();
-            case TypeId::GroupNode: return new YAM::GroupNode();
-            case TypeId::SourceFileNode: return new YAM::SourceFileNode();
-            case TypeId::FileRepository: return new YAM::FileRepository();
+            case TypeId::BuildFileCompilerNode: return std::make_shared<YAM::BuildFileCompilerNode>();
+            case TypeId::BuildFileParserNode: return std::make_shared<YAM::BuildFileParserNode>();
+            case TypeId::CommandNode: return std::make_shared<YAM::CommandNode>();
+            case TypeId::DirectoryNode: return std::make_shared<YAM::DirectoryNode>();
+            case TypeId::DotIgnoreNode: return std::make_shared<YAM::DotIgnoreNode>();
+            case TypeId::GeneratedFileNode: return std::make_shared<YAM::GeneratedFileNode>();
+            case TypeId::GlobNode: return std::make_shared<YAM::GlobNode>();
+            case TypeId::GroupNode: return std::make_shared<YAM::GroupNode>();
+            case TypeId::SourceFileNode: return std::make_shared<YAM::SourceFileNode>();
+            case TypeId::FileRepository: return std::make_shared<YAM::FileRepository>();
             default: throw std::exception("unknown node type");
             }
         }
@@ -252,6 +255,8 @@ namespace YAM
         reset();
         retrieveAll();
         for (auto pair : _keyToObject) addToBuildState(pair.second);
+        std::unordered_set<IPersistable const*> restored;
+        for (auto pair : _keyToObject) pair.second->restore(_context, restored);
     }
 
     void PersistentBuildState::reset() {
@@ -295,7 +300,6 @@ namespace YAM
                 retrieveKey(key, reader);
             }
         }
-        for (auto pair : _keyToObject) pair.second->restore(_context);
     }
 
     void PersistentBuildState::retrieveKey(Key key) {
@@ -430,9 +434,16 @@ namespace YAM
             Key key = _objectToKey[object.get()];
             object->prepareDeserialize();
             retrieveKey(key);
+        };
+        std::unordered_set<IPersistable const*> restored;
+        for (auto const& pair : _objectToKey) {
+            restored.insert(pair.first);
         }
         for (auto const& object : _toReplace) {
-            object->restore(_context);
+            restored.erase(object.get());
+        }
+        for (auto const& object : _toReplace) {
+            object->restore(_context, restored);
         }
     }
 

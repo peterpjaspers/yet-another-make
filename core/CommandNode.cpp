@@ -663,12 +663,12 @@ namespace YAM
         result._newState = newState;
         if (result._newState == Node::State::Ok) {
             _executionHash = computeExecutionHash();
-            modified(true);
         } else {
             ExecutionResult r;
             for (auto const& pair : _detectedInputs) r._removedInputPaths.insert(pair.first);
             setDetectedInputs(r);
         }
+        modified(true);
         notifyCommandCompletion(sresult);
     }
 
@@ -784,12 +784,25 @@ namespace YAM
         return streamableTypeId;
     }
 
+    /*
+    * 
+
+        InputNodes _detectedInputs;
+
+        // The hash of the hashes of all items that, when changed, invalidate
+        // the output files. Items include the script, the output files and 
+        // the relevant aspects of the input files.
+        XXH64_hash_t _executionHash;
+    */
     void CommandNode::stream(IStreamer* streamer) {
         Node::stream(streamer);
         streamer->stream(_ruleLineNr);
+        streamer->stream(_inputAspectsName);
         streamer->streamVector(_cmdInputs);
         streamer->streamVector(_orderOnlyInputs);
-
+        streamer->stream(_script);
+        streamer->streamVector(_outputs);
+        streamer->streamVector(_ignoredOutputs);
         std::vector<std::shared_ptr<FileNode>> inputs;
         std::shared_ptr<DirectoryNode> wdir;
         if (streamer->writing()) {
@@ -802,9 +815,6 @@ namespace YAM
             for (auto const& n : inputs) _detectedInputs.insert({ n->name(), n });
             _workingDir = wdir;
         }
-        streamer->stream(_script);
-        streamer->streamVector(_outputs);
-        streamer->streamVector(_ignoredOutputs);
         streamer->stream(_executionHash);
     }
 
@@ -824,16 +834,24 @@ namespace YAM
         _ignoredOutputs.clear();
     }
 
-    void CommandNode::restore(void* context) {
-        Node::restore(context);
+    bool CommandNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
+        if (!Node::restore(context, restored)) return false;
+        for (auto const& node : _cmdInputs) {
+            node->restore(context, restored);
+        }
+        for (auto const& genFileNode : _orderOnlyInputs) {
+            genFileNode->restore(context, restored);
+        }
         updateInputProducers();
         for (auto const& i : _outputs) {
+            i->restore(context, restored);
             i->addObserver(this);
-            i->producer(this);
         }
         for (auto const& p : _detectedInputs) {
+            p.second->restore(context, restored);
             auto const& genFile = dynamic_pointer_cast<GeneratedFileNode>(p.second);
             if (genFile == nullptr) p.second->addObserver(this);
         }
+        return true;
     }
 }

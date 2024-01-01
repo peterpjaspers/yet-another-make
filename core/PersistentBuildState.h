@@ -1,14 +1,18 @@
 #pragma once
 
-#include "BinaryValueStreamer.h"
-#include "../btree/Forest.h"
-#include "../btree/PersistentPagePool.h"
-
 #include <memory>
 #include <filesystem>
 #include <map>
 #include <unordered_set>
 
+namespace BTree 
+{
+    class PersistentPagePool;
+    class Forest;
+    template<class K> class ValueReader;
+    template<class K> class StreamingTree;
+    typedef std::uint32_t TreeIndex;
+}
 
 namespace YAM
 {

@@ -52,9 +52,13 @@ namespace YAM
         for (auto const& node : _group) node->removeObserver(this);
         _group.clear();
     }
-    void GroupNode::restore(void* context) {
-        Node::restore(context);
-        for (auto const& node : _group) node->addObserver(this);
+    bool GroupNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
+        if (!Node::restore(context, restored)) return false;
+        for (auto const& node : _group) {
+            node->restore(context, restored);
+            node->addObserver(this);
+        }
+        return true;
     }
 }
 

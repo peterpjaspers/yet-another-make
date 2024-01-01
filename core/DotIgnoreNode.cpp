@@ -141,8 +141,12 @@ namespace YAM
         _dotIgnoreFiles.clear();
     }
 
-    void DotIgnoreNode::restore(void* context) {
-        Node::restore(context);
-        for (auto file : _dotIgnoreFiles) file->addObserver(this);
+    bool DotIgnoreNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
+        if (!Node::restore(context, restored)) return false;
+        for (auto file : _dotIgnoreFiles) {
+            file->restore(context, restored);
+            file->addObserver(this);
+        }
+        return true;
     }
 }
