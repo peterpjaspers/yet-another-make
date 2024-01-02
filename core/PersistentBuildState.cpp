@@ -162,7 +162,9 @@ namespace YAM
         void stream(IStreamer* reader, std::shared_ptr<IStreamable>& object) {
             PersistentBuildState::Key key;
             reader->stream(key);
-            if (key != nullPtrKey) {
+            if (key == nullPtrKey) {
+                object.reset();
+            } else {
                 std::shared_ptr<YAM::IPersistable> node = _buildState.retrieve(key);
                 object = dynamic_pointer_cast<IStreamable>(node);
             }
@@ -351,10 +353,12 @@ namespace YAM
         }
 
         std::size_t nStored = _toInsert.size() + _toReplace.size() + _toRemove.size();
-        try { _forest->commit(); } 
-        catch (std::string msg) {
-            rollback(true);
-            nStored = -1;
+        if (0 < nStored) {
+            try { _forest->commit(); } 
+            catch (std::string msg) {
+                rollback(true);
+                nStored = -1;
+            }
         }
 
         _toInsert.clear();
@@ -405,7 +409,7 @@ namespace YAM
         _objectToKey.erase(object.get());
         KeyCode code(key);
         auto tree = _typeToTree[code._type];
-        tree->erase(code._id);
+        tree->erase(key);
     }
 
     void PersistentBuildState::rollback(bool recoverForest) {

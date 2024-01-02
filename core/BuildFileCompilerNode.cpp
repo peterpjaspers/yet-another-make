@@ -43,7 +43,8 @@ namespace
         node->context()->nodes().add(node);
     }
     void addNode(std::shared_ptr<GroupNode> group, StateObserver* observer) {
-        // A group node can be shared by multiple compilers.
+        // A group node can be shared by multiple compilers and can already
+        // have been added to the context by another compiler.
         group->context()->nodes().addIfAbsent(group);
     }
 
@@ -79,9 +80,7 @@ namespace
     }
     void removeNode(std::shared_ptr<GroupNode> group, StateObserver* observer) {
         // owned by all compiler nodes that contribute to the group
-        if (group->observers().empty()) {
-            group->context()->nodes().remove(group);
-        }
+        // When can it me removed from context?
     }
 
     template<class TNode>
@@ -300,6 +299,7 @@ namespace YAM
 
             if (validGeneratedInputs()) {
                 _executionHash = computeExecutionHash();
+                modified(true);
                 notifyProcessingCompletion(Node::State::Ok);
             } else {
                 notifyProcessingCompletion(Node::State::Failed);
@@ -384,7 +384,6 @@ namespace YAM
     }
 
     void BuildFileCompilerNode::notifyProcessingCompletion(Node::State state) {
-        modified(true);
         Node::notifyCompletion(state);
     }
 

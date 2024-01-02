@@ -45,6 +45,7 @@ void logResult(ILogBook& logBook, BuildResult& result) {
     std::stringstream ss;
     ss << "Build completed " << (result.succeeded() ? "successfully" : "with errors");
     if (!duration.empty()) ss << " in " << duration;
+    else ss << " in less than 1 ms ";
     ss
         << std::endl
         << "#started=" << result.nNodesStarted()

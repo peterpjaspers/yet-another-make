@@ -116,7 +116,7 @@ namespace YAM
             postCompletion(Node::State::Canceled);
         } else {
             // TODO: parse the dotignore files
-            modified(true);
+            //modified(true);
             postCompletion(Node::State::Ok);
         }
     }

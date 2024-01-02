@@ -169,9 +169,7 @@ namespace YAM
 
         if (_buildState == nullptr) {
             if (_result->succeeded()) {
-                auto buildStateDir = yamDir / ".buildstate";
-                std::filesystem::create_directories(buildStateDir);
-                _buildState = std::make_shared<PersistentBuildState>(buildStateDir, &_context);
+                _buildState = std::make_shared<PersistentBuildState>(yamDir, &_context);
                 _buildState->retrieve();
                 if (_context.findRepository(".") == nullptr) {
                     std::filesystem::path repoPath = yamDir.parent_path();
@@ -301,9 +299,14 @@ namespace YAM
             _dirtyCommands->setState(_dirtyBuildFileCompilers->state());
             _handleCommandsCompletion(_dirtyCommands.get());
         } else {
-            if (!_dirtyBuildFileCompilers->group().empty()) _buildState->store();
             std::vector<std::shared_ptr<Node>> dirtyCommands;
             appendDirtyCommands(_context.nodes(), dirtyCommands);
+            if (
+                !_dirtyBuildFileCompilers->group().empty()
+                || !dirtyCommands.empty()
+            ) {
+                _buildState->store();
+            }
             if (dirtyCommands.empty()) {
                 _handleCommandsCompletion(_dirtyCommands.get());
             } else {

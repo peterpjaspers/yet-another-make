@@ -311,7 +311,7 @@ namespace YAM {
             }
             if (groupNode == nullptr) {
                 std::stringstream ss;
-                ss << "No such input group name " << input.pathPattern.string() << std::endl;
+                ss << "No such input group name: {" << input.pathPattern.string() << "}" << std::endl;
                 ss << "In rule at line " << input.line << " in buildfile " << _buildFile.string() << ":" << std::endl;
                 throw std::runtime_error(ss.str());
             }

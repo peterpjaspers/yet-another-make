@@ -335,10 +335,7 @@ namespace YAM
         for (auto const& pair : _detectedInputs) inputs.push_back(dynamic_pointer_cast<Node>(pair.second));
     }
     void CommandNode::buildFile(SourceFileNode* buildFile) {
-        if (_buildFile != buildFile) {
-            _buildFile = buildFile;
-            modified(true);
-        }
+        _buildFile = buildFile;
     }
     void CommandNode::ruleLineNr(std::size_t ruleLineNr) {
         if (_ruleLineNr != ruleLineNr) {
@@ -412,7 +409,7 @@ namespace YAM
             auto result = _detectedInputs.insert({ node->name(), node });
             if (!result.second) throw std::exception("attempt to add duplicate input");
         }
-        modified(true);
+        modified(!result._removedInputPaths.empty() || !result._addedInputNodes.empty());
     }
 
     std::shared_ptr<GeneratedFileNode> CommandNode::findOutputNode(
