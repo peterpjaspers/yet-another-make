@@ -7,6 +7,7 @@
 #include "BuildFileParserNode.h"
 #include "BuildFileCompilerNode.h"
 #include "IStreamer.h"
+#include "NodeMapStreamer.h"
 
 #include <regex>
 
@@ -428,22 +429,7 @@ namespace YAM
         streamer->stream(_lastWriteTime);
         streamer->stream(_executionHash);
         streamer->stream(_dotIgnoreNode);
-        std::vector<std::shared_ptr<Node>> nodes;
-        if (streamer->writing()) {
-            for (auto const& p : _content) nodes.push_back(p.second);
-        }
-        streamer->streamVector(nodes);
-        if (streamer->reading()) {
-            // Take care: when streaming nodes from persistent repository the
-            // nodes are constructed but their members may not yet have been 
-            // streamed. Use temporary names to build the map and update the 
-            // map in restore();
-            uint32_t index = 0;
-            for (auto n : nodes) {
-                std::stringstream ss; ss << index; index += 1;
-                _content.insert({ std::filesystem::path(ss.str()), n });
-            }
-        }
+        NodeMapStreamer::stream(streamer, _content);
         streamer->stream(_buildFileParserNode);
         streamer->stream(_buildFileCompilerNode);
     }
@@ -464,18 +450,15 @@ namespace YAM
         _dotIgnoreNode->directory(this);
         _dotIgnoreNode->addObserver(this);
         _dotIgnoreNode->restore(context, restored);
-        std::vector<std::shared_ptr<Node>> nodes;
+        NodeMapStreamer::restore(_content);
         for (auto const& p : _content) {
             p.second->restore(context, restored);
-            nodes.push_back(p.second);
             auto dir = dynamic_cast<DirectoryNode*>(p.second.get());
             if (dir != nullptr) {
                 dir->addObserver(this);
                 dir->parent(this);
             }
         }
-        _content.clear();
-        for (auto const& n : nodes) _content.insert({ n->name(), n });
         return true;
     }
 }

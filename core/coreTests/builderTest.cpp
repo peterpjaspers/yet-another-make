@@ -340,15 +340,15 @@ namespace
         // 3 generated file nodes pietOut, janOut, pietjanOut before script exec
         // 3 generated file nodes pietOut, janOut, pietjanOut after script exec
         // 3 commandNodes ccPiet, ccJan, linkPietjan
-        // 16 root, .yam, .yam\.buildstate, generated and src dir each have .ignore, .gitignore and .yamignore
+        // 16 root, .yam, generated and src dir each have .ignore, .gitignore and .yamignore
         // 35 total
-        EXPECT_EQ(35, driver.stats.nStarted); 
+        EXPECT_EQ(31, driver.stats.nStarted); 
         // pietOut, janOut, pietjanOut are started twice
-        EXPECT_EQ(32, driver.stats.started.size());
-        EXPECT_EQ(5, driver.stats.nDirectoryUpdates);
+        EXPECT_EQ(28, driver.stats.started.size());
+        EXPECT_EQ(4, driver.stats.nDirectoryUpdates);
         // 4 source + 3 generated (before cmd exec) + 3 generated (after cmd exec)
         // + 4 .gitignore + 4 .yamignore
-        EXPECT_EQ(20, driver.stats.nRehashedFiles); 
+        EXPECT_EQ(18, driver.stats.nRehashedFiles); 
 
         EXPECT_TRUE(driver.stats.started.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.dir))));
         EXPECT_TRUE(driver.stats.started.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.dir / "src"))));
@@ -364,8 +364,8 @@ namespace
         EXPECT_TRUE(driver.stats.started.contains(driver.pietjanOut.get()));
 
         // Verify nodes self-executed 
-        EXPECT_EQ(33, driver.stats.nSelfExecuted);
-        EXPECT_EQ(30, driver.stats.selfExecuted.size());
+        EXPECT_EQ(29, driver.stats.nSelfExecuted);
+        EXPECT_EQ(26, driver.stats.selfExecuted.size());
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.dir))));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.dir / "src"))));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietCpp))));

@@ -241,14 +241,14 @@ namespace
         ASSERT_NE(nullptr, fileNode);
         auto updatedHash = storage.addFileAndUpdateFileAndExecuteNode(fileNode);
         EXPECT_TRUE(fileNode->modified());
-        EXPECT_EQ(nNodes+1, setup.context.nodes().size()); // new FileNode for File4
+        EXPECT_EQ(nNodes+2, setup.context.nodes().size()); // new FileNode for File4, new dir buildstate
         auto newFileNode = dynamic_pointer_cast<FileNode>(setup.context.nodes().find(root / "File4"));
         EXPECT_NE(nullptr, newFileNode);
         EXPECT_TRUE(newFileNode->modified());
 
         // Verify that the modified file node is updated in storage.
         std::size_t nStored = storage.store(); // store the modified file node.
-        EXPECT_EQ(3, nStored); // repo dir, file3, file4
+        EXPECT_EQ(5, nStored); // repo dir, file3, file4, buildstate dir, buildstate file
         storage.retrieve(); // replace all nodes in storage.context by ones freshly retrieved from storage
         fileNode = dynamic_pointer_cast<FileNode>(setup.context.nodes().find(root / "File3"));
         ASSERT_NE(nullptr, fileNode);

@@ -184,7 +184,7 @@ namespace YAM
             if (!buildState.contains(p)) {
                 toRemove.insert(p);
                 // p may have been modified before it was remooved
-                if (p->modified()) toReplace.erase(p);
+                if (p->modified()) toReplace.insert(p);
             }
         }
     }
