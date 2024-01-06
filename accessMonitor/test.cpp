@@ -20,8 +20,8 @@ string narrow( const wstring& string ){
 }
 
 void worker( const path directoryPath ) {
-    // path externals = directoryPath / "externals.txt";
-    // system( narrow((wstring( L"listDLLExternals.exe \"\" " ) + externals.wstring())).c_str() );
+    path externals = directoryPath / ".." / "externals.txt";
+    system( narrow((wstring( L"listDLLExternals.exe \"\" " ) + externals.wstring())).c_str() );
     create_directory( directoryPath, current_path() );
     ofstream file( directoryPath / "junk.txt" );
     file << "Hello world!\n";
@@ -49,21 +49,22 @@ void doFileAccess( bool multithreaded = true ) {
 }
 
 int main() {
+    bool multithreaded = false;
     try {
-        enableLog( "testLog.txt", Verbose );
+        enableLog( "test", Verbose );
         log() << "Performing file access without monitoring..." << endLine;
-        doFileAccess();
+        doFileAccess( multithreaded );
         log() << "Start monitoring..." << endLine;
         startMonitoring();
         log() << "Performing file access with monitoring..." << endLine;
-        doFileAccess();
+        doFileAccess( multithreaded );
         log() << "Stop monitoring..." << endLine;
         stopMonitoring();
         wofstream files( "./accessedFiles.txt" );
         streamAccessedFiles( files );
         files.close();
         log() << "Performing file access without monitoring..." << endLine;
-        doFileAccess();
+        doFileAccess( multithreaded );
         log() << "Done..." << endLine;
     }
     catch ( string message ) {

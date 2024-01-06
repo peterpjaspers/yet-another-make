@@ -14,21 +14,19 @@ namespace AccessMonitor {
 
     namespace {
 
-        // ToDo: Separate list of patched libraries...
         struct Patch {
-            string library; // ... remove this, replace with index in patchedLibraries
+            const string* library;
             PatchFunction original;
             PatchFunction* address;
-            Patch() : library( "" ), original( nullptr ) {}
+            Patch() : library( nullptr ), original( nullptr ), address( nullptr ) {}
         };
-//        vector< string > patchedLibraries;
+        set< string > patchedLibraries;
         map< string, PatchFunction > registeredPatches;
         map< PatchFunction, Patch > functionToPatch;
         bool librariesPatched = false;
 
     }
 
-    // ToDo: Do not allow (un)registration while libraries are patched
     void registerPatch( std::string name, PatchFunction function ) {
         static const char* signature = "void registerPatch( std::string name, PatchFunction function )";
         if (0 < registeredPatches.count( name )) throw signature + string( " - Function " ) + name + string( " already registered!" );
@@ -50,14 +48,7 @@ namespace AccessMonitor {
         VirtualProtect((void*)address, sizeof( PatchFunction ), protection, nullptr );
     }
 
-    void patchFunctionCall( PatchFunction* address, PatchFunction function ) {
-        DWORD protection = 0;
-        VirtualProtect((void*)address, sizeof( PatchFunction ), PAGE_READWRITE, &protection );
-        *address = function;
-        VirtualProtect((void*)address, sizeof( PatchFunction ), protection, nullptr );
-    }
-
-    void patchLibrary( bool patch, const string& libraryName, set<string>& patchedLibraries ) {
+    void patchLibrary( bool patch, const string& libraryName ) {
         if (patchedLibraries.count( libraryName ) == 0) {
             if(logging( Normal )) { log() << wstring((patch) ? L"Patching " : L"Unpatching ") << ((0 < libraryName.size()) ? widen( libraryName.c_str() ) : L"program executable" )<< endLine; }
             patchedLibraries.insert( libraryName );
@@ -70,7 +61,7 @@ namespace AccessMonitor {
             while ((importDescriptor->Name != 0) && ((importDescriptor->Name & Ordinal) == 0) && (importDescriptor->Name != Last)) {
                 string importLibraryName( (const char*)(importDescriptor->Name + (char*)imageBase) );
                 if (patchedLibraries.count( importLibraryName ) == 0) {
-                    patchLibrary( patch, importLibraryName, patchedLibraries );
+                    patchLibrary( patch, importLibraryName );
                     HMODULE library = LoadLibraryA( importLibraryName.c_str() );
                     if ( library ) {
                         IMAGE_THUNK_DATA* originalFirstThunk = (IMAGE_THUNK_DATA*)((char*)imageBase + importDescriptor->OriginalFirstThunk);
@@ -85,7 +76,7 @@ namespace AccessMonitor {
                                 Patch& patchData = functionToPatch[ function ];
                                 if (patch && (patchData.original == nullptr)) {
                                     if(logging( Terse )) { log() << L"      Patched function " << widen( name ) << " in " << widen( importLibraryName )<< endLine; }
-                                    patchData.library = importLibraryName;
+                                    patchData.library = &(*patchedLibraries.find( importLibraryName ));
                                     patchData.address = reinterpret_cast<PatchFunction*>(&firstThunk->u1.Function);
                                     patchData.original = *patchData.address;
                                     patchImportTable( patchData.address, function );
@@ -115,16 +106,15 @@ namespace AccessMonitor {
         if(logging( Normal )) { log() << wstring((patch) ? L"Patching" : L"Unpatching") << L" libraries..." << endLine; }
         if (librariesPatched && patch) throw string( signature ) + string( " - Libraries already patched!" );
         if (!librariesPatched && !patch) throw string( signature ) + string( " - Libraries not patched!" );
-        set<string> patchedLibraries;
-        patchLibrary( patch, "", patchedLibraries );
+        patchLibrary( patch, "" );
         librariesPatched = patch;
     }
 
     PatchFunction original( std::string name ) { return functionToPatch[ registeredPatches[ name ] ].original; }
     PatchFunction original( PatchFunction function ) { return functionToPatch[ function ].original; }
     PatchFunction patched( std::string name ) { return registeredPatches[ name ]; }
-    const std::string& patchedLibrary( std::string name ) { return functionToPatch[ registeredPatches[ name ] ].library; }
-    const std::string& patchedLibrary( PatchFunction function ){ return functionToPatch[ function ].library; }
+    const std::string& patchedLibrary( std::string name ) { return *functionToPatch[ registeredPatches[ name ] ].library; }
+    const std::string& patchedLibrary( PatchFunction function ){ return *functionToPatch[ function ].library; }
 
     bool repatched( std::string name ) {
         PatchFunction function = patched( name );
@@ -132,10 +122,15 @@ namespace AccessMonitor {
         return( (*patch.address != patch.original) && (*patch.address != function) );
     }
 
-
-    void patch() { patchLibraries( true ); }
-    void unpatch() { patchLibraries( false ); }
-
+    void patch() {
+        patchedLibraries.clear();
+        functionToPatch.clear();
+        patchLibraries( true );
+    }
+    void unpatch() {
+        patchedLibraries.clear();
+        patchLibraries( false );
+    }
 
 } // namespace AccessMonitor
 

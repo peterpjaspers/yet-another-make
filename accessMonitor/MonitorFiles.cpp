@@ -9,19 +9,10 @@
 #include <chrono>
 #include <mutex>
 
-// ToDo: Multi-thread safe implementation (in particular accessedFiles map)
-// Not sure if we can tolerate a synchronization mutex on the map
-// A possible approach is to maintain thread local results that are communicated when threads exit.
-// This requires communication and synchronization only once per thread but will require a
-// merge of all thread local results.
-
-// ToDo: stream relevant parameters to patched functions (in particular file names)
-
 // CreateHardLinkW, GetFileAttributesW, GetFullPathNameW, GetLongPathNameW, MoveFileExW, ReplaceFileW
 // SearchPathW, FindFirstStreamW, FindNextStreamW, GetCompressedFileSizeW, GetFinalPathNameByHandleW
 
 using namespace std;
-using namespace filesystem;
 
 namespace AccessMonitor {
 

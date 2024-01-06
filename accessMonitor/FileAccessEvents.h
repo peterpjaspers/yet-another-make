@@ -11,7 +11,7 @@ namespace AccessMonitor {
 
     typedef unsigned long FileAccessMode;
 
-    static const FileAccessMode AccessNone = (1 << 1);
+    static const FileAccessMode AccessNone = (1 << 0);
     static const FileAccessMode AccessRead = (1 << 1);
     static const FileAccessMode AccessWrite = (1 << 2);
     static const FileAccessMode AccessDelete = (1 << 3);

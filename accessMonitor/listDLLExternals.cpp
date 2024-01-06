@@ -1,10 +1,16 @@
 #include <string>
 #include <vector>
 #include <fstream>
+#include <iomanip>
+#include <chrono>
+#include <thread>
 
 #include <windows.h>
 #include <psapi.h>
 #include <imagehlp.h>
+
+#pragma comment(lib, "psapi.lib")
+#pragma comment(lib, "imagehlp.lib")
 
 namespace AccessMonitor {
 
@@ -88,13 +94,17 @@ namespace AccessMonitor {
 using namespace std;
 using namespace AccessMonitor;
 
+// ToDo: Build using MS cl compiler
+
 int main( int argc, char* argv[] ) {
     ofstream out( ( (2 < argc) ? argv[ 2 ] : "externals.txt" ) );
+    uint32_t index = 1;
     auto dlls = EnumerateModules( ( (1 < argc) ? argv[ 1 ] : "" ) );
     for ( auto dll : dlls ){
-        out << dll.name << " in " << dll.directory << "\n";
+        out << "Module " << dll.name << " in " << dll.directory << "\n";
         auto exports = EnumerateExports( dll );
-        for ( auto exported : exports ) out << "   " << exported << "\n";
+        for ( auto exported : exports ) out << setw(7) << index++ << "   " << exported << "\n";
     }
     out.close();
+    this_thread::sleep_for( 2000ms );
 }

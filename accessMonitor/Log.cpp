@@ -1,4 +1,5 @@
 #include "Log.h"
+#include "Process.h"
 
 #include <fstream>
 #include <chrono>
@@ -11,14 +12,15 @@ using namespace std;
 // terminate called after throwing an instance of 'std::logic_error'
 //  what():  basic_string::_M_construct null not valid
 
-// ToDo: Log file per process (?)
 // ToDo: Conditionally compile logging code while compiling in debug controlled via NDEBUG
 
 namespace AccessMonitor {
     
+    // ToDo: Implement multi-thread safe access to log file, thread_local does not work
     namespace {
         static wostream* logFile = nullptr;
-        thread_local wostringstream* logStream = nullptr;
+//        thread_local wostringstream* logStream = nullptr;
+        static wostringstream* logStream = nullptr;
         static LogLevel logLevel = LogLevel::Normal;
         bool levelValid( LogLevel level ) { return ((level == Terse) || (level == Normal) || (level == Verbose)); }
     }
@@ -28,7 +30,10 @@ namespace AccessMonitor {
         static const char* signature = "void enableLog( std::string file, LogLevel level )";
         if (logFile != nullptr) throw string( signature ) + " - Enabling enabled Monitor log on " + file;
         if (!levelValid( level )) throw string( signature ) + " - Invalid logging level";
-        logFile = new wofstream( file );
+        // Add process PID to file name to generate unique file name for log file...
+        stringstream uniqueFile;
+        uniqueFile << file << "_" << hex << CurrentProcessID() << ".log";
+        logFile = new wofstream( uniqueFile.str() );
 /*
         // ToDo: Write BOM to log file (this code does not work for some reason!)
         static uint8_t UTF16BOM[ 2 ] = { 0xFE, 0xFF }; 
@@ -72,7 +77,7 @@ namespace AccessMonitor {
 
     // Complete log entry and write to log file.
     wostream& endLine( wostream& stream ) {
-        wostringstream& sstream = static_cast<wostringstream&>(stream);
+        wostringstream& sstream = static_cast<wostringstream&>( stream );
         sstream << "\n";
         *logFile << sstream.str() << flush;
         sstream.str( L"" );

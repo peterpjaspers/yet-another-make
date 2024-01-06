@@ -1,5 +1,5 @@
-#ifndef MONITOR_THREADS_AND_PROCESSES_H
-#define MONITOR_THREADS_AND_PROCESSES_H
+#ifndef ACCESS_MONITOR_MONITOR_THREADS_AND_PROCESSES_H
+#define ACCESS_MONITOR_MONITOR_THREADS_AND_PROCESSES_H
 
 namespace AccessMonitor {
     // Register patches for OS process creation functions
@@ -8,4 +8,4 @@ namespace AccessMonitor {
     void unregisterProcessCreation();
 }
 
-#endif // MONITOR_THREADS_AND_PROCESSES_H
+#endif // ACCESS_MONITOR_MONITOR_THREADS_AND_PROCESSES_H

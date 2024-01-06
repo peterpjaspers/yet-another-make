@@ -1,6 +1,7 @@
 #include "MonitorThreadsAndProcesses.h"
 #include "Monitor.h"
 #include "Patch.h"
+#include "Inject.h"
 #include "Log.h"
 
 #include <windows.h>
@@ -31,14 +32,18 @@ namespace AccessMonitor {
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
             TypeCreateProcessA function = reinterpret_cast<TypeCreateProcessA>(original( (PatchFunction)PatchCreateProcessA ));
+            bool resume = !(dwCreationFlags & CREATE_SUSPENDED);
             BOOL result = function( lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
+            ProcessID child = GetProcessID( lpProcessInformation->dwProcessId );
             if (logging( Terse )) log() << "MonitorProcessesAndThreads - CreateProcessA( " << lpApplicationName << ", " << lpCommandLine << ", ... ) -> " << result << endLine;
+            inject( lpProcessInformation->dwProcessId, L"C:\\Users\\philv\\Code\\yam\\yet-another-make\\accessMonitor\\patchDLL.dll" );
+            if (resume) ResumeThread( lpProcessInformation->hThread );
             return result;
         }
         typedef BOOL(*TypeCreateProcessW)(LPCWSTR,LPWSTR,LPSECURITY_ATTRIBUTES,LPSECURITY_ATTRIBUTES,BOOL,DWORD,LPVOID,LPCSTR,LPSTARTUPINFOA,LPPROCESS_INFORMATION);
         BOOL PatchCreateProcessW(
-            LPCWSTR                lpApplicationName,
-            LPWSTR                 lpCommandLine,
+            LPCWSTR               lpApplicationName,
+            LPWSTR                lpCommandLine,
             LPSECURITY_ATTRIBUTES lpProcessAttributes,
             LPSECURITY_ATTRIBUTES lpThreadAttributes,
             BOOL                  bInheritHandles,
@@ -49,8 +54,11 @@ namespace AccessMonitor {
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
             TypeCreateProcessW function = reinterpret_cast<TypeCreateProcessW>(original( (PatchFunction)PatchCreateProcessW ));
-            BOOL result = function( lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
+            bool resume = !(dwCreationFlags & CREATE_SUSPENDED);
+            BOOL result = function( lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
             if (logging( Terse )) log() << "MonitorProcessesAndThreads - CreateProcessW( " << lpApplicationName << ", " << lpCommandLine << ", ... ) -> " << result << endLine;
+            inject( lpProcessInformation->dwProcessId, L"C:\\Users\\philv\\Code\\yam\\yet-another-make\\accessMonitor\\patchDLL.dll" );
+            if (resume) ResumeThread( lpProcessInformation->hThread );
             return result;
         }
         typedef BOOL(*TypeCreateProcessAsUserA)(HANDLE,LPCSTR,LPSTR,LPSECURITY_ATTRIBUTES,LPSECURITY_ATTRIBUTES,BOOL,DWORD,LPVOID,LPCSTR,LPSTARTUPINFOA,LPPROCESS_INFORMATION);
@@ -68,15 +76,18 @@ namespace AccessMonitor {
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
             TypeCreateProcessAsUserA function = reinterpret_cast<TypeCreateProcessAsUserA>(original( (PatchFunction)PatchCreateProcessAsUserA));
+            bool resume = !(dwCreationFlags & CREATE_SUSPENDED);
             BOOL result = function( hToken, lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
             if (logging( Terse )) log() << "MonitorProcessesAndThreads - CreateProcessAsUserA( ... , " << lpApplicationName << ", " << lpCommandLine << ", ... ) -> " << result << endLine;
+            inject( lpProcessInformation->dwProcessId, L"C:\\Users\\philv\\Code\\yam\\yet-another-make\\accessMonitor\\patchDLL.dll" );
+            if (resume) ResumeThread( lpProcessInformation->hThread );
             return result;
         }
         typedef BOOL(*TypeCreateProcessAsUserW)(HANDLE,LPCWSTR,LPWSTR,LPSECURITY_ATTRIBUTES,LPSECURITY_ATTRIBUTES,BOOL,DWORD,LPVOID,LPCSTR,LPSTARTUPINFOA,LPPROCESS_INFORMATION);
         BOOL PatchCreateProcessAsUserW(
             HANDLE                hToken,
-            LPCWSTR                lpApplicationName,
-            LPWSTR                 lpCommandLine,
+            LPCWSTR               lpApplicationName,
+            LPWSTR                lpCommandLine,
             LPSECURITY_ATTRIBUTES lpProcessAttributes,
             LPSECURITY_ATTRIBUTES lpThreadAttributes,
             BOOL                  bInheritHandles,
@@ -87,8 +98,11 @@ namespace AccessMonitor {
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
             TypeCreateProcessAsUserW function = reinterpret_cast<TypeCreateProcessAsUserW>(original( (PatchFunction)PatchCreateProcessAsUserW));
+            bool resume = !(dwCreationFlags & CREATE_SUSPENDED);
             BOOL result = function( hToken, lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
             if (logging( Terse )) log() << "MonitorProcessesAndThreads - CreateProcessAsUserW( ... , " << lpApplicationName << ", " << lpCommandLine << ", ... ) -> " << result << endLine;
+            inject( lpProcessInformation->dwProcessId, L"C:\\Users\\philv\\Code\\yam\\yet-another-make\\accessMonitor\\patchDLL.dll" );
+            if (resume) ResumeThread( lpProcessInformation->hThread );
             return result;
         }
         typedef BOOL(*TypeCreateProcessWithLogonW)(LPCWSTR,LPCWSTR,LPCWSTR,DWORD,LPCWSTR,LPWSTR,DWORD,LPVOID,LPCSTR,LPSTARTUPINFOA,LPPROCESS_INFORMATION);
@@ -97,8 +111,8 @@ namespace AccessMonitor {
             LPCWSTR               lpDomain,
             LPCWSTR               lpPassword,
             DWORD                 dwLogonFlags,
-            LPCWSTR                lpApplicationName,
-            LPWSTR                 lpCommandLine,
+            LPCWSTR               lpApplicationName,
+            LPWSTR                lpCommandLine,
             DWORD                 dwCreationFlags,
             LPVOID                lpEnvironment,
             LPCSTR                lpCurrentDirectory,
@@ -106,16 +120,19 @@ namespace AccessMonitor {
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
             TypeCreateProcessWithLogonW function = reinterpret_cast<TypeCreateProcessWithLogonW>(original( (PatchFunction)PatchCreateProcessAsUserW));
+            bool resume = !(dwCreationFlags & CREATE_SUSPENDED);
             BOOL result = function( lpUsername, lpDomain, lpPassword, dwLogonFlags, lpApplicationName, lpCommandLine, dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
             if (logging( Terse )) log() << "MonitorProcessesAndThreads - CreateProcessWithLogonW( ... , " << lpApplicationName << ", " << lpCommandLine << ", ... ) -> " << result << endLine;
+            inject( lpProcessInformation->dwProcessId, L"C:\\Users\\philv\\Code\\yam\\yet-another-make\\accessMonitor\\patchDLL.dll" );
+            if (resume) ResumeThread( lpProcessInformation->hThread );
             return result;
         }
         typedef  BOOL(*TypeCreateProcessWithTokenW)(HANDLE,DWORD,LPCWSTR,LPWSTR,DWORD,LPVOID,LPCSTR,LPSTARTUPINFOA,LPPROCESS_INFORMATION);
         BOOL PatchCreateProcessWithTokenW(
             HANDLE                hToken,
             DWORD                 swLogonFlags,
-            LPCWSTR                lpApplicationName,
-            LPWSTR                 lpCommandLine,
+            LPCWSTR               lpApplicationName,
+            LPWSTR                lpCommandLine,
             DWORD                 dwCreationFlags,
             LPVOID                lpEnvironment,
             LPCSTR                lpCurrentDirectory,
@@ -123,10 +140,28 @@ namespace AccessMonitor {
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
             TypeCreateProcessWithTokenW function = reinterpret_cast<TypeCreateProcessWithTokenW>(original( (PatchFunction)PatchCreateProcessAsUserW));
+            bool resume = !(dwCreationFlags & CREATE_SUSPENDED);
             BOOL result = function( hToken, swLogonFlags, lpApplicationName, lpCommandLine, dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
             if (logging( Terse )) log() << "MonitorProcessesAndThreads - CreateProcessWithTokenW( ... , " << lpApplicationName << ", " << lpCommandLine << ", ... ) -> " << result << endLine;
+            inject( lpProcessInformation->dwProcessId, L"C:\\Users\\philv\\Code\\yam\\yet-another-make\\accessMonitor\\patchDLL.dll" );
+            if (resume) ResumeThread( lpProcessInformation->hThread );
             return result;
         }
+        typedef void(*TypeExitProcess)();
+        void PatchExitProcess() {
+            TypeExitProcess function = reinterpret_cast<TypeExitProcess>(original( (PatchFunction)PatchExitProcess));
+            // ToDo: Synchronize with parent process
+            function();
+            if (logging( Terse )) log() << "MonitorProcessesAndThreads - ExitProcess()" << endLine;
+        }
+        typedef BOOL(*TypeTerminateProcess)(HANDLE,DWORD);
+        void PatchTerminateProcess( HANDLE process, DWORD exitCode ) {
+            TypeTerminateProcess function = reinterpret_cast<TypeTerminateProcess>(original( (PatchFunction)PatchTerminateProcess));
+            // ToDo: Synchronize with terminating process if it is a child of this process
+            BOOL result = function( process, exitCode );
+            if (logging( Terse )) log() << "MonitorProcessesAndThreads - TerminateProcess( " << process << ", " << exitCode << " )" << endLine;
+        }
+/*
         typedef NTSTATUS(*TypeNtCreateUserProcess)(HANDLE*,HANDLE*,ACCESS_MASK,ACCESS_MASK,OBJECT_ATTRIBUTES*,OBJECT_ATTRIBUTES*,ULONG,ULONG,RTL_USER_PROCESS_PARAMETERS*,ULONG*,ULONG*);
         NTSTATUS PatchNtCreateUserProcess(
             HANDLE*                         ProcessHandle,
@@ -147,6 +182,7 @@ namespace AccessMonitor {
             return result;
             
         }
+*/
     }
 
     void registerProcessesAndThreads() {
@@ -156,7 +192,9 @@ namespace AccessMonitor {
         registerPatch( "CreateProcessAsUserW", (PatchFunction)PatchCreateProcessAsUserW );
         registerPatch( "CreateProcessWithLogonW", (PatchFunction)PatchCreateProcessWithLogonW );
         registerPatch( "CreateProcessWithTokenW", (PatchFunction)PatchCreateProcessWithTokenW );
-        registerPatch( "NtCreateUserProcess", (PatchFunction)PatchNtCreateUserProcess );
+        registerPatch( "ExitProcess", (PatchFunction)PatchExitProcess );
+        registerPatch( "TerminateProcess", (PatchFunction)PatchTerminateProcess );
+        // registerPatch( "NtCreateUserProcess", (PatchFunction)PatchNtCreateUserProcess );
     }
     void unregisterProcessCreation() {
         unregisterPatch( "CreateProcessA" );
@@ -165,6 +203,8 @@ namespace AccessMonitor {
         unregisterPatch( "CreateProcessAsUserW" );
         unregisterPatch( "CreateProcessWithLogonW" );
         unregisterPatch( "CreateProcessWithTokenW" );
-        unregisterPatch( "NtCreateUserProcess" );
+        unregisterPatch( "ExitProcess" );
+        unregisterPatch( "TerminateProcess" );
+        // unregisterPatch( "NtCreateUserProcess" );
     }
 }

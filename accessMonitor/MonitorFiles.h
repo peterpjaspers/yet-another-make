@@ -1,5 +1,5 @@
-#ifndef MONITOR_FILES_H
-#define MONITOR_FILES_H
+#ifndef ACCESS_MONITOR_MONITOR_FILES_H
+#define ACCESS_MONITOR_MONITOR_FILES_H
 
 namespace AccessMonitor {
     // Register patches for OS file access functions
@@ -8,4 +8,4 @@ namespace AccessMonitor {
     void unregisterFileAccess();
 }
 
-#endif // MONITOR_FILES_H
+#endif // ACCESS_MONITOR_MONITOR_FILES_H

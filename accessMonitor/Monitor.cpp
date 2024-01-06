@@ -3,6 +3,8 @@
 #include "MonitorFiles.h"
 #include "MonitorThreadsAndProcesses.h"
 
+// ToDo: Add function calling convention to all externals
+
 using namespace std;
 
 namespace AccessMonitor {
@@ -20,10 +22,10 @@ namespace AccessMonitor {
         patch();
     }
 
-    void startMonitoring( ProcessId process ) {
-        static const char* signature = "void startMonitoring( ProcessId process )";
+    void startMonitoring( ProcessID process ) {
+        static const char* signature = "void startMonitoring( ProcessID process )";
         if (monitoring) throw string( signature ) + " - Already monitoring!";
-        // ToDo: Implement this function...
+        // ToDo: Implement this function (monitoring of a specific process)
         startMonitoring();
 
     }

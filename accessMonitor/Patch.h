@@ -27,7 +27,9 @@ namespace AccessMonitor {
     // Validate if a patch was re-patched by a third party
     bool repatched( std::string name );
 
+    // Patch libraries with all registered patches
     void patch();
+    // Un-patch libraries with all registered patches
     void unpatch();
 
 } // namespace AccessMonitor
