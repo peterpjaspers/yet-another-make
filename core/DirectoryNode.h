@@ -42,7 +42,7 @@ namespace YAM
         public std::enable_shared_from_this<DirectoryNode>
     {
     public:
-        DirectoryNode() {} // needed for deserialization
+        DirectoryNode(); // needed for deserialization
 
         DirectoryNode(
             ExecutionContext* context, 

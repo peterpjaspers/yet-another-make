@@ -26,6 +26,14 @@ namespace
 {
     using namespace YAM;
 
+    void resetNodeStates(NodeSet& nodes) {
+        auto resetState = Delegate<void, std::shared_ptr<Node> const&>::CreateLambda(
+            [](std::shared_ptr<Node> const& node) {
+                if (node->state() != Node::State::Ok) node->setState(Node::State::Dirty);
+            });
+        nodes.foreach(resetState);
+    }
+
     void appendDirtyDirectoryNodes(
         std::shared_ptr<DirectoryNode> directory,
         std::vector<std::shared_ptr<Node>>& dirtyNodes
@@ -190,7 +198,7 @@ namespace YAM
             [&nFailures](std::shared_ptr<Node> const& node) {
             auto generatedFileNode = dynamic_pointer_cast<GeneratedFileNode>(node);
             if (generatedFileNode != nullptr) {
-                if (!generatedFileNode->deleteFile()) nFailures += 1;
+                if (!generatedFileNode->deleteFile(true)) nFailures += 1;
             }
         });
         _context.nodes().foreach(cleanNode);
@@ -223,6 +231,7 @@ namespace YAM
 
     // Called in main thread
     void Builder::_start() {
+        resetNodeStates(_context.nodes());
         std::vector<std::shared_ptr<Node>> dirtyDirs;        
         for (auto const& pair : _context.repositories()) {
             auto repo = pair.second;

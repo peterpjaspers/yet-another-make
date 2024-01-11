@@ -293,7 +293,7 @@ namespace YAM
     void CommandNode::outputs(std::vector<std::shared_ptr<GeneratedFileNode>> const & newOutputs) {
         if (_outputs != newOutputs) {
             for (auto output : _outputs) {
-                output->deleteFile();
+                output->deleteFile(true);
                 output->removeObserver(this);
             }
             _outputs = newOutputs;
@@ -561,17 +561,18 @@ namespace YAM
         } else {
             MonitoredProcessResult scriptResult = executeMonitoredScript(result->_log);
             if (scriptResult.exitCode != 0) {
-                result->_newState = canceling() ? Node::State::Canceled : Node::State::Failed;
+                result->newState(canceling() ? Node::State::Canceled : Node::State::Failed);
             } else {
+                result->newState(Node::State::Ok);
                 auto postResult = postProcess(scriptResult.stdOut);
                 if (postResult != nullptr) {
                     result->_postResult = postResult;
-                    result->_newState = postResult->newState;
+                    result->newState(postResult->newState);
                     scriptResult.readFiles.insert(postResult->readFiles.begin(), postResult->readFiles.end());
                     scriptResult.writtenFiles.insert(postResult->writtenFiles.begin(), postResult->writtenFiles.end());
                     scriptResult.readOnlyFiles.insert(postResult->readOnlyFiles.begin(), postResult->readOnlyFiles.end());
                 }
-                if (result->_newState == Node::State::Ok) {
+                if (result->newState() == Node::State::Ok) {
                     std::set<std::filesystem::path> previousInputPaths;
                     for (auto const& pair : _detectedInputs) {
                         previousInputPaths.insert(pair.second->name());
@@ -583,7 +584,6 @@ namespace YAM
                         result->_removedInputPaths,
                         result->_addedInputPaths);
                     result->_outputPaths = convertToSymbolicPaths(scriptResult.writtenFiles, result->_log);
-                    result->_newState = Node::State::Ok;
                 }
             }
         }
@@ -658,12 +658,18 @@ namespace YAM
     void CommandNode::handleOutputAndNewInputFilesCompletion(Node::State newState, std::shared_ptr<ExecutionResult> sresult) {
         ExecutionResult& result = *sresult;
         result._newState = newState;
-        if (result._newState == Node::State::Ok) {
+        if (result._postResult != nullptr) {
+            commitPostProcessResult(result._postResult);
+            result.newState(result._postResult->newState);
+        }
+        if (result.newState() == Node::State::Ok) {
             _executionHash = computeExecutionHash();
         } else {
             ExecutionResult r;
             for (auto const& pair : _detectedInputs) r._removedInputPaths.insert(pair.first);
             setDetectedInputs(r);
+            for (auto output : _outputs) output->deleteFile();
+            _executionHash = rand();
         }
         modified(true);
         notifyCommandCompletion(sresult);
@@ -671,15 +677,12 @@ namespace YAM
 
     void CommandNode::notifyCommandCompletion(std::shared_ptr<ExecutionResult> sresult) {
         ExecutionResult& result = *sresult;
-        if (result._postResult != nullptr) {
-            result._postResult->newState = result._newState;
-            commitPostProcessResult(result._postResult);
-        }
-        Node::notifyCompletion(result._newState);
+        Node::notifyCompletion(result.newState());
     }
 
     // threadpool
     MonitoredProcessResult CommandNode::executeMonitoredScript(MemoryLogBook& logBook) {
+        for (auto output : _outputs) output->deleteFile();
         if (_script.empty()) return MonitoredProcessResult{ 0 };
 
         std::filesystem::path tmpDir = FileSystem::createUniqueDirectory();
@@ -849,6 +852,8 @@ namespace YAM
             auto const& genFile = dynamic_pointer_cast<GeneratedFileNode>(p.second);
             if (genFile == nullptr) p.second->addObserver(this);
         }
+        auto wdir = _workingDir.lock();
+        if (wdir != nullptr) wdir->restore(context, restored);
         return true;
     }
 }

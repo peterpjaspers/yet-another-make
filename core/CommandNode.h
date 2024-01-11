@@ -128,6 +128,23 @@ namespace YAM
             std::set<std::filesystem::path> _addedInputPaths;
             std::vector<std::shared_ptr<FileNode>> _addedInputNodes;
             std::shared_ptr<PostProcessResult> _postResult;
+
+            void newState(Node::State newState) {
+                _newState = newState;
+                if (_postResult != nullptr) _postResult->newState = newState;
+            }
+
+            Node::State newState() const {
+                Node::State newPRState = 
+                    _postResult != nullptr ? _postResult->newState : Node::State::Ok;
+                Node::State newState = Node::State::Ok;
+                if (_newState != Node::State::Ok) {
+                    newState = _newState;
+                } else if (newPRState != Node::State::Ok) {
+                    newState = newPRState;
+                }
+                return newState;
+            }
         };
 
         std::filesystem::path convertToSymbolicPath(std::filesystem::path const& absPath, MemoryLogBook& logBook);

@@ -22,11 +22,11 @@ namespace YAM
         return _producer.get();
     }
 
-    bool GeneratedFileNode::deleteFile() {
+    bool GeneratedFileNode::deleteFile(bool setDirty) {
         std::error_code ok;
         std::error_code ec;
         bool deleted = std::filesystem::remove(absolutePath(), ec);
-        if (deleted) {
+        if (deleted && setDirty) {
             setState(Node::State::Dirty);
         }
         return ec != ok;

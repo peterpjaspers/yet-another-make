@@ -94,7 +94,9 @@ Design aspects:
           then Y is processed before X. This ensures that the generated file
           node for GF exists when X is processed. After processing of X the
           commands produced by X are ready for execution.
-          Buildfile X is said to depend on buildfile Y.
+          Buildfile X is said to depend on buildfile Y. Either the user 
+          defines this dependency or yam is able to automatically derive the
+          dependency by using naming conventions (as tup does).
        c) 2-phase
           First phase creates all command nodes and generated file nodes for 
           their output files.
@@ -102,6 +104,91 @@ Design aspects:
           first phase.
           Only after processing of the second phase are the commands produced
           in the first phase ready for execution.
+       d) 1-phase with support for globs in generated files
+          The assumption here is that a glob operate on a mirror directory tree
+          that includes the generated file nodes. Note that the first mirror
+          will not contains generated files because none of the commands that
+          produce them has yet been executed. Therefore generated file nodes
+          must be added to the mirror during buildfile compilation.
+
+          Step 1: execute all build files and parse the produced rules
+          Note: execution/parsing can be done in threadpool.
+          outputMap = {}
+
+          Step 2: expand input and output specs to path lists.
+          for each rule {
+              expand input spec:
+                   path/glob on source files will produce final result, 
+                   path/glob on generated files will produce a possibly 
+                   incomplete result because the directories may not yet 
+                   contain all generated file nodes.
+                   An input sourcefile/glob will find SourceFileNodes, an
+                   input generatedfile/glob will only find already compiled
+                   GeneratedFileNodes.
+               expand output spec:
+                   Resolve %-flags in output spec
+                   Add outputs as GeneratedFileNodes to directories
+                   Note: the list of output nodes is incomplete in case of 
+                   incomplete result in input generatedfile glob AND output spec
+                   refers to inputs (%-flags).
+               Add output nodes outputMap
+                   var expandedRule = {inputs, outputs, rule}
+                   foreach output: 
+                       expandedRules = outputMap[output]
+                       expandedRules+= expandedRule
+                       if (!output.isGroup && expandedRules.size > 1: throw error
+                       outputMap[output] = expandedRules
+                   Node: expandedRule is like a possibly incomplete CommandNode
+          
+          Step 3: Re-evaluate input globs on generated files
+              do {
+                  newOutputs = do step 2
+              while (!newOutputs.empty);
+          Note: newOutputs can only be found when input specs are globs on
+          generated files that were not yet defined during previous step-2
+          execution. 
+          Note: when generated inputs are not referenced by output specs then 2
+          step-2 executions will result in complete lists of input paths. 
+          Note: it is not common use-case to reference generated inputs in
+          output spec (e.g. a link rule will not do such thing).
+ 
+          Step-4: Construct the expanded rule dependency graph:          
+          Merge the per-buildfile output maps into a global output map.
+          Duplicate outputfiles => error
+          For each rule {
+              inputDependencies = {}
+              for each input {
+                  if sourcefile: continue
+                  expandedRules = globalOutputMap[input]
+                  if expandedRules.empty: error (input references non-existing
+                      generatedfile)
+                  inputDependencies += expandedRules 
+              }
+          }
+          Detect cycles in rule graph. Cycles => error
+          Note: recover from error by removing the newly created generatednodes
+          from directories.
+          
+          Step 5: Commit: compile expandedRules into CommandNodes and GeneratedFileNodes
+          and add them to the context. 
+          Alternative: implement expandedRule as  CommandNode. Commit finds whether
+          node already exists in context. If so: update it, else create new one.
+          Idem for GeneratedFileNode.
+
+          Pros:
+              - rule order in buildfiles does not matter
+              - relieves user of specifying buildfile dependencies
+              - cyclic buildfile dependencies are no problem as long as
+                the expanded rules dependencies are not cyclic.
+                (although a warning is probably in-place).
+          Cons:
+              - O(N), N being number of output files+groups
+                Or can algo be incremental, N being number of modified buildfiles?
+                I don't think so.
+              - outputMap must be stored in buildstate or reconstructed during
+                first build after startup
+          Attention: group content order is not deterministic
+          
 
 2a and 2c (1-phase and 2-phase) require all buildfiles to be processed before
 command execution can begin. This limits scalability.
@@ -434,25 +521,50 @@ and then retry Globber.
 When file lookup fails: create source file node and execute it. Remove it when
 file does not exists and fail the build. Else continue.
 
-Practical problems: directory references are found in Globber. This code now
-
 ---Input globs on generated files.
 At time of writing input globs are executed on mirrored directory nodes by
-Globber. Initially dir nodes do not contain generated file nodes. So globs 
-like *.obj will not work. Alternative of executing the glob on the entire graph
-is not attractive because it is O(N).
+Globber. Dir nodes should only contain source dirs/files. So globs on generated
+files like *.obj will not work
+
+Besides that, the search domain of an input gen file glob in rule R in buildfile
+BF A must be restricted to the output files defined in the buildfiles on which
+BF A depends. E.g. an input glob **\*.obj in a rule in BF A would match all
+object files defined by all buildfiles in the current dir tree, even while A 
+only depends on 1 other buildfile.
+Conclusion:
+    - it makes no sense to include gen file nodes in the directory tree
+    - the search domain of genfile glob must be restriced to the output files
+      defined in the buildfile on which it declared itself dependent.
+The above holdes for the 1.5-phase processing model, not for the multi-phase
+model.
+
+Problem: unless buildfile syntax differentiates between source and generated
+file globs one cannot tell whether a glob will match source files or generated
+files or both. This implies that a glob cannot be executed as prerequisite of
+the buildfile (as is currently the case). Its execution must be postponed
+to the compilation of the rule that uses it.
+
+Simplification (a la tup): globs do not match directories. E.g. src*/*.cpp and
+**/*.cpp do make sense which src/*.cpp, ../src/*.cpp and mod1/src/*.cpp do.
+Or extend syntax to differentiate between globs that will only match source
+files and globs that will only match generated files.
+Source file globs are re-usable, gen file globs are not because their matches
+depend only on the outputs of rules preceding the glob.
+
+
 Possible solutions:
 
 1. Add generated file nodes to directory. Directory  keeps track of generated
 file nodes seperate from source file nodes. Directory does not own these nodes.
-Add/remove is responsibility of BuidFileProcessingNode. NB: directory must exist!
-
+Add/remove is responsibility of BuidFileProcessingNode. NB: directory must exist,
+else error.
 2. Variables with substibution. E.g.
        SRCS=*.cpp
        OBJS=$(SRCS, output\%B.obj)
        : foreach $(SRCS) |> cc -%f -o %O |> output\%B.obj
        : $(OBJS) |> link %d -o %O |> program.exe
    Redundant: output\%B.obj appears twice
+   Also this is not globbing.
    
 3. BFPN collects all outputs in an anonymous GroupNode. This group is passed to
 Globber. Globber now searches in directories and in groups. This can be expanded
@@ -461,8 +573,8 @@ to explicity named groups.
   %g<groupPath>/*.obj matches all obj nodes in specified group.
 Note: the input groups must be passed to CommandNode as part of cmdInputs.
 Note: When a groupPath occurs in buildfile A and B the BFPN_A and BFPN_B both
-add generated file nodes to this group. Assume buildfile B uses the the group
-as input. Then B must depend in A in order for the group content to be complete.
+add generated file nodes to this group. Assume buildfile B uses the group
+as input. Then B must depend on A in order for the group content to be complete.
 If not then the command that uses the group must delay execution until all
 buildfiles have been processed. Detecting missing, dependency declarations
 is not possible during buildfile processing. The problem can be avoided by,
@@ -472,5 +584,47 @@ the group. The group name declard in producer is a string, not a path. The
 group node name is a path: <sym path of dir of buildfile>\<group name>
 Readers of the group refer to the group by the (symbolic) group node path.
 
-Note: tup does not have the buildfile dependency problem because it processes
-all buildfiles before starting command execution.
+Note: tup automically finds buildfile dependencies: it first parses buildfiles
+in directories referenced in input paths/globs. This is simplified by the fact
+that tup does not support ** globs. It then parses the buildfile itself.
+
+--Output groups
+A rule in BFI that has uses an output group G as input must have deterministic content
+of G. BF1 must therefore specify as dependencies all buildfiles that output to G.
+In the tup example
+    #./submodules/sm1/Tupfile
+    : foo.c |> gcc -c %f -o %o |> %B.o ../<submodgroup>
+
+    #./submodules/sm2/Tupfile
+    : bar.c |> gcc -c %f -o %o |> %B.o ../<submodgroup>
+
+    #./project/Tupfile
+    : baz.c | ../submodules/<submodgroup> |> gcc -c %f -o %o |> %B.o
+
+tup will determine the buildfile deps of ./project/Tupfile by finding all buildfiles
+in the ../submodules directory tree.
+This implies that the buildfile dependencies are defined by glob ../**/buildfile_yam*
+Yam can adopt the same convention and add such deps automatically or the user 
+must be able to specify buildfile deps like: buildfile ../**/buildfile_yam*.
+The latter is error-prone. An incomplete spec will cause non-deterministic group
+content and may cause parse/compile errors when the group contains outputs from
+non-declared buildfiles.
+Decision: 
+    - group dependencies are solved by yam.
+    - yam supports both bins and groups.
+    - yam adds output (generated files) to respective directories
+      Thus enabling globs on generated files.
+
+--Recover from parse/compile errors.
+Current implementation modifies existing commands. These modifications are not
+rolledback when a later error occurs in the processing of that buildfile/rule.
+E.g. in a foreach rule some of the generated inputs do not exist. Some commands
+are updated, others not. 
+Commands and GeneratedFileNodes must only be added/modified when all are ok.
+Possible implementations:
+    - rollback from PersistentBuildState
+    - store info in tmp objects until all processing is done. Then commit to 
+      existing objects, store new objects in buildstate, remove obsolete objects
+      from buildstate.
+    - backup existing objects before modifying them. On error: rollback from
+      existing objects.

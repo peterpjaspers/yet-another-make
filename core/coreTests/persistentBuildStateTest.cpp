@@ -215,6 +215,70 @@ namespace
         }
     };
 
+    TEST(PersistentBuildState, storeAddedNode) {
+        SetupHelper setup(FileSystem::createUniqueDirectory());
+
+        std::filesystem::path addedName("addedNode");
+        std::string addedScript("a serious script");
+        auto addedNode = std::make_shared<CommandNode>(&setup.context, addedName);
+        addedNode->script(addedScript);
+        setup.context.nodes().add(addedNode);
+        addedNode = nullptr;
+        setup.persistentState.store();
+
+        setup.persistentState.retrieve();
+        addedNode = dynamic_pointer_cast<CommandNode>(setup.context.nodes().find(addedName));
+        ASSERT_NE(nullptr, addedNode);
+        EXPECT_EQ(addedScript, addedNode->script());
+    }
+
+    TEST(PersistentBuildState, storeModifiedNode) {
+        SetupHelper setup(FileSystem::createUniqueDirectory());
+
+        auto node = setup.cmdNode();
+        auto nodeName = node->name();
+        node->script("rubbish");
+        setup.persistentState.store();
+        node = nullptr;
+
+        setup.persistentState.retrieve();
+        node = dynamic_pointer_cast<CommandNode>(setup.context.nodes().find(nodeName));
+        ASSERT_NE(nullptr, node);
+        EXPECT_EQ("rubbish", node->script());
+    }
+
+
+    TEST(PersistentBuildState, storeModifiedRemovedNode) {
+        SetupHelper setup(FileSystem::createUniqueDirectory());
+
+        auto node = setup.cmdNode();
+        auto nodeName = node->name();
+        node->script("rubbish");
+        EXPECT_TRUE(node->modified());
+        setup.context.nodes().remove(node);
+        node = nullptr;
+        setup.persistentState.store();
+
+        setup.persistentState.retrieve();
+        ASSERT_EQ(nullptr, setup.context.nodes().find(nodeName));
+    }
+
+
+    TEST(PersistentBuildState, storeRemovedNode) {
+        SetupHelper setup(FileSystem::createUniqueDirectory());
+
+        auto node = setup.cmdNode();
+        auto nodeName = node->name();
+        EXPECT_FALSE(node->modified());
+        setup.context.nodes().remove(node);
+        node = nullptr;
+        setup.persistentState.store();
+
+        setup.persistentState.retrieve();
+        ASSERT_EQ(nullptr, setup.context.nodes().find(nodeName));
+    }
+
+
     TEST(PersistentBuildState, storeAndRetrieve) {
         SetupHelper setup(FileSystem::createUniqueDirectory());
 
@@ -264,7 +328,6 @@ namespace
 
     TEST(PersistentBuildState, rollbackRemovedRepo) {
         SetupHelper setup(FileSystem::createUniqueDirectory());
-        EXPECT_EQ(nNodes, setup.context.nodes().size());
 
         std::string repoName = setup.sourceFileRepo()->name();
         EXPECT_TRUE(setup.context.removeRepository(repoName));
@@ -280,26 +343,24 @@ namespace
 
     TEST(PersistentBuildState, rollbackRemovedNode) {
         SetupHelper setup(FileSystem::createUniqueDirectory());
-        EXPECT_EQ(nNodes, setup.context.nodes().size());
 
-        std::map<std::filesystem::path, std::shared_ptr<Node>> dirContentBeforeClear =  
-            setup.sourceFileRepo()->directoryNode()->getContent();
-        EXPECT_EQ(8, dirContentBeforeClear.size());
-        setup.sourceFileRepo()->clear(); // will remove all nodes
-        EXPECT_EQ(1, setup.context.nodes().size()); // the command node
-        EXPECT_EQ(0, setup.sourceFileRepo()->directoryNode()->getContent().size());
-
+        std::shared_ptr<CommandNode> cmdBeforeRollback = setup.cmdNode();
+        std::string scriptBeforeRollback = cmdBeforeRollback->script();
+        cmdBeforeRollback->script(R"(rubbish)");
+        ASSERT_TRUE(cmdBeforeRollback->modified());
+        setup.context.nodes().remove(cmdBeforeRollback);
         setup.persistentState.rollback();
 
+        auto cmdAfterRollback = setup.cmdNode();
+        EXPECT_EQ(scriptBeforeRollback, cmdAfterRollback->script());
+
         EXPECT_EQ(nNodes, setup.context.nodes().size());
-        EXPECT_EQ(dirContentBeforeClear.size(), setup.sourceFileRepo()->directoryNode()->getContent().size());
         // Verify that the rolled-back build state can be executed
         setup.executeAll();
     }
 
     TEST(PersistentBuildState, rollbackAddedNode) {
         SetupHelper setup(FileSystem::createUniqueDirectory());
-        EXPECT_EQ(nNodes, setup.context.nodes().size());
 
         std::filesystem::path addedFile = setup.addNode();
         // +2 because besides a node for the added file also a
@@ -317,7 +378,6 @@ namespace
 
     TEST(PersistentBuildState, rollbackModifiedNode) {
         SetupHelper setup(FileSystem::createUniqueDirectory());
-        EXPECT_EQ(nNodes, setup.context.nodes().size());
 
         auto tuple = setup.modifyNode();
         std::filesystem::path modifiedFile = std::get<0>(tuple);

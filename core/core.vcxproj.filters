@@ -300,6 +300,12 @@
     <ClInclude Include="NodeMapStreamer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="BuildFileCompiler_2.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildFilePreCompiler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -493,6 +499,12 @@
     </ClCompile>
     <ClCompile Include="BuildFile.cpp">
       <Filter>Source Files\BuildFileCompiler</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildFileCompiler_2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildFilePreCompiler.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

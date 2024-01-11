@@ -232,6 +232,43 @@ namespace YAM
         }
         return forest;
     }
+
+    // Determine the differences between buildState and storedState. 
+    // Post:
+    //   toInsert: objects in buildState but not in storedState.
+    //   toReplace: objects in buildState and storedState.
+    //   toRemove: objects in storedState but not in buildState.
+    //   objects in toInsert and toReplace are modified().
+    //   if rollback: if object in toRemove and object is modified
+    //   the object is also in toReplace.
+    void computeStorageNeed(
+        std::unordered_set<std::shared_ptr<IPersistable>> const& buildState,
+        std::unordered_set<std::shared_ptr<IPersistable>> const& storedState,
+        std::unordered_set<std::shared_ptr<IPersistable>>& toInsert,
+        std::unordered_set<std::shared_ptr<IPersistable>>& toReplace,
+        std::unordered_set<std::shared_ptr<IPersistable>>& toRemove,
+        bool rollback
+    ) {
+        for (auto const& p : buildState) {
+            if (storedState.contains(p)) {
+                if (p->modified()) toReplace.insert(p);
+            } else {
+                p->modified(true);
+                toInsert.insert(p);
+            }
+        }
+        for (auto const& p : storedState) {
+            if (!buildState.contains(p)) {
+                toRemove.insert(p);
+                if (rollback && p->modified()) {
+                    // p was modified before it was removed from buildstate.
+                    // Only re-inserting p into buildstate is not sufficient: 
+                    // p must also be reset to its state in persistent storage.
+                    toReplace.insert(p);
+                }
+            }
+        }
+    }
 }
 
 namespace YAM
@@ -329,8 +366,8 @@ namespace YAM
         std::unordered_set<std::shared_ptr<IPersistable>> storedState;
         _context->getBuildState(buildState);
         getStoredState(storedState);
-        _context->computeStorageNeed(buildState, storedState, _toInsert, _toReplace, _toRemove);
-
+        computeStorageNeed(buildState, storedState, _toInsert, _toReplace, _toRemove, false);
+        
         for (auto const& p : _toRemove) {
            // Save keys of removed object to enable rollback
             Key key = _objectToKey[p.get()];
@@ -456,7 +493,7 @@ namespace YAM
         std::unordered_set<std::shared_ptr<IPersistable>> storedState;
         _context->getBuildState(buildState);
         getStoredState(storedState);
-        _context->computeStorageNeed(buildState, storedState, _toInsert, _toReplace, _toRemove);
+        computeStorageNeed(buildState, storedState, _toInsert, _toReplace, _toRemove, true);
         rollback(false);
         _toInsert.clear();
         _toReplace.clear();

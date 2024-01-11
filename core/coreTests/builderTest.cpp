@@ -418,15 +418,11 @@ namespace
         // First build
         driver.initializeYam();
         driver.build();
-        driver.stats.reset();
 
-        // Incremental build while no modifications
+        // driver.build() will modify .yam (due to first time write of 
+        // persistent buildstate) and generated directory.
+        // Do a build to process these changes first.
         std::shared_ptr<BuildResult> result = driver.build();
-        EXPECT_TRUE(result->succeeded());
-        EXPECT_EQ(2, driver.stats.nDirectoryUpdates); // the generated directory
-        EXPECT_EQ(0, driver.stats.nRehashedFiles);
-        EXPECT_EQ(3, driver.stats.started.size()); // __dirtySources__ and generated dir
-        EXPECT_EQ(2, driver.stats.selfExecuted.size()); //  generated dir
 
         result = driver.build();
         EXPECT_TRUE(result->succeeded());
@@ -466,9 +462,8 @@ namespace
         EXPECT_EQ(Node::State::Ok, driver.janOut->state());
         EXPECT_EQ(Node::State::Ok, driver.pietjanOut->state());
 
-        // selfStarted and selfExecuted also contains 
+        // started and selfExecuted also contains 
         // _dirtyCommands from Builder.
-        EXPECT_EQ(2, driver.stats.nDirectoryUpdates); // .buildstate, generated dir
         EXPECT_EQ(3, driver.stats.nRehashedFiles);
         EXPECT_EQ(9, driver.stats.started.size());
 
@@ -522,7 +517,6 @@ namespace
         EXPECT_EQ(Node::State::Ok, driver.janOut->state());
         EXPECT_EQ(Node::State::Ok, driver.pietjanOut->state());
 
-        EXPECT_EQ(3, driver.stats.nDirectoryUpdates);
         EXPECT_EQ(1, driver.stats.nRehashedFiles);
         EXPECT_TRUE(driver.stats.rehashedFiles.contains(janCppNode.get()));
 

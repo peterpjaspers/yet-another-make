@@ -69,7 +69,7 @@ namespace YAM {
         }
         std::shared_ptr<BuildFileCompilerNode> bfcn = bfDirNode->buildFileCompilerNode();
         if (bfcn == nullptr) {
-            throw std::runtime_error("No buildfile found in directory " + bfDirName.string());
+            throw std::runtime_error("No buildfile found in directory: " + bfDirName.string());
         }
         _compilers.insert({ bfcn->name(), bfcn });
     }

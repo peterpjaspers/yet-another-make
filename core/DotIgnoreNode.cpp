@@ -28,7 +28,7 @@ namespace
 
 namespace YAM
 {
-    DotIgnoreNode::DotIgnoreNode() : Node() {}
+    DotIgnoreNode::DotIgnoreNode() : Node(), _directory(nullptr) {}
 
     DotIgnoreNode::DotIgnoreNode(
         ExecutionContext* context,

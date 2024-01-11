@@ -49,7 +49,8 @@ Todo: core
   This node is also passed to Globber. Can be expanded to explict groups
   that are persistent. Input globs are executed on all dirs plus the 
   anonymous GroupNode. %g<groupPath>/*.obj globs only on specified group.
-- extend PersistentBuildState test to include compiler node.
+- tokenizer does not recognize symbolic path/glob: token value of glob 
+  <repo>\file is <repo
 
 Done
 - Decide how to deal with using generated files from other repos

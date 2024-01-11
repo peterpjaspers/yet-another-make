@@ -31,7 +31,7 @@ namespace YAM {
         BuildFile::File const& parseTree() const; 
         XXH64_hash_t parseTreeHash() const;
 
-        std::vector<BuildFileParserNode const*> const& dependencies() const;
+        std::vector<BuildFileParserNode const*> const& dependencies();
 
         // Walk the dependency graph. Return whether no cycle was detected in
         // the dependency graph.
@@ -57,8 +57,8 @@ namespace YAM {
         void commitPostProcessResult(std::shared_ptr<CommandNode::PostProcessResult>& result) override;
 
     private:
-        void composeDependencies();
-        BuildFileParserNode* findDependency(std::shared_ptr<DirectoryNode> const& baseDir, std::filesystem::path const& depPath);
+        bool composeDependencies();
+        BuildFileParserNode* findDependency(std::filesystem::path const& depPath);
 
         std::shared_ptr<SourceFileNode> _buildFile;
         BuildFile::File _parseTree;

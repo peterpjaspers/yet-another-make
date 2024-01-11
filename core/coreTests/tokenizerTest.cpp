@@ -220,6 +220,21 @@ namespace {
         EXPECT_EQ("", token.value);
     }
 
+    /* TODO: fix tokenizing symbolicPath
+    TEST(
+        BuildFileTokenizer, symbolicPath) {
+        const std::string path(R"(<repo>\file)");
+        BuildFileTokenizer tokenizer("testFile", path, tokenSpecs);
+        Token token;
+        tokenizer.readNextToken(token);
+        EXPECT_EQ("glob", token.type);
+        EXPECT_EQ(path, token.value);
+        tokenizer.readNextToken(token);
+        EXPECT_EQ("eos", token.type);
+        EXPECT_EQ("", token.value);
+    }
+    */
+
     TEST(BuildFileTokenizer, relativeGlob1) {
         const std::string glob(R"(aap\a?b?[cde]*.txt)");
         BuildFileTokenizer tokenizer("testFile", glob, tokenSpecs);

@@ -196,6 +196,7 @@ namespace YAM {namespace BuildFile {
     void File::stream(IStreamer* streamer) {
         Node::stream(streamer);
         streamer->stream(buildFile);
+        deps.stream(streamer);
         streamNodes(streamer, variablesAndRules);
     }
 }}

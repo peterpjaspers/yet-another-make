@@ -65,8 +65,11 @@ namespace YAM
         return _parseTreeHash;
     }
 
-    std::vector<BuildFileParserNode const*> const& BuildFileParserNode::dependencies() const {
+    std::vector<BuildFileParserNode const*> const& BuildFileParserNode::dependencies() {
         if (state() != Node::State::Ok) throw std::runtime_error("illegal state");
+        if (_dependencies.empty() && !_parseTree.deps.depBuildFiles.empty()) {
+            composeDependencies();
+        }
         return _dependencies;
     }
 
@@ -106,8 +109,12 @@ namespace YAM
             }
         } else if (_buildFile != nullptr) {
             _parseTree = *(result->parseTree);
-            _parseTreeHash = result->parseTreeHash;
-            composeDependencies();
+            if (composeDependencies()) {
+                _parseTreeHash = result->parseTreeHash;
+            } else {
+                result->newState = Node::State::Failed;
+                _parseTreeHash = rand();
+            }
         } else {
             _parseTree = *(result->parseTree);
             _parseTreeHash = result->parseTreeHash;
@@ -115,34 +122,40 @@ namespace YAM
         modified(true);
     }
 
-    void BuildFileParserNode::composeDependencies() {
+    bool BuildFileParserNode::composeDependencies() {
         _dependencies.clear();
-        std::filesystem::path buildFileDirName = _buildFile->name().parent_path();
-        auto node = context()->nodes().find(buildFileDirName);
-        auto baseDir = dynamic_pointer_cast<DirectoryNode>(node);
-        if (baseDir == nullptr) {
-            throw std::runtime_error("No such directory: " + buildFileDirName.string());
-        }
+        if (_buildFile == nullptr) return true;
         for (auto const& buildFile : _parseTree.deps.depBuildFiles) {
-            auto dep = findDependency(baseDir, buildFile);
+            auto dep = findDependency(buildFile);
+            if (dep == nullptr) return false;
             _dependencies.push_back(dep);
         }
+        return true;
     }
     
     BuildFileParserNode* BuildFileParserNode::findDependency(
-        std::shared_ptr<DirectoryNode> const& baseDir,
         std::filesystem::path const& buildFileOrDirPath
     ) {
-        auto buildFileDir = baseDir;
-        auto optimizedPath = buildFileOrDirPath;
-        Globber::optimize(buildFileDir, optimizedPath);
-        auto bfDirNode = dynamic_pointer_cast<DirectoryNode>(context()->nodes().find(buildFileDir->name()));
-        if (bfDirNode == nullptr) {
-            throw std::runtime_error("No such directory: " + buildFileDir->name().string());
+        auto buildFileDir = CommandNode::workingDirectory();
+        auto node = buildFileDir->findChild(buildFileOrDirPath);
+        auto dirNode = dynamic_pointer_cast<DirectoryNode>(node);
+        if (dirNode == nullptr) {
+            auto fileNode = dynamic_pointer_cast<SourceFileNode>(node);
+            if (fileNode != nullptr) {
+                auto dirPath = fileNode->name().parent_path();
+                dirNode = dynamic_pointer_cast<DirectoryNode>(context()->nodes().find(dirPath));
+            }
         }
-        std::shared_ptr<BuildFileParserNode> bfpn = bfDirNode->buildFileParserNode();
+        if (dirNode == nullptr) {
+            LogRecord error(LogRecord::Error, "No such directory or file: " + buildFileOrDirPath.string());
+            context()->logBook()->add(error);
+            return nullptr;
+        }
+        std::shared_ptr<BuildFileParserNode> bfpn = dirNode->buildFileParserNode();
         if (bfpn == nullptr) {
-            throw std::runtime_error("No buildfile found in directory " + buildFileDir->name().string());
+            LogRecord error(LogRecord::Error, "No buildfile found in directory: " + dirNode->name().string());
+            context()->logBook()->add(error);
+            return nullptr;
         }
         return bfpn.get();
     }
@@ -180,7 +193,6 @@ namespace YAM
     bool BuildFileParserNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
         if (!CommandNode::restore(context, restored)) return false;
         _buildFile->restore(context, restored);
-        composeDependencies();
         return true;
     }
 

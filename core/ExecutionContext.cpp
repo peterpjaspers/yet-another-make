@@ -164,28 +164,4 @@ namespace YAM
         _repositories.clear();
         _nodes.clear();
     }
-
-    void ExecutionContext::computeStorageNeed(
-        std::unordered_set<std::shared_ptr<IPersistable>> const& buildState,
-        std::unordered_set<std::shared_ptr<IPersistable>> const& storedState,
-        std::unordered_set<std::shared_ptr<IPersistable>>& toInsert,
-        std::unordered_set<std::shared_ptr<IPersistable>>& toReplace,
-        std::unordered_set<std::shared_ptr<IPersistable>>& toRemove
-    ) {
-        for (auto const& p : buildState) {
-            if (storedState.contains(p)) {
-                if (p->modified()) toReplace.insert(p);
-            } else {
-                p->modified(true);
-                toInsert.insert(p);
-            }
-        }
-        for (auto const& p : storedState) {
-            if (!buildState.contains(p)) {
-                toRemove.insert(p);
-                // p may have been modified before it was remooved
-                if (p->modified()) toReplace.insert(p);
-            }
-        }
-    }
 }

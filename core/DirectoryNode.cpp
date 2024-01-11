@@ -53,6 +53,11 @@ namespace
 
 namespace YAM
 {
+    DirectoryNode::DirectoryNode()
+        : Node()
+        , _parent(nullptr)
+    {}
+
     DirectoryNode::DirectoryNode(
         ExecutionContext* context, 
         std::filesystem::path const& dirName,
@@ -126,10 +131,12 @@ namespace YAM
         if (*pit == up) {
             pit++;
             auto pdir = directory->parent();
-            if (pit == pitEnd) {
-                child = pdir;
-            } else if (pdir != nullptr) {
-                child = findChild(pdir, pit, pitEnd);
+            if (pdir != nullptr) {
+                if (pit == pitEnd) {
+                    child = pdir;
+                } else if (pdir != nullptr) {
+                    child = findChild(pdir, pit, pitEnd);
+                }
             }
         } else if (*pit == stay) {
             pit++;
@@ -443,6 +450,7 @@ namespace YAM
         }
         _dotIgnoreNode = nullptr;
         _content.clear();
+        _parent = nullptr;
     }
 
     bool DirectoryNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {

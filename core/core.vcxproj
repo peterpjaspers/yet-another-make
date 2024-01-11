@@ -103,8 +103,10 @@
     <ClInclude Include="BuildClient.h" />
     <ClInclude Include="Builder.h" />
     <ClInclude Include="BuildFileCompilerNode.h" />
+    <ClInclude Include="BuildFileCompiler_2.h" />
     <ClInclude Include="BuildFileDependenciesCompiler.h" />
     <ClInclude Include="BuildFileParserNode.h" />
+    <ClInclude Include="BuildFilePreCompiler.h" />
     <ClInclude Include="BuildState.h" />
     <ClInclude Include="Glob.h" />
     <ClInclude Include="Globber.h" />
@@ -190,8 +192,12 @@
     </ClCompile>
     <ClCompile Include="BuildFile.cpp" />
     <ClCompile Include="BuildFileCompilerNode.cpp" />
+    <ClCompile Include="BuildFileCompiler_2.cpp" />
     <ClCompile Include="BuildFileDependenciesCompiler.cpp" />
     <ClCompile Include="BuildFileParserNode.cpp" />
+    <ClCompile Include="BuildFilePreCompiler.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="BuildState.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
