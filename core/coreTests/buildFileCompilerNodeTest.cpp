@@ -27,6 +27,13 @@ namespace
         stream.close();
     }
 
+    std::string readFile(std::filesystem::path const& path) {
+        std::string content;
+        std::ifstream file(path.string().c_str());
+        std::getline(file, content);
+        return content;
+    }
+
     class TestSetup {
     public:
         DirectoryTree repoTree;
@@ -35,6 +42,7 @@ namespace
         std::filesystem::path absBuildFilePath;
         std::filesystem::path absSub1BuildFilePath;
         std::filesystem::path cmdOutputFile;
+        std::filesystem::path objectFilesGroupPath;
         std::shared_ptr<BuildFileCompilerNode> cCompiler;
         std::shared_ptr<BuildFileCompilerNode> lCompiler;
         std::shared_ptr<CommandNode> cCommand;
@@ -47,6 +55,7 @@ namespace
             , absBuildFilePath(repoTree.path() / R"(buildfile_yam.bat)")
             , absSub1BuildFilePath(repoTree.path() / R"(SubDir1\buildfile_yam.bat)")
             , cmdOutputFile(fileRepo->directoryNode()->name() / "main.obj")
+            , objectFilesGroupPath(fileRepo->directoryNode()->name() / "objectFiles")
         {
             std::stringstream sscompile;
             sscompile
@@ -57,8 +66,7 @@ namespace
             std::stringstream sslink;
             sslink
                 << "@echo off" << std::endl
-                << R"(echo buildfile ..)" << std::endl
-                << R"(echo : { objectFiles } ^|^> echo %%f ^> %%o ^|^> main.exe )"
+                << R"(echo : { ..\objectFiles } ^|^> echo %%f ^> %%o ^|^> main.exe )"
                 << std::endl;
             writeFile(absSub1BuildFilePath, sslink.str());
 
@@ -99,7 +107,7 @@ namespace
         ASSERT_NE(nullptr, setup.cCommand);
         ASSERT_NE(nullptr, setup.lCommand);
         {
-            std::shared_ptr<Node> node = setup.context.nodes().find("objectFiles");
+            std::shared_ptr<Node> node = setup.context.nodes().find(setup.objectFilesGroupPath);
             ASSERT_NE(nullptr, node);
             auto groupNode = dynamic_pointer_cast<GroupNode>(node);
             ASSERT_NE(nullptr, groupNode);
@@ -108,26 +116,18 @@ namespace
             EXPECT_EQ(setup.repoTree.path() / "main.obj", groupNode->group()[0]->absolutePath());
         }
         {
-            std::filesystem::path compileCmdName = setup.fileRepo->symbolicDirectory() / "main.obj\\__cmd";
-            std::shared_ptr<Node> node = setup.context.nodes().find(compileCmdName);
-            ASSERT_NE(nullptr, node);
-            auto compileNode = dynamic_pointer_cast<CommandNode>(node);
-            ASSERT_NE(nullptr, compileNode);
-            EXPECT_EQ(Node::State::Dirty, compileNode->state());
+            EXPECT_EQ(Node::State::Dirty, setup.cCommand->state());
+            EXPECT_EQ(Node::State::Dirty, setup.lCommand->state());
 
-            std::filesystem::path linkCmdName = setup.fileRepo->symbolicDirectory() / "SubDir1\\main.exe\\__cmd";
-            node = setup.context.nodes().find(linkCmdName);
-            ASSERT_NE(nullptr, node);
-            auto linkNode = dynamic_pointer_cast<CommandNode>(node);
-            ASSERT_NE(nullptr, linkNode);
-            EXPECT_EQ(Node::State::Dirty, linkNode->state());
-
-            bool completed = YAMTest::executeNode(linkNode.get());
+            bool completed = YAMTest::executeNode(setup.lCommand.get());
             EXPECT_TRUE(completed);
-            EXPECT_EQ(Node::State::Ok, compileNode->state());
+            EXPECT_EQ(Node::State::Ok, setup.cCommand->state());
+            EXPECT_EQ(Node::State::Ok, setup.lCommand->state());
             EXPECT_TRUE(std::filesystem::exists(setup.repoTree.path() / "main.obj"));
-            EXPECT_EQ(Node::State::Ok, linkNode->state());
-            EXPECT_TRUE(std::filesystem::exists(setup.repoTree.path() / "SubDir1\\main.exe"));
+            std::filesystem::path mainExePath = setup.repoTree.path() / "SubDir1\\main.exe";
+            ASSERT_TRUE(std::filesystem::exists(mainExePath));
+            std::string content = readFile(mainExePath);
+            EXPECT_EQ("..\\main.obj  ", content);
         }
     }
 
@@ -161,22 +161,43 @@ namespace
             if (!dirty) std::this_thread::sleep_for(retryInterval);
         } while (nRetries < maxRetries && !dirty);
         ASSERT_TRUE(dirty);
+        // cCompiler output is added to objectFiles group. When executing it will add
+        // lib.obj to that group. A change in group content will not cause lCompiler
+        // to become dirty. It will only cause the lCommand/ to become dirty after 
+        // completion of cCompiler.
+        EXPECT_EQ(Node::State::Ok, setup.lCompiler->state());
         
         setup.context.statistics().reset();
         setup.context.statistics().registerNodes = true;
-        bool completed = YAMTest::executeNode(setup.lCompiler.get());
+        bool completed = YAMTest::executeNode(setup.cCompiler.get());
         EXPECT_TRUE(completed);
         EXPECT_EQ(Node::State::Ok, setup.lCompiler->state());
+        EXPECT_EQ(Node::State::Ok, setup.cCompiler->state());
+        EXPECT_EQ(Node::State::Dirty, setup.cCommand->state());
+        EXPECT_EQ(Node::State::Dirty, setup.lCommand->state());
         auto const& selfExecuted = setup.context.statistics().selfExecuted;
-        EXPECT_EQ(5, selfExecuted.size());
+        EXPECT_EQ(4, selfExecuted.size());
         auto const& notFound = selfExecuted.end();
         EXPECT_NE(notFound, selfExecuted.find(setup.fileRepo->directoryNode().get()));
         EXPECT_NE(notFound, selfExecuted.find(setup.fileRepo->directoryNode()->findChild("SubDir1").get()));
         EXPECT_NE(notFound, selfExecuted.find(setup.cCompiler.get()));
-        EXPECT_NE(notFound, selfExecuted.find(setup.lCompiler.get()));
         auto globName = setup.fileRepo->directoryNode()->name() / "*.cpp";
         auto globNode = setup.context.nodes().find(globName);
         EXPECT_NE(notFound, selfExecuted.find(globNode.get()));
+
+        EXPECT_EQ(Node::State::Dirty, setup.cCommand->state());
+        EXPECT_EQ(Node::State::Dirty, setup.lCommand->state());
+
+        completed = YAMTest::executeNode(setup.lCommand.get());
+        EXPECT_TRUE(completed);
+        EXPECT_EQ(Node::State::Ok, setup.cCommand->state());
+        EXPECT_EQ(Node::State::Ok, setup.lCommand->state());
+        EXPECT_TRUE(std::filesystem::exists(setup.repoTree.path() / "main.obj"));
+        EXPECT_TRUE(std::filesystem::exists(setup.repoTree.path() / "lib.obj"));
+        std::filesystem::path mainExePath = setup.repoTree.path() / "SubDir1\\main.exe";
+        EXPECT_TRUE(std::filesystem::exists(mainExePath));
+        std::string content = readFile(mainExePath);
+        EXPECT_EQ("..\\lib.obj ..\\main.obj  ", content);
     }
 
     TEST(BuildFileCompilerNode, noReExecuteAfterDirtyWithoutChanges) {
@@ -186,7 +207,7 @@ namespace
         setup.lCompiler->setState(Node::State::Dirty);
 
         setup.context.statistics().registerNodes = true;
-        bool completed = YAMTest::executeNode(setup.lCompiler.get());
+        bool completed = YAMTest::executeNodes({ setup.lCompiler, setup.cCompiler });
         EXPECT_TRUE(completed);
         EXPECT_EQ(Node::State::Ok, setup.cCompiler->state());
         EXPECT_EQ(Node::State::Ok, setup.lCompiler->state());

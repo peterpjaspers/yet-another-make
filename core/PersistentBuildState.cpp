@@ -507,7 +507,8 @@ namespace YAM
     void PersistentBuildState::addToBuildState(std::shared_ptr<IPersistable> const& object) {
         auto node = dynamic_pointer_cast<Node>(object);
         auto repo = dynamic_pointer_cast<FileRepository>(object);
-        if (node != nullptr) {
+        if (object == nullptr) {
+        } else if (node != nullptr) {
             _context->nodes().add(node);
         } else if (repo != nullptr) {
             _context->addRepository(repo);

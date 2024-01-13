@@ -116,18 +116,18 @@ namespace
         ASSERT_EQ(1, command0->cmdInputs().size());
         auto input00 = command0->cmdInputs()[0];
         EXPECT_EQ(setup.lib1File, input00);
-        EXPECT_EQ("type src\\lib1.cpp > output\\lib1.obj", command0->script());
+        EXPECT_EQ("type %f > %o", command0->script());
         ASSERT_EQ(1, command0->outputs().size());
         auto output00 = command0->outputs()[0];
         EXPECT_EQ(std::string("<repo>\\output\\lib1.obj"), output00->name().string());
         ASSERT_EQ(1, command0->ignoredOutputs().size());
         EXPECT_EQ(ignoredOutput.path, command0->ignoredOutputs()[0]);
-        EXPECT_EQ(0, command0->orderOnlyInputs().size());
+        EXPECT_EQ(3, command0->orderOnlyInputs().size());
 
         ASSERT_EQ(1, command1->cmdInputs().size());
         auto input10 = command1->cmdInputs()[0];
         EXPECT_EQ(setup.lib2File, input10);
-        EXPECT_EQ("type src\\lib2.cpp > output\\lib2.obj", command1->script());
+        EXPECT_EQ("type %f > %o", command1->script());
         ASSERT_EQ(1, command1->outputs().size());
         auto output1 = command1->outputs()[0];
         EXPECT_EQ(std::string("<repo>\\output\\lib2.obj"), output1->name().string());

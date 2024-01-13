@@ -14,6 +14,12 @@
 #include <atomic>
 #include <initializer_list>
 
+#ifdef _DEBUG
+#define ASSERT_MAIN_THREAD(contextPtr) (contextPtr)->assertMainThread()
+#else
+#define ASSERT_MAIN_THREAD(contextPtr)
+#endif
+
 namespace YAM
 {
     class ExecutionContext;

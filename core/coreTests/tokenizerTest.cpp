@@ -235,6 +235,23 @@ namespace {
     }
     */
 
+    TEST(
+        BuildFileTokenizer, inputGroup) {
+        const std::string path(R"({..\submodules\object})");
+        BuildFileTokenizer tokenizer("testFile", path, tokenSpecs);
+        Token token;
+        tokenizer.readNextToken(token);
+        EXPECT_EQ("{", token.type);
+        tokenizer.readNextToken(token);
+        EXPECT_EQ("glob", token.type);
+        EXPECT_EQ(R"(..\submodules\object)", token.value);
+        tokenizer.readNextToken(token);
+        EXPECT_EQ("}", token.type);
+        tokenizer.readNextToken(token);
+        EXPECT_EQ("eos", token.type);
+        EXPECT_EQ("", token.value);
+    }
+
     TEST(BuildFileTokenizer, relativeGlob1) {
         const std::string glob(R"(aap\a?b?[cde]*.txt)");
         BuildFileTokenizer tokenizer("testFile", glob, tokenSpecs);

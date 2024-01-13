@@ -2,11 +2,14 @@
 #include "DirectoryNode.h"
 #include "SourceFileNode.h"
 #include "GeneratedFileNode.h"
+#include "GroupNode.h"
 #include "ExecutionContext.h"
 #include "MonitoredProcess.h"
 #include "FileAspectSet.h"
 #include "FileSystem.h"
 #include "FileRepository.h"
+#include "BuildFileCompiler.h"
+#include "NodeMapStreamer.h"
 #include "IStreamer.h"
 
 #include <iostream>
@@ -26,6 +29,20 @@ namespace
     template <typename V>
     bool contains(std::vector<V> const& vec, V el) {
         return std::find(vec.begin(), vec.end(), el) != vec.end();
+    }
+
+    std::vector<std::shared_ptr<Node>> expandGroups(std::vector<std::shared_ptr<Node>> const& nodes) {
+        std::vector<std::shared_ptr<Node>> expanded;
+        for (auto const& node : nodes) {
+            auto groupNode = dynamic_pointer_cast<GroupNode>(node);
+            if (groupNode != nullptr) {
+                auto const& content = groupNode->group();
+                expanded.insert(expanded.end(), content.begin(), content.end());
+            } else {
+                expanded.push_back(node);
+            }
+        }
+        return expanded;
     }
 
     void computePathSetsDifference(
@@ -72,12 +89,16 @@ namespace
     }
 
     void getOutputFileNodes(
-        std::unordered_set<CommandNode*> const& producers,
+        std::unordered_set<Node*> const& producers,
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>>& outputFiles
     ) {
-        for (auto const& producer : producers) {
-            for (auto const& genFile : producer->outputs()) {
-                 outputFiles.insert(std::pair{ genFile->name(), genFile });
+        std::vector<std::shared_ptr<Node>> outputs;
+        for (auto const& producer : producers) producer->getOutputs(outputs);
+
+        for (auto const& output : outputs) {
+            auto genFileNode = dynamic_pointer_cast<GeneratedFileNode>(output);
+            if (genFileNode != nullptr) {
+                outputFiles.insert(std::pair{ genFileNode->name(), genFileNode });
             }
         }
     }
@@ -220,7 +241,7 @@ namespace YAM
 {
     using namespace boost::process;
 
-    CommandNode::CommandNode() 
+    CommandNode::CommandNode()
         : Node()
         , _buildFile(nullptr) {}
 
@@ -251,7 +272,7 @@ namespace YAM
         }
     }
 
-    void CommandNode::cmdInputs(std::vector<std::shared_ptr<FileNode>> const& newInputs) {
+    void CommandNode::cmdInputs(std::vector<std::shared_ptr<Node>> const& newInputs) {
         if (_cmdInputs != newInputs) {
             _cmdInputs = newInputs;
             updateInputProducers();
@@ -261,7 +282,7 @@ namespace YAM
         }
     }
 
-    void CommandNode::orderOnlyInputs(std::vector<std::shared_ptr<GeneratedFileNode>> const& newInputs) {
+    void CommandNode::orderOnlyInputs(std::vector<std::shared_ptr<Node>> const& newInputs) {
         if (_orderOnlyInputs != newInputs) {
             _orderOnlyInputs = newInputs;
             updateInputProducers();
@@ -271,20 +292,28 @@ namespace YAM
         }
     }
 
+    void appendInputProducers(
+        std::vector<std::shared_ptr<Node>>const& inputs,
+        std::unordered_set<Node*>& inputProducers
+    ) {
+        for (auto const& node : inputs) {
+            auto genFileNode = dynamic_pointer_cast<GeneratedFileNode>(node);
+            if (genFileNode != nullptr) {
+                inputProducers.insert(genFileNode->producer());
+            } else {
+                auto groupNode = dynamic_pointer_cast<GroupNode>(node);
+                if (groupNode != nullptr) inputProducers.insert(groupNode.get());
+            }
+        }
+    }
+
     void CommandNode::updateInputProducers() {
         for (auto producer : _inputProducers) {
             producer->removeObserver(this);
         }
         _inputProducers.clear();
-        for (auto const& node : _cmdInputs) {
-            auto genFileNode = dynamic_pointer_cast<GeneratedFileNode>(node);
-            if (genFileNode != nullptr) {
-                _inputProducers.insert(genFileNode->producer());
-            }
-        }
-        for (auto const& genFileNode : _orderOnlyInputs) {
-            _inputProducers.insert(genFileNode->producer());
-        }
+        appendInputProducers(_cmdInputs, _inputProducers);
+        appendInputProducers(_orderOnlyInputs, _inputProducers);
         for (auto producer : _inputProducers) {
             producer->addObserver(this);
         }
@@ -355,8 +384,16 @@ namespace YAM
         auto wdir = _workingDir.lock();
         if (wdir != nullptr) hashes.push_back(XXH64_string(wdir->name().string()));
         hashes.push_back(XXH64_string(_script));
+        for (auto const& node : _cmdInputs) {
+            auto grpNode = dynamic_pointer_cast<GroupNode>(node);
+            if (grpNode != nullptr) hashes.push_back(grpNode->hash());
+        }
+        for (auto const& node : _orderOnlyInputs) {
+            auto grpNode = dynamic_pointer_cast<GroupNode>(node);
+            if (grpNode != nullptr) hashes.push_back(grpNode->hash());
+        }
         auto entireFile = FileAspect::entireFileAspect().name();
-        for (auto node : _outputs) hashes.push_back(node->hashOf(entireFile));
+        for (auto const& node : _outputs) hashes.push_back(node->hashOf(entireFile));
         FileAspectSet inputAspects = context()->findFileAspectSet(_inputAspectsName);
         for (auto const& pair : _detectedInputs) {
             auto const& node = pair.second;
@@ -680,16 +717,105 @@ namespace YAM
         Node::notifyCompletion(result.newState());
     }
 
+    bool CommandNode::verifyCmdFlag(
+        std::string const& script, 
+        std::vector<std::shared_ptr<Node>> const& cmdInputs,
+        ILogBook& logBook
+    ) {
+        bool valid = !cmdInputs.empty();
+        if (!valid) {
+            valid = BuildFileCompiler::containsCmdInputFlag(script);
+            if (!valid) {
+                std::string buildFile = _buildFile != nullptr ? _buildFile->name().string() : "";
+                std::stringstream ss;
+                ss << "In command of rule at line " << _ruleLineNr << " in buildfile " << buildFile << ":" << std::endl;
+                ss << "No cmd input files while command contains percentage flag that operates on cmd input." << std::endl;
+                LogRecord error(LogRecord::Error, ss.str());
+                logBook.add(error);
+            }
+        }
+        return valid;
+    }
+    bool CommandNode::verifyOrderOnlyFlag(
+        std::string const& script,
+        std::vector<std::shared_ptr<Node>> const& orderOnlyInputs,
+        ILogBook& logBook
+    ) {
+        bool valid = !orderOnlyInputs.empty();
+        if (!valid) {
+            valid = BuildFileCompiler::containsOrderOnlyInputFlag(script);
+            if (!valid) {
+                std::string buildFile = _buildFile != nullptr ? _buildFile->name().string() : "";
+                std::stringstream ss;
+                ss << "In command of rule at line " << _ruleLineNr << " in buildfile " << buildFile << ":" << std::endl;
+                ss << "No order-only input files while command contains percentage flag that operates on order-only input." << std::endl;
+                LogRecord error(LogRecord::Error, ss.str());
+                logBook.add(error);
+            }
+        }
+        return valid;
+    }
+
+    bool CommandNode::verifyOutputFlag(
+        std::string const& script,
+        std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs,
+        ILogBook& logBook
+    ) {
+        bool valid = !outputs.empty();
+        if (!valid) {
+            valid = BuildFileCompiler::containsOutputFlag(script);
+            if (!valid) {
+                std::string buildFile = _buildFile != nullptr ? _buildFile->name().string() : "";
+                std::stringstream ss;
+                ss << "In command of rule at line " << _ruleLineNr << " in buildfile " << buildFile << ":" << std::endl;
+                ss << "No output files while command contains percentage flag that operates on cmd output." << std::endl;
+                LogRecord error(LogRecord::Error, ss.str());
+                logBook.add(error);
+            }
+        }
+        return valid;
+    }
+
+    std::string CommandNode::compileScript(ILogBook& logBook) {
+        std::filesystem::path wdir;
+        auto workingDir = _workingDir.lock();
+        if (workingDir == nullptr) return _script;
+        if (BuildFileCompiler::isLiteralScript(_script)) return _script;
+
+        BuildFile::Script bfScript;
+        bfScript.script = _script;
+        std::filesystem::path buildFile = _buildFile == nullptr ? "" : _buildFile->name();
+        std::vector<std::shared_ptr<Node>> cmdInputs = expandGroups(_cmdInputs);
+        std::vector<std::shared_ptr<Node>> orderOnlyInputs = expandGroups(_cmdInputs);
+
+        bool cmdInOk = verifyCmdFlag(_script, cmdInputs, logBook);
+        bool orderOnlyInOk = verifyOrderOnlyFlag(_script, orderOnlyInputs, logBook);
+        bool outputOk = verifyOutputFlag(_script, _outputs, logBook);
+        if (cmdInOk && orderOnlyInOk && outputOk) {
+            std::string script = BuildFileCompiler::compileScript(
+                buildFile,
+                bfScript,
+                workingDir.get(),
+                cmdInputs,
+                orderOnlyInputs,
+                _outputs);
+            return script;
+        }
+        return "";
+    }
+
     // threadpool
-    MonitoredProcessResult CommandNode::executeMonitoredScript(MemoryLogBook& logBook) {
+    MonitoredProcessResult CommandNode::executeMonitoredScript(ILogBook& logBook) {
         for (auto output : _outputs) output->deleteFile();
-        if (_script.empty()) return MonitoredProcessResult{ 0 };
+
+        std::string script = compileScript(logBook);
+        if (script.empty()) return MonitoredProcessResult{ 0 };
 
         std::filesystem::path tmpDir = FileSystem::createUniqueDirectory();
         auto scriptFilePath = std::filesystem::path(tmpDir / "cmdscript.cmd");
         std::ofstream scriptFile(scriptFilePath.string());
         scriptFile << "@echo off" << std::endl;
-        scriptFile << _script << std::endl;
+        scriptFile << script << std::endl;
         scriptFile.close();
 
         std::map<std::string, std::string> env;
@@ -803,16 +929,13 @@ namespace YAM
         streamer->stream(_script);
         streamer->streamVector(_outputs);
         streamer->streamVector(_ignoredOutputs);
-        std::vector<std::shared_ptr<FileNode>> inputs;
+        NodeMapStreamer::stream(streamer, _detectedInputs);
         std::shared_ptr<DirectoryNode> wdir;
         if (streamer->writing()) {
-            for (auto const& pair : _detectedInputs) inputs.push_back(pair.second);
             wdir = _workingDir.lock();
         }
-        streamer->streamVector(inputs);
         streamer->stream(wdir);
         if (streamer->reading()) {
-            for (auto const& n : inputs) _detectedInputs.insert({ n->name(), n });
             _workingDir = wdir;
         }
         streamer->stream(_executionHash);
@@ -847,6 +970,7 @@ namespace YAM
             i->restore(context, restored);
             i->addObserver(this);
         }
+        NodeMapStreamer::restore(_detectedInputs);
         for (auto const& p : _detectedInputs) {
             p.second->restore(context, restored);
             auto const& genFile = dynamic_pointer_cast<GeneratedFileNode>(p.second);

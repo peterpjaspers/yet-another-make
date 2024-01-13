@@ -62,8 +62,8 @@ namespace
 
     void removeNode(std::shared_ptr<CommandNode> cmd, StateObserver* observer) {
         static std::vector<std::shared_ptr<GeneratedFileNode>> emptyOutputs;
-        static std::vector<std::shared_ptr<FileNode>> emptyCmdInputs;
-        static std::vector<std::shared_ptr<GeneratedFileNode>> emptyOrderOnlyInputs;
+        static std::vector<std::shared_ptr<Node>> emptyCmdInputs;
+        static std::vector<std::shared_ptr<Node>> emptyOrderOnlyInputs;
         ExecutionContext* context = cmd->context();
         std::vector<std::shared_ptr<GeneratedFileNode>> outputs = cmd->outputs();
         cmd->outputs(emptyOutputs);
@@ -79,7 +79,7 @@ namespace
         context->nodes().remove(node);
     }
     void removeNode(std::shared_ptr<GroupNode> group, StateObserver* observer) {
-        // owned by all compiler nodes that contribute to the group
+        // owned by all compiler nodes that reference the group
         // When can it me removed from context?
     }
 
@@ -128,11 +128,6 @@ namespace
         computeMapsDifference(newSet, toUpdate, kept, added, removed);
         for (auto const& pair : added) addNode(pair.second, observer);
         for (auto const& pair : removed) removeNode(pair.second, observer);
-        for (auto const& pair : removed) {
-            auto cmd = pair.second;
-            if (!cmd->observers().empty()) throw std::runtime_error("command node still being observed");
-            context->nodes().remove(cmd);
-        }
         toUpdate = newSet;
     }
 
@@ -187,15 +182,19 @@ namespace YAM
     void BuildFileCompilerNode::buildFileParser(std::shared_ptr<BuildFileParserNode> const& newParser) {
         static std::map<std::filesystem::path, std::shared_ptr<CommandNode>> emptyCmds;
         static std::map<std::filesystem::path, std::shared_ptr<GroupNode>> emptyGroups;
+        static std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> emptyOutputs;
         static std::map<std::filesystem::path, std::shared_ptr<BuildFileCompilerNode>> emptyCompilers;
         static std::map<std::filesystem::path, std::shared_ptr<GlobNode>> emptyGlobs;
         if (_buildFileParser != newParser) {
             if (_buildFileParser != nullptr) {
                 _buildFileParser->removeObserver(this);
-                updateCommands(context(), this, _commands, emptyCmds);
+                for (auto const& pair : _outputGroups) cleanOutputGroup(pair.second.get());
+                updateMap(context(), this, _commands, emptyCmds);
                 updateMap(context(), this, _outputGroups, emptyGroups);
+                updateMap(context(), this, _outputs, emptyOutputs);
                 updateMap(context(), this, _depCompilers, emptyCompilers);
                 updateMap(context(), this, _depGlobs, emptyGlobs);
+                _executionHash = rand();
             }
             _buildFileParser = newParser;
             if (_buildFileParser != nullptr) {
@@ -243,8 +242,8 @@ namespace YAM
                 _buildFileParser->workingDirectory(),
                 _buildFileParser->parseTree());
 
-            updateMap<BuildFileCompilerNode>(context(), this, _depCompilers, compiler.compilers());
-            updateMap<GlobNode>(context(), this, _depGlobs, compiler.globs());
+            updateMap(context(), this, _depCompilers, compiler.compilers());
+            updateMap(context(), this, _depGlobs, compiler.globs());
 
             updated = true;
         } catch (std::runtime_error e) {
@@ -290,9 +289,9 @@ namespace YAM
                 context(),
                 _buildFileParser->workingDirectory(),
                 _buildFileParser->parseTree());
-            updateMap<CommandNode>(context(), this, _commands, compiler.commands());
-            updateMap<GroupNode>(context(), this, _outputGroups, compiler.groups());
-            updateMap<GeneratedFileNode>(context(), this, _outputs, compiler.outputs());
+            updateMap(context(), this, _commands, compiler.commands());
+            updateMap(context(), this, _outputGroups, compiler.outputGroups());
+            updateMap(context(), this, _outputs, compiler.outputs());
             for (auto const& pair : _commands) {
                 pair.second->buildFile(_buildFileParser->buildFile().get());
             }
@@ -333,25 +332,30 @@ namespace YAM
         return definingParser;
     }
 
+    bool BuildFileCompilerNode::findDefiningParsers(
+        std::vector<std::shared_ptr<Node>> const& inputs,
+        std::unordered_set<BuildFileParserNode const*>& parsers
+    ) const {
+        bool valid = true;
+        for (auto const& input : inputs) {
+            auto genFile = dynamic_cast<GeneratedFileNode const*>(input.get());
+            if (genFile != nullptr) {
+                auto parser = findDefiningParser(genFile);
+                valid = nullptr != parser;
+                if (valid && parser != _buildFileParser.get()) parsers.insert(parser);
+            }
+        }
+        return valid;
+    }
+
     bool BuildFileCompilerNode::validGeneratedInputs() const {
         if (_buildFileParser->buildFile() == nullptr) return true;
         std::unordered_set<BuildFileParserNode const*> usedParsers;
         bool valid = true;
-        auto thisBuildFile = _buildFileParser->buildFile().get();
         for (auto const& pair : _commands) {
-            for (auto const& input : pair.second->cmdInputs()) {
-                auto genFile = dynamic_cast<GeneratedFileNode const*>(input.get());
-                if (genFile != nullptr) {
-                    auto parser = findDefiningParser(genFile);
-                    valid = nullptr != parser;
-                    if (valid && parser != _buildFileParser.get()) usedParsers.insert(parser);
-                }
-            }
-            for (auto const& genFile : pair.second->orderOnlyInputs()) {
-                auto parser = findDefiningParser(genFile.get());
-                valid = nullptr != parser;
-                if (valid && parser != _buildFileParser.get()) usedParsers.insert(parser);
-            }
+            std::shared_ptr<CommandNode> const& cmd = pair.second;
+            if (!findDefiningParsers(cmd->cmdInputs(), usedParsers)) valid = false;
+            if (!findDefiningParsers(cmd->orderOnlyInputs(), usedParsers)) valid = false;
         }
         if (!validParserDependencies(usedParsers)) valid = false;
         return valid;

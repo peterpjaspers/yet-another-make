@@ -56,6 +56,9 @@ namespace YAM {
         void cleanOutputGroup(GroupNode* group);
         XXH64_hash_t computeExecutionHash() const;
         bool validGeneratedInputs() const;
+        bool findDefiningParsers(
+            std::vector<std::shared_ptr<Node>> const& inputs,
+            std::unordered_set<BuildFileParserNode const*>& parsers) const;
         BuildFileParserNode const* findDefiningParser(GeneratedFileNode const* genFile) const;
         bool validParserDependencies(std::unordered_set<BuildFileParserNode const*> const& usedParsers) const;
         void notifyProcessingCompletion(Node::State state);

@@ -1,5 +1,6 @@
 #pragma once
 #include "Node.h"
+#include "../xxHash/xxhash.h"
 
 #include <vector>
 #include <memory>
@@ -19,6 +20,10 @@ namespace YAM
 
         // Override Node
         void start() override;
+        void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const override;
+
+        // Return a hash of the names of the nodes in the group.
+        XXH64_hash_t hash() const { return _hash; }
 
         static void setStreamableType(uint32_t type);
         // Inherited from IStreamable (via IPersistable)
@@ -29,9 +34,11 @@ namespace YAM
         bool restore(void* context, std::unordered_set<IPersistable const*>& restored) override;
 
     private:
+        XXH64_hash_t computeHash() const;
         void handleGroupCompletion(Node::State groupState);
 
         std::vector<std::shared_ptr<Node>> _group;
+        XXH64_hash_t _hash;
     };
 }
 

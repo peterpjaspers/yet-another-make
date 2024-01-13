@@ -9,7 +9,7 @@
 
 namespace YAM {
     class ExecutionContext;
-    class FileNode;
+    class Node;
     class GeneratedFileNode;
     class DirectoryNode;
     class CommandNode;
@@ -24,6 +24,24 @@ namespace YAM {
             BuildFile::File const& buildFile,
             std::filesystem::path const& globNameSpace = "");
 
+        static std::string compileScript(
+            std::filesystem::path const& buildFile,
+            BuildFile::Script const& script,
+            DirectoryNode const* baseDir,
+            std::vector<std::shared_ptr<Node>> cmdInputs,
+            std::vector<std::shared_ptr<Node>> orderOnlyInputs,
+            std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs);
+
+        // Return whether script contains flag that refers to cmd input,
+        // order-only input and output files respectively.
+        static bool containsCmdInputFlag(std::string const& script);
+        static bool containsOrderOnlyInputFlag(std::string const& script);
+        static bool containsOutputFlag(std::string const& script);
+
+        // Return whether the script is literal, i.e. contains no input
+        // or output flags.
+        static bool isLiteralScript(std::string const& script);
+
         std::map<std::filesystem::path, std::shared_ptr<CommandNode>>  const& commands() {
             return _commands;
         }
@@ -32,8 +50,8 @@ namespace YAM {
             return _outputs;
         }
 
-        std::map<std::filesystem::path, std::shared_ptr<GroupNode>> const& groups() {
-            return _groups;
+        std::map<std::filesystem::path, std::shared_ptr<GroupNode>> const& outputGroups() {
+            return _outputGroups;
         }
 
         // Return the globs that were used to resolve rule inputs.
@@ -61,25 +79,21 @@ namespace YAM {
         std::shared_ptr<GlobNode> compileGlob(
             std::filesystem::path const& pattern);
 
-        std::vector<std::shared_ptr<FileNode>> compileInputGroup(
+        std::shared_ptr<GroupNode> compileGroupNode(
+            BuildFile::Node const& rule,
+            std::filesystem::path const& groupName);
+
+        std::shared_ptr<GroupNode> compileInputGroup(
             BuildFile::Input const& input);
 
-        std::vector<std::shared_ptr<FileNode>> compileInput(
+        std::vector<std::shared_ptr<Node>> compileInput(
             BuildFile::Input const& input);
 
-        std::vector<std::shared_ptr<FileNode>> compileInputs(
+        std::vector<std::shared_ptr<Node>> compileInputs(
             BuildFile::Inputs const& inputs); 
         
-        std::vector<std::shared_ptr<GeneratedFileNode>> compileOrderOnlyInputs(
+        std::vector<std::shared_ptr<Node>> compileOrderOnlyInputs(
             BuildFile::Inputs const& inputs);
-
-        static std::string compileScript(
-            std::filesystem::path const& buildFile,
-            BuildFile::Script const& script,
-            DirectoryNode const* baseDir,
-            std::vector<std::shared_ptr<FileNode>> cmdInputs,
-            std::vector<std::shared_ptr<GeneratedFileNode>> orderOnlyInputs,
-            std::vector<std::shared_ptr<GeneratedFileNode>> outputs);
 
         std::shared_ptr<GeneratedFileNode> createGeneratedFileNode(
             BuildFile::Rule const& rule,
@@ -93,13 +107,13 @@ namespace YAM {
 
         std::filesystem::path compileOutputPath(
             BuildFile::Output const& output,
-            std::vector<std::shared_ptr<FileNode>> const& cmdInputs,
+            std::vector<std::shared_ptr<Node>> const& cmdInputs,
             std::size_t defaultOffset
         ) const;
 
         std::vector<std::filesystem::path> compileOutputPaths(
             BuildFile::Outputs const& outputs,
-            std::vector<std::shared_ptr<FileNode>> const& cmdInputs
+            std::vector<std::shared_ptr<Node>> const& cmdInputs
         ) const;
 
         std::vector<std::filesystem::path> compileIgnoredOutputs(
@@ -111,8 +125,8 @@ namespace YAM {
 
         void compileCommand(
             BuildFile::Rule const& rule,
-            std::vector<std::shared_ptr<FileNode>> const& cmdInputs,
-            std::vector<std::shared_ptr<GeneratedFileNode>> const& orderOnlyInputs);
+            std::vector<std::shared_ptr<Node>> const& cmdInputs,
+            std::vector<std::shared_ptr<Node>> const& orderOnlyInputs);
 
         void compileOutputGroup(
             BuildFile::Rule const& rule,
@@ -133,7 +147,7 @@ namespace YAM {
         std::map<std::filesystem::path, std::shared_ptr<CommandNode>> _commands;
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _outputs;
         std::map<std::filesystem::path, std::shared_ptr<GlobNode>> _globs;
-        std::map<std::filesystem::path, std::shared_ptr<GroupNode>> _groups;
+        std::map<std::filesystem::path, std::shared_ptr<GroupNode>> _outputGroups;
 
         std::map<std::filesystem::path, std::shared_ptr<CommandNode>> _newCommands;
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _newOutputs;

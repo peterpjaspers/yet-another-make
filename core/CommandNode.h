@@ -51,11 +51,14 @@ namespace YAM
             return _inputAspectsName;
         }
 
-        void cmdInputs(std::vector<std::shared_ptr<FileNode>> const& newInputs);
-        std::vector<std::shared_ptr<FileNode>> const& cmdInputs() const { return _cmdInputs; }
+        // Pre: newInputs contains SourceFileNode and/or GeneratedFileNode
+        // and/or GroupNode instances.
+        void cmdInputs(std::vector<std::shared_ptr<Node>> const& newInputs);
+        std::vector<std::shared_ptr<Node>> const& cmdInputs() const { return _cmdInputs; }
 
-        void orderOnlyInputs(std::vector<std::shared_ptr<GeneratedFileNode>> const& newInputs);
-        std::vector<std::shared_ptr<GeneratedFileNode>> const& orderOnlyInputs() const { return _orderOnlyInputs; }
+        // Pre: newInputs contains GeneratedFileNode and/or GroupNode instances.
+        void orderOnlyInputs(std::vector<std::shared_ptr<Node>> const& newInputs);
+        std::vector<std::shared_ptr<Node>> const& orderOnlyInputs() const { return _orderOnlyInputs; }
 
         // Set/get the shell script to be executed when this node executes.
         void script(std::string const& newScript);
@@ -156,7 +159,20 @@ namespace YAM
         void updateInputProducers();
         void notifyCommandCompletion(std::shared_ptr<ExecutionResult> result);
 
-        MonitoredProcessResult executeMonitoredScript(MemoryLogBook& logBook);
+        bool verifyCmdFlag(
+            std::string const& script, 
+            std::vector<std::shared_ptr<Node>> const& cmdInputs,
+            ILogBook& logBook);
+        bool verifyOrderOnlyFlag(
+            std::string const& script, 
+            std::vector<std::shared_ptr<Node>> const& orderOnlyInputs,
+            ILogBook& logBook);
+        bool verifyOutputFlag(
+            std::string const& script, 
+            std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs,
+            ILogBook& logBook);
+        std::string compileScript(ILogBook& logBook);
+        MonitoredProcessResult executeMonitoredScript(ILogBook& logBook);
         void getSourceInputs(std::vector<Node*>& sourceInputs) const;
         void clearDetectedInputs();
         void setDetectedInputs(ExecutionResult const& result);
@@ -185,9 +201,10 @@ namespace YAM
         std::size_t _ruleLineNr;
 
         std::string _inputAspectsName;
-        std::vector<std::shared_ptr<FileNode>> _cmdInputs;
-        std::vector<std::shared_ptr<GeneratedFileNode>> _orderOnlyInputs;
-        std::unordered_set<CommandNode*> _inputProducers;
+        std::vector<std::shared_ptr<Node>> _cmdInputs;
+        std::vector<std::shared_ptr<Node>> _orderOnlyInputs;
+        // _inputProducers contains pointers to CommandNode and/or GroupNode
+        std::unordered_set<Node*> _inputProducers;
         std::string _script;
         std::weak_ptr<DirectoryNode> _workingDir;
         std::vector<std::shared_ptr<GeneratedFileNode>> _outputs;

@@ -7,12 +7,6 @@
 
 #include <iostream>
 
-#ifdef _DEBUG
-#define ASSERT_MAIN_THREAD(contextPtr) (contextPtr)->assertMainThread()
-#else
-#define ASSERT_MAIN_THREAD(contextPtr)
-#endif
-
 namespace {
     using namespace YAM;
 

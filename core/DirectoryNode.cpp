@@ -254,11 +254,12 @@ namespace YAM
                 _removeChildRecursively(child);
             }
         }
+        _content.clear();
+        updateBuildFileParserNode();
         if (_buildFileParserNode != nullptr) {
             context()->nodes().remove(_buildFileParserNode);
             context()->nodes().remove(_buildFileCompilerNode);
         }
-        _content.clear();
         modified(true);
     }
 
@@ -314,7 +315,7 @@ namespace YAM
             result->_lastWriteTime = retrieveLastWriteTime();
             result->_executionHash = computeExecutionHash(_dotIgnoreNode->hash(), result->_content);
             if (
-                result->_lastWriteTime != _lastWriteTime 
+                result->_lastWriteTime != _lastWriteTime
                 || result->_executionHash != _executionHash // because _dotIgnoreNode changed
             ) {
                 retrieveContent(result->_content, result->_added, result->_removed, result->_kept);

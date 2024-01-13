@@ -18,8 +18,10 @@ namespace YAM
     class BuildFileCompilerNode;
 
     // Executing a DirectoryNode caches the content of a directory as
-    //    - a Source or Generated FileNode for each file in the directory.
+    //    - a SourceFileNode for each file in the directory.
     //    - a DirectoryNode for each subdir in the directory.
+    // Files for which a GeneratedFileNode exists are not included in 
+    // the directory content.
     // 
     // When executing a DirectoryNode it will:
     //      - synchronize its content with the filesystem state
@@ -36,6 +38,13 @@ namespace YAM
     // repository that contains the directory/file.
     // 
     // All functions execute in main thread unless stated otherwise.
+    //
+    // Note: when deleting directory A/B from the filesystem then 
+    // FileRepositoryWatcher will mark directories A and A/B dirty. In this 
+    // case execution of A/B will recursively remove A/B. The removal of A/B
+    // will cause havoc when both directory nodes are executed in parallel. 
+    // It is up to the application to avoid such situations by only starting
+    // a directory node when its parent directory is not dirty. 
     //
     class __declspec(dllexport) DirectoryNode : 
         public Node,
