@@ -35,6 +35,16 @@ namespace YAM {
         void buildFileParser(std::shared_ptr<BuildFileParserNode> const& newFile);
         std::shared_ptr<BuildFileParserNode> buildFileParser() const;
 
+        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const& commands() {
+            return _commands; 
+        }
+        std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const & outputs() {
+            return _outputs;
+        }
+        std::map<std::filesystem::path, std::shared_ptr<GroupNode>> const& outputGroups() {
+            return _outputGroups;
+        }
+
         // Inherited from Node
         void start() override;
         void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const override;

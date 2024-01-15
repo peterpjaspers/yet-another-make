@@ -158,15 +158,14 @@ to fix this:
 ---How does yam process buildfiles?
 
 --Globs on source and generated files
-Yam does not impose conventions upon the user like tup thus. In tup the search 
-domain for a glob dir/*.obj is simply the set of output files defined by the 
-rules in dir/Tupfile. In yam this will not work because there is no guarantee 
-that dir will contain a yam buildfile nor that it defines the output files
-intended to be matched by the glob. In yam the user must therefore specify the
-build files that span the search domain for the glob.
-This puts a burden on the user. But the alternative is an implementation with
-O(N) time complexity, N being the number of file nodes in the graph.
-See scenario 2d in design_buildfile.txt.
+Yam does not impose tup's "output files are in the Tupfile directory" upon the
+user. In tup the search domain for a glob dir/*.obj is simply the set of output
+files defined by the rules in dir/Tupfile. In yam this will not work because 
+there is no relation between Tupfile directory and output file directory. In 
+yam the user must therefore specify the build files that span the search domain
+for the glob. This puts a burden on the user. But the alternative is an 
+implementation with O(N) time complexity, N being the number of file nodes in
+the graph. See scenario 2d in design_buildfile.txt.
 
 --Cyclic group dependencies
     <grpA> |> ... %<grpA> ... |> b <grpB>
@@ -176,8 +175,8 @@ Cyclic group dependencies can occur because of the lazy evaluation of group
 content, i.e. during command execution. Note that cyclic dependencies among
 rules that do not use groups cannot occur because yam (and tup) requires output
 files to be defined before they can be used as inputs. E.g. for rules
-    A |> ... %f ... |> b B>
+    A |> ... %f ... |> b B
     B |> ... %f ... |> c A
-yam (and tup) would raise an error in the first rule because input A is not
+yam (and tup) will raise an error in the first rule because input A is not
 yet defined.
 

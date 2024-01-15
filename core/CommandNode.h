@@ -15,6 +15,7 @@ namespace YAM
     class DirectoryNode;
     class FileRepository;
     class SourceFileNode;
+    class GroupNode;
 
     // CommandNode is capable of:
     //    - executing a shell script with a given set of output files.
@@ -79,6 +80,10 @@ namespace YAM
         std::vector<std::filesystem::path> const& ignoredOutputs() const { return _ignoredOutputs; }
 
         InputNodes const& detectedInputs() const { return _detectedInputs; }
+
+        // Return the groups that will be executed before this command executes,
+        // i.e. the group nodes in cmdInputs and orderOnlyInputs.
+        std::vector<std::shared_ptr<GroupNode>> inputGroups() const;
 
         // Override Node
         void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const override;

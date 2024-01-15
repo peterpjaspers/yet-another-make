@@ -306,6 +306,9 @@
     <ClInclude Include="BuildFilePreCompiler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="GroupCycleFinder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -504,6 +507,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="BuildFilePreCompiler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GroupCycleFinder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

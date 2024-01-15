@@ -41,7 +41,7 @@ namespace YAM
     //
     // Note: when deleting directory A/B from the filesystem then 
     // FileRepositoryWatcher will mark directories A and A/B dirty. In this 
-    // case execution of A/B will recursively remove A/B. The removal of A/B
+    // case execution of A will recursively remove A/B. The removal of A/B
     // will cause havoc when both directory nodes are executed in parallel. 
     // It is up to the application to avoid such situations by only starting
     // a directory node when its parent directory is not dirty. 

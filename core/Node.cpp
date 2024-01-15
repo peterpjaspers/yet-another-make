@@ -275,6 +275,7 @@ namespace YAM
     }
 
     void Node::prepareDeserialize() {
+        _state = Node::State::Dirty;
     }
 
     bool Node::restore(void* context, std::unordered_set<IPersistable const*>& restored) {

@@ -121,6 +121,7 @@ namespace YAM {
         ) const;
 
         std::shared_ptr<CommandNode> createCommand(
+            BuildFile::Rule const& rule,
             std::vector<std::filesystem::path> const& outputPaths);
 
         void compileCommand(

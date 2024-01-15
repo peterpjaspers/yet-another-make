@@ -47,9 +47,12 @@ namespace YAM
         void _handleDirectoriesCompletion(Node* n);
         void _handleBuildFileParsersCompletion(Node* n);
         void _handleBuildFileCompilersCompletion(Node* n);
-        bool containsCycles(std::vector<std::shared_ptr<Node>> const& buildFileParserNodes) const;
+        bool _containsBuildFileCycles(std::vector<std::shared_ptr<Node>> const& buildFileParserNodes) const;
+        bool _containsGroupCycles(std::vector<std::shared_ptr<Node>> const& buildFileCompilerNodes) const;
+        void _rollback();
         void _handleCommandsCompletion(Node* n);
         void _notifyCompletion();
+        void _storeBuildState();
 
         ExecutionContext _context;
         std::shared_ptr<PersistentBuildState> _buildState;

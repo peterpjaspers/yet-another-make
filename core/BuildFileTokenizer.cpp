@@ -52,16 +52,17 @@ namespace YAM {
     bool BuildFileTokenizer::match(TokenSpec const& spec, const char* str, std::string& match) {
         std::cmatch cm;
         bool matched = std::regex_search(str, cm, spec.regex, std::regex_constants::match_continuous);
-        if (!matched) return false;
-        std::string m0 = cm[0].str();
-        match = cm[spec.group].str();
-        captureLocation(m0);
-        _cursor += m0.length();
-        return true;
+        if (matched) {
+            std::string m0 = cm[0].str();
+            match = cm[spec.group].str();
+            captureLocation(m0);
+            _cursor += m0.length();
+        }
+        return matched;
     }
 
     void BuildFileTokenizer::captureLocation(std::string const& matched) {
-        std::regex nlRe(R"(\n)");
+        static std::regex nlRe(R"(\n)");
 
         // Absolute offsets.
         _tokenStartOffset = _cursor;

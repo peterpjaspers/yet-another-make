@@ -11,6 +11,7 @@
 #include "Glob.h"
 #include "GlobNode.h"
 #include "GroupNode.h"
+#include "AcyclicTrail.h"
 
 #include <sstream>
 #include <chrono>
@@ -271,6 +272,74 @@ namespace
         return nullptr;
     }
 
+    std::string groupCycleMessage(
+        GroupNode* closingGroup,
+        std::list< GroupNode*> const& trail
+    ) {
+        std::stringstream ss;
+        for (auto grp : trail) ss << grp->name() << " => ";
+        ss << closingGroup->name() << std::endl;
+        return ss.str();
+    }
+
+    // Find whether group is part of a group cycle.
+    // Post: if (returned group == nullptr) then no cycle
+    // Else adding returned group to trail would make trail cyclic.
+    GroupNode* findGroupCycle(AcyclicTrail<GroupNode*>& trail, GroupNode* group) {
+        if (!trail.add(group)) {
+            return group;
+        }
+        for (auto const& node : group->group()) {
+            auto genFile = dynamic_pointer_cast<GeneratedFileNode>(node);
+            if (genFile != nullptr) {
+                for (auto const& inputGroup : genFile->producer()->inputGroups()) {
+                    auto closingGroup = findGroupCycle(trail, inputGroup.get());
+                    if (closingGroup != nullptr) return closingGroup;
+                }
+            }
+        }
+        trail.remove(group);
+        return nullptr;
+    }
+
+    void assertNoGroupCycle(
+        AcyclicTrail<GroupNode*>& trail, 
+        GroupNode* group, 
+        std::unordered_set<GroupNode*>& visited,
+        std::vector<std::string>& cycles
+    ) {
+        bool notVisited = visited.insert(group).second;
+        if (true) {
+            auto closingGroup = findGroupCycle(trail, group);
+            if (closingGroup != nullptr) {
+                cycles.push_back(groupCycleMessage(closingGroup, trail.trail()));
+            }
+        }
+    }
+
+    void assertNoGroupCycles(
+        std::map<std::filesystem::path, std::shared_ptr<GroupNode>> const& outputGroups,
+        std::vector<std::string>& cycles
+    ) {
+        std::unordered_set<std::shared_ptr<GroupNode>> inAndOutGroups;
+        for (auto const& pair : outputGroups) {
+            auto outGroup = pair.second;
+            inAndOutGroups.insert(outGroup);
+            for (auto const& el : outGroup->group()) {
+                auto genFile = dynamic_pointer_cast<GeneratedFileNode>(el);
+                if (genFile != nullptr) {
+                    for (auto const& inputGroup : genFile->producer()->inputGroups()) {
+                        inAndOutGroups.insert(inputGroup);
+                    }
+                }
+            }
+        }
+        for (auto const& group : inAndOutGroups) {
+            AcyclicTrail<GroupNode*> trail;
+            std::unordered_set<GroupNode*> visited;
+            assertNoGroupCycle(trail, group.get(), visited, cycles);
+        }
+    }
 }
 
 namespace YAM {
@@ -290,6 +359,19 @@ namespace YAM {
         for (auto const& varOrRule : buildFile.variablesAndRules) {
             auto rule = dynamic_cast<BuildFile::Rule*>(varOrRule.get());
             if (rule != nullptr) compileRule(*rule);
+        }
+        // Note: to find all group cycles one must first executed ALL dirty
+        // buildfilecompilernodes, then call assertNoGroupCycles on all groups
+        // of the executed compiler nodes.
+        std::vector<std::string> cycles;
+        assertNoGroupCycles(_outputGroups, cycles);
+        if (!cycles.empty()) {
+            std::stringstream ss;
+            ss << "Cyclic group dependenc";
+            (cycles.size() == 1) ? (ss << "y:") : (ss << "ies:");
+            ss << std::endl;
+            for (auto const& cycle : cycles) ss << cycle << std::endl;
+            throw std::runtime_error(ss.str());
         }
     }
 
@@ -479,7 +561,7 @@ namespace YAM {
                     std::stringstream ss;
                     ss << "In rule at line " << rule.line << " in buildfile " << _buildFile.string() << ":" << std::endl;
                     ss << "Output file is either a source file or a stale output file: " << node->name().string() << std::endl;
-                    ss << "If a source file: fix the rule definition." << std::endl;
+                    ss << "If a source file: modify the rule definition." << std::endl;
                     ss << "If a stale output file: delete it." << std::endl;
                     ss << "Note: output files become stale when you delete yam's buildstate." << std::endl;
                     ss << "When deleting yam's buildstate also delete all output files before running a build." << std::endl;
@@ -492,9 +574,8 @@ namespace YAM {
                 std::stringstream ss;
                 ss << "In rule at line " << rule.line << " in buildfile " << _buildFile.string() << ":" << std::endl;
                 ss << "Output file " << outputNode->name().string()
-                    << " already defined at rule at line " << producer->ruleLineNr()
+                    << " already owned by the rule at line " << producer->ruleLineNr()
                     << " in buildfile " << producer->buildFile()->absolutePath() << std::endl;
-                ss << "Fix rule to remove duplicate output file." << std::endl;
                 throw std::runtime_error(ss.str());
             }
         } else {
@@ -570,6 +651,7 @@ namespace YAM {
         return ignoredOutputs;
     }
     std::shared_ptr<CommandNode> BuildFileCompiler::createCommand(
+        BuildFile::Rule const& rule,
         std::vector<std::filesystem::path> const& outputPaths)
     {
         std::shared_ptr<CommandNode> cmdNode;
@@ -580,12 +662,21 @@ namespace YAM {
             cmdName = outputPaths[0] / "__cmd";
         }
         std::shared_ptr<Node> node = _context->nodes().find(cmdName);
-
         cmdNode = dynamic_pointer_cast<CommandNode>(node);
+
         if (cmdNode == nullptr) {
             cmdNode = std::make_shared<CommandNode>(_context, cmdName);
             _newCommands.insert({ cmdNode->name(), cmdNode });
+        } else if (_commands.contains(cmdNode->name())) {
+            std::stringstream ss;
+            ss << "In rule at line " << rule.line << " in buildfile " << _buildFile.string() << ":" << std::endl;
+            ss << "Output file " << outputPaths[0].string()
+                << " already owned by the rule at line " << cmdNode->ruleLineNr()
+                << " in buildfile " << cmdNode->buildFile()->name() << std::endl;
+            throw std::runtime_error(ss.str());
         }
+        _commands.insert({ cmdNode->name(), cmdNode });
+
         return cmdNode;
     }
 
@@ -598,7 +689,7 @@ namespace YAM {
         std::vector<std::filesystem::path> ignoredOutputs = compileIgnoredOutputs(rule.outputs);
         if (outputPaths.empty()) assertScriptHasNoOutputFlag(rule);
 
-        std::shared_ptr<CommandNode> cmdNode = createCommand(outputPaths);
+        std::shared_ptr<CommandNode> cmdNode = createCommand(rule, outputPaths);
         std::vector<std::shared_ptr<GeneratedFileNode>> outputs = createGeneratedFileNodes(rule, cmdNode, outputPaths);
         // Compile the script to check for semantic errors
         std::string notused = compileScript(_buildFile, rule.script, _baseDir.get(), cmdInputs, orderOnlyInputs, outputs);
@@ -612,7 +703,6 @@ namespace YAM {
         cmdNode->script(rule.script.script);
         cmdNode->outputs(outputs);
         cmdNode->ignoreOutputs(ignoredOutputs);
-        _commands.insert({ cmdNode->name(), cmdNode });
         compileOutputGroup(rule, outputs);
     }
 
@@ -627,7 +717,9 @@ namespace YAM {
             _outputGroups.insert({ groupNode->name(), groupNode });
         }
         std::vector<std::shared_ptr<Node>> group = groupNode->group();
-        for (auto const& n : outputs) group.push_back(n);
+        for (auto const& n : outputs) {
+            group.push_back(n);
+        }
         groupNode->group(group);
     }
 

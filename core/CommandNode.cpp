@@ -45,6 +45,16 @@ namespace
         return expanded;
     }
 
+    void getGroups(
+        std::vector<std::shared_ptr<Node>> const& nodes,
+        std::vector<std::shared_ptr<GroupNode>>& groups
+    ) {
+        for (auto const& node : nodes) {
+            auto grp = dynamic_pointer_cast<GroupNode>(node);
+            if (grp != nullptr) groups.push_back(grp);
+        }
+    }
+
     void computePathSetsDifference(
         std::set<std::filesystem::path> const& in1,
         std::set<std::filesystem::path> const& in2,
@@ -363,6 +373,14 @@ namespace YAM
     void CommandNode::getInputs(std::vector<std::shared_ptr<Node>>& inputs) const {
         for (auto const& pair : _detectedInputs) inputs.push_back(dynamic_pointer_cast<Node>(pair.second));
     }
+
+    std::vector<std::shared_ptr<GroupNode>> CommandNode::inputGroups() const {
+        std::vector<std::shared_ptr<GroupNode>> groups;
+        getGroups(_cmdInputs, groups);
+        getGroups(_orderOnlyInputs, groups);
+        return groups;
+    }
+
     void CommandNode::buildFile(SourceFileNode* buildFile) {
         _buildFile = buildFile;
     }
