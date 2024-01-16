@@ -388,7 +388,6 @@ namespace
         EXPECT_EQ(nNodes, setup.context.nodes().size());
         auto symModifiedFile = setup.sourceFileRepo()->symbolicPathOf(modifiedFile);
         auto node = dynamic_pointer_cast<FileNode>(setup.context.nodes().find(symModifiedFile));
-        YAMTest::executeNode(node.get());
         XXH64_hash_t hash = node->hashOf(FileAspect::entireFileAspect().name());
         EXPECT_EQ(hashBeforeModify, hash);
         // Verify that the rolled-back build state can be executed

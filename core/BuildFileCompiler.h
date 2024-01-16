@@ -32,11 +32,11 @@ namespace YAM {
             std::vector<std::shared_ptr<Node>> orderOnlyInputs,
             std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs);
 
-        // Return whether script contains flag that refers to cmd input,
-        // order-only input and output files respectively.
-        static bool containsCmdInputFlag(std::string const& script);
-        static bool containsOrderOnlyInputFlag(std::string const& script);
-        static bool containsOutputFlag(std::string const& script);
+        // Return whether str contains flag that refers to cmd input,
+        // order-only input, output files respectively.
+        static bool containsCmdInputFlag(std::string const& str);
+        static bool containsOrderOnlyInputFlag(std::string const& str);
+        static bool containsOutputFlag(std::string const& str);
 
         // Return whether the script is literal, i.e. contains no input
         // or output flags.
@@ -133,9 +133,9 @@ namespace YAM {
             BuildFile::Rule const& rule,
             std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs);
 
-        void assertScriptHasNoCmdInputFlag(BuildFile::Rule const& rule) const;
-        void assertScriptHasNoOrderOnlyInputFlag(BuildFile::Rule const& rule) const;
-        void assertScriptHasNoOutputFlag(BuildFile::Rule const& rule) const;
+        void assertHasNoCmdInputFlag(std::size_t line, std::string const& str) const;
+        void assertHasNoOrderOnlyInputFlag(std::size_t line, std::string const& str) const;
+        void assertHasNoOutputFlag(std::size_t line, std::string const& str) const;
 
         void compileRule(BuildFile::Rule const& rule);
 

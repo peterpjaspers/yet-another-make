@@ -41,11 +41,11 @@ void logFailStartServer(ILogBook& logBook) {
 }
 
 void logResult(ILogBook& logBook, BuildResult& result) {
-    auto duration = result.niceDuration();
     std::stringstream ss;
     ss << "Build completed " << (result.succeeded() ? "successfully" : "with errors");
-    if (!duration.empty()) ss << " in " << duration;
-    else ss << " in less than 1 ms ";
+    //auto duration = result.niceDuration();
+    //if (!duration.empty()) ss << " in " << duration;
+    //else ss << " in less than 1 ms ";
     ss
         << std::endl
         << "#started=" << result.nNodesStarted()
@@ -145,6 +145,8 @@ public:
 
 int main(int argc, char argv[]) {
     ConsoleLogBook logBook;
+    logBook.logElapsedTime(true);
+
     std::filesystem::path dotYamDir = DotYamDirectory::initialize(std::filesystem::current_path(), &logBook);
     std::filesystem::path repoDir = dotYamDir.parent_path();
     bool inProcess = false;

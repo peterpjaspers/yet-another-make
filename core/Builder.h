@@ -52,7 +52,7 @@ namespace YAM
         void _rollback();
         void _handleCommandsCompletion(Node* n);
         void _notifyCompletion();
-        void _storeBuildState();
+        void _storeBuildState(bool logSave = false);
 
         ExecutionContext _context;
         std::shared_ptr<PersistentBuildState> _buildState;

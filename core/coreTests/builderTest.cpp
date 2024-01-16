@@ -465,7 +465,7 @@ namespace
         // started and selfExecuted also contains 
         // _dirtyCommands from Builder.
         EXPECT_EQ(3, driver.stats.nRehashedFiles);
-        EXPECT_EQ(9, driver.stats.started.size());
+        EXPECT_EQ(8, driver.stats.started.size());
 
         // 1: pendingStartSelf of ccJan sees changed hash of janCpp
         // 2: self-execution of ccJan => updates and rehashes janOut 
@@ -473,7 +473,7 @@ namespace
         // 4: execution of linkPietJan updates and rehashes pietjanOut
         auto srcRepo = driver.sourceRepo();
         auto janCppNode = driver.context->nodes().find(srcRepo->symbolicPathOf(driver.repo.janCpp));
-        EXPECT_EQ(7, driver.stats.selfExecuted.size());
+        EXPECT_EQ(6, driver.stats.selfExecuted.size());
         EXPECT_TRUE(driver.stats.selfExecuted.contains(janCppNode.get()));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.ccJan.get()));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.janOut.get()));
@@ -520,7 +520,7 @@ namespace
         EXPECT_EQ(1, driver.stats.nRehashedFiles);
         EXPECT_TRUE(driver.stats.rehashedFiles.contains(janCppNode.get()));
 
-        EXPECT_EQ(5, driver.stats.selfExecuted.size());
+        EXPECT_EQ(4, driver.stats.selfExecuted.size());
         EXPECT_TRUE(driver.stats.selfExecuted.contains(janCppNode.get()));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.ccJan.get()));;
     }

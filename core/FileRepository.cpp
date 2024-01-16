@@ -179,7 +179,7 @@ namespace YAM
     }
 
     void FileRepository::clear() {
-        _context->nodes().remove(_directoryNode);
+        _context->nodes().removeIfPresent(_directoryNode);
         _directoryNode->clear();
         _directoryNode->setState(Node::State::Dirty);
         modified(true);

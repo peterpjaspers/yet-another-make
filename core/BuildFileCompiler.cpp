@@ -271,75 +271,6 @@ namespace
         }
         return nullptr;
     }
-
-    std::string groupCycleMessage(
-        GroupNode* closingGroup,
-        std::list< GroupNode*> const& trail
-    ) {
-        std::stringstream ss;
-        for (auto grp : trail) ss << grp->name() << " => ";
-        ss << closingGroup->name() << std::endl;
-        return ss.str();
-    }
-
-    // Find whether group is part of a group cycle.
-    // Post: if (returned group == nullptr) then no cycle
-    // Else adding returned group to trail would make trail cyclic.
-    GroupNode* findGroupCycle(AcyclicTrail<GroupNode*>& trail, GroupNode* group) {
-        if (!trail.add(group)) {
-            return group;
-        }
-        for (auto const& node : group->group()) {
-            auto genFile = dynamic_pointer_cast<GeneratedFileNode>(node);
-            if (genFile != nullptr) {
-                for (auto const& inputGroup : genFile->producer()->inputGroups()) {
-                    auto closingGroup = findGroupCycle(trail, inputGroup.get());
-                    if (closingGroup != nullptr) return closingGroup;
-                }
-            }
-        }
-        trail.remove(group);
-        return nullptr;
-    }
-
-    void assertNoGroupCycle(
-        AcyclicTrail<GroupNode*>& trail, 
-        GroupNode* group, 
-        std::unordered_set<GroupNode*>& visited,
-        std::vector<std::string>& cycles
-    ) {
-        bool notVisited = visited.insert(group).second;
-        if (true) {
-            auto closingGroup = findGroupCycle(trail, group);
-            if (closingGroup != nullptr) {
-                cycles.push_back(groupCycleMessage(closingGroup, trail.trail()));
-            }
-        }
-    }
-
-    void assertNoGroupCycles(
-        std::map<std::filesystem::path, std::shared_ptr<GroupNode>> const& outputGroups,
-        std::vector<std::string>& cycles
-    ) {
-        std::unordered_set<std::shared_ptr<GroupNode>> inAndOutGroups;
-        for (auto const& pair : outputGroups) {
-            auto outGroup = pair.second;
-            inAndOutGroups.insert(outGroup);
-            for (auto const& el : outGroup->group()) {
-                auto genFile = dynamic_pointer_cast<GeneratedFileNode>(el);
-                if (genFile != nullptr) {
-                    for (auto const& inputGroup : genFile->producer()->inputGroups()) {
-                        inAndOutGroups.insert(inputGroup);
-                    }
-                }
-            }
-        }
-        for (auto const& group : inAndOutGroups) {
-            AcyclicTrail<GroupNode*> trail;
-            std::unordered_set<GroupNode*> visited;
-            assertNoGroupCycle(trail, group.get(), visited, cycles);
-        }
-    }
 }
 
 namespace YAM {
@@ -359,19 +290,6 @@ namespace YAM {
         for (auto const& varOrRule : buildFile.variablesAndRules) {
             auto rule = dynamic_cast<BuildFile::Rule*>(varOrRule.get());
             if (rule != nullptr) compileRule(*rule);
-        }
-        // Note: to find all group cycles one must first executed ALL dirty
-        // buildfilecompilernodes, then call assertNoGroupCycles on all groups
-        // of the executed compiler nodes.
-        std::vector<std::string> cycles;
-        assertNoGroupCycles(_outputGroups, cycles);
-        if (!cycles.empty()) {
-            std::stringstream ss;
-            ss << "Cyclic group dependenc";
-            (cycles.size() == 1) ? (ss << "y:") : (ss << "ies:");
-            ss << std::endl;
-            for (auto const& cycle : cycles) ss << cycle << std::endl;
-            throw std::runtime_error(ss.str());
         }
     }
 
@@ -604,13 +522,16 @@ namespace YAM {
         std::vector<std::shared_ptr<Node>> const& cmdInputs,
         std::size_t defaultInputOffset
     ) const {
-        static std::vector<std::shared_ptr<GeneratedFileNode>> emptyOutputs;
-        std::vector<std::shared_ptr<Node>> emptyOrderOnlyInputs;
         auto base = _baseDir;
         std::filesystem::path pattern = output.path;
         Globber::optimize(base, pattern);
+        std::filesystem::path optimizedPath = base->name() / pattern;
+        if (defaultInputOffset == -1 ) return optimizedPath;
+
+        static std::vector<std::shared_ptr<GeneratedFileNode>> emptyOutputs;
+        std::vector<std::shared_ptr<Node>> emptyOrderOnlyInputs;
         std::filesystem::path outputPath = compilePercentageFlags(
-            _buildFile, output, _baseDir.get(), (base->name() / pattern).string(),
+            _buildFile, output, _baseDir.get(), optimizedPath.string(),
             cmdInputs, defaultInputOffset, emptyOrderOnlyInputs,
             emptyOutputs, false);
         if (!FileRepository::isSymbolicPath(outputPath)) return _baseDir->name() / outputPath;
@@ -624,6 +545,9 @@ namespace YAM {
         std::vector<std::filesystem::path> outputPaths;
         for (auto const& output : outputs.outputs) {
             if (!output.ignore) {
+                if (cmdInputs.empty()) {
+                    outputPaths.push_back(compileOutputPath(output, cmdInputs, -1));
+                }
                 for (std::size_t i = 0; i < cmdInputs.size(); ++i) {
                     std::filesystem::path outputPath = compileOutputPath(output, cmdInputs, i);
                     // When output does not contain %-flags then duplicate outputPaths will
@@ -687,7 +611,7 @@ namespace YAM {
     ) {
         std::vector<std::filesystem::path> outputPaths = compileOutputPaths(rule.outputs, cmdInputs);
         std::vector<std::filesystem::path> ignoredOutputs = compileIgnoredOutputs(rule.outputs);
-        if (outputPaths.empty()) assertScriptHasNoOutputFlag(rule);
+        if (outputPaths.empty()) assertHasNoOutputFlag(rule.script.line, rule.script.script);
 
         std::shared_ptr<CommandNode> cmdNode = createCommand(rule, outputPaths);
         std::vector<std::shared_ptr<GeneratedFileNode>> outputs = createGeneratedFileNodes(rule, cmdNode, outputPaths);
@@ -723,29 +647,29 @@ namespace YAM {
         groupNode->group(group);
     }
 
-    void BuildFileCompiler::assertScriptHasNoCmdInputFlag(BuildFile::Rule const& rule) const {
-        if (containsFlag(rule.script.script, isCmdInputFlag)) {
+    void BuildFileCompiler::assertHasNoCmdInputFlag(std::size_t line, std::string const& str) const {
+        if (containsFlag(str, isCmdInputFlag)) {
             std::stringstream ss;
-            ss << "In rule at line " << rule.line << " in buildfile " << _buildFile.string() << ":" << std::endl;
-            ss << "No cmd input files while script contains percentage flag that operates on cmd input." << std::endl;
+            ss << "At line " << line << " in buildfile " << _buildFile.string() << ":" << std::endl;
+            ss << "No cmd input files while '" << str << "' contains percentage flag that operates on cmd input." << std::endl;
             throw std::runtime_error(ss.str());
         }
     }
 
-    void BuildFileCompiler::assertScriptHasNoOrderOnlyInputFlag(BuildFile::Rule const& rule) const {
-        if (containsFlag(rule.script.script, isOrderOnlyInputFlag)) {
+    void BuildFileCompiler::assertHasNoOrderOnlyInputFlag(std::size_t line, std::string const& str) const {
+        if (containsFlag(str, isOrderOnlyInputFlag)) {
             std::stringstream ss;
-            ss << "In rule at line " << rule.line << " in buildfile " << _buildFile.string() << ":" << std::endl;
-            ss << "No order-only input files while script contains percentage flag that operates on order-only input." << std::endl;
+            ss << "At line " << line << " in buildfile " << _buildFile.string() << ":" << std::endl;
+            ss << "No order-only input files while '" << str << "' contains percentage flag that operates on order-only input." << std::endl;
             throw std::runtime_error(ss.str());
         }
     }
 
-    void BuildFileCompiler::assertScriptHasNoOutputFlag(BuildFile::Rule const& rule) const {
-        if (containsFlag(rule.script.script, isOutputFlag)) {
+    void BuildFileCompiler::assertHasNoOutputFlag(std::size_t line, std::string const& str) const {
+        if (containsFlag(str, isOutputFlag)) {
             std::stringstream ss;
-            ss << "In rule at line " << rule.line << " in buildfile " << _buildFile.string() << ":" << std::endl;
-            ss << "No output files while script contains percentage flag that operates on output." << std::endl;
+            ss << "At line " << line << " in buildfile " << _buildFile.string() << ":" << std::endl;
+            ss << "No output files while '" << str << "' contains percentage flag that operates on output." << std::endl;
             throw std::runtime_error(ss.str());
         }
     }
@@ -760,8 +684,8 @@ namespace YAM {
     void BuildFileCompiler::compileRule(BuildFile::Rule const& rule) {
         std::vector<std::shared_ptr<Node>> cmdInputs = compileInputs(rule.cmdInputs);
         std::vector<std::shared_ptr<Node>> orderOnlyInputs = compileOrderOnlyInputs(rule.orderOnlyInputs);
-        if (cmdInputs.empty()) assertScriptHasNoCmdInputFlag(rule);
-        if (orderOnlyInputs.empty()) assertScriptHasNoOrderOnlyInputFlag(rule);
+        if (cmdInputs.empty()) assertHasNoCmdInputFlag(rule.script.line, rule.script.script);
+        if (orderOnlyInputs.empty()) assertHasNoOrderOnlyInputFlag(rule.script.line, rule.script.script);
         if (rule.forEach) {
             for (auto const& cmdInput : cmdInputs) {
                 std::vector<std::shared_ptr<Node>> cmdInputs_({ cmdInput });

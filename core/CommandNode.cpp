@@ -706,7 +706,7 @@ namespace YAM
         }
         result._log.forwardTo(*(context()->logBook()));
         if (result._newState != Node::State::Ok) {
-            notifyCommandCompletion(sresult);
+            handleOutputAndNewInputFilesCompletion(result._newState, sresult);
         }
     }
 
@@ -740,17 +740,15 @@ namespace YAM
         std::vector<std::shared_ptr<Node>> const& cmdInputs,
         ILogBook& logBook
     ) {
-        bool valid = !cmdInputs.empty();
+        bool containsFlag = BuildFileCompiler::containsCmdInputFlag(script); 
+        bool valid = !(containsFlag && cmdInputs.empty());
         if (!valid) {
-            valid = BuildFileCompiler::containsCmdInputFlag(script);
-            if (!valid) {
-                std::string buildFile = _buildFile != nullptr ? _buildFile->name().string() : "";
-                std::stringstream ss;
-                ss << "In command of rule at line " << _ruleLineNr << " in buildfile " << buildFile << ":" << std::endl;
-                ss << "No cmd input files while command contains percentage flag that operates on cmd input." << std::endl;
-                LogRecord error(LogRecord::Error, ss.str());
-                logBook.add(error);
-            }
+            std::string buildFile = _buildFile != nullptr ? _buildFile->name().string() : "";
+            std::stringstream ss;
+            ss << "In command of rule at line " << _ruleLineNr << " in buildfile " << buildFile << ":" << std::endl;
+            ss << "No cmd input files while command contains percentage flag that operates on cmd input." << std::endl;
+            LogRecord error(LogRecord::Error, ss.str());
+            logBook.add(error);
         }
         return valid;
     }
@@ -759,17 +757,15 @@ namespace YAM
         std::vector<std::shared_ptr<Node>> const& orderOnlyInputs,
         ILogBook& logBook
     ) {
-        bool valid = !orderOnlyInputs.empty();
+        bool containsFlag = BuildFileCompiler::containsOrderOnlyInputFlag(script);
+        bool valid = !(containsFlag && orderOnlyInputs.empty());
         if (!valid) {
-            valid = BuildFileCompiler::containsOrderOnlyInputFlag(script);
-            if (!valid) {
-                std::string buildFile = _buildFile != nullptr ? _buildFile->name().string() : "";
-                std::stringstream ss;
-                ss << "In command of rule at line " << _ruleLineNr << " in buildfile " << buildFile << ":" << std::endl;
-                ss << "No order-only input files while command contains percentage flag that operates on order-only input." << std::endl;
-                LogRecord error(LogRecord::Error, ss.str());
-                logBook.add(error);
-            }
+            std::string buildFile = _buildFile != nullptr ? _buildFile->name().string() : "";
+            std::stringstream ss;
+            ss << "In command of rule at line " << _ruleLineNr << " in buildfile " << buildFile << ":" << std::endl;
+            ss << "No order-only input files while command contains percentage flag that operates on order-only input." << std::endl;
+            LogRecord error(LogRecord::Error, ss.str());
+            logBook.add(error);
         }
         return valid;
     }

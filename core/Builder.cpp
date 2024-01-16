@@ -194,6 +194,7 @@ namespace YAM
                         repoPath,
                         &_context);
                     _context.addRepository(repo);
+                    _storeBuildState();
                 }
             }
         }
@@ -259,28 +260,33 @@ namespace YAM
         for (auto const& c : buildFileCompilerNodes) {
             compilers.push_back(dynamic_pointer_cast<BuildFileCompilerNode>(c));
         }
+        //GroupCycleFinder finder(compilers);
+        //std::string cycles = finder.cyclesToString(finder.uniqueCycles());
+        //bool cycling = !cycles.empty();
+        //if (cycling) {
+        //    LogRecord error(LogRecord::Error, cycles);
+        //    compilers[0]->context()->logBook()->add(error);
+        //}
         GroupCycleFinder finder(compilers);
-        std::vector<std::string> const& cycles = finder.cycles();
-        bool cycling = !cycles.empty();
+        std::string cyclingGroups = finder.cyclingGroupsToString(); 
+        bool cycling = !cyclingGroups.empty();
         if (cycling) {
-            std::stringstream ss;
-            ss << "Detected cyclic group dependenc";
-            (cycles.size() == 1) ? (ss << "y:") : (ss << "ies:");
-            ss << std::endl;
-            for (auto const& cycle : cycles) ss << cycle << std::endl;
-            LogRecord error(LogRecord::Error, ss.str());
+            LogRecord error(LogRecord::Error, cyclingGroups);
             compilers[0]->context()->logBook()->add(error);
         }
+        
         return cycling;
     }
 
-    void Builder::_storeBuildState() {
+    void Builder::_storeBuildState(bool logSave) {
         if (0 < _buildState->store()) {
             // TODO: find an efficient way to figure out whether objects will
             // be saved.
-            ILogBook& logBook = *(_context.logBook());
-            LogRecord saving(LogRecord::Progress, "Saving buildstate");
-            logBook.add(saving);
+            if (logSave) {
+                ILogBook& logBook = *(_context.logBook());
+                LogRecord saving(LogRecord::Progress, "Saving buildstate");
+                logBook.add(saving);
+            }
         }
     }
 
@@ -379,10 +385,10 @@ namespace YAM
             _rollback();
             _dirtyCommands->setState(_dirtyBuildFileCompilers->state());
             _handleCommandsCompletion(_dirtyCommands.get());
- //       } else if (_containsGroupCycles(_dirtyBuildFileCompilers->group())) {
- //           _rollback();
- //           _dirtyCommands->setState(Node::State::Failed);
- //           _handleCommandsCompletion(_dirtyCommands.get());
+        } else if (_containsGroupCycles(_dirtyBuildFileCompilers->group())) {
+            _rollback();
+            _dirtyCommands->setState(Node::State::Failed);
+            _handleCommandsCompletion(_dirtyCommands.get());
         } else {
             std::vector<std::shared_ptr<Node>> dirtyCommands;
             appendDirtyCommands(_context.nodes(), dirtyCommands);
