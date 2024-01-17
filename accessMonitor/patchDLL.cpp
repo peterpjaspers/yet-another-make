@@ -6,48 +6,43 @@
 #include <iostream>
 #include <fstream>
 
+// #pragma comment(lib, "User32")
+
 using namespace AccessMonitor;
 using namespace std;
 
-DWORD threadMain( void* argument ) {
+DWORD monitorMain( void* argument ) {
+    auto monitor = AccesstEvent( "Monitor", CurrentProcessID() );
+    auto exit = AccesstEvent( "ExitProcess", CurrentProcessID() );
     enableLog( "patch", Verbose );
     log() << "Start monitoring..." << endLine;
     startMonitoring();
-    // ToDo: Signal parent process that monitoring has started
-    HMODULE dll;
-    if ( GetModuleHandleExA( GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, LPCSTR( threadMain ), &dll ) ) {
-        wchar_t moduleName[ MaxFileName + 1 ];
-        DWORD size = GetModuleFileNameW( dll, &moduleName[ 0 ], MaxFileName );
-        if (0 < size) {
-            wofstream file( "C:/Users/philv/Code/yam/yet-another-make/accessMonitor/InjectOutput.txt" );
-            file << L"Loaded module " << moduleName << L"..." << endl;
-            file.close();
-        }
+    EventSignal( monitor ); // Signal parent process that monitoring has started
+    // Wait for this process to exit
+    if (EventWait( exit )) {
+        log() << "Stop monitoring..." << endLine;
+        stopMonitoring();
+        wofstream files( "./remoteAccessedFiles.txt" );
+        streamAccessedFiles( files );
+        files.close();
+        log() << "Done monitoring..." << endLine;
+        disableLog();
+        EventSignal( monitor ); // Signal parent process that monitoring has stopped
+        EventSignal( exit ); // Signal this process that it can exit
     }
-    // ToDo: Delay process exit/terminate until accessed file data is communicated
-    log() << "Stop monitoring..." << endLine;
-    stopMonitoring();
-    wofstream files( "./remoteAccessedFiles.txt" );
-    streamAccessedFiles( files );
-    files.close();
-    log() << "Done..." << endLine;
-    disableLog();
-    // ToDo: Signal parent process that monitoring has completed
-    return( ERROR_SUCCESS );
+    ReleaseEvent( monitor );
+    ReleaseEvent( exit );
+    return ERROR_SUCCESS;
 }
 
 BOOL WINAPI DllMain( HINSTANCE dll,  DWORD reason, LPVOID arg ) {
-    switch( reason ) { 
-        case DLL_PROCESS_ATTACH:
-            CreateThread( nullptr, 0, threadMain, nullptr, 0, nullptr );
-            break;
-        case DLL_THREAD_ATTACH:
-            break;
-        case DLL_THREAD_DETACH:
-            break;
-        case DLL_PROCESS_DETACH:
-            if (arg != nullptr) break;
-            break;
+    if (reason == DLL_PROCESS_ATTACH) {
+        auto thread = CreateThread( nullptr, 0, monitorMain, nullptr, 0, nullptr );
+        if (thread == nullptr) return false;
+    } else if (reason == DLL_THREAD_ATTACH) {
+    } else if (reason == DLL_THREAD_DETACH) {
+    } else if (reason == DLL_PROCESS_DETACH) {
+        if (arg != nullptr) return true;
     }
-    return TRUE;
+    return true;
 }

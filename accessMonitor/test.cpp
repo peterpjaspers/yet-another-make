@@ -21,7 +21,9 @@ string narrow( const wstring& string ){
 
 void worker( const path directoryPath ) {
     path externals = directoryPath / ".." / "externals.txt";
-    system( narrow((wstring( L"listDLLExternals.exe \"\" " ) + externals.wstring())).c_str() );
+    auto command = (wstring( L"listDLLExternals.exe \"\" " ) + externals.wstring());
+    auto exitCode = system( narrow( command ).c_str() );
+    log() << "Process " << command << " exitted with " << hex << uppercase << noshowbase << static_cast<uint32_t>( exitCode ) << endLine;
     create_directory( directoryPath, current_path() );
     ofstream file( directoryPath / "junk.txt" );
     file << "Hello world!\n";

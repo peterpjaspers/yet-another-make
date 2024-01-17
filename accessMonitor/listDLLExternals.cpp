@@ -75,26 +75,24 @@ namespace AccessMonitor {
         bool mapped = MapAndLoad( dll.name.c_str(), dll.directory.c_str(), &image, true, true );
         if (!mapped) errorException( "MapAndLoad" );
         unsigned long dataSize;
-        _IMAGE_EXPORT_DIRECTORY* directory = (_IMAGE_EXPORT_DIRECTORY*)ImageDirectoryEntryToData( image.MappedAddress, true, IMAGE_DIRECTORY_ENTRY_EXPORT, &dataSize );
+        IMAGE_SECTION_HEADER* sectionHeader;
+        IMAGE_EXPORT_DIRECTORY* directory = (_IMAGE_EXPORT_DIRECTORY*)ImageDirectoryEntryToDataEx( image.MappedAddress, true, IMAGE_DIRECTORY_ENTRY_EXPORT, &dataSize, &sectionHeader );
         if (directory != nullptr) {
             DWORD* names = (DWORD*)ImageRvaToVa( image.FileHeader, image.MappedAddress, directory->AddressOfNames, nullptr );
             if  (names == nullptr) { UnMapAndLoad( &image ); errorException( "ImageRvaToVa" ); }
             for (int n = 0; n < directory->NumberOfNames; ++n) {
                 char* name = (char*)ImageRvaToVa( image.FileHeader, image.MappedAddress, names[ n ], nullptr );
-                if (name == nullptr) { UnMapAndLoad( &image ); errorException( "ImageRvaToVa" ); }
-                exports.push_back( name );
+                if (name == nullptr) { UnMapAndLoad( &image ); errorException( "ImageRvaToVa" );
+                } else exports.push_back( name );
             }
         }
         UnMapAndLoad( &image );
         return exports;
     }
-
 }
 
 using namespace std;
 using namespace AccessMonitor;
-
-// ToDo: Build using MS cl compiler
 
 int main( int argc, char* argv[] ) {
     ofstream out( ( (2 < argc) ? argv[ 2 ] : "externals.txt" ) );
@@ -107,4 +105,5 @@ int main( int argc, char* argv[] ) {
     }
     out.close();
     this_thread::sleep_for( 2000ms );
+    return( 0 );
 }
