@@ -297,9 +297,7 @@ namespace YAM
             _handleDirectoriesCompletion(_dirtyDirectories.get());
         } else {
             ILogBook& logBook = *(_context.logBook());
-            std::string msg = "Scanning repositor";
-            (_context.repositories().size() > 1) ? msg.append("y") : msg.append("ies");
-            LogRecord scanning(LogRecord::Progress, msg);
+            LogRecord scanning(LogRecord::Progress, "Scanning filesystem");
             logBook.add(scanning);
 
             _dirtyDirectories->group(prunedDirtyDirs);

@@ -200,6 +200,7 @@ namespace YAM
             if (_buildFileParser != nullptr) {
                 _buildFileParser->addObserver(this);
             }
+            modified(true);
             setState(Node::State::Dirty);
         }
     }
@@ -244,10 +245,11 @@ namespace YAM
 
             updateMap(context(), this, _depCompilers, compiler.compilers());
             updateMap(context(), this, _depGlobs, compiler.globs());
-
+            modified(_executionHash != computeExecutionHash());
             updated = true;
         } catch (std::runtime_error e) {
             updated = false;
+            _executionHash = rand();
             LogRecord error(LogRecord::Error, e.what());
             context()->logBook()->add(error);
         }
@@ -297,14 +299,17 @@ namespace YAM
             }
 
             if (validGeneratedInputs()) {
-                _executionHash = computeExecutionHash();
-                modified(true);
+                XXH64_hash_t newHash = computeExecutionHash();
+                if (_executionHash != newHash) modified(true);
+                _executionHash = newHash;
                 notifyProcessingCompletion(Node::State::Ok);
             } else {
+                modified(true);
                 notifyProcessingCompletion(Node::State::Failed);
             }
         } catch (std::runtime_error e) {
             _executionHash = rand();
+            modified(true);
             LogRecord error(LogRecord::Error, e.what());
             context()->logBook()->add(error);
             notifyProcessingCompletion(Node::State::Failed);
@@ -433,8 +438,10 @@ namespace YAM
     }
     bool BuildFileCompilerNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
         if (!Node::restore(context, restored)) return false;
-        _buildFileParser->restore(context, restored);
-        _buildFileParser->addObserver(this);
+        if (_buildFileParser != nullptr) {
+            _buildFileParser->restore(context, restored);
+            _buildFileParser->addObserver(this);
+        }
         NodeMapStreamer::restore(_depCompilers);
         NodeMapStreamer::restore(_depGlobs);
         NodeMapStreamer::restore(_commands);

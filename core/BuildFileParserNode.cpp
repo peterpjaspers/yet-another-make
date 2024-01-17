@@ -192,7 +192,7 @@ namespace YAM
 
     bool BuildFileParserNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
         if (!CommandNode::restore(context, restored)) return false;
-        _buildFile->restore(context, restored);
+        if (_buildFile != nullptr) _buildFile->restore(context, restored);
         return true;
     }
 
