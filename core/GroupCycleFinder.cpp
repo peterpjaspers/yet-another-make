@@ -35,8 +35,10 @@ namespace
     void findGroupCycle(
         AcyclicTrail<GroupNode*>& trail,
         GroupNode* group,
-        std::vector<std::list<GroupNode*>>& cycles
+        std::vector<std::list<GroupNode*>>& cycles,
+        std::unordered_set<GroupNode*>& doneGroups
     ) {
+        if (doneGroups.contains(group)) return;
         if (!trail.add(group)) {
             auto cycle = trail.trail();
             cycle.insert(cycle.end(), group);
@@ -48,97 +50,12 @@ namespace
             if (genFile != nullptr) {
                 auto inputGroups = genFile->producer()->inputGroups();
                 for (auto const& inputGroup : inputGroups) {
-                    findGroupCycle(trail, inputGroup.get(), cycles);
+                    findGroupCycle(trail, inputGroup.get(), cycles, doneGroups);
                 }
             }
         }
         trail.remove(group);
-    }
-
-    void findGroupCycles(
-        std::vector<std::shared_ptr<GroupNode>> const& groups
-    ) {
-        std::vector<std::list<GroupNode*>> cycles;
-        for (auto const& group : groups) {
-            AcyclicTrail<GroupNode*> trail;
-            findGroupCycle(trail, group.get(), cycles);
-        }
-
-        if (!cycles.empty()) {
-            std::stringstream ss;
-            ss << "Cyclic group dependenc";
-            (cycles.size() == 1) ? (ss << "y:") : (ss << "ies:");
-            ss << std::endl;
-            for (auto const& cycle : cycles) {
-                ss << trailToString(cycle) << std::endl;
-            }
-            throw std::runtime_error(ss.str());
-        }
-    }
-
-    typedef std::list<GroupNode*> Trail;
-    typedef std::unordered_set<GroupNode*> TrailSet;
-    typedef std::map<Trail const*, TrailSet const*> TrailToTrailSet;
-    typedef std::pair<Trail const*, TrailSet const*> TrailPair;
-
-    TrailPair const* prune(TrailPair* pair0, TrailPair* pair1) {
-        if (pair0->second->size() > pair1->second->size()) std::swap(pair0, pair1);
-        TrailSet const* set0 = pair0->second;
-        TrailSet const* set1 = pair1->second;
-        for (auto el0 : *set0) {
-            if (!set1->contains(el0)) return nullptr;
-        }
-        // Trails are equivalent, return the shortes one
-        if (pair0->first->size() < pair1->first->size()) return pair0;
-        return pair1;
-    }
-
-    std::vector<Trail> prune(std::vector<Trail> const& cycles) {
-        std::vector<TrailSet> sets;
-        sets.reserve(cycles.size());
-        TrailToTrailSet map;
-        for (auto const& trail : cycles) {
-            TrailSet set;
-            set.insert(trail.begin(), trail.end());
-            sets.push_back(std::move(set));
-            TrailSet const& setRef = sets[sets.size() - 1];
-            TrailSet const* setPtr = &setRef;
-            map.insert({ &trail, setPtr });
-        }
-        std::size_t mapSize;
-        do {
-            mapSize = map.size();
-            TrailToTrailSet prunedMap;
-            auto pair = map.begin();
-            for (auto it0 = map.begin(); it0 != map.end(); ++it0) {
-                TrailPair p0 = *it0;
-                TrailPair const* prunedPair = nullptr;
-                auto it1 = it0;
-                it1++;
-                for (; it1 != map.end(); ++it1) {
-                    TrailPair p1 = *it1;
-                    TrailPair const* candidate = prune(&p0, &p1);
-                    if (candidate != nullptr) {
-                        if (prunedPair == nullptr) prunedPair = candidate;
-                        else if (candidate->first->size() < prunedPair->first->size()) {
-                            prunedPair = candidate;
-                        }
-                    }
-                }
-                if (prunedPair != nullptr) {
-                    prunedMap.insert(*prunedPair);
-                } else {
-                    prunedMap.insert(*it0);
-                }
-            }
-            map = prunedMap;
-        } while (map.size() < mapSize);
-
-        std::vector<Trail> prunedTrails;
-        for (auto const& pair : map) {
-            prunedTrails.push_back(*(pair.first));
-        }
-        return prunedTrails;
+        doneGroups.insert(group);
     }
  }
 
@@ -152,14 +69,11 @@ namespace YAM
     GroupCycleFinder::GroupCycleFinder(
         std::vector<std::shared_ptr<GroupNode>> const& groups
     ) {
+        std::unordered_set<GroupNode*> doneGroups;
         for (auto const& group : groups) {
             AcyclicTrail<GroupNode*> trail;
-            findGroupCycle(trail, group.get(), _cycles);
+            findGroupCycle(trail, group.get(), _cycles, doneGroups);
         }
-    }
-
-    std::vector<std::list<GroupNode*>> GroupCycleFinder::uniqueCycles() const {
-        return prune(_cycles);
     }
 
     // Return the set of groups involved in cycles()
@@ -179,14 +93,14 @@ namespace YAM
         return groups;
     }
 
-    std::string GroupCycleFinder::cyclesToString(std::vector<std::list<GroupNode*>> const& cycles) const {
-        if (cycles.empty()) return "";
+    std::string GroupCycleFinder::cyclesToString() const {
+        if (_cycles.empty()) return "";
 
         std::stringstream ss;
         ss << "Cyclic group dependenc";
-        (cycles.size() == 1) ? (ss << "y:") : (ss << "ies:");
+        (_cycles.size() == 1) ? (ss << "y:") : (ss << "ies:");
         ss << std::endl;
-        for (auto const& cycle : cycles) {
+        for (auto const& cycle : _cycles) {
             ss << trailToString(cycle) << std::endl;
         }
         return ss.str();

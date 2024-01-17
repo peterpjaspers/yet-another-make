@@ -259,22 +259,14 @@ namespace YAM
         std::vector<std::shared_ptr<BuildFileCompilerNode>> compilers;
         for (auto const& c : buildFileCompilerNodes) {
             compilers.push_back(dynamic_pointer_cast<BuildFileCompilerNode>(c));
-        }
-        //GroupCycleFinder finder(compilers);
-        //std::string cycles = finder.cyclesToString(finder.uniqueCycles());
-        //bool cycling = !cycles.empty();
-        //if (cycling) {
-        //    LogRecord error(LogRecord::Error, cycles);
-        //    compilers[0]->context()->logBook()->add(error);
-        //}
+        } 
         GroupCycleFinder finder(compilers);
-        std::string cyclingGroups = finder.cyclingGroupsToString(); 
-        bool cycling = !cyclingGroups.empty();
+        bool cycling = !finder.cycles().empty();
         if (cycling) {
-            LogRecord error(LogRecord::Error, cyclingGroups);
+            std::string cycleLog = finder.cyclesToString();
+            LogRecord error(LogRecord::Error, cycleLog);
             compilers[0]->context()->logBook()->add(error);
-        }
-        
+        }        
         return cycling;
     }
 
