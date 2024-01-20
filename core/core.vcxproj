@@ -183,7 +183,8 @@
     <ClInclude Include="TimePoint.h" />
     <ClInclude Include="BinaryValueStreamer.h" />
     <ClInclude Include="BuildFileTokenizer.h" />
-    <ClInclude Include="buildFileTokenSpecs.h" />
+    <ClInclude Include="BuildFileTokenSpecs.h" />
+    <ClInclude Include="Token.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BasicOStreamLogBook.cpp" />
@@ -193,15 +194,9 @@
     </ClCompile>
     <ClCompile Include="BuildFile.cpp" />
     <ClCompile Include="BuildFileCompilerNode.cpp" />
-    <ClCompile Include="BuildFileCompiler_2.cpp" />
     <ClCompile Include="BuildFileDependenciesCompiler.cpp" />
     <ClCompile Include="BuildFileParserNode.cpp" />
-    <ClCompile Include="BuildFilePreCompiler.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="BuildState.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-    </ClCompile>
+    <ClCompile Include="BuildFileTokenSpecs.cpp" />
     <ClCompile Include="Glob.cpp" />
     <ClCompile Include="Globber.cpp" />
     <ClCompile Include="BuildFileParser.cpp" />

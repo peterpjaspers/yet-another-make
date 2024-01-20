@@ -1,35 +1,41 @@
 #pragma once
 
-#include <regex>
+#include "Token.h"
+
 #include <filesystem>
+#include <memory>
 
 namespace YAM {
-    struct __declspec(dllexport) Token {
-        Token() {}
-        std::string type;
-        std::string value;
-    };
-
-    struct __declspec(dllexport) TokenSpec {
-        TokenSpec(std::string const& pattern_, std::string const& tokenType, std::size_t groupIndex = 0)
-            : pattern(pattern_)
-            , regex(pattern)
-            , type(tokenType)
-            , group(groupIndex)
-        {}
-        std::string pattern;
-        std::regex regex;
-        std::string type;
-        std::size_t group;
-    };
-
     class __declspec(dllexport) BuildFileTokenizer {
     public:
         BuildFileTokenizer(
             std::filesystem::path const& filePath,
-            std::string const& content, 
-            std::vector<TokenSpec> const& specs);
-        void readNextToken(Token& token);
+            std::string const& content);
+
+        // Return the spec that matches eos.
+        static ITokenSpec const* eosTokenSpec();
+
+        std::filesystem::path const& filePath() const { return _filePath; }
+        std::string const& content() const { return _content; }
+
+        // Return whether end-of-stream has been reached;
+        bool eos() const;
+
+        // Read token at current position that matches one of the given
+        // token specifications.
+        // If eos(): returned token.spec == eosTokenSpec and token.type == "eos".
+        // If no match could be found: throw std::runtime_error.
+        Token readNextToken(std::vector<ITokenSpec const*> const& specs);
+
+        // Read all characters from current positon until spec is matched.
+        // Return the read characters in consumed.
+        // If eos(): returned token.spec == eosTokenSpec and token.type == "eos".
+        // If no match with spec is found: throw std::runtime_error.
+        Token readUntil(ITokenSpec const* spec, std::string& consumed);
+
+        // Read character at current position.
+        // If eos(): throw std::runtime_error.
+        char readChar();
 
         std::size_t tokenStartOffset() const { return _tokenStartOffset; }
         std::size_t tokenEndOffset() const { return _tokenEndOffset; }
@@ -43,15 +49,14 @@ namespace YAM {
         std::size_t line() const { return _line; }
         std::size_t column() const { return _column; }
 
+
+
     private:
-        bool match(TokenSpec const& spec, const char* str, std::string& match);
-        bool hasMoreTokens();
         void captureLocation(std::string const& matched);
-        void throwUnexpectedToken();
+        void captureLocation(char c);
 
         std::filesystem::path const& _filePath;
         std::string const& _content; 
-        std::vector<TokenSpec> const& _specs;
 
         Token _token;
         std::size_t _tokenStartOffset;

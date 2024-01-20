@@ -264,7 +264,7 @@
     <ClInclude Include="BuildFile.h">
       <Filter>Header Files\BuildFileCompiler</Filter>
     </ClInclude>
-    <ClInclude Include="buildFileTokenSpecs.h">
+    <ClInclude Include="BuildFileTokenSpecs.h">
       <Filter>Header Files\BuildFileCompiler</Filter>
     </ClInclude>
     <ClInclude Include="Glob.h">
@@ -307,6 +307,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="GroupCycleFinder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Token.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -497,19 +500,13 @@
     <ClCompile Include="BuildFileParserNode.cpp">
       <Filter>Source Files\Node</Filter>
     </ClCompile>
-    <ClCompile Include="BuildState.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="BuildFile.cpp">
       <Filter>Source Files\BuildFileCompiler</Filter>
     </ClCompile>
-    <ClCompile Include="BuildFileCompiler_2.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="BuildFilePreCompiler.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="GroupCycleFinder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildFileTokenSpecs.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

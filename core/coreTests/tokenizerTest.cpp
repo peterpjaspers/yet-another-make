@@ -1,11 +1,28 @@
 #include "../BuildFileTokenizer.h"
-#include "../buildFileTokenSpecs.h" // defines variable tokenSpecs
+#include "../BuildFileTokenSpecs.h" // defines variable tokenSpecs
 #include "gtest/gtest.h"
 #include <regex>
 #include <chrono>
 
 namespace {
     using namespace YAM;
+
+    std::vector<ITokenSpec const*> ispecs = BuildFileTokenSpecs::ispecs();
+    std::vector<TokenRegexSpec const*> tokenSpecs = BuildFileTokenSpecs::specs();
+
+    TokenRegexSpec const* whiteSpace(BuildFileTokenSpecs::whiteSpace());
+    TokenRegexSpec const* comment1(BuildFileTokenSpecs::comment1());
+    TokenRegexSpec const* commentN(BuildFileTokenSpecs::commentN());
+    TokenRegexSpec const* depBuildFile(BuildFileTokenSpecs::depBuildFile());
+    TokenRegexSpec const* depGlob(BuildFileTokenSpecs::depGlob());
+    TokenRegexSpec const* rule(BuildFileTokenSpecs::rule());
+    TokenRegexSpec const* foreach(BuildFileTokenSpecs::foreach());
+    TokenRegexSpec const* ignore(BuildFileTokenSpecs::ignore());
+    TokenRegexSpec const* curlyOpen(BuildFileTokenSpecs::curlyOpen());
+    TokenRegexSpec const* curlyClose(BuildFileTokenSpecs::curlyClose());
+    TokenRegexSpec const* script(BuildFileTokenSpecs::script());
+    TokenRegexSpec const* vertical(BuildFileTokenSpecs::vertical());
+    TokenRegexSpec const* glob(BuildFileTokenSpecs::glob());
 
     bool testCommandMatching() {
         const std::string group(R"(
@@ -75,21 +92,20 @@ namespace {
     }
 
     TEST(BuildFileTokenizer, whiteSpace) {
-        const std::string whitespace(R"(    )");
-        BuildFileTokenizer tokenizer("testFile", whitespace, tokenSpecs);
+        const std::string ws(R"(    )");
+        BuildFileTokenizer tokenizer("testFile", ws);
         Token token;
-        tokenizer.readNextToken(token);
-        EXPECT_EQ("eos", token.type);
-        EXPECT_EQ("", token.value);
+        token = tokenizer.readNextToken({whiteSpace});
+        EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
 
     TEST(BuildFileTokenizer, ruleStart) {
-        const std::string rule(R"(
+        const std::string ruleStr(R"(
   : 
   )");
-        BuildFileTokenizer tokenizer("testFile", rule, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", ruleStr);
         Token token;
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({whiteSpace, rule });
         EXPECT_EQ("rule", token.type);
         EXPECT_EQ(":", token.value);
         EXPECT_EQ(3, tokenizer.tokenStartOffset());
@@ -101,20 +117,19 @@ namespace {
         EXPECT_EQ(4, tokenizer.cursor());
         EXPECT_EQ(1, tokenizer.lineBeginOffset());
         EXPECT_EQ(3, tokenizer.column());
-        tokenizer.readNextToken(token);
-        EXPECT_EQ("eos", token.type);
-        EXPECT_EQ("", token.value);
+        token = tokenizer.readNextToken({whiteSpace});
+        EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
 
     TEST(BuildFileTokenizer, commentLine) {
         const std::string commentLine(R"(  : // comment  :  
-  : )");
-        BuildFileTokenizer tokenizer("testFile", commentLine, tokenSpecs);
+  : // comment)");
+        BuildFileTokenizer tokenizer("testFile", commentLine);
         Token token;
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({ whiteSpace, comment1, rule });
         EXPECT_EQ("rule", token.type);
         EXPECT_EQ(":", token.value);
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({ whiteSpace, comment1, rule });
         EXPECT_EQ("rule", token.type);
         EXPECT_EQ(":", token.value);
         EXPECT_EQ(22, tokenizer.tokenStartOffset());
@@ -126,9 +141,8 @@ namespace {
         EXPECT_EQ(23, tokenizer.cursor());
         EXPECT_EQ(20, tokenizer.lineBeginOffset());
         EXPECT_EQ(3, tokenizer.column());
-        tokenizer.readNextToken(token);
-        EXPECT_EQ("eos", token.type);
-        EXPECT_EQ("", token.value);
+        token = tokenizer.readNextToken({ whiteSpace, comment1, });
+        EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
 
     TEST(BuildFileTokenizer, commentLines) {
@@ -138,9 +152,9 @@ namespace {
         c3
         c4 
   */  :)");
-        BuildFileTokenizer tokenizer("testFile", commentLines, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", commentLines);
         Token token;
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({ comment1, commentN, rule, whiteSpace});
         EXPECT_EQ("rule", token.type);
         EXPECT_EQ(":", token.value);
         EXPECT_EQ(67, tokenizer.tokenStartOffset());
@@ -152,84 +166,79 @@ namespace {
         EXPECT_EQ(68, tokenizer.cursor());
         EXPECT_EQ(61, tokenizer.lineBeginOffset());
         EXPECT_EQ(7, tokenizer.column());
-        tokenizer.readNextToken(token);
-        EXPECT_EQ("eos", token.type);
-        EXPECT_EQ("", token.value);
+        token = tokenizer.readNextToken({ });
+        EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
 
     TEST(BuildFileTokenizer, not) {
-        const std::string whitespace(R"(^aap.c)");
-        BuildFileTokenizer tokenizer("testFile", whitespace, tokenSpecs);
+        const std::string notGlob(R"(^aap.c)");
+        BuildFileTokenizer tokenizer("testFile", notGlob);
         Token token;
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({ignore, glob});
         EXPECT_EQ("not", token.type);
         EXPECT_EQ("^", token.value);
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({glob});
         EXPECT_EQ("glob", token.type);
         EXPECT_EQ("aap.c", token.value);
-        tokenizer.readNextToken(token);
-        EXPECT_EQ("eos", token.type);
-        EXPECT_EQ("", token.value);
+        EXPECT_TRUE(tokenizer.eos());
+        token = tokenizer.readNextToken({ });
+        EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
 
     TEST(BuildFileTokenizer, relativePath3) {
         const std::string path(R"(aap\noot\mies.txt)");
-        BuildFileTokenizer tokenizer("testFile", path, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", path);
         Token token;
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({glob});
         EXPECT_EQ("glob", token.type);
         EXPECT_EQ(path, token.value);
-        tokenizer.readNextToken(token);
-        EXPECT_EQ("eos", token.type);
-        EXPECT_EQ("", token.value);
+        token = tokenizer.readNextToken({});
+        EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
 
     TEST(BuildFileTokenizer, relativePath1) {
         const std::string path(R"(mies.txt)");
-        BuildFileTokenizer tokenizer("testFile", path, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", path);
         Token token;
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({glob});
         EXPECT_EQ("glob", token.type);
         EXPECT_EQ(path, token.value);
-        tokenizer.readNextToken(token);
-        EXPECT_EQ("eos", token.type);
-        EXPECT_EQ("", token.value);
+        token = tokenizer.readNextToken({ });
+        EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
 
     TEST(BuildFileTokenizer, absolutePath3) {
         const std::string path(R"(\aap\noot\mies.txt)");
-        BuildFileTokenizer tokenizer("testFile", path, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", path);
         Token token;
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({glob});
         EXPECT_EQ("glob", token.type);
         EXPECT_EQ(path, token.value);
-        tokenizer.readNextToken(token);
-        EXPECT_EQ("eos", token.type);
-        EXPECT_EQ("", token.value);
+        token = tokenizer.readNextToken({});
+        EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
 
     TEST(BuildFileTokenizer, absolutePath1) {
         const std::string path(R"(mies.txt)");
-        BuildFileTokenizer tokenizer("testFile", path, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", path);
         Token token;
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({glob});
         EXPECT_EQ("glob", token.type);
         EXPECT_EQ(path, token.value);
-        tokenizer.readNextToken(token);
-        EXPECT_EQ("eos", token.type);
-        EXPECT_EQ("", token.value);
+        token = tokenizer.readNextToken({});
+        EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
 
     /* TODO: fix tokenizing symbolicPath
     TEST(
         BuildFileTokenizer, symbolicPath) {
         const std::string path(R"(<repo>\file)");
-        BuildFileTokenizer tokenizer("testFile", path, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", path);
         Token token;
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken(ispecs);
         EXPECT_EQ("glob", token.type);
         EXPECT_EQ(path, token.value);
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken(ispecs);
         EXPECT_EQ("eos", token.type);
         EXPECT_EQ("", token.value);
     }
@@ -238,143 +247,138 @@ namespace {
     TEST(
         BuildFileTokenizer, inputGroup) {
         const std::string path(R"({..\submodules\object})");
-        BuildFileTokenizer tokenizer("testFile", path, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", path);
         Token token;
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({curlyOpen});
         EXPECT_EQ("{", token.type);
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({glob});
         EXPECT_EQ("glob", token.type);
         EXPECT_EQ(R"(..\submodules\object)", token.value);
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({curlyClose});
         EXPECT_EQ("}", token.type);
-        tokenizer.readNextToken(token);
-        EXPECT_EQ("eos", token.type);
-        EXPECT_EQ("", token.value);
+        token = tokenizer.readNextToken({});
+        EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
 
     TEST(BuildFileTokenizer, relativeGlob1) {
-        const std::string glob(R"(aap\a?b?[cde]*.txt)");
-        BuildFileTokenizer tokenizer("testFile", glob, tokenSpecs);
+        const std::string globStr(R"(aap\a?b?[cde]*.txt)");
+        BuildFileTokenizer tokenizer("testFile", globStr);
         Token token;
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({glob});
         EXPECT_EQ("glob", token.type);
-        EXPECT_EQ(glob, token.value);
-        tokenizer.readNextToken(token);
-        EXPECT_EQ("eos", token.type);
-        EXPECT_EQ("", token.value);
+        EXPECT_EQ(globStr, token.value);
+        token = tokenizer.readNextToken({});
+        EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
 
     TEST(BuildFileTokenizer, absoluteGlob1) {
-        const std::string glob(R"(\aap\a?b?[cde]*.txt)");
-        BuildFileTokenizer tokenizer("testFile", glob, tokenSpecs);
+        const std::string globStr(R"(\aap\a?b?[cde]*.txt)");
+        BuildFileTokenizer tokenizer("testFile", globStr);
         Token token;
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({glob});
         EXPECT_EQ("glob", token.type);
-        EXPECT_EQ(glob, token.value);
-        tokenizer.readNextToken(token);
-        EXPECT_EQ("eos", token.type);
-        EXPECT_EQ("", token.value);
+        EXPECT_EQ(globStr, token.value);
+        token = tokenizer.readNextToken({ });
+        EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
 
     TEST(BuildFileTokenizer, singleLineScript) {
-        const std::string group(R"(gcc src\hello.c -o bin\hello)");
-        const std::string script = R"(|>gcc src\hello.c -o bin\hello|> )";
+        const std::string groupStr(R"(gcc src\hello.c -o bin\hello)");
+        const std::string scriptStr = R"(|>gcc src\hello.c -o bin\hello|>)";
 
-        BuildFileTokenizer tokenizer("testFile", script, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", scriptStr);
         Token token;
 
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({script});
         EXPECT_EQ("script", token.type);
-        EXPECT_EQ(group, token.value);
-        tokenizer.readNextToken(token);
-        EXPECT_EQ("eos", token.type);
-        EXPECT_EQ("", token.value);
+        EXPECT_EQ(groupStr, token.value);
+        token = tokenizer.readNextToken({});
+        EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
 
     TEST(BuildFileTokenizer, multiLineScript) {
-        const std::string group(R"(
+        const std::string groupStr(R"(
                 gcc 
                 src\hello.c 
                -o bin\hello)");
-        const std::string script = R"(|>
+        const std::string scriptStr = R"(|>
                 gcc 
                 src\hello.c 
                -o bin\hello|> )";
 
-        BuildFileTokenizer tokenizer("testFile", script, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", scriptStr);
         Token token;
 
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({script});
         EXPECT_EQ("script", token.type);
-        EXPECT_EQ(group, token.value);
-        tokenizer.readNextToken(token);
-        EXPECT_EQ("eos", token.type);
-        EXPECT_EQ("", token.value);
+        EXPECT_EQ(groupStr, token.value);
+        token = tokenizer.readNextToken({ whiteSpace });
+        EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
     TEST(BuildFileTokenizer, rule) {
-        const std::string command(R"(
+        const std::string commandStr(R"(
                 gcc 
                 src\hello.c 
                -o bin\hello 
             )");
-        const std::string rule(R"(: 
+        const std::string ruleStr(R"(: 
             src\hello.c |>
                 gcc 
                 src\hello.c 
                -o bin\hello 
             |> bin\%B.obj )");
 
-        BuildFileTokenizer tokenizer("testFile", rule, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", ruleStr);
         Token token;
 
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({ rule, foreach, whiteSpace});
         EXPECT_EQ("rule", token.type);
         EXPECT_EQ(":", token.value);
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({ glob, whiteSpace });
         EXPECT_EQ("glob", token.type);
         EXPECT_EQ("src\\hello.c", token.value);
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({ script, whiteSpace });
         EXPECT_EQ("script", token.type);
-        EXPECT_EQ(command, token.value);
-        tokenizer.readNextToken(token);
+        EXPECT_EQ(commandStr, token.value);
+        token = tokenizer.readNextToken({ glob, whiteSpace });
         EXPECT_EQ("glob", token.type);
         EXPECT_EQ("bin\\%B.obj", token.value);
-        tokenizer.readNextToken(token);
-        EXPECT_EQ("eos", token.type);
+        token = tokenizer.readNextToken({ whiteSpace });
+        EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
 
     TEST(BuildFileTokenizer, foreachRule) {
-        const std::string command(R"(
+        const std::string commandStr(R"(
                 gcc 
                 src\hello.c 
                -o bin\hello 
             )");
-        const std::string rule(R"(: 
+        const std::string ruleStr(R"(: 
             foreach src\hello.c |>
                 gcc 
                 src\hello.c 
                -o bin\hello 
             |> bin\%B.obj )");
 
-        BuildFileTokenizer tokenizer("testFile", rule, tokenSpecs);
+        BuildFileTokenizer tokenizer("testFile", ruleStr);
         Token token;
 
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({whiteSpace, rule});
         EXPECT_EQ("rule", token.type);
         EXPECT_EQ(":", token.value);
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({foreach, glob, whiteSpace});
         EXPECT_EQ("foreach", token.type);
         EXPECT_EQ("foreach", token.value);
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({ glob, whiteSpace });
         EXPECT_EQ("glob", token.type);
         EXPECT_EQ("src\\hello.c", token.value);
-        tokenizer.readNextToken(token);
+        token = tokenizer.readNextToken({ script, whiteSpace });
         EXPECT_EQ("script", token.type);
-        EXPECT_EQ(command, token.value);
-        tokenizer.readNextToken(token);
+        EXPECT_EQ(commandStr, token.value);
+        token = tokenizer.readNextToken({ glob, whiteSpace });
         EXPECT_EQ("glob", token.type);
         EXPECT_EQ("bin\\%B.obj", token.value);
-        tokenizer.readNextToken(token);
-        EXPECT_EQ("eos", token.type);
+        token = tokenizer.readNextToken({ whiteSpace });
+        EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
 }

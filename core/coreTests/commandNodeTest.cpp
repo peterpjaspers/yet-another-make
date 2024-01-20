@@ -62,6 +62,7 @@ namespace
             , stats(context.statistics())
         {
             std::filesystem::create_directories(repoDir / "generated");
+            logBook->setAspects({ LogRecord::Aspect::Error });
             logBook->add(memLogBook);
             logBook->add(stdoutLogBook);
             context.logBook(logBook);

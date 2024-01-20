@@ -1,7 +1,7 @@
 #include "BuildFileParser.h"
 #include "BuildFileTokenizer.h"
 #include "BuildFile.h"
-#include "buildFileTokenSpecs.h" // defines variable tokenSpecs
+#include "BuildFileTokenSpecs.h" // defines variable tokenSpecs
 #include "Glob.h"
 
 #include <sstream>
@@ -18,9 +18,9 @@ namespace {
         return ss.str();
     }
 
-    TokenSpec const& findTokenSpec(std::string tokenType) {
-        for (auto const& t : tokenSpecs) {
-            if (t.type == tokenType) return t;
+    TokenRegexSpec const* findTokenSpec(std::string tokenType) {
+        for (auto t : BuildFileTokenSpecs::specs()) {
+            if (t->type() == tokenType) return t;
         }
         throw std::runtime_error("unknown token type " + tokenType);
     }
@@ -41,7 +41,7 @@ namespace YAM {
         std::string const& buildFileContent,
         std::filesystem::path const& buildFilePath)
         : _buildFilePath(buildFilePath)
-        , _tokenizer(buildFilePath, buildFileContent, tokenSpecs)
+        , _tokenizer(buildFilePath, buildFileContent)
         , _file(parseBuildFile())
     {}
 
@@ -49,25 +49,26 @@ namespace YAM {
         std::string&& buildFileContent,
         std::filesystem::path const& buildFilePath)
         : _buildFilePath(buildFilePath)
-        , _tokenizer(buildFilePath, buildFileContent, tokenSpecs)
+        , _tokenizer(buildFilePath, buildFileContent)
         , _file(parseBuildFile())
     {}
 
 
     Token BuildFileParser::eat(std::string const& tokenType) {
         Token eaten = _lookAhead;
-        if (eaten.type == "") syntaxError(tokenType);
-        if (eaten.type != tokenType) syntaxError(tokenType);
-        _tokenizer.readNextToken(_lookAhead);
+        auto spec = dynamic_cast<TokenRegexSpec const*>(eaten.spec);
+        if (spec == nullptr) syntaxError(tokenType);
+        if (spec->type() != tokenType) syntaxError(tokenType);
+        _lookAhead = _tokenizer.readNextToken(BuildFileTokenSpecs::ispecs());
         return eaten;
     }
 
     void BuildFileParser::syntaxError(std::string const& tokenType) {
-        TokenSpec const& expectedToken = findTokenSpec(tokenType);
+        TokenRegexSpec const* expectedToken = findTokenSpec(tokenType);
         std::stringstream ss;
         ss
             << "Unexpected token: " << _lookAhead.type << ", "
-            << "expected token: " << tokenType << " must match regex " << expectedToken.pattern
+            << "expected token: " << tokenType << " must match regex " << expectedToken->pattern()
             << std::endl
             << "At line " << _tokenizer.tokenStartLine()
             << ", from column " << _tokenizer.tokenStartColumn()
@@ -78,7 +79,7 @@ namespace YAM {
 
     std::shared_ptr<BuildFile::File> BuildFileParser::parseBuildFile() {
         auto file = std::make_shared<BuildFile::File>();
-        _tokenizer.readNextToken(_lookAhead);
+        _lookAhead = _tokenizer.readNextToken(BuildFileTokenSpecs::ispecs());
         file->buildFile = _buildFilePath;
         file->line = _tokenizer.tokenStartLine();
         file->column = _tokenizer.tokenStartColumn();
