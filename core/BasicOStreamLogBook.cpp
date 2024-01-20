@@ -7,9 +7,13 @@ namespace YAM
     BasicOStreamLogBook::BasicOStreamLogBook(std::basic_ostream<char, std::char_traits<char>>* ostream)
         : _ostream(ostream)
         , _startTime(std::chrono::system_clock::now())
+        , _logElapsedTime(false)
+        , _logAspect(false)
     {}
 
     void BasicOStreamLogBook::add(LogRecord const& record)  {
+        if (!mustLogAspect(record.aspect)) return;
+
         std::lock_guard<std::mutex> lock(_mutex);
         ILogBook::add(record);
         std::string timeStr;
@@ -25,9 +29,8 @@ namespace YAM
         } else {
             timeStr = record.time.wctime().time3();
         }
-        *_ostream
-            << timeStr 
-            << " " << LogRecord::aspect2str(record.aspect)
-            << ": " << record.message << std::endl;
+        *_ostream << timeStr << " ";
+        if (_logAspect) *_ostream << LogRecord::aspect2str(record.aspect) << ": ";
+        *_ostream << record.message << std::endl;
     } 
 }

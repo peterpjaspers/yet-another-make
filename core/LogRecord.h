@@ -10,16 +10,15 @@ namespace YAM
     {
     public:
         enum Aspect {
-            Error,                // error in build file, command execution, etc.
-            Warning,              // 
-            Progress,             // successfull completion of command script
+            Error,
+            Warning,
+            Progress,
             ScriptOutput,         // output of command script
             Script,               // command script text
             Scope,                // build scope info
             Performance,          // time and memory usage
             InputFiles,           // input files of a command
             IgnoredInputFiles,    // ignored input files of a commansd
-            SuspectBuildOrdering, // ordering depends on indirect prerequisites
             FileChanges,          // files changed since previous build
             DirectoryChanges,     // directories changed since previous build
             BuildTimePrediction   // estimated remaining build time
@@ -32,9 +31,13 @@ namespace YAM
 
         LogRecord(IStreamer* reader);
 
+        static std::vector<LogRecord::Aspect>const& allAspects();
         static std::string aspect2str(LogRecord::Aspect aspect);
-
         static void setStreamableType(uint32_t type);
+        static void streamAspect(IStreamer* streamer, LogRecord::Aspect& aspect);
+        static void streamAspects(IStreamer* streamer, std::vector<LogRecord::Aspect>& aspects);
+
+        uint32_t a;
         // Inherited from IStreamable
         uint32_t typeId() const override;
         void stream(IStreamer* streamer) override;

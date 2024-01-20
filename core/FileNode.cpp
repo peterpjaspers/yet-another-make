@@ -52,8 +52,15 @@ namespace YAM
     ) {
         if (newLastWriteTime != _lastWriteTime) {
             _lastWriteTime = newLastWriteTime;
+            bool changedContent = _hashes != newHashes;
             _hashes = newHashes;
             modified(true);
+            if (changedContent) {
+                std::stringstream ss;
+                ss << "Content of file " << name().string() << " has changed.";
+                LogRecord change(LogRecord::FileChanges, ss.str());
+                context()->logBook()->add(change);
+            }
             context()->statistics().registerRehashedFile(this);
         }
         Node::notifyCompletion(Node::State::Ok);

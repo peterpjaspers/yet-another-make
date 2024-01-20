@@ -366,6 +366,7 @@ namespace YAM
 
     // Executes in main thread
     void DirectoryNode::commitResult(YAM::DirectoryNode::RetrieveResult& result) {
+        bool dirChanged = _executionHash != result._executionHash;
         _lastWriteTime = result._lastWriteTime;
         _executionHash = result._executionHash;
         _content.clear();
@@ -401,6 +402,13 @@ namespace YAM
             LogRecord progress(LogRecord::Aspect::Progress, std::string("Rehashed directory ").append(name().string()));
             context()->addToLogBook(progress);
         }
+        if (dirChanged) {
+            std::stringstream ss;
+            ss << "Directory " << name().string() << " has changed.";
+            LogRecord change(LogRecord::Aspect::DirectoryChanges, ss.str());
+            context()->addToLogBook(change);
+        }
+
     }
     
     void DirectoryNode::updateBuildFileParserNode() {

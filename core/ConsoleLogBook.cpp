@@ -20,6 +20,7 @@ namespace YAM
     }
 
     void ConsoleLogBook::add(LogRecord const& record) {
+        if (!mustLogAspect(record.aspect)) return;
         std::lock_guard<std::mutex> lock(_mutex);
         setColors(record.aspect);
         BasicOStreamLogBook::add(record);

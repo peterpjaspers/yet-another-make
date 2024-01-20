@@ -14,7 +14,9 @@ namespace YAM
 
     BuildRequest::BuildRequest(RequestType type)
         : _type(type)
-    {}
+        , _logAspects(LogRecord::allAspects())
+    {
+    }
 
     // Set/get the build command type.
     void BuildRequest::requestType(BuildRequest::RequestType type) {
@@ -42,6 +44,14 @@ namespace YAM
         return _pathsInScope;
     }
 
+    void BuildRequest::logAspects(std::vector<LogRecord::Aspect> const& aspects) {
+        _logAspects = aspects;
+    }
+
+    std::vector<LogRecord::Aspect>const& BuildRequest::logAspects() const {
+        return _logAspects;
+    }
+
     void BuildRequest::setStreamableType(uint32_t type) {
         _streamableType = type;
     }
@@ -56,5 +66,6 @@ namespace YAM
         if (streamer->reading()) _type = static_cast<RequestType>(t);
         streamer->stream(_directory);
         streamer->streamVector(_pathsInScope);
+        LogRecord::streamAspects(streamer, _logAspects);
     }
 }

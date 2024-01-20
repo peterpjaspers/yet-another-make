@@ -146,6 +146,7 @@ public:
 int main(int argc, char argv[]) {
     ConsoleLogBook logBook;
     logBook.logElapsedTime(true);
+    //logBook.setAspects({ LogRecord::Aspect::Error, LogRecord::Aspect::Warning, LogRecord::Aspect::Progress });
 
     std::filesystem::path dotYamDir = DotYamDirectory::initialize(std::filesystem::current_path(), &logBook);
     std::filesystem::path repoDir = dotYamDir.parent_path();

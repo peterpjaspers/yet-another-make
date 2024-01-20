@@ -5,6 +5,7 @@ namespace YAM
     MemoryLogBook::MemoryLogBook() {}
 
     void MemoryLogBook::add(LogRecord const& record) {
+        if (!mustLogAspect(record.aspect)) return;
         ILogBook::add(record);
         _records.push_back(record); 
     }

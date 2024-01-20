@@ -13,6 +13,7 @@ namespace YAM
     }
 
     void MultiwayLogBook::add(LogRecord const& record) {
+        if (!mustLogAspect(record.aspect)) return;
         for (auto const& b : _books) {
             b->add(record);
         }

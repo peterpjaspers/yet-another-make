@@ -1,6 +1,7 @@
 #pragma 
 
 #include "IStreamable.h"
+#include "LogRecord.h"
 #include <filesystem>
 #include <vector>
 #include <string>
@@ -30,6 +31,9 @@ namespace YAM
         void addToScope(std::filesystem::path const& path);
         std::vector<std::filesystem::path> const& pathsInScope();
 
+        void logAspects(std::vector<LogRecord::Aspect> const& aspects);
+        std::vector<LogRecord::Aspect>const& logAspects() const;
+
         static void setStreamableType(uint32_t type);
         // Inherited via IStreamable
         uint32_t typeId() const override;
@@ -39,6 +43,7 @@ namespace YAM
         RequestType _type;
         std::filesystem::path _directory;
         std::vector<std::filesystem::path> _pathsInScope;
+        std::vector<LogRecord::Aspect> _logAspects;
     };
 }
 

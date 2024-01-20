@@ -7,8 +7,10 @@ namespace YAM
     class __declspec(dllexport) ILogBook
     {
     public:
+        ILogBook() : _error(false), _aspects(LogRecord::allAspects()) {}
+
         virtual void add(LogRecord const& record) {
-            _error = _error || (record.aspect == LogRecord::Aspect::Error);
+            if (record.aspect == LogRecord::Aspect::Error) _error = true;
         }
 
         // Return whether an error record has been logged

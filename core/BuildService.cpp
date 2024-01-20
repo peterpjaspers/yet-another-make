@@ -55,6 +55,7 @@ namespace YAM
     }
 
     void BuildService::add(LogRecord const& record) {
+        if (!mustLogAspect(record.aspect)) return;
         std::lock_guard<std::mutex> lock(_logMutex);
         ILogBook::add(record);
         auto ptr = std::make_shared<LogRecord>(record);
@@ -73,6 +74,7 @@ namespace YAM
         _builder.context()->logBook(_logBook);
         if (buildRequest != nullptr) {
             if (!_builder.running()) {
+                _logBook->setAspects(buildRequest->logAspects());
                 _builder.completor().AddRaw(this, &BuildService::handleBuildCompletion);
                 _builder.start(buildRequest);
             }
