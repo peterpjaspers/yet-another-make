@@ -271,14 +271,13 @@ namespace YAM
     }
 
     void Builder::_storeBuildState(bool logSave) {
-        if (0 < _buildState->store()) {
-            // TODO: find an efficient way to figure out whether objects will
-            // be saved.
-            if (logSave) {
-                ILogBook& logBook = *(_context.logBook());
-                LogRecord saving(LogRecord::Progress, "Saving buildstate");
-                logBook.add(saving);
-            }
+        std::size_t nStored = _buildState->store();
+        if (0 < nStored) {
+            std::stringstream ss;
+            ss << "Updated " << nStored << " nodes in buildstate." << std::endl;
+            ILogBook& logBook = *(_context.logBook());
+            LogRecord saving(LogRecord::Progress, ss.str());
+            logBook.add(saving);
         }
     }
 
@@ -372,10 +371,28 @@ namespace YAM
     void Builder::_handleBuildFileCompilersCompletion(Node* n) {
         if (n != _dirtyBuildFileCompilers.get()) throw std::exception("unexpected node");
         if (_dirtyBuildFileCompilers->state() != Node::State::Ok) {
-            _rollback();
+            // _rollback is not needed because the failed compilers will be
+            // re-executed at next build. This continues until the user fixed
+            // all compilation errors. Command node execution only starts once
+            // all compilation has succeeded. So there is no risk of execting 
+            // inconsistent command nodes.
+            // Rollback would also be inefficient because it also rolls-back 
+            // the compiler nodes that executed successfully.
             _dirtyCommands->setState(_dirtyBuildFileCompilers->state());
             _handleCommandsCompletion(_dirtyCommands.get());
-        } else if (_containsGroupCycles(_dirtyBuildFileCompilers->group())) {
+         } else if (_containsGroupCycles(_dirtyBuildFileCompilers->group())) {
+            // In this case there are no failing compiler nodes. Without rollback
+            // the next build would skip compilation and start command node 
+            // execution. This would result in a deadlock because of the cycle(s).
+            // This can be prevented by remembering that a cycle was detected, and
+            // at the next build do a cycle detection over all groups (i.e. not
+            // only over the output groups of the dirty compilers!!). 
+            // An alternative way of fixing this is to rollback. It has better
+            // incremental behavior because all rolled-back nodes (i.e the nodes
+            // whose changes introduced the cycles) will be re-executed at next
+            // build. This continues until the user removed all cycles. So there
+            // is no risk of execting command nodes whose input groups are 
+            // cyclic dependent.
             _rollback();
             _dirtyCommands->setState(Node::State::Failed);
             _handleCommandsCompletion(_dirtyCommands.get());
