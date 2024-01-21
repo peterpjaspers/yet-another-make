@@ -24,18 +24,8 @@ namespace YAM {
         // Read token at current position that matches one of the given
         // token specifications.
         // If eos(): returned token.spec == eosTokenSpec and token.type == "eos".
-        // If no match could be found: throw std::runtime_error.
+        // If no match could be found: returned token.spec == nullptr.
         Token readNextToken(std::vector<ITokenSpec const*> const& specs);
-
-        // Read all characters from current positon until spec is matched.
-        // Return the read characters in consumed.
-        // If eos(): returned token.spec == eosTokenSpec and token.type == "eos".
-        // If no match with spec is found: throw std::runtime_error.
-        Token readUntil(ITokenSpec const* spec, std::string& consumed);
-
-        // Read character at current position.
-        // If eos(): throw std::runtime_error.
-        char readChar();
 
         std::size_t tokenStartOffset() const { return _tokenStartOffset; }
         std::size_t tokenEndOffset() const { return _tokenEndOffset; }
@@ -52,8 +42,7 @@ namespace YAM {
 
 
     private:
-        void captureLocation(std::string const& matched);
-        void captureLocation(char c);
+        void captureLocation(std::size_t consumed);
 
         std::filesystem::path const& _filePath;
         std::string const& _content; 

@@ -60,37 +60,10 @@ namespace YAM {
                 return token;
             }
         }
-        std::stringstream ss;
-        ss
-            << "Unexpected token at line " << _line
-            << ", column " << _column << " in file " << _filePath.string()
-            << std::endl;
-        throw std::runtime_error(ss.str());
+        return token;
     }
 
-    Token BuildFileTokenizer::readUntil(ITokenSpec const* spec, std::string& consumed) {
-        Token endToken;
-        while (!eos() && !spec->match(_content.c_str() + _cursor, endToken)) {
-            consumed.push_back(readChar());
-        }
-        if (eos()) endToken.spec = eosTokenSpec();
-        return endToken;
-    }
-
-    // Read character at current position.
-    // If eos(): throw std::runtime_error.
-    char BuildFileTokenizer::readChar() {
-        if (eos()) throw std::runtime_error("Attempt to read beyond eos");
-        auto cstr = _content.c_str() + _cursor;
-        char c = cstr[0];
-        captureLocation(c);
-        _cursor += 1;
-        return c;
-    }
-
-    void BuildFileTokenizer::captureLocation(std::string const& matched) {
-        static std::regex nlRe(R"(\n)");
-
+    void BuildFileTokenizer::captureLocation(std::size_t consumed) {
         // Absolute offsets.
         _tokenStartOffset = _cursor;
 
@@ -98,40 +71,22 @@ namespace YAM {
         _tokenStartLine = _line;
         _tokenStartColumn = _tokenStartOffset - _lineBeginOffset;
 
-        // Extract `\n` in the matched token.
-        auto begin = std::sregex_iterator(matched.begin(), matched.end(), nlRe);
-        auto end = std::sregex_iterator();
-        for (std::sregex_iterator i = begin; i != end; ++i) {
-            _line++;
-            _lineBeginOffset = _tokenStartOffset + (*i).position() + 1;
+        // Extract `\n` in the consumes characters.
+        auto cstr = _content.c_str() + _cursor;
+        for (std::size_t i = 0; i < consumed; ++i) {
+            if (cstr[i] == '\n') {
+                _line++;
+                _lineBeginOffset = _tokenStartOffset + i + 1;
+            }
         }
 
-        _tokenEndOffset = _cursor + matched.length();
+        _tokenEndOffset = _cursor + consumed;
 
         // Line-based locations, end.
         _tokenEndLine = _line;
         _tokenEndColumn = _tokenEndOffset - _lineBeginOffset;
         _column = _tokenEndColumn;
 
-        _cursor += matched.length();
-    }
-
-    void BuildFileTokenizer::captureLocation(char c) {
-        _tokenStartOffset = _cursor;
-        _tokenStartLine = _line;
-        _tokenStartColumn = _tokenStartOffset - _lineBeginOffset;
-
-        if (c == '\\n') {
-            _line++;
-            _lineBeginOffset = 0;
-        }
-
-        _tokenEndOffset = _cursor + 1;
-
-        _tokenEndLine = _line;
-        _tokenEndColumn = _tokenEndOffset - _lineBeginOffset;
-        _column = _tokenEndColumn;
-
-        _cursor += 1;
+        _cursor += consumed;
     }
 }

@@ -24,6 +24,32 @@ namespace {
         }
         throw std::runtime_error("unknown token type " + tokenType);
     }
+
+    std::vector<ITokenSpec const*> ispecs = BuildFileTokenSpecs::ispecs();
+    std::vector<TokenRegexSpec const*> tokenSpecs = BuildFileTokenSpecs::specs();
+    TokenRegexSpec const* whiteSpace(BuildFileTokenSpecs::whiteSpace());
+    TokenRegexSpec const* comment1(BuildFileTokenSpecs::comment1());
+    TokenRegexSpec const* commentN(BuildFileTokenSpecs::commentN());
+    TokenRegexSpec const* depBuildFile(BuildFileTokenSpecs::depBuildFile());
+    TokenRegexSpec const* depGlob(BuildFileTokenSpecs::depGlob());
+    TokenRegexSpec const* rule(BuildFileTokenSpecs::rule());
+    TokenRegexSpec const* foreach(BuildFileTokenSpecs::foreach());
+    TokenRegexSpec const* ignore(BuildFileTokenSpecs::ignore());
+    TokenRegexSpec const* curlyOpen(BuildFileTokenSpecs::curlyOpen());
+    TokenRegexSpec const* curlyClose(BuildFileTokenSpecs::curlyClose());
+    TokenRegexSpec const* cmdStart(BuildFileTokenSpecs::cmdStart());
+    TokenRegexSpec const* cmdEnd(BuildFileTokenSpecs::cmdEnd());
+    TokenRegexSpec const* script(BuildFileTokenSpecs::script());
+    TokenRegexSpec const* vertical(BuildFileTokenSpecs::vertical());
+    TokenRegexSpec const* glob(BuildFileTokenSpecs::glob());
+
+    static std::vector<ITokenSpec const*> skip = {whiteSpace, comment1, commentN};
+
+    std::vector<ITokenSpec const*> tspecs(std::vector<ITokenSpec const*> const& s) {
+        std::vector<ITokenSpec const*> specs = skip;
+        specs.insert(specs.end(), s.begin(), s.end());
+        return specs;
+    }
 }
 
 // TODO: error reporting is poor due to BuildFileTokenizer approach with
@@ -54,142 +80,160 @@ namespace YAM {
     {}
 
 
-    Token BuildFileParser::eat(std::string const& tokenType) {
+    void BuildFileParser::lookAhead(std::vector<ITokenSpec const*> const& specs) {
+        _tokenizer.readNextToken(skip);
+        _lookAhead.spec = nullptr;
+        if (!specs.empty()) _lookAhead = _tokenizer.readNextToken(specs);
+    }
+
+    Token BuildFileParser::eat(
+        ITokenSpec const* toEat,
+        std::vector<ITokenSpec const*> const& toLookAhead
+     ) {
+        if (toEat != nullptr && _lookAhead.spec != toEat) {
+            syntaxError();
+        }
         Token eaten = _lookAhead;
-        auto spec = dynamic_cast<TokenRegexSpec const*>(eaten.spec);
-        if (spec == nullptr) syntaxError(tokenType);
-        if (spec->type() != tokenType) syntaxError(tokenType);
-        _lookAhead = _tokenizer.readNextToken(BuildFileTokenSpecs::ispecs());
+        lookAhead(toLookAhead);
         return eaten;
     }
 
-    void BuildFileParser::syntaxError(std::string const& tokenType) {
-        TokenRegexSpec const* expectedToken = findTokenSpec(tokenType);
+    void BuildFileParser::syntaxError() {
         std::stringstream ss;
         ss
-            << "Unexpected token: " << _lookAhead.type << ", "
-            << "expected token: " << tokenType << " must match regex " << expectedToken->pattern()
-            << std::endl
-            << "At line " << _tokenizer.tokenStartLine()
-            << ", from column " << _tokenizer.tokenStartColumn()
-            << " to " << _tokenizer.tokenEndColumn()
+            << "Unexpected token at line " << _tokenizer.line()
+            << ", column " << _tokenizer.column()
+            << " in file " << _tokenizer.filePath().string()
             << std::endl;
         throw std::runtime_error(ss.str());
     }
 
     std::shared_ptr<BuildFile::File> BuildFileParser::parseBuildFile() {
         auto file = std::make_shared<BuildFile::File>();
-        _lookAhead = _tokenizer.readNextToken(BuildFileTokenSpecs::ispecs());
         file->buildFile = _buildFilePath;
         file->line = _tokenizer.tokenStartLine();
         file->column = _tokenizer.tokenStartColumn();
-        if (_lookAhead.type == "depBuildFile" || _lookAhead.type == "depGlob") {
+        lookAhead({ depBuildFile, depGlob });
+        if (_lookAhead.spec == depBuildFile || _lookAhead.spec == depGlob) {
             parseDeps(file->deps);
         }
-        while (_lookAhead.type != "eos") {
-            if (_lookAhead.type == "rule") {
-                file->variablesAndRules.push_back(parseRule());
-            } else {
-                eat(_lookAhead.type);
-            }
-        }
-        return file;
+        lookAhead({ rule });
+        while (
+            _lookAhead.spec == rule 
+            // || _lookAhead.spec == var, etc
+         ) {
+             file->variablesAndRules.push_back(parseRule());
+             lookAhead({ rule });
+         }
+         return file;
     }
 
     void BuildFileParser::parseDeps(BuildFile::Deps& deps) {
         deps.line = _tokenizer.tokenStartLine();
         deps.column = _tokenizer.tokenStartColumn();
-        while (
-            _lookAhead.type == "depBuildFile"
-            || _lookAhead.type == "depGlob"
-        ) {
-            if (_lookAhead.type == "depBuildFile") {
-                eat("depBuildFile");
-                std::filesystem::path path;
-                parsePath(path);
+        while (_lookAhead.spec == depBuildFile || _lookAhead.spec == depGlob) {
+            if (_lookAhead.spec == depBuildFile) {
+                eat(depBuildFile, { glob });
+                std::filesystem::path path = parsePath();
                 deps.depBuildFiles.push_back(path);
-            } else if (_lookAhead.type == "depGlob") {
-                eat("depGlob");
-                std::filesystem::path glob;
-                parseGlob(glob);
-                deps.depGlobs.push_back(glob);
+                eat(glob, { depBuildFile, depGlob });
+            } else if (_lookAhead.spec == depGlob) {
+                eat(depGlob, { glob });
+                std::filesystem::path path = parseGlob();
+                deps.depGlobs.push_back(path);
+                eat(glob, { depBuildFile, depGlob });
             }
         }
     }
 
     std::shared_ptr<BuildFile::Rule> BuildFileParser::parseRule() {
-        eat("rule"); // Return value not needed
-        auto rule = std::make_shared<BuildFile::Rule>();
-        rule->line = _tokenizer.tokenStartLine();
-        rule->column = _tokenizer.tokenStartColumn();
-        if (_lookAhead.type == "foreach") {
-            rule->forEach = true;
-            eat("foreach");
+        auto rulePtr = std::make_shared<BuildFile::Rule>();
+        rulePtr->line = _tokenizer.tokenStartLine();
+        rulePtr->column = _tokenizer.tokenStartColumn();
+        eat(rule, { foreach, curlyOpen, ignore, glob, vertical, script });
+        if (_lookAhead.spec == foreach) {
+            rulePtr->forEach = true;
+            eat(foreach, {  curlyOpen, ignore, glob, vertical, script });
         }
-        parseInputs(rule->cmdInputs);
-        parseOrderOnlyInputs(rule->orderOnlyInputs);
-        parseScript(rule->script);
-        parseOutputs(rule->outputs);
-        parseGroup(rule->outputGroup);
-        return rule;
+        if (
+            _lookAhead.spec == curlyOpen
+            || _lookAhead.spec == ignore
+            || _lookAhead.spec == glob
+        ) {
+            parseInputs(rulePtr->cmdInputs, { curlyOpen, ignore, glob, vertical, script });
+        }
+        if (_lookAhead.spec == vertical) {
+            parseOrderOnlyInputs(rulePtr->orderOnlyInputs, { curlyOpen, ignore, glob, script });
+        }
+        if (_lookAhead.spec != script) syntaxError();
+        parseScript(rulePtr->script);
+        if (_lookAhead.spec == glob) {
+            parseOutputs(rulePtr->outputs);
+        }
+        if (_lookAhead.spec == curlyOpen) {
+            parseGroup(rulePtr->outputGroup);
+        }
+        return rulePtr;
     }
 
-    void BuildFileParser::parseInputs(BuildFile::Inputs& inputs) {
+    void BuildFileParser::parseInputs(BuildFile::Inputs& inputs, std::vector<ITokenSpec const*> const& toLookAhead) {
         inputs.line = _tokenizer.tokenStartLine();
         inputs.column = _tokenizer.tokenStartColumn();
         while (
-            _lookAhead.type == "{" 
-            || _lookAhead.type == "not" 
-            || _lookAhead.type == "glob"
+            _lookAhead.spec == curlyOpen
+            || _lookAhead.spec == ignore
+            || _lookAhead.spec == glob
         ) {
             BuildFile::Input in;
             parseInput(in);
             inputs.inputs.push_back(in);
+            eat(nullptr, toLookAhead);
         }
     }
 
     void BuildFileParser::parseInput(BuildFile::Input& input) {
         input.line = _tokenizer.tokenStartLine();
         input.column = _tokenizer.tokenStartColumn();
-        if (_lookAhead.type == "{") {
-            eat("{");
+        if (_lookAhead.spec == curlyOpen) {
+            eat(curlyOpen, {glob});
             input.exclude = false;
             input.isGroup = true;
-            parsePath(input.pathPattern);
-            eat("}");
-        } else if (_lookAhead.type == "not") {
+            input.pathPattern = parsePath();
+            eat(glob, { curlyClose });
+        } else if (_lookAhead.spec == ignore) {
+            eat(ignore, { glob });
             input.isGroup = false;
             input.exclude = true;
-            eat("not");
-            parseGlob(input.pathPattern);
+            input.pathPattern = parseGlob();
+            eat({ glob }, { });
         } else if (_lookAhead.type == "glob") {
             input.isGroup = false;
             input.exclude = false;
-            parseGlob(input.pathPattern);
+            input.pathPattern = parseGlob();
+            eat(glob, {});
         }
     }
 
-    void BuildFileParser::parseOrderOnlyInputs(BuildFile::Inputs& inputs) {
+    void BuildFileParser::parseOrderOnlyInputs(BuildFile::Inputs& inputs, std::vector<ITokenSpec const*> const& toLookAhead) {
         inputs.line = _tokenizer.tokenStartLine();
         inputs.column = _tokenizer.tokenStartColumn();
-        if (_lookAhead.type == "|") {
-            eat("|");
-            parseInputs(inputs);
+        if (_lookAhead.spec == vertical) {
+            eat(vertical, toLookAhead);
+            parseInputs(inputs, toLookAhead);
         }
     }
 
-
-    void BuildFileParser::parseScript(BuildFile::Script& script) {
-        script.line = _tokenizer.tokenStartLine();
-        script.column = _tokenizer.tokenStartColumn();
-        Token token = eat("script");
-        script.script = token.value;
+    void BuildFileParser::parseScript(BuildFile::Script& scriptNode) {
+        scriptNode.line = _tokenizer.tokenStartLine();
+        scriptNode.column = _tokenizer.tokenStartColumn();
+        Token token = eat(script, { glob, curlyOpen, _tokenizer.eosTokenSpec()});
+        scriptNode.script = token.value;
     }
 
     void BuildFileParser::parseOutputs(BuildFile::Outputs& outputs) {
         outputs.line = _tokenizer.tokenStartLine();
         outputs.column = _tokenizer.tokenStartColumn();
-        while (_lookAhead.type == "glob") {
+        while (_lookAhead.spec == glob || _lookAhead.spec == ignore) {
             BuildFile::Output out;
             parseOutput(out);
             outputs.outputs.push_back(out);
@@ -198,39 +242,40 @@ namespace YAM {
     void BuildFileParser::parseOutput(BuildFile::Output& output) {
         output.line = _tokenizer.tokenStartLine();
         output.column = _tokenizer.tokenStartColumn();
-        output.ignore = _lookAhead.type == "not";
-        parsePath(output.path);
+        output.ignore = false;
+        if (_lookAhead.spec == glob) {
+            output.path = parsePath();
+            eat(glob, { ignore, glob, curlyOpen });
+        } else if (_lookAhead.spec == ignore) {
+            output.ignore = true;
+            eat(ignore, { glob, curlyOpen });
+        } 
     }
 
     void BuildFileParser::parseGroup(std::filesystem::path& groupName) {
-        if (_lookAhead.type == "{") {
-            eat("{");
-            parsePath(groupName);
-            eat("}");
+        if (_lookAhead.spec == curlyOpen) {
+            eat(curlyOpen, { glob });
+            groupName = parsePath();
+            eat(glob, { curlyClose });
         }
     }
 
-    void BuildFileParser::parseGlob(std::filesystem::path& glob) {
-        Token token = eat("glob");
-        glob = token.value;
+    std::filesystem::path BuildFileParser::parseGlob() {
+        return _lookAhead.value;
     }
 
-    void BuildFileParser::parsePath(std::filesystem::path& path) {
-        if (_lookAhead.type == "glob") {
-            path = _lookAhead.value;
-            if (Glob::isGlob(_lookAhead.value)) {
-                std::stringstream ss;
-                ss
-                    << "Path '" << _lookAhead.value << "' is not allowed to contain glob special characters"
-                    << std::endl
-                    << "At line " << _tokenizer.tokenStartLine()
-                    << ", from column " << _tokenizer.tokenStartColumn()
-                    << " to " << _tokenizer.tokenEndColumn()
-                    << std::endl;
-                throw std::runtime_error(ss.str());
-            } else {
-                eat("glob");
-            }
+    std::filesystem::path BuildFileParser::parsePath() {
+        if (Glob::isGlob(_lookAhead.value)) {
+            std::stringstream ss;
+            ss
+                << "Path '" << _lookAhead.value << "' is not allowed to contain glob special characters"
+                << std::endl
+                << "At line " << _tokenizer.tokenStartLine()
+                << ", from column " << _tokenizer.tokenStartColumn()
+                << " to " << _tokenizer.tokenEndColumn()
+                << std::endl;
+            throw std::runtime_error(ss.str());
         }
+        return _lookAhead.value;
     }
 }

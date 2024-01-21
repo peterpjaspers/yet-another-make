@@ -10,7 +10,7 @@ namespace YAM {
         ITokenSpec const* spec;
         std::string type;
         std::string value; // the string that matches spec.
-        std::string consumed; // value is substring of consumed
+        std::size_t consumed; // nr of characters consumed: >= value.length()
         bool skip; // whether to skip this token and return the next token instead
     };
 

@@ -12,7 +12,9 @@ namespace YAM
             std::string const& pattern,
             std::string const& tokenType,
             std::size_t groupIndex = 0,
-            bool skip = false);
+            bool skip = false,
+            std::regex_constants::match_flag_type flags = std::regex_constants::match_continuous
+        );
 
         bool match(const char* str, Token& token) const override;
         bool skip() const;
@@ -22,6 +24,7 @@ namespace YAM
     private:
         std::string _pattern;
         std::regex _regex;
+        std::regex_constants::match_flag_type _flags;
         std::string _type;
         std::size_t _group;
         bool _skip;
@@ -43,6 +46,8 @@ namespace YAM
         static TokenRegexSpec const* ignore();
         static TokenRegexSpec const* curlyOpen();
         static TokenRegexSpec const* curlyClose();
+        static TokenRegexSpec const* cmdStart();
+        static TokenRegexSpec const* cmdEnd();
         static TokenRegexSpec const* script();
         static TokenRegexSpec const* vertical();
         static TokenRegexSpec const* glob();

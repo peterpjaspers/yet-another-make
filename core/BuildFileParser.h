@@ -180,20 +180,23 @@ namespace YAM
         std::shared_ptr<BuildFile::File> const& file() { return _file; }
 
     private:
-        Token eat(std::string const& tokenType);
-        void syntaxError(std::string const& tokenType);
+        void lookAhead(std::vector<ITokenSpec const*> const& specs);
+        Token eat(
+            ITokenSpec const* toEat,
+            std::vector<ITokenSpec const*> const& toLookAhead);
+        void syntaxError();
 
         std::shared_ptr<BuildFile::File> parseBuildFile();
         void parseDeps(BuildFile::Deps& deps);
         std::shared_ptr<BuildFile::Rule> parseRule();
-        void parseInputs(BuildFile::Inputs& inputs);
+        void parseInputs(BuildFile::Inputs& inputs, std::vector<ITokenSpec const*> const& toLookAhead);
         void parseInput(BuildFile::Input& input);
-        void parseOrderOnlyInputs(BuildFile::Inputs& inputs);
+        void parseOrderOnlyInputs(BuildFile::Inputs& inputs, std::vector<ITokenSpec const*> const& toLookAhead);
         void parseScript(BuildFile::Script& script);
         void parseOutputs(BuildFile::Outputs& outputs);
         void parseOutput(BuildFile::Output& output);
-        void parseGlob(std::filesystem::path& glob);
-        void parsePath(std::filesystem::path& path);
+        std::filesystem::path parseGlob();
+        std::filesystem::path parsePath();
         void parseGroup(std::filesystem::path& groupName);
 
         std::filesystem::path _buildFilePath;

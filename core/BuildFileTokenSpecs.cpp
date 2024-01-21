@@ -4,9 +4,9 @@
 namespace {
     using namespace YAM;
 
-    TokenRegexSpec _whiteSpace(R"(^\s+)", "skip", 0, true);
-    TokenRegexSpec _comment1(R"(^\/\/.*)", "skip", 0, true); // single-line comment
-    TokenRegexSpec _commentN(R"(^\/\*[\s\S]*?\*\/)", "skip", 0, true); // multi-line comment
+    TokenRegexSpec _whiteSpace(R"(^\s+)", "'skip'whitespace", 0, true);
+    TokenRegexSpec _comment1(R"(^\/\/.*)", "comment1", 0, true); // single-line comment
+    TokenRegexSpec _commentN(R"(^\/\*[\s\S]*?\*\/)", "commentN", 0, true); // multi-line comment
     TokenRegexSpec _depBuildFile(R"(^buildfile)", "depBuildFile");
     TokenRegexSpec _depGlob(R"(^glob)", "depGlob");
     TokenRegexSpec _rule(R"(^:)", "rule");
@@ -14,7 +14,9 @@ namespace {
     TokenRegexSpec _ignore(R"(^\^)", "not");
     TokenRegexSpec _curlyOpen(R"(^\{)", "{");
     TokenRegexSpec _curlyClose(R"(^\})", "}");
-    TokenRegexSpec _cmdDelim(R"(^\|>)", "_cmdDelim");
+    TokenRegexSpec _cmdStart(R"(^\|>)", "cmdStart");
+    TokenRegexSpec _cmdEnd(R"(\|>)", "cmdEnd", 0, false, std::regex_constants::match_default);
+    //TokenRegexSpec _cmdEnd(R"(^(((?!\|>)\S|\s)*)(\|>))", "cmdEnd", 3);
     TokenRegexSpec _script(R"(^\|>(((?!\|>)\S|\s)*)\|>)", "script", 1);
     TokenRegexSpec _vertical(R"(^\|[^>])", "|");
     TokenRegexSpec _glob(R"(^[^\{\}\|\s]+\\?(?:[\w\.\*\?\%\[\]-])+(?:\\([\w\.\*\?\%\[\]-])+)*)", "glob");
@@ -58,9 +60,11 @@ namespace YAM
         std::string const& pattern,
         std::string const& tokenType,
         std::size_t groupIndex,
-        bool skip)
+        bool skip,
+        std::regex_constants::match_flag_type flags)
         : _pattern(pattern)
         , _regex(pattern)
+        , _flags(flags)
         , _type(tokenType)
         , _group(groupIndex)
         , _skip(skip)
@@ -69,11 +73,11 @@ namespace YAM
     bool TokenRegexSpec::match(const char* str, Token& token) const {
         token.spec = nullptr;
         std::cmatch cm;
-        bool matched = std::regex_search(str, cm, _regex, std::regex_constants::match_continuous);
+        bool matched = std::regex_search(str, cm, _regex, _flags);
         if (matched) {
             token.spec = this;
             token.type = _type;
-            token.consumed = cm[0].str();
+            token.consumed = cm[0].length();
             token.value = cm[_group].str();
             token.skip = _skip;
         }
@@ -104,6 +108,8 @@ namespace YAM
     TokenRegexSpec const* BuildFileTokenSpecs::ignore() { return &_ignore; }
     TokenRegexSpec const* BuildFileTokenSpecs::curlyOpen() { return &_curlyOpen; }
     TokenRegexSpec const* BuildFileTokenSpecs::curlyClose() { return &_curlyClose; }
+    TokenRegexSpec const* BuildFileTokenSpecs::cmdStart() { return &_cmdStart; }
+    TokenRegexSpec const* BuildFileTokenSpecs::cmdEnd() { return &_cmdEnd; }
     TokenRegexSpec const* BuildFileTokenSpecs::script() { return &_script; }
     TokenRegexSpec const* BuildFileTokenSpecs::vertical() { return &_vertical; }
     TokenRegexSpec const* BuildFileTokenSpecs::glob() { return &_glob; }

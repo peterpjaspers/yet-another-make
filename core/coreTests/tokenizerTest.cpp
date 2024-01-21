@@ -20,6 +20,8 @@ namespace {
     TokenRegexSpec const* ignore(BuildFileTokenSpecs::ignore());
     TokenRegexSpec const* curlyOpen(BuildFileTokenSpecs::curlyOpen());
     TokenRegexSpec const* curlyClose(BuildFileTokenSpecs::curlyClose());
+    TokenRegexSpec const* cmdStart(BuildFileTokenSpecs::cmdStart());
+    TokenRegexSpec const* cmdEnd(BuildFileTokenSpecs::cmdEnd());
     TokenRegexSpec const* script(BuildFileTokenSpecs::script());
     TokenRegexSpec const* vertical(BuildFileTokenSpecs::vertical());
     TokenRegexSpec const* glob(BuildFileTokenSpecs::glob());
@@ -123,13 +125,48 @@ namespace {
 
     TEST(BuildFileTokenizer, commentLine) {
         const std::string commentLine(R"(  : // comment  :  
-  : // comment)");
+  ://  comment
+ )");
         BuildFileTokenizer tokenizer("testFile", commentLine);
         Token token;
-        token = tokenizer.readNextToken({ whiteSpace, comment1, rule });
+        token = tokenizer.readNextToken({ whiteSpace });
+        token = tokenizer.readNextToken({ rule });
         EXPECT_EQ("rule", token.type);
         EXPECT_EQ(":", token.value);
-        token = tokenizer.readNextToken({ whiteSpace, comment1, rule });
+        EXPECT_EQ(2, tokenizer.tokenStartOffset());
+        EXPECT_EQ(3, tokenizer.tokenEndOffset());
+        EXPECT_EQ(0, tokenizer.tokenStartLine());
+        EXPECT_EQ(0, tokenizer.tokenEndLine());
+        EXPECT_EQ(2, tokenizer.tokenStartColumn());
+        EXPECT_EQ(3, tokenizer.tokenEndColumn());
+        EXPECT_EQ(3, tokenizer.cursor());
+        EXPECT_EQ(0, tokenizer.lineBeginOffset());
+        EXPECT_EQ(3, tokenizer.column());
+    
+        token = tokenizer.readNextToken({ whiteSpace });
+        token = tokenizer.readNextToken({ comment1 });
+        EXPECT_EQ(4, tokenizer.tokenStartOffset());
+        EXPECT_EQ(19, tokenizer.tokenEndOffset());
+        EXPECT_EQ(0, tokenizer.tokenStartLine());
+        EXPECT_EQ(0, tokenizer.tokenEndLine());
+        EXPECT_EQ(4, tokenizer.tokenStartColumn());
+        EXPECT_EQ(19, tokenizer.tokenEndColumn());
+        EXPECT_EQ(19, tokenizer.cursor());
+        EXPECT_EQ(0, tokenizer.lineBeginOffset());
+        EXPECT_EQ(19, tokenizer.column());
+
+        token = tokenizer.readNextToken({ whiteSpace });
+        EXPECT_EQ(19, tokenizer.tokenStartOffset());
+        EXPECT_EQ(22, tokenizer.tokenEndOffset());
+        EXPECT_EQ(0, tokenizer.tokenStartLine());
+        EXPECT_EQ(1, tokenizer.tokenEndLine());
+        EXPECT_EQ(19, tokenizer.tokenStartColumn());
+        EXPECT_EQ(2, tokenizer.tokenEndColumn());
+        EXPECT_EQ(22, tokenizer.cursor());
+        EXPECT_EQ(20, tokenizer.lineBeginOffset());
+        EXPECT_EQ(2, tokenizer.column());
+
+        token = tokenizer.readNextToken({ rule });
         EXPECT_EQ("rule", token.type);
         EXPECT_EQ(":", token.value);
         EXPECT_EQ(22, tokenizer.tokenStartOffset());
@@ -141,6 +178,20 @@ namespace {
         EXPECT_EQ(23, tokenizer.cursor());
         EXPECT_EQ(20, tokenizer.lineBeginOffset());
         EXPECT_EQ(3, tokenizer.column());
+
+        token = tokenizer.readNextToken({ whiteSpace, });
+        token = tokenizer.readNextToken({ comment1 });
+        token = tokenizer.readNextToken({ whiteSpace });
+        EXPECT_EQ(34, tokenizer.tokenStartOffset());
+        EXPECT_EQ(36, tokenizer.tokenEndOffset());
+        EXPECT_EQ(1, tokenizer.tokenStartLine());
+        EXPECT_EQ(2, tokenizer.tokenEndLine());
+        EXPECT_EQ(14, tokenizer.tokenStartColumn());
+        EXPECT_EQ(1, tokenizer.tokenEndColumn());
+        EXPECT_EQ(36, tokenizer.cursor());
+        EXPECT_EQ(35, tokenizer.lineBeginOffset());
+        EXPECT_EQ(1, tokenizer.column());
+
         token = tokenizer.readNextToken({ whiteSpace, comment1, });
         EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
@@ -380,5 +431,32 @@ namespace {
         EXPECT_EQ("bin\\%B.obj", token.value);
         token = tokenizer.readNextToken({ whiteSpace });
         EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
+    }
+
+    TEST(BuildFileTokenizer, command) {
+        const std::string commandStr(R"(
+                gcc 
+                src\hello.c 
+               -o bin\hello 
+            )");
+        const std::string ruleStr(R"(: 
+            |>
+                gcc 
+                src\hello.c 
+               -o bin\hello 
+            |> bin\%B.obj )");
+        BuildFileTokenizer tokenizer("testFile", ruleStr);
+        Token token;
+
+        token = tokenizer.readNextToken({ whiteSpace, rule });
+        EXPECT_EQ("rule", token.type);
+        EXPECT_EQ(":", token.value);
+        token = tokenizer.readNextToken({ whiteSpace, cmdStart });
+        EXPECT_EQ("cmdStart", token.type);
+        EXPECT_EQ("|>", token.value);
+        token = tokenizer.readNextToken({ cmdEnd });
+        EXPECT_EQ("cmdEnd", token.type);
+        EXPECT_EQ("|>", token.value);
+
     }
 }
