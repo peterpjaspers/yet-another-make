@@ -507,7 +507,7 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="BuildFileTokenSpecs.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\BuildFileCompiler</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

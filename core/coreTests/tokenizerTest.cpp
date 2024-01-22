@@ -280,10 +280,9 @@ namespace {
         EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
 
-    /* TODO: fix tokenizing symbolicPath
-    TEST(
-        BuildFileTokenizer, symbolicPath) {
-        const std::string path(R"(<repo>\file)");
+    // TODO: fix tokenizing symbolicPath
+    TEST(BuildFileTokenizer, symbolicPath) {
+        const std::string path(R"($R(repo)\file)");
         BuildFileTokenizer tokenizer("testFile", path);
         Token token;
         token = tokenizer.readNextToken(ispecs);
@@ -293,7 +292,7 @@ namespace {
         EXPECT_EQ("eos", token.type);
         EXPECT_EQ("", token.value);
     }
-    */
+    //*/
 
     TEST(
         BuildFileTokenizer, inputGroup) {

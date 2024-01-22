@@ -57,14 +57,7 @@ namespace YAM
     }
 
     bool FileRepository::isSymbolicPath(std::filesystem::path const& path) {
-        auto it = path.begin();
-        if (it == path.end()) return false;
-        std::string repoComponent = (*it).string();
-        std::size_t n = repoComponent.length();
-        if (n <= 2) return false;
-        if (repoComponent[0] != '<') return false;
-        if (repoComponent[n - 1] != '>') return false;
-        return true;
+        return !repoNameFromPath(path).empty();
     }
 
     std::string FileRepository::repoNameFromPath(std::filesystem::path const& path) {
@@ -73,14 +66,16 @@ namespace YAM
         if (it == path.end()) return empty;
         std::string repoComponent = (*it).string();
         std::size_t n = repoComponent.length();
-        if (n <= 2) return empty;
-        if (repoComponent[0] != '<') return empty;
-        if (repoComponent[n - 1] != '>') return empty;
-        return repoComponent.substr(1, n - 2);
+        if (n < 5) return empty;
+        if (repoComponent[0] != '$') return empty;
+        if (repoComponent[1] != 'R') return empty;
+        if (repoComponent[2] != '(') return empty;
+        if (repoComponent[n - 1] != ')') return empty;
+        return repoComponent.substr(3, n - 4);
     }
 
     std::filesystem::path FileRepository::repoNameToSymbolicPath(std::string const& repoName) {
-        std::filesystem::path p("<" + repoName + ">");
+        std::filesystem::path p("$R(" + repoName + ")");
         return p;
     }
 

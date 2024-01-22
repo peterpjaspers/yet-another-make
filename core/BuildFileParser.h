@@ -181,22 +181,22 @@ namespace YAM
 
     private:
         void lookAhead(std::vector<ITokenSpec const*> const& specs);
-        Token eat(
-            ITokenSpec const* toEat,
-            std::vector<ITokenSpec const*> const& toLookAhead);
+        Token eat(ITokenSpec const* toEat);
         void syntaxError();
 
         std::shared_ptr<BuildFile::File> parseBuildFile();
         void parseDeps(BuildFile::Deps& deps);
-        std::shared_ptr<BuildFile::Rule> parseRule();
-        void parseInputs(BuildFile::Inputs& inputs, std::vector<ITokenSpec const*> const& toLookAhead);
-        void parseInput(BuildFile::Input& input);
-        void parseOrderOnlyInputs(BuildFile::Inputs& inputs, std::vector<ITokenSpec const*> const& toLookAhead);
-        void parseScript(BuildFile::Script& script);
+        void eatDepBuildFile(BuildFile::Deps& deps);
+        void eatDepGlob(BuildFile::Deps& deps);
+        std::shared_ptr<BuildFile::Rule> eatRule();
+        void parseInputs(BuildFile::Inputs& inputs);
+        void eatInput(BuildFile::Input& input);
+        void parseOrderOnlyInputs(BuildFile::Inputs& inputs);
+        void eatScript(BuildFile::Script& script);
         void parseOutputs(BuildFile::Outputs& outputs);
-        void parseOutput(BuildFile::Output& output);
-        std::filesystem::path parseGlob();
-        std::filesystem::path parsePath();
+        void eatOutput(BuildFile::Output& output);
+        std::filesystem::path eatGlob();
+        std::filesystem::path eatPath();
         void parseGroup(std::filesystem::path& groupName);
 
         std::filesystem::path _buildFilePath;

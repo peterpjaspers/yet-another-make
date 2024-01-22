@@ -34,12 +34,12 @@ namespace YAM
     // 
     // FileRepository supports the conversion of so-called symbolic paths
     // to/from absolute paths. The format of a symbolic path is
-    // <repoName>\relPath where repoName is the name of the repository and 
+    // $R(repoName)\relPath where repoName is the name of the repository and 
     // relPath is a path relative to the root directory of the repository.
     // E.g. given a repo with name XYZ and root dir C:\repos\XYZ_root. Then
     // the following paths convert to/from each other:
     //        Symbolic path   <=>    Absolute path
-    //     <XYZ>\src\main.cpp <=> C:\repos\XYZ_root\src\main.cpp 
+    //   $R(XYZ)\src\main.cpp <=> C:\repos\XYZ_root\src\main.cpp 
     //
     class __declspec(dllexport) FileRepository : public IPersistable
     {
@@ -55,7 +55,7 @@ namespace YAM
         static bool isSymbolicPath(std::filesystem::path const& path);
         // Return empty string when !isSymbolicPath(path)
         static std::string repoNameFromPath(std::filesystem::path const& path);
-        // Return <repoName>, e.g. when repoName="main" return "<main>"
+        // Return <repoName>, e.g. when repoName="main" return "$R(main)"
         static std::filesystem::path repoNameToSymbolicPath(std::string const& repoName);
 
         std::string const& name() const;
@@ -73,7 +73,7 @@ namespace YAM
         // the repository lexically contains path.
         // E.g. if repository directory = /a/b and path = /a/b then 
         // the repository lexically contains path.
-        // E.g. if repository name is 'someRepo' and path is <someRepo>/a/b
+        // E.g. if repository name is 'someRepo' and path is $R(someRepo)/a/b
         // then repository lexically contains path. 
         // Note: a lexically contained path need not exist in the file system.
         bool lexicallyContains(std::filesystem::path const& path) const;

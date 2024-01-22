@@ -112,12 +112,12 @@ namespace
         TestDriver(bool initialize = true)
             : repo()
             , context(builder.context())
-            , ccPiet(std::make_shared<CommandNode>(context, R"(<.>\ccpiet)"))
-            , ccJan(std::make_shared<CommandNode>(context, R"(<.>\ccjan)"))
-            , linkPietJan(std::make_shared<CommandNode>(context, R"(<.>\linkpietjan)"))
-            , pietOut(std::make_shared<GeneratedFileNode>(context, R"(<.>\generated\pietout.obj)", ccPiet))
-            , janOut(std::make_shared<GeneratedFileNode>(context, R"(<.>\generated\janout.obj)", ccJan))
-            , pietjanOut(std::make_shared<GeneratedFileNode>(context, R"(<.>\generated\pietjanout.dll)", linkPietJan))
+            , ccPiet(std::make_shared<CommandNode>(context, R"($R(.)\ccpiet)"))
+            , ccJan(std::make_shared<CommandNode>(context, R"($R(.)\ccjan)"))
+            , linkPietJan(std::make_shared<CommandNode>(context, R"($R(.)\linkpietjan)"))
+            , pietOut(std::make_shared<GeneratedFileNode>(context, R"($R(.)\generated\pietout.obj)", ccPiet))
+            , janOut(std::make_shared<GeneratedFileNode>(context, R"($R(.)\generated\janout.obj)", ccJan))
+            , pietjanOut(std::make_shared<GeneratedFileNode>(context, R"($R(.)\generated\pietjanout.dll)", linkPietJan))
             , stats(context->statistics())
         {
             stats.registerNodes = true;
