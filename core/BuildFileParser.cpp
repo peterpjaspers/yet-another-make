@@ -42,14 +42,6 @@ namespace {
     TokenRegexSpec const* script(BuildFileTokenSpecs::script());
     TokenRegexSpec const* vertical(BuildFileTokenSpecs::vertical());
     TokenRegexSpec const* glob(BuildFileTokenSpecs::glob());
-
-    static std::vector<ITokenSpec const*> skip = {whiteSpace, comment1, commentN};
-
-    std::vector<ITokenSpec const*> tspecs(std::vector<ITokenSpec const*> const& s) {
-        std::vector<ITokenSpec const*> specs = skip;
-        specs.insert(specs.end(), s.begin(), s.end());
-        return specs;
-    }
 }
 
 // Conventions:
@@ -82,7 +74,7 @@ namespace YAM {
 
 
     void BuildFileParser::lookAhead(std::vector<ITokenSpec const*> const& specs) {
-        _tokenizer.readNextToken(skip);
+        _tokenizer.skip({ whiteSpace, comment1, commentN });
         _lookAhead = _tokenizer.readNextToken(specs);
     }
 

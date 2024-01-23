@@ -44,6 +44,13 @@ namespace YAM {
         return _cursor >= _content.length();
     }
 
+    void BuildFileTokenizer::skip(std::vector<ITokenSpec const*> const& specs) {
+        Token token = readNextToken(specs);
+        while (specs.end() != std::find(specs.begin(), specs.end(), token.spec)) {
+            token = readNextToken(specs);
+        }
+    }
+
     Token BuildFileTokenizer::readNextToken(std::vector<ITokenSpec const*> const& specs) {
         Token token;
         token.spec = nullptr;
@@ -56,7 +63,6 @@ namespace YAM {
         for (auto const& spec : specs) {
             if (spec->match(cstr, token)) {
                 captureLocation(token.consumed);
-                if (token.skip) token = readNextToken(specs);
                 return token;
             }
         }

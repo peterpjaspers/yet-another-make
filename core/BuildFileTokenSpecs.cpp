@@ -4,9 +4,9 @@
 namespace {
     using namespace YAM;
 
-    TokenRegexSpec _whiteSpace(R"(^\s+)", "'skip'whitespace", 0, true);
-    TokenRegexSpec _comment1(R"(^\/\/.*)", "comment1", 0, true); // single-line comment
-    TokenRegexSpec _commentN(R"(^\/\*[\s\S]*?\*\/)", "commentN", 0, true); // multi-line comment
+    TokenRegexSpec _whiteSpace(R"(^\s+)", "'skip'whitespace", 0);
+    TokenRegexSpec _comment1(R"(^\/\/.*)", "comment1", 0); // single-line comment
+    TokenRegexSpec _commentN(R"(^\/\*[\s\S]*?\*\/)", "commentN", 0); // multi-line comment
     TokenRegexSpec _depBuildFile(R"(^buildfile)", "depBuildFile");
     TokenRegexSpec _depGlob(R"(^glob)", "depGlob");
     TokenRegexSpec _rule(R"(^:)", "rule");
@@ -15,7 +15,7 @@ namespace {
     TokenRegexSpec _curlyOpen(R"(^\{)", "{");
     TokenRegexSpec _curlyClose(R"(^\})", "}");
     TokenRegexSpec _cmdStart(R"(^\|>)", "cmdStart");
-    TokenRegexSpec _cmdEnd(R"(\|>)", "cmdEnd", 0, false, std::regex_constants::match_default);
+    TokenRegexSpec _cmdEnd(R"(\|>)", "cmdEnd", 0, std::regex_constants::match_default);
     //TokenRegexSpec _cmdEnd(R"(^(((?!\|>)\S|\s)*)(\|>))", "cmdEnd", 3);
     TokenRegexSpec _script(R"(^\|>(((?!\|>)\S|\s)*)\|>)", "script", 1);
     TokenRegexSpec _vertical(R"(^\|[^>])", "|");
@@ -60,14 +60,12 @@ namespace YAM
         std::string const& pattern,
         std::string const& tokenType,
         std::size_t groupIndex,
-        bool skip,
         std::regex_constants::match_flag_type flags)
         : _pattern(pattern)
         , _regex(pattern)
         , _flags(flags)
         , _type(tokenType)
         , _group(groupIndex)
-        , _skip(skip)
     {}
 
     bool TokenRegexSpec::match(const char* str, Token& token) const {
@@ -79,12 +77,10 @@ namespace YAM
             token.type = _type;
             token.consumed = cm[0].length();
             token.value = cm[_group].str();
-            token.skip = _skip;
         }
         return matched;
     }
 
-    bool TokenRegexSpec::skip() const { return _skip; }
     std::string const& TokenRegexSpec::type() const { return _type; }
     std::string const& TokenRegexSpec::pattern() const { return _pattern; }
 }

@@ -97,6 +97,7 @@ namespace {
         const std::string ws(R"(    )");
         BuildFileTokenizer tokenizer("testFile", ws);
         Token token;
+        tokenizer.skip({ whiteSpace });
         token = tokenizer.readNextToken({whiteSpace});
         EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
@@ -107,7 +108,8 @@ namespace {
   )");
         BuildFileTokenizer tokenizer("testFile", ruleStr);
         Token token;
-        token = tokenizer.readNextToken({whiteSpace, rule });
+        tokenizer.skip({ whiteSpace });
+        token = tokenizer.readNextToken({ rule });
         EXPECT_EQ("rule", token.type);
         EXPECT_EQ(":", token.value);
         EXPECT_EQ(3, tokenizer.tokenStartOffset());
@@ -119,6 +121,7 @@ namespace {
         EXPECT_EQ(4, tokenizer.cursor());
         EXPECT_EQ(1, tokenizer.lineBeginOffset());
         EXPECT_EQ(3, tokenizer.column());
+        tokenizer.skip({ whiteSpace });
         token = tokenizer.readNextToken({whiteSpace});
         EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
@@ -205,7 +208,8 @@ namespace {
   */  :)");
         BuildFileTokenizer tokenizer("testFile", commentLines);
         Token token;
-        token = tokenizer.readNextToken({ comment1, commentN, rule, whiteSpace});
+        tokenizer.skip({ comment1, commentN, whiteSpace });
+        token = tokenizer.readNextToken({ rule});
         EXPECT_EQ("rule", token.type);
         EXPECT_EQ(":", token.value);
         EXPECT_EQ(67, tokenizer.tokenStartOffset());
@@ -362,6 +366,7 @@ namespace {
         token = tokenizer.readNextToken({script});
         EXPECT_EQ("script", token.type);
         EXPECT_EQ(groupStr, token.value);
+        tokenizer.skip({ whiteSpace });
         token = tokenizer.readNextToken({ whiteSpace });
         EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
@@ -381,18 +386,23 @@ namespace {
         BuildFileTokenizer tokenizer("testFile", ruleStr);
         Token token;
 
-        token = tokenizer.readNextToken({ rule, foreach, whiteSpace});
+        tokenizer.skip({ whiteSpace });
+        token = tokenizer.readNextToken({ rule, foreach });
         EXPECT_EQ("rule", token.type);
         EXPECT_EQ(":", token.value);
-        token = tokenizer.readNextToken({ glob, whiteSpace });
+        tokenizer.skip({ whiteSpace });
+        token = tokenizer.readNextToken({ glob });
         EXPECT_EQ("glob", token.type);
         EXPECT_EQ("src\\hello.c", token.value);
-        token = tokenizer.readNextToken({ script, whiteSpace });
+        tokenizer.skip({ whiteSpace });
+        token = tokenizer.readNextToken({ script });
         EXPECT_EQ("script", token.type);
         EXPECT_EQ(commandStr, token.value);
-        token = tokenizer.readNextToken({ glob, whiteSpace });
+        tokenizer.skip({ whiteSpace });
+        token = tokenizer.readNextToken({ glob });
         EXPECT_EQ("glob", token.type);
         EXPECT_EQ("bin\\%B.obj", token.value);
+        tokenizer.skip({ whiteSpace });
         token = tokenizer.readNextToken({ whiteSpace });
         EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
@@ -413,21 +423,27 @@ namespace {
         BuildFileTokenizer tokenizer("testFile", ruleStr);
         Token token;
 
-        token = tokenizer.readNextToken({whiteSpace, rule});
+        tokenizer.skip({ whiteSpace });
+        token = tokenizer.readNextToken({rule});
         EXPECT_EQ("rule", token.type);
         EXPECT_EQ(":", token.value);
-        token = tokenizer.readNextToken({foreach, glob, whiteSpace});
+        tokenizer.skip({ whiteSpace });
+        token = tokenizer.readNextToken({foreach, glob});
         EXPECT_EQ("foreach", token.type);
         EXPECT_EQ("foreach", token.value);
-        token = tokenizer.readNextToken({ glob, whiteSpace });
+        tokenizer.skip({ whiteSpace });
+        token = tokenizer.readNextToken({ glob });
         EXPECT_EQ("glob", token.type);
         EXPECT_EQ("src\\hello.c", token.value);
-        token = tokenizer.readNextToken({ script, whiteSpace });
+        tokenizer.skip({ whiteSpace });
+        token = tokenizer.readNextToken({ script });
         EXPECT_EQ("script", token.type);
         EXPECT_EQ(commandStr, token.value);
-        token = tokenizer.readNextToken({ glob, whiteSpace });
+        tokenizer.skip({ whiteSpace });
+        token = tokenizer.readNextToken({ glob });
         EXPECT_EQ("glob", token.type);
         EXPECT_EQ("bin\\%B.obj", token.value);
+        tokenizer.skip({ whiteSpace });
         token = tokenizer.readNextToken({ whiteSpace });
         EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
@@ -447,12 +463,15 @@ namespace {
         BuildFileTokenizer tokenizer("testFile", ruleStr);
         Token token;
 
-        token = tokenizer.readNextToken({ whiteSpace, rule });
+        tokenizer.skip({ whiteSpace });
+        token = tokenizer.readNextToken({ rule });
         EXPECT_EQ("rule", token.type);
         EXPECT_EQ(":", token.value);
+        tokenizer.skip({ whiteSpace });
         token = tokenizer.readNextToken({ whiteSpace, cmdStart });
         EXPECT_EQ("cmdStart", token.type);
         EXPECT_EQ("|>", token.value);
+        tokenizer.skip({ whiteSpace });
         token = tokenizer.readNextToken({ cmdEnd });
         EXPECT_EQ("cmdEnd", token.type);
         EXPECT_EQ("|>", token.value);

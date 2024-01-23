@@ -12,12 +12,10 @@ namespace YAM
             std::string const& pattern,
             std::string const& tokenType,
             std::size_t groupIndex = 0,
-            bool skip = false,
             std::regex_constants::match_flag_type flags = std::regex_constants::match_continuous
         );
 
         bool match(const char* str, Token& token) const override;
-        bool skip() const;
         std::string const& type() const override;
         std::string const& pattern() const;
 
@@ -28,6 +26,9 @@ namespace YAM
         std::string _type;
         std::size_t _group;
         bool _skip;
+    };
+
+    class __declspec(dllexport) TokenGlobSpec : public ITokenSpec {
     };
 
     class __declspec(dllexport)  BuildFileTokenSpecs

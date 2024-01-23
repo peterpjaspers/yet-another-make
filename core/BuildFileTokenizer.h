@@ -21,6 +21,10 @@ namespace YAM {
         // Return whether end-of-stream has been reached;
         bool eos() const;
 
+        // Skip all tokens matched by specs. Typically used to skip whitespace
+        // and comment.
+        void skip(std::vector<ITokenSpec const*> const& specs);
+
         // Read token at current position that matches one of the given
         // token specifications.
         // If eos(): returned token.spec == eosTokenSpec and token.type == "eos".
