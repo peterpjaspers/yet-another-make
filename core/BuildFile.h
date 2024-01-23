@@ -53,6 +53,7 @@ namespace YAM { namespace BuildFile {
     struct __declspec(dllexport) Output : public Node {
         bool ignore;
         std::filesystem::path path;
+        bool isGroup;
 
         void addHashes(std::vector<XXH64_hash_t>& hashes) override;
         void stream(IStreamer* streamer) override;

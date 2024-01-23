@@ -21,7 +21,7 @@ namespace {
         EXPECT_TRUE(Glob::isGlob("*.cpp"));
         EXPECT_TRUE(Glob::isGlob("a/b/c/foo*.txt"));
         EXPECT_TRUE(Glob::isGlob("a/b/c/foo[12].txt"));
-        EXPECT_TRUE(Glob::isGlob("a{1,3}"));
+        EXPECT_FALSE(Glob::isGlob("a{1,3}")); // see Glob::isGlob
 
         Glob glob("foo", globstar);
         EXPECT_TRUE(glob.matches(std::string("foo")));

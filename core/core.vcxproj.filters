@@ -312,6 +312,12 @@
     <ClInclude Include="Token.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="TokenPathSpec.h">
+      <Filter>Header Files\BuildFileCompiler</Filter>
+    </ClInclude>
+    <ClInclude Include="TokenRegexSpec.h">
+      <Filter>Header Files\BuildFileCompiler</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -507,6 +513,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="BuildFileTokenSpecs.cpp">
+      <Filter>Source Files\BuildFileCompiler</Filter>
+    </ClCompile>
+    <ClCompile Include="TokenRegexSpec.cpp">
+      <Filter>Source Files\BuildFileCompiler</Filter>
+    </ClCompile>
+    <ClCompile Include="TokenPathSpec.cpp">
       <Filter>Source Files\BuildFileCompiler</Filter>
     </ClCompile>
   </ItemGroup>

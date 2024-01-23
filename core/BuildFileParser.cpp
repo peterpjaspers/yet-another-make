@@ -18,30 +18,21 @@ namespace {
         return ss.str();
     }
 
-    TokenRegexSpec const* findTokenSpec(std::string tokenType) {
-        for (auto t : BuildFileTokenSpecs::specs()) {
-            if (t->type() == tokenType) return t;
-        }
-        throw std::runtime_error("unknown token type " + tokenType);
-    }
-
-    std::vector<ITokenSpec const*> ispecs = BuildFileTokenSpecs::ispecs();
-    std::vector<TokenRegexSpec const*> tokenSpecs = BuildFileTokenSpecs::specs();
-    TokenRegexSpec const* whiteSpace(BuildFileTokenSpecs::whiteSpace());
-    TokenRegexSpec const* comment1(BuildFileTokenSpecs::comment1());
-    TokenRegexSpec const* commentN(BuildFileTokenSpecs::commentN());
-    TokenRegexSpec const* depBuildFile(BuildFileTokenSpecs::depBuildFile());
-    TokenRegexSpec const* depGlob(BuildFileTokenSpecs::depGlob());
-    TokenRegexSpec const* rule(BuildFileTokenSpecs::rule());
-    TokenRegexSpec const* foreach(BuildFileTokenSpecs::foreach());
-    TokenRegexSpec const* ignore(BuildFileTokenSpecs::ignore());
-    TokenRegexSpec const* curlyOpen(BuildFileTokenSpecs::curlyOpen());
-    TokenRegexSpec const* curlyClose(BuildFileTokenSpecs::curlyClose());
-    TokenRegexSpec const* cmdStart(BuildFileTokenSpecs::cmdStart());
-    TokenRegexSpec const* cmdEnd(BuildFileTokenSpecs::cmdEnd());
-    TokenRegexSpec const* script(BuildFileTokenSpecs::script());
-    TokenRegexSpec const* vertical(BuildFileTokenSpecs::vertical());
-    TokenRegexSpec const* glob(BuildFileTokenSpecs::glob());
+    ITokenSpec const* whiteSpace(BuildFileTokenSpecs::whiteSpace());
+    ITokenSpec const* comment1(BuildFileTokenSpecs::comment1());
+    ITokenSpec const* commentN(BuildFileTokenSpecs::commentN());
+    ITokenSpec const* depBuildFile(BuildFileTokenSpecs::depBuildFile());
+    ITokenSpec const* depGlob(BuildFileTokenSpecs::depGlob());
+    ITokenSpec const* rule(BuildFileTokenSpecs::rule());
+    ITokenSpec const* foreach(BuildFileTokenSpecs::foreach());
+    ITokenSpec const* ignore(BuildFileTokenSpecs::ignore());
+    ITokenSpec const* curlyOpen(BuildFileTokenSpecs::curlyOpen());
+    ITokenSpec const* curlyClose(BuildFileTokenSpecs::curlyClose());
+    ITokenSpec const* cmdStart(BuildFileTokenSpecs::cmdStart());
+    ITokenSpec const* cmdEnd(BuildFileTokenSpecs::cmdEnd());
+    ITokenSpec const* script(BuildFileTokenSpecs::script());
+    ITokenSpec const* vertical(BuildFileTokenSpecs::vertical());
+    ITokenSpec const* glob(BuildFileTokenSpecs::glob());
 }
 
 // Conventions:
@@ -154,26 +145,35 @@ namespace YAM {
         lookAhead({ script });
         eatScript(rulePtr->script);
         
-        parseOutputs(rulePtr->outputs);
-        parseGroup(rulePtr->outputGroup);
-
+        BuildFile::Outputs outputs;
+        parseOutputs(outputs);
+        for (auto const& output : outputs.outputs) {
+            if (output.isGroup) {
+                if (rulePtr->outputGroup.empty()) {
+                    rulePtr->outputGroup = output.path;
+                } else {
+                    syntaxError(); // only 1 output group allowed
+                }
+            } else {
+                rulePtr->outputs.outputs.push_back(output);
+            }
+        }
         return rulePtr;
     }
 
     void BuildFileParser::parseInputs(BuildFile::Inputs& inputs) {
-        lookAhead({ curlyOpen, glob });
-        if (_lookAhead.spec == curlyOpen || _lookAhead.spec == glob) {
+        lookAhead({ glob });
+        if (_lookAhead.spec == glob) {
             inputs.line = _tokenizer.tokenStartLine();
             inputs.column = _tokenizer.tokenStartColumn();
             while (
-                _lookAhead.spec == curlyOpen
-                || _lookAhead.spec == glob
+                _lookAhead.spec == glob
                 || _lookAhead.spec == ignore
             ) {
                 BuildFile::Input in;
                 eatInput(in);
                 inputs.inputs.push_back(in);
-                lookAhead({ curlyOpen, glob, ignore });
+                lookAhead({ glob, ignore });
             }
         }
     }
@@ -181,22 +181,23 @@ namespace YAM {
     void BuildFileParser::eatInput(BuildFile::Input& input) {
         input.line = _tokenizer.tokenStartLine();
         input.column = _tokenizer.tokenStartColumn();
-        if (_lookAhead.spec == curlyOpen) {
-            input.exclude = false;
-            input.isGroup = true;
-            lookAhead({ glob });
-            input.pathPattern = eatPath();
-            lookAhead({ curlyClose });
-            eat(curlyClose);
-        } else if (_lookAhead.type == "glob") {
-            input.isGroup = false;
-            input.exclude = false;
-            input.pathPattern = eatGlob();
-        } else if (_lookAhead.spec == ignore) {
-            input.isGroup = false;
+        input.exclude = false;
+        input.isGroup = false;
+        if (_lookAhead.spec == ignore) {
             input.exclude = true;
             lookAhead({ glob });
-            input.pathPattern = eatGlob();
+        }
+        if (_lookAhead.spec == glob) {
+            if (_lookAhead.type == "group") {
+                input.isGroup = true;
+                input.pathPattern = eatPath();
+            } else if (_lookAhead.type == "glob") {
+                input.pathPattern = eatGlob();
+            } else if (_lookAhead.type == "path") {
+                input.pathPattern = eatPath();
+            } else {
+                syntaxError();
+            }
         } else {
             syntaxError();
         }
@@ -234,22 +235,24 @@ namespace YAM {
         output.line = _tokenizer.tokenStartLine();
         output.column = _tokenizer.tokenStartColumn();
         output.ignore = false;
-        if (_lookAhead.spec == glob) {
-            output.path = eatPath();
-        } else if (_lookAhead.spec == ignore) {
+        output.isGroup = false;
+        if (_lookAhead.spec == ignore) {
             output.ignore = true;
+            lookAhead({ glob });
+        }
+        if (_lookAhead.spec == glob) {
+            if (_lookAhead.type == "group") {
+                output.isGroup = true;
+                output.path = eatPath();
+            } else if (_lookAhead.type == "glob") {
+                output.path = eatPath(); // will raise glob-not-allowed
+            } else if (_lookAhead.type == "path") {
+                output.path = eatPath();
+            } else {
+                syntaxError();
+            }
         } else {
             syntaxError();
-        }
-    }
-
-    void BuildFileParser::parseGroup(std::filesystem::path& groupName) {
-        lookAhead({ curlyOpen });
-        if (_lookAhead.spec == curlyOpen) {
-            lookAhead({glob});
-            groupName = eatPath();
-            lookAhead({ curlyClose });
-            eat(curlyClose);
         }
     }
 
@@ -259,7 +262,7 @@ namespace YAM {
 
     std::filesystem::path BuildFileParser::eatPath() {
         Token token = eat(glob);
-        if (Glob::isGlob(token.value)) {
+        if (token.type == "glob") {
             std::stringstream ss;
             ss
                 << "Path '" << token.value << "' is not allowed to contain glob special characters"

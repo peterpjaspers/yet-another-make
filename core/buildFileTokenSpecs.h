@@ -1,56 +1,28 @@
 #pragma once
 
-#include "Token.h"
-#include <regex>
+#include "TokenRegexSpec.h"
+#include "TokenPathSpec.h"
 #include <vector>
 
 namespace YAM
 {
-    class __declspec(dllexport) TokenRegexSpec : public ITokenSpec {
-    public:
-        TokenRegexSpec(
-            std::string const& pattern,
-            std::string const& tokenType,
-            std::size_t groupIndex = 0,
-            std::regex_constants::match_flag_type flags = std::regex_constants::match_continuous
-        );
-
-        bool match(const char* str, Token& token) const override;
-        std::string const& type() const override;
-        std::string const& pattern() const;
-
-    private:
-        std::string _pattern;
-        std::regex _regex;
-        std::regex_constants::match_flag_type _flags;
-        std::string _type;
-        std::size_t _group;
-        bool _skip;
-    };
-
-    class __declspec(dllexport) TokenGlobSpec : public ITokenSpec {
-    };
-
     class __declspec(dllexport)  BuildFileTokenSpecs
     {
     public:
-        static std::vector<ITokenSpec const*> const& ispecs();
-        static std::vector<TokenRegexSpec const*> const& specs();
-
-        static TokenRegexSpec const* whiteSpace();
-        static TokenRegexSpec const* comment1();
-        static TokenRegexSpec const* commentN();
-        static TokenRegexSpec const* depBuildFile();
-        static TokenRegexSpec const* depGlob();
-        static TokenRegexSpec const* rule();
-        static TokenRegexSpec const* foreach();
-        static TokenRegexSpec const* ignore();
-        static TokenRegexSpec const* curlyOpen();
-        static TokenRegexSpec const* curlyClose();
-        static TokenRegexSpec const* cmdStart();
-        static TokenRegexSpec const* cmdEnd();
-        static TokenRegexSpec const* script();
-        static TokenRegexSpec const* vertical();
-        static TokenRegexSpec const* glob();
+        static ITokenSpec const* whiteSpace();
+        static ITokenSpec const* comment1();
+        static ITokenSpec const* commentN();
+        static ITokenSpec const* depBuildFile();
+        static ITokenSpec const* depGlob();
+        static ITokenSpec const* rule();
+        static ITokenSpec const* foreach();
+        static ITokenSpec const* ignore();
+        static ITokenSpec const* curlyOpen();
+        static ITokenSpec const* curlyClose();
+        static ITokenSpec const* cmdStart();
+        static ITokenSpec const* cmdEnd();
+        static ITokenSpec const* script();
+        static ITokenSpec const* vertical();
+        static ITokenSpec const* glob();
     };
 }

@@ -55,18 +55,18 @@ namespace
             , absBuildFilePath(repoTree.path() / R"(buildfile_yam.bat)")
             , absSub1BuildFilePath(repoTree.path() / R"(SubDir1\buildfile_yam.bat)")
             , cmdOutputFile(fileRepo->directoryNode()->name() / "main.obj")
-            , objectFilesGroupPath(fileRepo->directoryNode()->name() / "objectFiles")
+            , objectFilesGroupPath(fileRepo->directoryNode()->name() / "<objectFiles>")
         {
             std::stringstream sscompile;
             sscompile
                 << "@echo off" << std::endl
-                << R"(echo : foreach *.cpp ^|^> echo %%f ^> %%o ^|^> %%B.obj { objectFiles })"
+                << R"(echo : foreach *.cpp ^|^> echo %%f ^> %%o ^|^> %%B.obj ^<objectFiles^>)"
                 << std::endl;
             writeFile(absBuildFilePath, sscompile.str());
             std::stringstream sslink;
             sslink
                 << "@echo off" << std::endl
-                << R"(echo : { ..\objectFiles } ^|^> echo %%f ^> %%o ^|^> main.exe )"
+                << R"(echo : ..\^<objectFiles^> ^|^> echo %%f ^> %%o ^|^> main.exe )"
                 << std::endl;
             writeFile(absSub1BuildFilePath, sslink.str());
 

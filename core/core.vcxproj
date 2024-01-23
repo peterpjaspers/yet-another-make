@@ -185,6 +185,8 @@
     <ClInclude Include="BuildFileTokenizer.h" />
     <ClInclude Include="BuildFileTokenSpecs.h" />
     <ClInclude Include="Token.h" />
+    <ClInclude Include="TokenPathSpec.h" />
+    <ClInclude Include="TokenRegexSpec.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BasicOStreamLogBook.cpp" />
@@ -276,6 +278,8 @@
     <ClCompile Include="TimePoint.cpp" />
     <ClCompile Include="BinaryValueStreamer.cpp" />
     <ClCompile Include="BuildFileTokenizer.cpp" />
+    <ClCompile Include="TokenPathSpec.cpp" />
+    <ClCompile Include="TokenRegexSpec.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="IStreamer.inl" />

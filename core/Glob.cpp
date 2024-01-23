@@ -107,7 +107,8 @@ namespace YAM {
     {}
 
     bool Glob::isGlob(std::string const& pattern) {
-        static const auto check = std::regex(R"(([\*\?\{\}\,\[\]]))");
+        // {} characters removed because not allowed in yam buildfiles.
+        static const auto check = std::regex(R"(([\*\?\[\]]))");
         return std::regex_search(pattern, check);
     }
 

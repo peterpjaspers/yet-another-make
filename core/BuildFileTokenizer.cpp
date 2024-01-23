@@ -11,10 +11,6 @@ namespace
     struct EosTokenSpec : public ITokenSpec
     {
         bool match(const char* str, Token& token) const override { return false; }
-        std::string const& type() const override { 
-            static std::string eos("eos");
-            return eos;
-        }
     };
     EosTokenSpec eosSpec;
     ITokenSpec const* eosPtr = &eosSpec;
@@ -53,10 +49,9 @@ namespace YAM {
 
     Token BuildFileTokenizer::readNextToken(std::vector<ITokenSpec const*> const& specs) {
         Token token;
-        token.spec = nullptr;
         if (eos()) {
             token.spec = eosTokenSpec();
-            token.type = token.spec->type();
+            token.type = "eos";
             return token;
         }
         auto cstr = _content.c_str() + _cursor;

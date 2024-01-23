@@ -16,10 +16,9 @@ namespace {
     TokenRegexSpec _curlyClose(R"(^\})", "}");
     TokenRegexSpec _cmdStart(R"(^\|>)", "cmdStart");
     TokenRegexSpec _cmdEnd(R"(\|>)", "cmdEnd", 0, std::regex_constants::match_default);
-    //TokenRegexSpec _cmdEnd(R"(^(((?!\|>)\S|\s)*)(\|>))", "cmdEnd", 3);
     TokenRegexSpec _script(R"(^\|>(((?!\|>)\S|\s)*)\|>)", "script", 1);
     TokenRegexSpec _vertical(R"(^\|[^>])", "|");
-    TokenRegexSpec _glob(R"(^[^\{\}\|\s]+\\?(?:[\w\.\*\?\%\[\]-])+(?:\\([\w\.\*\?\%\[\]-])+)*)", "glob");
+    TokenPathSpec _glob;
 
     std::vector<ITokenSpec const*> _tokenIspecs = {
         &_whiteSpace,
@@ -36,77 +35,23 @@ namespace {
         &_vertical,
         &_glob,
     };
-
-    std::vector<TokenRegexSpec const*> _tokenSpecs = {
-        &_whiteSpace,
-        &_comment1,
-        &_commentN,
-        &_depBuildFile,
-        &_depGlob,
-        &_rule,
-        &_foreach,
-        &_ignore,
-        &_curlyOpen,
-        &_curlyClose,
-        &_script,
-        &_vertical,
-        &_glob,
-    };
 }
 
 namespace YAM
 {
-    TokenRegexSpec::TokenRegexSpec(
-        std::string const& pattern,
-        std::string const& tokenType,
-        std::size_t groupIndex,
-        std::regex_constants::match_flag_type flags)
-        : _pattern(pattern)
-        , _regex(pattern)
-        , _flags(flags)
-        , _type(tokenType)
-        , _group(groupIndex)
-    {}
-
-    bool TokenRegexSpec::match(const char* str, Token& token) const {
-        token.spec = nullptr;
-        std::cmatch cm;
-        bool matched = std::regex_search(str, cm, _regex, _flags);
-        if (matched) {
-            token.spec = this;
-            token.type = _type;
-            token.consumed = cm[0].length();
-            token.value = cm[_group].str();
-        }
-        return matched;
-    }
-
-    std::string const& TokenRegexSpec::type() const { return _type; }
-    std::string const& TokenRegexSpec::pattern() const { return _pattern; }
-}
-
-namespace YAM
-{
-    std::vector<ITokenSpec const*> const& BuildFileTokenSpecs::ispecs() {
-        return _tokenIspecs;
-    }
-    std::vector<TokenRegexSpec const*> const& BuildFileTokenSpecs::specs() {
-        return _tokenSpecs;
-    }
-
-    TokenRegexSpec const* BuildFileTokenSpecs::whiteSpace() { return &_whiteSpace; }
-    TokenRegexSpec const* BuildFileTokenSpecs::comment1() { return &_comment1; }
-    TokenRegexSpec const* BuildFileTokenSpecs::commentN() { return &_commentN; }
-    TokenRegexSpec const* BuildFileTokenSpecs::depBuildFile() { return &_depBuildFile; }
-    TokenRegexSpec const* BuildFileTokenSpecs::depGlob() { return &_depGlob; }
-    TokenRegexSpec const* BuildFileTokenSpecs::rule() { return &_rule; }
-    TokenRegexSpec const* BuildFileTokenSpecs::foreach() { return &_foreach; }
-    TokenRegexSpec const* BuildFileTokenSpecs::ignore() { return &_ignore; }
-    TokenRegexSpec const* BuildFileTokenSpecs::curlyOpen() { return &_curlyOpen; }
-    TokenRegexSpec const* BuildFileTokenSpecs::curlyClose() { return &_curlyClose; }
-    TokenRegexSpec const* BuildFileTokenSpecs::cmdStart() { return &_cmdStart; }
-    TokenRegexSpec const* BuildFileTokenSpecs::cmdEnd() { return &_cmdEnd; }
-    TokenRegexSpec const* BuildFileTokenSpecs::script() { return &_script; }
-    TokenRegexSpec const* BuildFileTokenSpecs::vertical() { return &_vertical; }
-    TokenRegexSpec const* BuildFileTokenSpecs::glob() { return &_glob; }
+    ITokenSpec const* BuildFileTokenSpecs::whiteSpace() { return &_whiteSpace; }
+    ITokenSpec const* BuildFileTokenSpecs::comment1() { return &_comment1; }
+    ITokenSpec const* BuildFileTokenSpecs::commentN() { return &_commentN; }
+    ITokenSpec const* BuildFileTokenSpecs::depBuildFile() { return &_depBuildFile; }
+    ITokenSpec const* BuildFileTokenSpecs::depGlob() { return &_depGlob; }
+    ITokenSpec const* BuildFileTokenSpecs::rule() { return &_rule; }
+    ITokenSpec const* BuildFileTokenSpecs::foreach() { return &_foreach; }
+    ITokenSpec const* BuildFileTokenSpecs::ignore() { return &_ignore; }
+    ITokenSpec const* BuildFileTokenSpecs::curlyOpen() { return &_curlyOpen; }
+    ITokenSpec const* BuildFileTokenSpecs::curlyClose() { return &_curlyClose; }
+    ITokenSpec const* BuildFileTokenSpecs::cmdStart() { return &_cmdStart; }
+    ITokenSpec const* BuildFileTokenSpecs::cmdEnd() { return &_cmdEnd; }
+    ITokenSpec const* BuildFileTokenSpecs::script() { return &_script; }
+    ITokenSpec const* BuildFileTokenSpecs::vertical() { return &_vertical; }
+    ITokenSpec const* BuildFileTokenSpecs::glob() { return &_glob; }
 }

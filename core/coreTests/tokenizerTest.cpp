@@ -7,24 +7,21 @@
 namespace {
     using namespace YAM;
 
-    std::vector<ITokenSpec const*> ispecs = BuildFileTokenSpecs::ispecs();
-    std::vector<TokenRegexSpec const*> tokenSpecs = BuildFileTokenSpecs::specs();
-
-    TokenRegexSpec const* whiteSpace(BuildFileTokenSpecs::whiteSpace());
-    TokenRegexSpec const* comment1(BuildFileTokenSpecs::comment1());
-    TokenRegexSpec const* commentN(BuildFileTokenSpecs::commentN());
-    TokenRegexSpec const* depBuildFile(BuildFileTokenSpecs::depBuildFile());
-    TokenRegexSpec const* depGlob(BuildFileTokenSpecs::depGlob());
-    TokenRegexSpec const* rule(BuildFileTokenSpecs::rule());
-    TokenRegexSpec const* foreach(BuildFileTokenSpecs::foreach());
-    TokenRegexSpec const* ignore(BuildFileTokenSpecs::ignore());
-    TokenRegexSpec const* curlyOpen(BuildFileTokenSpecs::curlyOpen());
-    TokenRegexSpec const* curlyClose(BuildFileTokenSpecs::curlyClose());
-    TokenRegexSpec const* cmdStart(BuildFileTokenSpecs::cmdStart());
-    TokenRegexSpec const* cmdEnd(BuildFileTokenSpecs::cmdEnd());
-    TokenRegexSpec const* script(BuildFileTokenSpecs::script());
-    TokenRegexSpec const* vertical(BuildFileTokenSpecs::vertical());
-    TokenRegexSpec const* glob(BuildFileTokenSpecs::glob());
+    ITokenSpec const* whiteSpace(BuildFileTokenSpecs::whiteSpace());
+    ITokenSpec const* comment1(BuildFileTokenSpecs::comment1());
+    ITokenSpec const* commentN(BuildFileTokenSpecs::commentN());
+    ITokenSpec const* depBuildFile(BuildFileTokenSpecs::depBuildFile());
+    ITokenSpec const* depGlob(BuildFileTokenSpecs::depGlob());
+    ITokenSpec const* rule(BuildFileTokenSpecs::rule());
+    ITokenSpec const* foreach(BuildFileTokenSpecs::foreach());
+    ITokenSpec const* ignore(BuildFileTokenSpecs::ignore());
+    ITokenSpec const* curlyOpen(BuildFileTokenSpecs::curlyOpen());
+    ITokenSpec const* curlyClose(BuildFileTokenSpecs::curlyClose());
+    ITokenSpec const* cmdStart(BuildFileTokenSpecs::cmdStart());
+    ITokenSpec const* cmdEnd(BuildFileTokenSpecs::cmdEnd());
+    ITokenSpec const* script(BuildFileTokenSpecs::script());
+    ITokenSpec const* vertical(BuildFileTokenSpecs::vertical());
+    ITokenSpec const* glob(BuildFileTokenSpecs::glob());
 
     bool testCommandMatching() {
         const std::string group(R"(
@@ -233,7 +230,7 @@ namespace {
         EXPECT_EQ("not", token.type);
         EXPECT_EQ("^", token.value);
         token = tokenizer.readNextToken({glob});
-        EXPECT_EQ("glob", token.type);
+        EXPECT_EQ("path", token.type);
         EXPECT_EQ("aap.c", token.value);
         EXPECT_TRUE(tokenizer.eos());
         token = tokenizer.readNextToken({ });
@@ -245,7 +242,7 @@ namespace {
         BuildFileTokenizer tokenizer("testFile", path);
         Token token;
         token = tokenizer.readNextToken({glob});
-        EXPECT_EQ("glob", token.type);
+        EXPECT_EQ("path", token.type);
         EXPECT_EQ(path, token.value);
         token = tokenizer.readNextToken({});
         EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
@@ -256,7 +253,7 @@ namespace {
         BuildFileTokenizer tokenizer("testFile", path);
         Token token;
         token = tokenizer.readNextToken({glob});
-        EXPECT_EQ("glob", token.type);
+        EXPECT_EQ("path", token.type);
         EXPECT_EQ(path, token.value);
         token = tokenizer.readNextToken({ });
         EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
@@ -267,7 +264,7 @@ namespace {
         BuildFileTokenizer tokenizer("testFile", path);
         Token token;
         token = tokenizer.readNextToken({glob});
-        EXPECT_EQ("glob", token.type);
+        EXPECT_EQ("path", token.type);
         EXPECT_EQ(path, token.value);
         token = tokenizer.readNextToken({});
         EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
@@ -278,39 +275,34 @@ namespace {
         BuildFileTokenizer tokenizer("testFile", path);
         Token token;
         token = tokenizer.readNextToken({glob});
-        EXPECT_EQ("glob", token.type);
+        EXPECT_EQ("path", token.type);
         EXPECT_EQ(path, token.value);
         token = tokenizer.readNextToken({});
         EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
 
-    // TODO: fix tokenizing symbolicPath
     TEST(BuildFileTokenizer, symbolicPath) {
         const std::string path(R"($R(repo)\file)");
         BuildFileTokenizer tokenizer("testFile", path);
         Token token;
-        token = tokenizer.readNextToken(ispecs);
-        EXPECT_EQ("glob", token.type);
+        token = tokenizer.readNextToken({ glob });
+        EXPECT_EQ("path", token.type);
         EXPECT_EQ(path, token.value);
-        token = tokenizer.readNextToken(ispecs);
+        token = tokenizer.readNextToken({glob});
         EXPECT_EQ("eos", token.type);
         EXPECT_EQ("", token.value);
     }
-    //*/
 
     TEST(
         BuildFileTokenizer, inputGroup) {
-        const std::string path(R"({..\submodules\object})");
+        const std::string path(R"(..\submodules\<object>)");
         BuildFileTokenizer tokenizer("testFile", path);
         Token token;
-        token = tokenizer.readNextToken({curlyOpen});
-        EXPECT_EQ("{", token.type);
         token = tokenizer.readNextToken({glob});
-        EXPECT_EQ("glob", token.type);
-        EXPECT_EQ(R"(..\submodules\object)", token.value);
-        token = tokenizer.readNextToken({curlyClose});
-        EXPECT_EQ("}", token.type);
-        token = tokenizer.readNextToken({});
+        EXPECT_EQ("group", token.type);
+        EXPECT_EQ(R"(..\submodules\<object>)", token.value);
+        tokenizer.skip({ whiteSpace });
+        token = tokenizer.readNextToken({ });
         EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
 
@@ -392,7 +384,7 @@ namespace {
         EXPECT_EQ(":", token.value);
         tokenizer.skip({ whiteSpace });
         token = tokenizer.readNextToken({ glob });
-        EXPECT_EQ("glob", token.type);
+        EXPECT_EQ("path", token.type);
         EXPECT_EQ("src\\hello.c", token.value);
         tokenizer.skip({ whiteSpace });
         token = tokenizer.readNextToken({ script });
@@ -400,7 +392,7 @@ namespace {
         EXPECT_EQ(commandStr, token.value);
         tokenizer.skip({ whiteSpace });
         token = tokenizer.readNextToken({ glob });
-        EXPECT_EQ("glob", token.type);
+        EXPECT_EQ("path", token.type);
         EXPECT_EQ("bin\\%B.obj", token.value);
         tokenizer.skip({ whiteSpace });
         token = tokenizer.readNextToken({ whiteSpace });
@@ -433,7 +425,7 @@ namespace {
         EXPECT_EQ("foreach", token.value);
         tokenizer.skip({ whiteSpace });
         token = tokenizer.readNextToken({ glob });
-        EXPECT_EQ("glob", token.type);
+        EXPECT_EQ("path", token.type);
         EXPECT_EQ("src\\hello.c", token.value);
         tokenizer.skip({ whiteSpace });
         token = tokenizer.readNextToken({ script });
@@ -441,7 +433,7 @@ namespace {
         EXPECT_EQ(commandStr, token.value);
         tokenizer.skip({ whiteSpace });
         token = tokenizer.readNextToken({ glob });
-        EXPECT_EQ("glob", token.type);
+        EXPECT_EQ("path", token.type);
         EXPECT_EQ("bin\\%B.obj", token.value);
         tokenizer.skip({ whiteSpace });
         token = tokenizer.readNextToken({ whiteSpace });

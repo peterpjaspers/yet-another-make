@@ -60,12 +60,12 @@ namespace {
             glob src\*.cpp
         : 
             foreach 
-                hello.c { someGroup } 
-                | hi.obj { someOtherGroup }
+                hello.c <someGroup>
+                | hi.obj <..\modules\<someOtherGroup>
             |>
                 gcc hello.c -o hello
             |> 
-            %B.obj { objects }
+            %B.obj <objects>
         )";
         BuildFileParser parser(rules);
 
@@ -83,7 +83,7 @@ namespace {
 
         ASSERT_NE(nullptr, rule);
         EXPECT_TRUE(rule->forEach);
-        EXPECT_EQ("objects", rule->outputGroup);
+        EXPECT_EQ("<objects>", rule->outputGroup);
         ASSERT_EQ(2, rule->cmdInputs.inputs.size());
 
         auto const& input0 = rule->cmdInputs.inputs[0];
@@ -93,7 +93,7 @@ namespace {
         auto const& input1 = rule->cmdInputs.inputs[1];
         EXPECT_FALSE(input1.exclude);
         EXPECT_TRUE(input1.isGroup);
-        EXPECT_EQ("someGroup", input1.pathPattern);
+        EXPECT_EQ("<someGroup>", input1.pathPattern);
 
         ASSERT_EQ(2, rule->orderOnlyInputs.inputs.size());
         auto const& ooinput0 = rule->orderOnlyInputs.inputs[0];
@@ -103,7 +103,7 @@ namespace {
         auto const& ooinput1 = rule->orderOnlyInputs.inputs[1];
         EXPECT_FALSE(ooinput1.exclude);
         EXPECT_TRUE(ooinput1.isGroup);
-        EXPECT_EQ("someOtherGroup", ooinput1.pathPattern);
+        EXPECT_EQ(R"(<..\modules\<someOtherGroup>)", ooinput1.pathPattern);
 
         std::string expectedScript(R"(
                 gcc hello.c -o hello

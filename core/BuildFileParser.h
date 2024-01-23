@@ -197,7 +197,6 @@ namespace YAM
         void eatOutput(BuildFile::Output& output);
         std::filesystem::path eatGlob();
         std::filesystem::path eatPath();
-        void parseGroup(std::filesystem::path& groupName);
 
         std::filesystem::path _buildFilePath;
         BuildFileTokenizer _tokenizer;

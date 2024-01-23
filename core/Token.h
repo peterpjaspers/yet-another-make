@@ -8,6 +8,7 @@ namespace YAM {
     struct __declspec(dllexport) Token {
         Token() : spec(nullptr), consumed(0) {}
         ITokenSpec const* spec;
+        // Next three members only valid when spec != nullptr
         std::string type;
         std::string value; // the string that matches spec.
         std::size_t consumed; // nr of characters consumed: >= value.length()
@@ -16,7 +17,5 @@ namespace YAM {
     class __declspec(dllexport) ITokenSpec {
     public:
         virtual bool match(const char* str, Token& token) const = 0;
-        // Return string that identifies the token class.
-        virtual std::string const& type() const = 0;
     };
 }
