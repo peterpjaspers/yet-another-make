@@ -718,7 +718,18 @@ namespace YAM
             result.newState(result._postResult->newState);
         }
         if (result.newState() == Node::State::Ok) {
+            auto prevHash = _executionHash;
             _executionHash = computeExecutionHash();
+            if (
+                result._postResult == nullptr 
+                && prevHash != _executionHash 
+                && context()->logBook()->mustLogAspect(LogRecord::Aspect::DirectoryChanges)
+            ) {
+                std::stringstream ss;
+                ss << className() << " " << name().string() << " has changed inputs/outputs/script/file deps";
+                LogRecord change(LogRecord::DirectoryChanges, ss.str());
+                context()->logBook()->add(change);
+            }
         } else {
             ExecutionResult r;
             for (auto const& pair : _detectedInputs) r._removedInputPaths.insert(pair.first);

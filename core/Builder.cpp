@@ -125,6 +125,33 @@ namespace
         LogRecord error(LogRecord::Error, ss.str());
         logBook->add(error);
     }
+
+    struct CompareTypeName {
+        bool operator()(const std::shared_ptr<Node>& lhs, const std::shared_ptr<Node>& rhs) const {
+            return lhs->className() < rhs->className();
+        }
+    };
+
+    void logBuildState(ExecutionContext* context) {
+        std::vector<std::shared_ptr<Node>> nodes = context->nodes().nodes();
+        Node::CompareName cmpName;
+        std::sort(nodes.begin(), nodes.end(), cmpName);
+        std::stringstream ss;
+        ss << nodes.size() << " nodes, sorted by node name." << std::endl;
+        for (auto const& node : nodes) {
+            ss << node->name().string() << " : " << node->className() << std::endl;
+        } 
+        CompareTypeName cmpType;
+        std::sort(nodes.begin(), nodes.end(), cmpType);
+        ss << nodes.size() << " nodes, sorted by node type." << std::endl;
+        for (auto const& node : nodes) {
+            ss << node->className() << " : " << node->name().string() << std::endl;
+        }
+        ss << nodes.size() << " nodes in buildstate." << std::endl;
+
+        LogRecord r(LogRecord::Aspect::BuildState, ss.str());
+        context->logBook()->add(r);
+    }
 }
 
 namespace YAM
@@ -454,6 +481,7 @@ namespace YAM
         _dirtyBuildFileCompilers->setState(Node::State::Ok);
         _dirtyCommands->setState(Node::State::Ok);
 
+        logBuildState(&_context);
         auto result = _result;
         _result = nullptr;
         _context.buildRequest(nullptr);

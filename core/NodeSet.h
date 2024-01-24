@@ -52,8 +52,10 @@ namespace YAM
 
         std::size_t size() const;
 
+        std::vector<std::shared_ptr<Node>> nodes() const;
+
     private:
-        std::unordered_map<std::filesystem::path, std::shared_ptr<Node> > _nodes;
+        std::unordered_map<std::filesystem::path, std::shared_ptr<Node>> _nodes;
     };
 }
 

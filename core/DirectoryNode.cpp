@@ -398,13 +398,9 @@ namespace YAM
 
         modified(true);
         context()->statistics().registerUpdatedDirectory(this);
-        if (context()->logBook()->mustLogAspect(LogRecord::Aspect::DirectoryChanges)) {
-            LogRecord progress(LogRecord::Aspect::Progress, std::string("Rehashed directory ").append(name().string()));
-            context()->addToLogBook(progress);
-        }
-        if (dirChanged) {
+        if (dirChanged && context()->logBook()->mustLogAspect(LogRecord::Aspect::DirectoryChanges)) {
             std::stringstream ss;
-            ss << "Directory " << name().string() << " has changed.";
+            ss << "DirectoryNode " << name().string() << " has changed.";
             LogRecord change(LogRecord::Aspect::DirectoryChanges, ss.str());
             context()->addToLogBook(change);
         }

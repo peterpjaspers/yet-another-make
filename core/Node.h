@@ -74,6 +74,8 @@ namespace YAM
         // where <repoName> matches one of the names in context()->repositories().
         std::filesystem::path const& name() const { return _name; }
 
+        virtual std::string className() const { return typeid(*this).name(); }
+
         // Return the repository that contains this node.
         std::shared_ptr<FileRepository> const& repository() const;
 

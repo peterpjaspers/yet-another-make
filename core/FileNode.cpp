@@ -4,6 +4,7 @@
 #include "FileRepository.h"
 #include "ExecutionContext.h"
 #include "IStreamer.h"
+#include "ILogBook.h"
 
 namespace
 {
@@ -57,7 +58,7 @@ namespace YAM
             modified(true);
             if (changedContent) {
                 std::stringstream ss;
-                ss << "Content of file " << name().string() << " has changed.";
+                ss << className() << " " << name().string() << " has changed file content.";
                 LogRecord change(LogRecord::FileChanges, ss.str());
                 context()->logBook()->add(change);
             }

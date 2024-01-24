@@ -301,6 +301,12 @@ namespace YAM
             if (validGeneratedInputs()) {
                 XXH64_hash_t newHash = computeExecutionHash();
                 if (_executionHash != newHash) modified(true);
+                if (newHash != _executionHash && context()->logBook()->mustLogAspect(LogRecord::Aspect::FileChanges)) {
+                    std::stringstream ss;
+                    ss << className() << " " << name().string() << " has compiled because of changed parseTree/glob deps/buildfile deps.";
+                    LogRecord change(LogRecord::FileChanges, ss.str());
+                    context()->logBook()->add(change);
+                }
                 _executionHash = newHash;
                 notifyProcessingCompletion(Node::State::Ok);
             } else {

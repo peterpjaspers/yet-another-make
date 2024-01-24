@@ -60,6 +60,8 @@ namespace YAM
 
         virtual ~DirectoryNode();
 
+        std::string className() const override { return "DirectoryNode"; }
+
         void start() override;
 
         // Add the prerequisites (i.e. the DotIgnoreNode and its prerequisites)

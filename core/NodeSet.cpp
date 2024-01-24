@@ -61,4 +61,10 @@ namespace YAM
     std::size_t NodeSet::size() const {
         return _nodes.size(); 
     }
+
+    std::vector<std::shared_ptr<Node>> NodeSet::nodes() const {
+        std::vector<std::shared_ptr<Node>> nodes;
+        for (auto const& pair : _nodes) nodes.push_back(pair.second);
+        return nodes;
+    }
 }

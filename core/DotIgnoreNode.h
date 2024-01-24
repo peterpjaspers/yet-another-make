@@ -28,6 +28,8 @@ namespace YAM
             std::filesystem::path const& name,
             DirectoryNode *directory);
 
+        std::string className() const override { return "DotIgnoreNode"; }
+
         // Add the prerequisites (i.e, the .gitignore and .yamignore file nodes
         // to the execution context.
         void addPrerequisitesToContext();

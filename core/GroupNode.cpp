@@ -1,6 +1,7 @@
 #include "GroupNode.h"
 #include "CommandNode.h"
 #include "GeneratedFileNode.h"
+#include "ExecutionContext.h"
 
 #include "IStreamer.h"
 
@@ -64,7 +65,16 @@ namespace YAM
     }
 
     void GroupNode::handleGroupCompletion(Node::State groupState) {
-        _hash = computeHash();
+        if (groupState == Node::State::Ok) {
+            XXH64_hash_t prevHash = _hash;
+            _hash = computeHash();
+            if (prevHash != _hash && context()->logBook()->mustLogAspect(LogRecord::Aspect::DirectoryChanges)) {
+                std::stringstream ss;
+                ss << className() << " " << name().string() << " has changed.";
+                LogRecord change(LogRecord::DirectoryChanges, ss.str());
+                context()->logBook()->add(change);
+            }
+        }
         Node::notifyCompletion(groupState);
     }
 

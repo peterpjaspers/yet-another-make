@@ -25,6 +25,8 @@ namespace YAM {
         BuildFileParserNode(); // needed for deserialization
         BuildFileParserNode(ExecutionContext* context, std::filesystem::path const& name);
 
+        std::string className() const override { return "BuildFileParserNode"; }
+
         void buildFile(std::shared_ptr<SourceFileNode> const& newFile);
         std::shared_ptr<SourceFileNode> buildFile() const;
 

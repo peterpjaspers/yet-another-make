@@ -125,8 +125,15 @@ namespace YAM
             for (auto const& dir : _inputDirs) dir->removeObserver(this);
             _inputDirs = globber->inputDirs();
             for (auto const& dir : _inputDirs) dir->addObserver(this);
+            auto prevHash = _executionHash;
             _executionHash = computeExecutionHash();
             _inputsHash = computeInputsHash();
+            if (prevHash != _executionHash && context()->logBook()->mustLogAspect(LogRecord::Aspect::DirectoryChanges)) {
+                std::stringstream ss;
+                ss << className() << " " << name().string() << " has changed baseDir/pattern/matches.";
+                LogRecord change(LogRecord::DirectoryChanges, ss.str());
+                context()->logBook()->add(change);
+            }
         } else {
             LogRecord errorRecord(LogRecord::Aspect::Error, error);
             context()->logBook()->add(errorRecord);

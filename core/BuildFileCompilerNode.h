@@ -32,6 +32,8 @@ namespace YAM {
         BuildFileCompilerNode(ExecutionContext* context, std::filesystem::path const& name);
         virtual ~BuildFileCompilerNode();
 
+        std::string className() const override { return "BuildFileCompilerNode"; }
+
         void buildFileParser(std::shared_ptr<BuildFileParserNode> const& newFile);
         std::shared_ptr<BuildFileParserNode> buildFileParser() const;
 

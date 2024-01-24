@@ -36,6 +36,7 @@ namespace YAM
             all.push_back(Aspect::FileChanges);
             all.push_back(Aspect::DirectoryChanges);
             all.push_back(Aspect::BuildTimePrediction);
+            //all.push_back(Aspect::BuildState);
         }
         return all;
     }
@@ -54,6 +55,7 @@ namespace YAM
             case FileChanges: return "FileChanges";
             case DirectoryChanges: return "DirectoryChanges";
             case BuildTimePrediction: return "BuildTimePrediction";
+            case BuildState: return "BuildState";
             default: return "unknown aspect";
         }
     }

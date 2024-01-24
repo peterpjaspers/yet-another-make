@@ -18,6 +18,8 @@ namespace YAM
             std::filesystem::path const& name, 
             std::shared_ptr<CommandNode> const& producer);
 
+        std::string className() const override { return "GeneratedFileNode"; }
+
         CommandNode* producer() const;
         bool deleteFile(bool setDirty = false);
 

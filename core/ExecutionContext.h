@@ -6,7 +6,6 @@
 #include "ThreadPool.h"
 #include "FileAspectSet.h"
 #include "ExecutionStatistics.h"
-#include "ILogBook.h"
 
 #include <memory>
 #include <unordered_set>
@@ -16,6 +15,8 @@ namespace YAM
     class FileRepository;
     class BuildRequest;
     class IPersistable;
+    class ILogBook;
+    class LogRecord;
 
     class __declspec(dllexport) ExecutionContext
     {

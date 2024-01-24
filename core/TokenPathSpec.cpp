@@ -32,12 +32,13 @@ namespace
 namespace YAM
 {
     bool TokenPathSpec::match(const char* str, Token& token) const {
-		// for input globs: '"|>| starts command
-		// for output globs: ':' starts new rule
-		// no glob should start with '>'
-		// This does not work if rule does not contain command/script.
-		// BuildFileParser should (like tup) first look for command section.
-		// If not found: error.
+		// For input paths: '|' starts orderOnlyInput section, '|>' starts 
+		// command section. 
+		// For output paths: ':' starts new rule
+		// '>' is exluded as first char because a typical typo is to start the
+		// command section with '>|'.
+		// Note: this does not work if rule does not contain command section.
+		// BuildFileParser to verify presence of command section?
 		static std::vector<char> ex = { '|', ':', '>'};
 
 		std::string result;

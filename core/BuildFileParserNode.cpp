@@ -110,7 +110,14 @@ namespace YAM
         } else if (_buildFile != nullptr) {
             _parseTree = *(result->parseTree);
             if (composeDependencies()) {
+                auto prevHash = _parseTreeHash;
                 _parseTreeHash = result->parseTreeHash;
+                if (prevHash != _parseTreeHash && context()->logBook()->mustLogAspect(LogRecord::Aspect::FileChanges)) {
+                    std::stringstream ss;
+                    ss << className() << " " << name().string() << " has a changed parse tree.";
+                    LogRecord change(LogRecord::FileChanges, ss.str());
+                    context()->logBook()->add(change);
+                }
             } else {
                 result->newState = Node::State::Failed;
                 _parseTreeHash = rand();

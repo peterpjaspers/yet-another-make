@@ -24,6 +24,8 @@ namespace YAM
         GlobNode(ExecutionContext* context, std::filesystem::path const& name);
         ~GlobNode();
 
+        std::string className() const override { return "GlobNode"; }
+
         // The path pattern is relative to the base directory.
         void baseDirectory(std::shared_ptr<DirectoryNode> const& newBaseDir);
         std::shared_ptr<DirectoryNode> const& baseDirectory() const { return _baseDir;  }

@@ -21,7 +21,8 @@ namespace YAM
             IgnoredInputFiles,    // ignored input files of a commansd
             FileChanges,          // files changed since previous build
             DirectoryChanges,     // directories changed since previous build
-            BuildTimePrediction   // estimated remaining build time
+            BuildTimePrediction,  // estimated remaining build time
+            BuildState,           // nodes in buildstate 
         };
 
         LogRecord(

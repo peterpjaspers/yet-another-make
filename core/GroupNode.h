@@ -15,6 +15,8 @@ namespace YAM
         GroupNode(); // needed for deserialization
         GroupNode(ExecutionContext* context, std::filesystem::path const& name);
 
+        std::string className() const override { return "GroupNode"; }
+
         void group(std::vector<std::shared_ptr<Node>> newGroup);
         std::vector<std::shared_ptr<Node>> const& group() const { return _group; }
 

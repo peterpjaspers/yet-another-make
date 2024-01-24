@@ -42,6 +42,8 @@ namespace YAM
         CommandNode(ExecutionContext* context, std::filesystem::path const& name);
         ~CommandNode();
 
+        std::string className() const override { return "CommandNode"; }
+
         // Set the name of input file aspect set. The set is accessed via
         // context()->findFileAspectSet(newName).
         // The command node will only re-execute when input file aspect hash 
