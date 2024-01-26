@@ -146,9 +146,9 @@ public:
 int main(int argc, char argv[]) {
     ConsoleLogBook logBook;
     logBook.logElapsedTime(true);
-    //auto allAspects = LogRecord::allAspects();
-    //allAspects.push_back(LogRecord::BuildState);
-    //logBook.setAspects(allAspects);
+    std::vector<LogRecord::Aspect> logAspects = logBook.aspects();
+    logAspects.push_back(LogRecord::BuildStateUpdate);
+    logBook.aspects(logAspects);
 
     std::filesystem::path dotYamDir = DotYamDirectory::initialize(std::filesystem::current_path(), &logBook);
     std::filesystem::path repoDir = dotYamDir.parent_path();
@@ -164,6 +164,7 @@ int main(int argc, char argv[]) {
 
     auto request = std::make_shared<BuildRequest>();
     request->directory(repoDir);
+    request->logAspects(logAspects);
     std::shared_ptr<BuildResult> result;
     Dispatcher dispatcher;
     BuildClient& client = server->client();

@@ -66,30 +66,27 @@ namespace YAM
         if (it == path.end()) return empty;
         std::string repoComponent = (*it).string();
         std::size_t n = repoComponent.length();
-        if (n < 5) return empty;
-        if (repoComponent[0] != '$') return empty;
-        if (repoComponent[1] != 'R') return empty;
-        if (repoComponent[2] != '(') return empty;
-        if (repoComponent[n - 1] != ')') return empty;
-        return repoComponent.substr(3, n - 4);
+        if (n < 3) return empty;
+        if (repoComponent[0] != '@') return empty;
+        if (repoComponent[1] != '@') return empty;
+        return repoComponent.substr(2);
     }
 
     std::filesystem::path FileRepository::repoNameToSymbolicPath(std::string const& repoName) {
-        std::filesystem::path p("$R(" + repoName + ")");
+        std::filesystem::path p("@@" + repoName);
         return p;
     }
 
     bool FileRepository::lexicallyContains(std::filesystem::path const& path) const {
-        bool contains = true;
+        bool contains;
         if (path.is_absolute()) {
             auto pit = path.begin();
             auto rit = _directory.begin();
-            for (; 
-                pit != path.end() && rit != _directory.end() && contains;
-                pit++, rit++
-            ) {
-                contains = *pit == *rit;
+            for (; rit != _directory.end(); rit++) {
+                if ((pit != path.end()) && (*pit == *rit)) pit++;
+                else break;
             }
+            contains = rit == _directory.end();
         } else {
             auto it = path.begin();
             contains = (it != path.end() && *it == _directoryNode->name());
@@ -142,8 +139,7 @@ namespace YAM
 
     std::filesystem::path FileRepository::absolutePathOf(std::filesystem::path const& symbolicPath) const {
         std::filesystem::path absPath;
-        std::string symRepoName = repoNameFromPath(symbolicPath);
-        if (symRepoName != _name) return absPath;
+        if (*symbolicPath.begin() != _directoryNode->name()) return absPath;
         absPath = _directory;
         auto it = symbolicPath.begin();
         it++; // skip repo name component

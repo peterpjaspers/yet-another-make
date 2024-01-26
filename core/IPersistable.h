@@ -4,6 +4,7 @@
 
 #include <unordered_set>
 #include <cstdint>
+#include <sstream>
 
 namespace YAM
 {
@@ -15,6 +16,9 @@ namespace YAM
         // repository resets the modified flag when storage has completed.
         virtual void modified(bool value) = 0;
         virtual bool modified() const = 0;
+
+        virtual std::string describeName() const = 0;
+        virtual std::string describeType() const = 0;
 
         // Prepare the object for deserialization.
         // To be called when the object is about to be deserialized.

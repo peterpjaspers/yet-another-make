@@ -119,7 +119,7 @@ namespace
         EXPECT_EQ("type %f > %o", command0->script());
         ASSERT_EQ(1, command0->outputs().size());
         auto output00 = command0->outputs()[0];
-        EXPECT_EQ("$R(repo)\\output\\lib1.obj", output00->name().string());
+        EXPECT_EQ("@@repo\\output\\lib1.obj", output00->name().string());
         ASSERT_EQ(1, command0->ignoredOutputs().size());
         EXPECT_EQ(ignoredOutput.path, command0->ignoredOutputs()[0]);
         EXPECT_EQ(3, command0->orderOnlyInputs().size());
@@ -130,7 +130,7 @@ namespace
         EXPECT_EQ("type %f > %o", command1->script());
         ASSERT_EQ(1, command1->outputs().size());
         auto output1 = command1->outputs()[0];
-        EXPECT_EQ("$R(repo)\\output\\lib2.obj", output1->name().string());
+        EXPECT_EQ("@@repo\\output\\lib2.obj", output1->name().string());
         ASSERT_EQ(1, command1->ignoredOutputs().size());
         EXPECT_EQ(ignoredOutput.path, command1->ignoredOutputs()[0]);
 
@@ -185,7 +185,7 @@ namespace
         ASSERT_EQ(rule->script.script, command0->script());
         ASSERT_EQ(1, command0->outputs().size());
         auto output00 = command0->outputs()[0];
-        EXPECT_EQ(std::string("$R(repo)\\output\\main.obj"), output00->name().string());
+        EXPECT_EQ(std::string("@@repo\\output\\main.obj"), output00->name().string());
     }
 
 

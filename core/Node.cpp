@@ -43,7 +43,7 @@ namespace YAM
         , _nExecutingNodes(0)
         , _notifyingObservers(false)
         , _modified(true)
-    {} 
+    {}
 
     Node::~Node() {}
 
@@ -162,7 +162,7 @@ namespace YAM
         case Node::State::Failed: break;
         case Node::State::Canceled: break;
         default:
-            throw std::runtime_error("Unknown Node::State");
+        throw std::runtime_error("Unknown Node::State");
         }
     }
 
@@ -172,11 +172,11 @@ namespace YAM
         // When a node completes it calls this function for ALL if its 
         // observers. This node must only handle completion of node when
         // it is actually waiting for node to complete.
-         if (_nodesToExecute.find(node) == _nodesToExecute.end()) return;
+        if (_nodesToExecute.find(node) == _nodesToExecute.end()) return;
 #ifdef _DEBUG
-         if (_nExecutingNodes != _executingNodes.size()) {
-             throw std::exception("_nExecutingNodes != _executingNodes.size()");
-         }
+        if (_nExecutingNodes != _executingNodes.size()) {
+            throw std::exception("_nExecutingNodes != _executingNodes.size()");
+        }
         if (0 == _executingNodes.erase(node)) {
             throw std::exception("callback from unexpected node");
         }
@@ -224,9 +224,9 @@ namespace YAM
 
     void Node::postCompletion(Node::State newState) {
         auto d = Delegate<void>::CreateLambda([this, newState]()
-            {
-                notifyCompletion(newState);
-            });
+        {
+            notifyCompletion(newState);
+        });
         _context->mainThreadQueue().push(std::move(d));
     }
 

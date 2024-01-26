@@ -293,7 +293,7 @@ namespace {
     }
 
     TEST(BuildFileTokenizer, symbolicPath) {
-        const std::string path(R"($R(repo)\file)");
+        const std::string path(R"(@@repo\file)");
         BuildFileTokenizer tokenizer("testFile", path);
         Token token;
         token = tokenizer.readNextToken({ glob });

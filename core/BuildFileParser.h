@@ -195,6 +195,7 @@ namespace YAM
         void eatScript(BuildFile::Script& script);
         void parseOutputs(BuildFile::Outputs& outputs);
         void eatOutput(BuildFile::Output& output);
+        Token eatGlobToken();
         std::filesystem::path eatGlob();
         std::filesystem::path eatPath();
 

@@ -23,6 +23,7 @@ namespace YAM
             DirectoryChanges,     // directories changed since previous build
             BuildTimePrediction,  // estimated remaining build time
             BuildState,           // nodes in buildstate 
+            BuildStateUpdate,     // changes made to buildstate
         };
 
         LogRecord(

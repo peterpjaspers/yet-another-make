@@ -21,6 +21,64 @@
 #include <filesystem>
 #include <set>
 
+namespace
+{
+    struct ComparePName {
+        constexpr bool operator()(const std::shared_ptr<IPersistable>& lhs, const std::shared_ptr<IPersistable>& rhs) const {
+            return lhs->describeName() < rhs->describeName();
+        }
+    };
+
+    void strStream(std::stringstream& ss, std::unordered_set<std::shared_ptr<IPersistable>>const& persistables) {
+        if (persistables.empty()) return;
+        std::vector<std::shared_ptr<IPersistable>> sorted(persistables.begin(), persistables.end());
+        ComparePName cmpName;
+        std::sort(sorted.begin(), sorted.end(), cmpName);
+        for (auto const& p : sorted) {
+            ss << "\t" << p->describeName() << " : " << p->describeType() << std::endl;
+        }
+    }
+
+    void logStorageNeed(
+        ILogBook& logBook,
+        std::unordered_set<std::shared_ptr<IPersistable>>const& toInsert,
+        std::unordered_set<std::shared_ptr<IPersistable>>const& toReplace,
+        std::unordered_set<std::shared_ptr<IPersistable>>const& toRemove,
+        bool rollback
+    ) {
+        if (!logBook.mustLogAspect(LogRecord::BuildStateUpdate)) return;
+
+        std::stringstream ss;
+        ss << "Persistent buildstate updates:" << std::endl;
+        if (!toInsert.empty()) {
+            if (rollback) {
+                ss << "Rollback insertion of: " << std::endl;
+            } else {
+                ss << "Insert new objects: " << std::endl;
+            }
+            strStream(ss, toInsert);
+        }
+        if (!toReplace.empty()) {
+            if (rollback) {
+                ss << "Rollback replacement of: " << std::endl;
+            } else {
+                ss << "Replace objects: " << std::endl;
+            }
+            strStream(ss, toReplace);
+        }
+        if (!toRemove.empty()) {
+            if (rollback) {
+                ss << "Rollback removal of: " << std::endl;
+            } else {
+                ss << "Remove objects: " << std::endl;
+            }
+            strStream(ss, toRemove);
+        }
+        LogRecord r(LogRecord::Aspect::BuildStateUpdate, ss.str());
+        logBook.add(r);
+    }
+}
+
 namespace YAM
 {
     PersistentBuildState::Key nullPtrKey = UINT64_MAX;
@@ -267,6 +325,14 @@ namespace YAM
                     toReplace.insert(p);
                 }
             }
+        }
+        std::shared_ptr<IPersistable> p;
+        if (!toInsert.empty()) p = *toInsert.begin();
+        else if (!toReplace.empty()) p = *toReplace.begin();
+        else if (!toRemove.empty()) p = *toRemove.begin();
+        if (p != nullptr) {
+            auto n = dynamic_cast<Node*>(p.get());
+            logStorageNeed(*(n->context()->logBook()), toInsert, toReplace, toRemove, rollback);
         }
     }
 }

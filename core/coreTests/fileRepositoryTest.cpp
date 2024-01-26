@@ -20,6 +20,20 @@ namespace
 {
     using namespace YAM;
 
+    void writeFile(std::filesystem::path p, std::string const& content) {
+        std::ofstream stream(p);
+        EXPECT_TRUE(stream.is_open());
+        stream << content;
+        stream.close();
+    }
+
+    std::string readFile(std::filesystem::path const& path) {
+        std::ifstream file(path);
+        std::stringstream ss;
+        ss << file.rdbuf();
+        return ss.str();
+    }
+
     class RepoProps {
     public:
         RepoProps()
@@ -47,29 +61,35 @@ namespace
         RepoProps repoProps;
         ExecutionContext context;
         FileRepository repo(repoProps.name, repoProps.dir, &context);
-        EXPECT_TRUE(repo.lexicallyContains(R"(C:\aap\noot\mies\file.cpp)"));
         EXPECT_TRUE(repo.lexicallyContains(R"(C:\aap\noot\mies)"));
         EXPECT_TRUE(repo.lexicallyContains(R"(C:\aap\noot\mies\)"));
-        EXPECT_TRUE(repo.lexicallyContains(R"($R(testRepo))"));
-        EXPECT_TRUE(repo.lexicallyContains(R"($R(testRepo)\)"));
-        EXPECT_TRUE(repo.lexicallyContains(R"($R(testRepo)\file.cpp)"));
+        EXPECT_TRUE(repo.lexicallyContains(R"(C:\aap\noot\mies\file.cpp)"));
+        EXPECT_TRUE(repo.lexicallyContains(R"(C:/aap/noot/mies)"));
+        EXPECT_TRUE(repo.lexicallyContains(R"(C:/aap/noot/mies/)"));
+        EXPECT_TRUE(repo.lexicallyContains(R"(C:/aap/noot/mies/file.cpp)"));
 
-        EXPECT_FALSE(repo.lexicallyContains(R"(unknown\file.cpp)"));
-        EXPECT_FALSE(repo.lexicallyContains(R"(<unknown>\file.cpp)"));
-        EXPECT_FALSE(repo.lexicallyContains(R"(testRepo\file.cpp)"));
+        EXPECT_TRUE(repo.lexicallyContains(R"(@@testRepo)"));
+        EXPECT_TRUE(repo.lexicallyContains(R"(@@testRepo/)"));
+        EXPECT_TRUE(repo.lexicallyContains(R"(@@testRepo\)"));
+
+        EXPECT_FALSE(repo.lexicallyContains(R"(C:\aap)"));
+        EXPECT_FALSE(repo.lexicallyContains(R"(C:\aap\noot)"));
         EXPECT_FALSE(repo.lexicallyContains(R"(C:\aap\noot\file.cpp)"));
-        EXPECT_FALSE(repo.lexicallyContains(R"(\aap\noot\mies\file.cpp)"));
+        EXPECT_FALSE(repo.lexicallyContains(R"(\\aap)"));
         EXPECT_FALSE(repo.lexicallyContains(R"(aap\noot\mies\file.cpp)"));
+        EXPECT_FALSE(repo.lexicallyContains(R"(\aap\noot\mies\file.cpp)"));
     }
-    TEST(FileRepository, relativePath) {
+    TEST(FileRepository, relativePathOf) {
         RepoProps repoProps;
         ExecutionContext context;
         FileRepository repo(repoProps.name, repoProps.dir, &context);
-        EXPECT_EQ(std::filesystem::path(R"(file.cpp)"), repo.relativePathOf(R"(C:\aap\noot\mies\file.cpp)"));
-        EXPECT_ANY_THROW(repo.relativePathOf(R"($R(testRepo))"));
-        EXPECT_EQ(std::filesystem::path(), repo.relativePathOf(R"(C:\aap\noot\mies)"));
-        EXPECT_EQ(std::filesystem::path(), repo.relativePathOf(R"(C:\aap\noot\mies\)"));
-        EXPECT_EQ(std::filesystem::path(), repo.relativePathOf(R"(C:\aap\noot\file.cpp)"));
+        EXPECT_EQ("file.cpp", repo.relativePathOf(R"(C:\aap\noot\mies\file.cpp)"));
+        EXPECT_ANY_THROW(repo.relativePathOf(R"(@@testRepo/file.cpp)"));
+        EXPECT_ANY_THROW(repo.relativePathOf(R"(file.cpp)"));
+        EXPECT_EQ("", repo.relativePathOf(R"(C:\aap\noot\mies)"));
+        EXPECT_EQ("", repo.relativePathOf(R"(C:\aap\noot\mies\)"));
+        EXPECT_EQ("", repo.relativePathOf(R"(C:\aap\noot\file.cpp)"));
+        EXPECT_EQ("", repo.relativePathOf(R"(C:\aap\noot)"));
         EXPECT_ANY_THROW(repo.relativePathOf(R"(\aap\noot\file.cpp)"));
         EXPECT_ANY_THROW(repo.relativePathOf(R"(aap\noot\mies\file.cpp)"));
     }
@@ -77,10 +97,10 @@ namespace
         RepoProps repoProps;
         ExecutionContext context;
         FileRepository repo(repoProps.name, repoProps.dir, &context);
-        EXPECT_EQ(std::filesystem::path(R"($R(testRepo)\file.cpp)"), repo.symbolicPathOf(R"(C:\aap\noot\mies\file.cpp)"));
-        EXPECT_EQ(std::filesystem::path(R"($R(testRepo))"), repo.symbolicPathOf(R"(C:\aap\noot\mies)"));
-        EXPECT_EQ(std::filesystem::path(R"($R(testRepo)\)"), repo.symbolicPathOf(R"(C:\aap\noot\mies\)"));
-        EXPECT_EQ(std::filesystem::path(), repo.symbolicPathOf(R"(C:\aap\noot\file.cpp)"));
+        EXPECT_EQ(R"(@@testRepo\file.cpp)", repo.symbolicPathOf(R"(C:\aap\noot\mies\file.cpp)"));
+        EXPECT_EQ(R"(@@testRepo)", repo.symbolicPathOf(R"(C:\aap\noot\mies)"));
+        EXPECT_EQ(R"(@@testRepo\)", repo.symbolicPathOf(R"(C:\aap\noot\mies\)"));
+        EXPECT_EQ("", repo.symbolicPathOf(R"(C:\aap\noot\file.cpp)"));
         EXPECT_ANY_THROW(repo.symbolicPathOf(R"(\aap\noot\file.cpp)"));
         EXPECT_ANY_THROW(repo.symbolicPathOf(R"(aap\noot\mies\file.cpp)"));
     }
@@ -89,11 +109,11 @@ namespace
         RepoProps repoProps;
         ExecutionContext context;
         FileRepository repo(repoProps.name, repoProps.dir, &context);
-        EXPECT_EQ(std::filesystem::path(R"(C:\aap\noot\mies\file.cpp)"), repo.absolutePathOf(R"($R(testRepo)\file.cpp)"));
-        EXPECT_EQ(std::filesystem::path(R"(C:\aap\noot\mies)"), repo.absolutePathOf(R"($R(testRepo))"));
-        EXPECT_EQ(std::filesystem::path(R"(C:\aap\noot\mies\)"), repo.absolutePathOf(R"($R(testRepo)\)"));
-        EXPECT_EQ(std::filesystem::path(), repo.absolutePathOf(R"(<otherRepo>\)"));
-        EXPECT_EQ(std::filesystem::path(), repo.absolutePathOf(R"(C:\aap\noot\)"));
+        EXPECT_EQ(R"(C:\aap\noot\mies\file.cpp)", repo.absolutePathOf(R"(@@testRepo\file.cpp)"));
+        EXPECT_EQ(R"(C:\aap\noot\mies)", repo.absolutePathOf(R"(@@testRepo)"));
+        EXPECT_EQ(R"(C:\aap\noot\mies\)", repo.absolutePathOf(R"(@@testRepo\)"));
+        EXPECT_EQ("", repo.absolutePathOf(R"(@@otherRepo\)"));
+        EXPECT_EQ("", repo.absolutePathOf(R"(C:\aap\noot\)"));
     }
 }
 namespace
@@ -244,49 +264,5 @@ namespace
         EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode_S1_S2_S3.get()));
         dirNode_S1_S2_S3->getFiles(files);
         for (auto f : files) EXPECT_FALSE(context.statistics().rehashedFiles.contains(f.get()));
-    }
-
-    TEST(FileRepository, absPath) {
-        std::filesystem::path p(R"(C:\aap\piet.txt)");
-        EXPECT_EQ("C:", p.root_name());
-        EXPECT_EQ(R"(\)", p.root_directory());
-        EXPECT_EQ(R"(aap\piet.txt)", p.relative_path());
-        EXPECT_TRUE(p.is_absolute());
-        auto it = p.begin();
-        EXPECT_EQ("C:", *it);
-    }
-    TEST(FileRepository, relPath) {
-        // This test shows the behavior of std::filesystem::path
-        std::filesystem::path p(R"(\repoName:\aap\piet.txt)");
-        EXPECT_EQ("", p.root_name());
-        EXPECT_EQ(R"(\)", p.root_directory());
-        EXPECT_EQ(R"(repoName:\aap\piet.txt)", p.relative_path());
-        EXPECT_FALSE(p.is_absolute());
-        auto it = p.begin();
-        EXPECT_EQ(R"(\)", *it);
-        it++;
-        EXPECT_EQ("repoName:", *it);
-    }
-    TEST(FileRepository, symPath) {
-        // This test shows the behavior of std::filesystem::path
-        std::filesystem::path p(R"(<\repoName:\aap\piet.txt)");
-        EXPECT_EQ("", p.root_name());
-        EXPECT_EQ("", p.root_directory());
-        EXPECT_EQ(R"(<\repoName:\aap\piet.txt)", p.relative_path());
-        EXPECT_FALSE(p.is_absolute());
-        auto it = p.begin();
-        EXPECT_EQ(R"(<)", *it);
-        it++;
-        EXPECT_EQ("repoName:", *it);
-    }
-
-    TEST(FileRepository, pathSeparators) {
-        // This test shows the behavior of std::filesystem::path
-        std::filesystem::path pWindows(R"(\aap\piet.txt)");
-        std::filesystem::path pUnix(R"(/aap/piet.txt)");
-        std::filesystem::path pMix(R"(/aap\piet.txt)");
-        EXPECT_EQ(pWindows, pUnix);
-        EXPECT_EQ(pWindows, pMix);
-        EXPECT_EQ(pUnix, pMix);
     }
 }

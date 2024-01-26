@@ -22,12 +22,11 @@ namespace YAM
         // Post: !error();
         virtual void resetError() { _error = false; }
 
-        // Set the aspects that must be logged
-        void setAspects(std::vector<LogRecord::Aspect> aspects) {
+        void aspects(std::vector<LogRecord::Aspect> aspects) {
             _aspects = aspects;
         }
 
-        std::vector<LogRecord::Aspect> const& getAspects(std::vector<LogRecord::Aspect>) {
+        std::vector<LogRecord::Aspect> const& aspects() {
             return _aspects;
         }
 

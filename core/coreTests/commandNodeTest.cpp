@@ -54,15 +54,15 @@ namespace
             , pietCmd(std::make_shared<CommandNode>(&context, "piet\\_cmd"))
             , janCmd(std::make_shared<CommandNode>(&context, "jan\\_cmd"))
             , pietjanCmd(std::make_shared<CommandNode>(& context, "pietjan\\_cmd"))
-            , pietOut(std::make_shared<GeneratedFileNode>(& context, R"($R(.)\generated\pietout.txt)", pietCmd))
-            , janOut(std::make_shared<GeneratedFileNode>(&context, R"($R(.)\generated\janout.txt)", janCmd))
-            , pietjanOut(std::make_shared<GeneratedFileNode>(&context, R"($R(.)\generated\pietjanout.txt)", pietjanCmd))
-            , pietSrc(std::make_shared<SourceFileNode>(&context, R"($R(.)\pietsrc.txt)"))
-            , janSrc(std::make_shared<SourceFileNode>(&context, R"($R(.)\jansrc.txt)"))
+            , pietOut(std::make_shared<GeneratedFileNode>(& context, R"(@@.\generated\pietout.txt)", pietCmd))
+            , janOut(std::make_shared<GeneratedFileNode>(&context, R"(@@.\generated\janout.txt)", janCmd))
+            , pietjanOut(std::make_shared<GeneratedFileNode>(&context, R"(@@.\generated\pietjanout.txt)", pietjanCmd))
+            , pietSrc(std::make_shared<SourceFileNode>(&context, R"(@@.\pietsrc.txt)"))
+            , janSrc(std::make_shared<SourceFileNode>(&context, R"(@@.\jansrc.txt)"))
             , stats(context.statistics())
         {
             std::filesystem::create_directories(repoDir / "generated");
-            logBook->setAspects({ LogRecord::Aspect::Error });
+            logBook->aspects({ LogRecord::Aspect::Error });
             logBook->add(memLogBook);
             logBook->add(stdoutLogBook);
             context.logBook(logBook);

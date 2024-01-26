@@ -68,7 +68,8 @@ namespace YAM
         if (groupState == Node::State::Ok) {
             XXH64_hash_t prevHash = _hash;
             _hash = computeHash();
-            if (prevHash != _hash && context()->logBook()->mustLogAspect(LogRecord::Aspect::DirectoryChanges)) {
+            modified(prevHash != _hash);
+            if (modified() && context()->logBook()->mustLogAspect(LogRecord::Aspect::DirectoryChanges)) {
                 std::stringstream ss;
                 ss << className() << " " << name().string() << " has changed.";
                 LogRecord change(LogRecord::DirectoryChanges, ss.str());

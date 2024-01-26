@@ -12,7 +12,7 @@ namespace {
     using namespace YAM;
 
     std::string readFile(std::filesystem::path const& path) {
-        std::ifstream file(path.string().c_str());
+        std::ifstream file(path);
         std::stringstream ss;
         ss << file.rdbuf();
         return ss.str();
@@ -256,20 +256,37 @@ namespace YAM {
         }
     }
 
+    Token BuildFileParser::eatGlobToken() {
+        Token token = eat(glob);
+        std::filesystem::path path(token.value);
+        if (path.is_absolute()) {
+            std::stringstream ss;
+            ss
+                << "Illegal use of absolute path '" << path.string() << "'"
+                << " at line " << _tokenizer.tokenStartLine()
+                << ", from column " << _tokenizer.tokenStartColumn()
+                << " to " << _tokenizer.tokenEndColumn()
+                << " in file " << _tokenizer.filePath().string()
+                << std::endl;
+            throw std::runtime_error(ss.str());
+        }
+        return token;
+    }
+
     std::filesystem::path BuildFileParser::eatGlob() {
-        return eat(glob).value;
+        return eatGlobToken().value;
     }
 
     std::filesystem::path BuildFileParser::eatPath() {
-        Token token = eat(glob);
+        Token token = eatGlobToken();
         if (token.type == "glob") {
             std::stringstream ss;
             ss
-                << "Path '" << token.value << "' is not allowed to contain glob special characters"
-                << std::endl
-                << "At line " << _tokenizer.tokenStartLine()
+                << "Illegal use of glob characters in path '" << token.value << "'"
+                << " at line " << _tokenizer.tokenStartLine()
                 << ", from column " << _tokenizer.tokenStartColumn()
                 << " to " << _tokenizer.tokenEndColumn()
+                << " in file " << _tokenizer.filePath().string()
                 << std::endl;
             throw std::runtime_error(ss.str());
         }

@@ -93,7 +93,7 @@ namespace
 
             std::vector<std::shared_ptr<DirectoryNode>> subDirs; 
             sourceFileRepo()->directoryNode()->getSubDirs(subDirs); 
-            auto cmdNode = std::make_shared<CommandNode>(&context, std::filesystem::path("$R(repo)") / "__cmd");
+            auto cmdNode = std::make_shared<CommandNode>(&context, std::filesystem::path("@@repo") / "__cmd");
             cmdNode->script(R"(C:\Windows\System32\cmd.exe /c echo piet)");
             cmdNode->workingDirectory(subDirs[0]);
             context.nodes().add(cmdNode);
@@ -111,7 +111,7 @@ namespace
         }
 
         std::shared_ptr<CommandNode> cmdNode() {
-            auto node = context.nodes().find(std::filesystem::path("$R(repo)") / "__cmd");
+            auto node = context.nodes().find(std::filesystem::path("@@repo") / "__cmd");
             return dynamic_pointer_cast<CommandNode>(node);
         }
 

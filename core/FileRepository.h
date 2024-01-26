@@ -14,6 +14,7 @@ namespace YAM
     class ExecutionContext;
     class FileRepositoryWatcher;
 
+
     // A FileRepository is associated with a directory tree. 
     // The directory tree may contain:
     //      - subdirectories (recursively)
@@ -34,12 +35,12 @@ namespace YAM
     // 
     // FileRepository supports the conversion of so-called symbolic paths
     // to/from absolute paths. The format of a symbolic path is
-    // $R(repoName)\relPath where repoName is the name of the repository and 
+    // @@repoName\relPath where repoName is the name of the repository and 
     // relPath is a path relative to the root directory of the repository.
     // E.g. given a repo with name XYZ and root dir C:\repos\XYZ_root. Then
     // the following paths convert to/from each other:
     //        Symbolic path   <=>    Absolute path
-    //   $R(XYZ)\src\main.cpp <=> C:\repos\XYZ_root\src\main.cpp 
+    //     @@XYZ\src\main.cpp <=> C:\repos\XYZ_root\src\main.cpp 
     //
     class __declspec(dllexport) FileRepository : public IPersistable
     {
@@ -67,25 +68,27 @@ namespace YAM
             return _symbolicDirectory;
         }
 
-        // Return whether 'path' is a path in the repository.
-        // 'path' can be an absolute path or a symbolic path.
-        // E.g. if repository directory = /a/b and path = /a/b/c/e then 
-        // the repository lexically contains path.
-        // E.g. if repository directory = /a/b and path = /a/b then 
-        // the repository lexically contains path.
-        // E.g. if repository name is 'someRepo' and path is $R(someRepo)/a/b
-        // then repository lexically contains path. 
+        // Return whether 'path' is an absolute path or symbolic path in
+        // the repository.
+        // E.g. if repository directory = C:\a\b and name is XYZ then repo
+        //    lexicallyContains("C:\a\b\c\e")
+        //    lexicallyContains("C:\a\b")
+        //    lexicallyContains("@@XYZ")
+        //    lexicallyContains("@@XYZ\c\e")
+        //    !lexicallyContains("C:\a")
+        //    !lexicallyContains("a\b\c")
         // Note: a lexically contained path need not exist in the file system.
         bool lexicallyContains(std::filesystem::path const& path) const;
 
         // Return 'absPath' relative to the repo directory.
-        // Return empty path when !lexicallyContains(absPath) or when
-        // absPath == directory().
+        // Return empty path when:
+        //  !absPath.is_absolute() || !lexicallyContains(absPath) || absPath == directory()
+        // Pre: absPath must be in normal form, i.e. not contain . and/or .. components.
         std::filesystem::path relativePathOf(std::filesystem::path const& absPath) const;
 
-        // Return given 'absPath' as <repoName>/absPath.relative_path().
+        // Return given 'absPath' as symbolicDirectory()/relativePathOf(absPath)
         // Return empty path when !lexicallyContains(absPath).
-        // Return name() when absPath == directory().
+        // Return symbolicDirectory() when absPath == directory().
         // Pre: absPath.is_absolute();
         std::filesystem::path symbolicPathOf(std::filesystem::path const& absPath) const;
 
@@ -110,6 +113,8 @@ namespace YAM
         // Inherited from IPersistable
         void modified(bool newValue) override;
         bool modified() const override;
+        std::string describeName() const override { return _name; }
+        std::string describeType() const override { return "FileRepository"; }
 
         static void setStreamableType(uint32_t type);
         // Inherited from IStreamer (via IPersistable)

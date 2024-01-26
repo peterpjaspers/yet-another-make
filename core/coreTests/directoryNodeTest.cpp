@@ -138,7 +138,7 @@ namespace
             auto file = std::filesystem::path("..\\SubDir2\\File1");
             auto child = dirNode_S2_S3->findChild(file);
             ASSERT_NE(nullptr, child);
-            EXPECT_EQ(R"($R(repo)\SubDir2\SubDir2\File1)", child->name().string());
+            EXPECT_EQ(R"(@@repo\SubDir2\SubDir2\File1)", child->name().string());
         }
         {
             auto file = std::filesystem::path("..\\SubDir2\\..\\File1");

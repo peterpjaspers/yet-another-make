@@ -51,6 +51,8 @@ Todo: core
   anonymous GroupNode. %g<groupPath>/*.obj globs only on specified group.
 - tokenizer does not recognize symbolic path/glob: token value of glob 
   <repo>\file is <repo
+- investigate use of std::filesystem::path.string() and intialing paths
+  from a std::string. Shouldn't we use wstring?
 
 Done
 - Decide how to deal with using generated files from other repos

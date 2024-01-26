@@ -136,6 +136,8 @@ namespace YAM
         // Inherited from IPersistable
         void modified(bool newValue) override;
         bool modified() const override;
+        std::string describeName() const override { return _name.string(); }
+        std::string describeType() const override { return className(); }
 
         // Inherited from IStreamer (via IPersistable)
         void stream(IStreamer* streamer) override;

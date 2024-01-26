@@ -145,6 +145,18 @@ namespace {
     }
 
 
+    TEST(BuildFileParser, illegalInputPath) {
+        const std::string file = R"(: C:\hello.c |> gcc hello.c -o hello |> hello)";
+        try
+        {
+            BuildFileParser parser(file);
+        } catch (std::runtime_error e)
+        {
+            std::string expected("Illegal use of absolute path 'C:\\hello.c' at line 0, from column 2 to 12 in file test\n");
+            std::string actual = e.what();
+            EXPECT_EQ(expected, actual);
+        }
+    }
     TEST(BuildFileParser, illegalOutputPath) {
         const std::string file = R"(: hello.c |> gcc hello.c -o hello |> hello*)";
         try
@@ -152,7 +164,7 @@ namespace {
             BuildFileParser parser(file);
         } catch (std::runtime_error e)
         {
-            std::string expected("Path 'hello*' is not allowed to contain glob special characters\nAt line 0, from column 37 to 43\n");
+            std::string expected("Illegal use of glob characters in path 'hello*' at line 0, from column 37 to 43 in file test\n");
             std::string actual = e.what();
             EXPECT_EQ(expected, actual);
         }
