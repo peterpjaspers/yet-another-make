@@ -42,7 +42,7 @@ namespace YAM
             for (auto const& node : _group) unsubscribe(node.get(), this);
             _group = newGroup;
             for (auto const& node : _group) subscribe(node.get(), this);
-            modified(true);
+            modified(_hash != computeHash());
             setState(Node::State::Dirty);
         }
     }
