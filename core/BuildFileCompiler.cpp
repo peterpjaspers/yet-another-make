@@ -62,6 +62,18 @@ namespace
         return resolved;
     }
 
+    template<typename TNode>
+    std::vector<std::filesystem::path> relativePathsOf(
+        DirectoryNode const* baseDir,
+        std::vector<std::shared_ptr<TNode>> const& nodes
+    ) {
+        std::vector<std::filesystem::path> relPaths;
+        for (auto const& node : nodes) {
+            relPaths.push_back(node->name().lexically_relative(baseDir->name()));
+        }
+        return relPaths;
+    }
+
     // Return -1 if stringWithFlags[i] is not a digit
     std::size_t parseOffset(
         std::filesystem::path const& buildFile,
@@ -105,16 +117,16 @@ namespace
     void assertOffset(
         std::filesystem::path const& buildFile,
         BuildFile::Node const& node,
-        std::string stringWithFlags,
+        std::size_t columnOffset,
         std::size_t offset,
         std::size_t maxOffset
     ) {
         if (offset == -1) return;
-        if (offset > maxOffset) {
+        if (offset >= maxOffset) {
             std::stringstream ss;
             ss <<
-                "Too large offset " << offset << "after '%' " << "in " << stringWithFlags
-                << " at line " << node.line << " at column " << node.column
+                "Too large offset " << offset+1
+                << " at line " << node.line << " at column " << node.column + columnOffset
                 << " in build file " << buildFile.string()
                 << std::endl;
             throw std::runtime_error(ss.str());
@@ -124,12 +136,10 @@ namespace
     std::string compileFlag1(
         std::filesystem::path const& buildFile,
         BuildFile::Node const& node,
-        std::string const& stringWithFlags,
         DirectoryNode const* baseDir,
-        Node const* fileNode,
+        std::filesystem::path inputPath,
         char flag
     ) {
-        std::filesystem::path inputPath = resolvePath(baseDir, fileNode);
         if (flag == 'f') {
             return inputPath.string();
         } else if (flag == 'b') {
@@ -150,7 +160,7 @@ namespace
         } else {
             std::stringstream ss;
             ss <<
-                "Unknown flag %" << flag << " in " << stringWithFlags
+                "Unknown flag %" << flag 
                 << " at line " << node.line << " at column " << node.column
                 << " in build file " << buildFile.string()
                 << std::endl;
@@ -158,27 +168,25 @@ namespace
         }
     }
 
-    template<typename T>
     void compileFlagN(
         std::filesystem::path const& buildFile,
         BuildFile::Node const& node,
-        std::string const& stringWithFlags,
         DirectoryNode const* baseDir,
         std::size_t offset,
-        std::vector<std::shared_ptr<T>> const& fileNodes,
+        std::vector<std::filesystem::path> const& filePaths,
         char flag,
         std::string& result
      ) {
         if (offset == -1) {
-            std::size_t nFiles = fileNodes.size();
+            std::size_t nFiles = filePaths.size();
             for (std::size_t i = 0; i < nFiles; ++i) {
-                auto path = compileFlag1(buildFile, node, stringWithFlags, baseDir, fileNodes[i].get(), flag);
+                auto path = compileFlag1(buildFile, node, baseDir, filePaths[i], flag);
                 result.append(path);
                 if (i < nFiles-1) result.append(" ");
             }
         } else {
-            T const* fileNode = fileNodes[offset].get();
-            auto path = compileFlag1(buildFile, node, stringWithFlags, baseDir, fileNode, flag);
+            std::filesystem::path filePath = filePaths[offset];
+            auto path = compileFlag1(buildFile, node, baseDir, filePath, flag);
             result.append(path);
         }
     }
@@ -197,16 +205,17 @@ namespace
 
     void assertValidFlag(
         std::filesystem::path const& buildFile,
-        BuildFile::Node const& node, 
-        std::string stringWithFlags, 
+        BuildFile::Node const& node,
+        std::size_t columnOffset,
         char flag
     ) {
         static std::vector<char> flags = { 'f','b','B', 'e', 'd', 'D', 'i', 'o' };
         if (flags.end() == std::find(flags.begin(), flags.end(), flag)) {
+            std::size_t column = node.column + columnOffset;
             std::stringstream ss;
                 ss <<
-                "Unknown flag %" << flag << " in " << stringWithFlags
-                << " at line " << node.line << " at column " << node.column
+                "Unknown flag %" << flag
+                << " at line " << node.line << " at column " << column
                 << " in build file " << buildFile.string()
                 << std::endl;
                 throw std::runtime_error(ss.str());
@@ -243,6 +252,10 @@ namespace
         std::vector<std::shared_ptr<GeneratedFileNode>> const& cmdOutputs,
         bool allowOutputFlag // %o
     ) {
+        std::vector<std::filesystem::path> cmdInputPaths = relativePathsOf(baseDir, cmdInputs);
+        std::vector<std::filesystem::path> orderOnlyInputPaths = relativePathsOf(baseDir, orderOnlyInputs);
+        std::vector<std::filesystem::path> cmdOutputPaths = relativePathsOf(baseDir, cmdOutputs);
+
         std::size_t nChars = stringWithFlags.length();
         char const* chars = stringWithFlags.data();
         std::string result;
@@ -261,18 +274,26 @@ namespace
                     result.insert(result.end(), '%');
                     break;
                 }
-                assertValidFlag(buildFile, node, stringWithFlags, chars[i]);
+
+                std::size_t oidx = i;
                 std::size_t offset = parseOffset(buildFile, node, stringWithFlags, i);
+                std::size_t columnOffset = i;
+                if (allowOutputFlag) {
+                    // stringWithFlags is the rule command. Correct column offset for start
+                    // token of command string "|>".
+                    columnOffset = i + 2;
+                }
+                assertValidFlag(buildFile, node, columnOffset, chars[i]);
                 if (allowOutputFlag && chars[i] == 'o') {
-                    assertOffset(buildFile, node, stringWithFlags, offset, cmdOutputs.size());
-                    compileFlagN(buildFile, node, stringWithFlags, baseDir, offset, cmdOutputs, chars[i], result);
+                    assertOffset(buildFile, node, oidx, offset, cmdOutputPaths.size());
+                    compileFlagN(buildFile, node, baseDir, offset, cmdOutputPaths, chars[i], result);
                 } else if (chars[i] == 'i') {
-                    assertOffset(buildFile, node, stringWithFlags, offset, orderOnlyInputs.size());
-                    compileFlagN(buildFile, node, stringWithFlags, baseDir, offset, orderOnlyInputs, chars[i], result);
+                    assertOffset(buildFile, node, oidx, offset, orderOnlyInputPaths.size());
+                    compileFlagN(buildFile, node, baseDir, offset, orderOnlyInputPaths, chars[i], result);
                 } else {
-                    assertOffset(buildFile, node, stringWithFlags, offset, cmdInputs.size()); 
+                    assertOffset(buildFile, node, oidx, offset, cmdInputPaths.size());
                     if (offset == -1) offset = defaultCmdInputOffset;
-                    compileFlagN(buildFile, node, stringWithFlags, baseDir, offset, cmdInputs, chars[i], result);
+                    compileFlagN(buildFile, node, baseDir, offset, cmdInputPaths, chars[i], result);
                 } 
             } else {
                 result.insert(result.end(), chars[i]);
@@ -382,9 +403,12 @@ namespace YAM {
         auto optimizedPattern = input.path;
         Globber::optimize(optimizedBaseDir, optimizedPattern);
         std::filesystem::path inputPath(optimizedBaseDir->name() / optimizedPattern);
-        auto match = _context->nodes().find(inputPath);
-        auto fileNode = dynamic_pointer_cast<FileNode>(match);
+        auto fileNode = dynamic_pointer_cast<FileNode>(_context->nodes().find(inputPath));
         if (fileNode == nullptr) {
+            auto it = _outputs.find(inputPath);
+            if (it != _outputs.end()) fileNode = dynamic_pointer_cast<FileNode>(it->second);
+        }
+        if (fileNode == nullptr || fileNode->state() == Node::State::Deleted) {
             std::stringstream ss;
             ss << input.path.string() << ": no such input file." << std::endl;
             ss << "In rule at line " << input.line << " in buildfile " << _buildFile.string() << std::endl;
@@ -550,6 +574,7 @@ namespace YAM {
                     << " in buildfile " << producer->buildFile()->absolutePath() << std::endl;
                 throw std::runtime_error(ss.str());
             }
+            if (outputNode->state() == Node::State::Deleted) outputNode->setState(Node::State::Dirty);
         } else {
             outputNode = std::make_shared<GeneratedFileNode>(_context, outputPath, cmdNode);
             _newOutputs.insert({ outputPath, outputNode });
@@ -576,20 +601,20 @@ namespace YAM {
         std::vector<std::shared_ptr<Node>> const& cmdInputs,
         std::size_t defaultInputOffset
     ) const {
+        std::filesystem::path outputPath = output.path;
+        if (defaultInputOffset != -1) {
+            static std::vector<std::shared_ptr<GeneratedFileNode>> emptyOutputs;
+            static std::vector<std::shared_ptr<Node>> emptyOrderOnlyInputs;
+            outputPath = compilePercentageFlags(
+                _buildFile, output, _baseDir.get(), outputPath.string(),
+                cmdInputs, defaultInputOffset, emptyOrderOnlyInputs,
+                emptyOutputs, false);
+        }
         auto base = _baseDir;
-        std::filesystem::path pattern = output.path;
+        std::filesystem::path pattern = outputPath;
         Globber::optimize(base, pattern);
-        std::filesystem::path optimizedPath = base->name() / pattern;
-        if (defaultInputOffset == -1 ) return optimizedPath;
-
-        static std::vector<std::shared_ptr<GeneratedFileNode>> emptyOutputs;
-        std::vector<std::shared_ptr<Node>> emptyOrderOnlyInputs;
-        std::filesystem::path outputPath = compilePercentageFlags(
-            _buildFile, output, _baseDir.get(), optimizedPath.string(),
-            cmdInputs, defaultInputOffset, emptyOrderOnlyInputs,
-            emptyOutputs, false);
-        if (!FileRepository::isSymbolicPath(outputPath)) return _baseDir->name() / outputPath;
-        return std::filesystem::path(outputPath);
+        std::filesystem::path symOutputPath = base->name() / pattern;
+        return symOutputPath;
     }
 
     std::vector<std::filesystem::path> BuildFileCompiler::compileOutputPaths(
