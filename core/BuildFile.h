@@ -11,6 +11,8 @@
 
 namespace YAM { namespace BuildFile {
 
+    enum PathType { Path=1, Glob=2, Group=3, Bin=4 };
+
     struct __declspec(dllexport) Node : public IStreamable {
         std::size_t line;
         std::size_t column;
@@ -29,8 +31,8 @@ namespace YAM { namespace BuildFile {
         
     struct __declspec(dllexport) Input : public Node {
         bool exclude;
-        std::filesystem::path pathPattern;
-        bool isGroup;
+        std::filesystem::path path;
+        PathType pathType;
 
         void addHashes(std::vector<XXH64_hash_t>& hashes) override;
         void stream(IStreamer* streamer) override;
@@ -53,7 +55,7 @@ namespace YAM { namespace BuildFile {
     struct __declspec(dllexport) Output : public Node {
         bool ignore;
         std::filesystem::path path;
-        bool isGroup;
+        PathType pathType;
 
         void addHashes(std::vector<XXH64_hash_t>& hashes) override;
         void stream(IStreamer* streamer) override;
@@ -73,7 +75,8 @@ namespace YAM { namespace BuildFile {
         Inputs orderOnlyInputs;
         Script script;
         Outputs outputs;
-        std::filesystem::path outputGroup;
+        std::vector<std::filesystem::path> outputGroups;
+        std::vector<std::filesystem::path> bins;
 
         void addHashes(std::vector<XXH64_hash_t>& hashes) override;
         uint32_t typeId() const override;

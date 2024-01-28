@@ -77,8 +77,8 @@ namespace YAM {
     void BuildFileDependenciesCompiler::compileInputs(BuildFile::Inputs const& inputs) {
         std::vector<std::shared_ptr<FileNode>> inputNodes;
         for (auto const& input : inputs.inputs) {
-            if (Glob::isGlob(input.pathPattern.string())) {
-                compileGlob(input.pathPattern);
+            if (input.pathType == BuildFile::PathType::Glob) {
+                compileGlob(input.path);
             }
         }
     }

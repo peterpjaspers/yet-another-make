@@ -58,10 +58,12 @@ namespace
         TestSetup setup;
         BuildFile::Input input1;
         input1.exclude = false;
-        input1.pathPattern = "src1\\*.cpp";
+        input1.pathType = BuildFile::PathType::Glob;
+        input1.path = "src1\\*.cpp";
         BuildFile::Input input2;
         input2.exclude = false;
-        input2.pathPattern = "src2\\*.cpp";
+        input2.pathType = BuildFile::PathType::Glob;
+        input2.path = "src2\\*.cpp";
         auto rule = std::make_shared<BuildFile::Rule>();
         rule->forEach = true;
         rule->cmdInputs.inputs.push_back(input1);

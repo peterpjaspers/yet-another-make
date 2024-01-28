@@ -384,11 +384,9 @@ namespace YAM
     void CommandNode::buildFile(SourceFileNode* buildFile) {
         _buildFile = buildFile;
     }
+
     void CommandNode::ruleLineNr(std::size_t ruleLineNr) {
-        if (_ruleLineNr != ruleLineNr) {
-            _ruleLineNr = ruleLineNr;
-            modified(true);
-        }
+        _ruleLineNr = ruleLineNr;
     }
     SourceFileNode const* CommandNode::buildFile() const {
         return _buildFile;
@@ -409,6 +407,9 @@ namespace YAM
         for (auto const& node : _orderOnlyInputs) {
             auto grpNode = dynamic_pointer_cast<GroupNode>(node);
             if (grpNode != nullptr) hashes.push_back(grpNode->hash());
+        }
+        for (auto const& path : _ignoredOutputs) {
+            hashes.push_back(XXH64_string(path.string()));
         }
         auto entireFile = FileAspect::entireFileAspect().name();
         for (auto const& node : _outputs) hashes.push_back(node->hashOf(entireFile));
@@ -947,7 +948,6 @@ namespace YAM
     */
     void CommandNode::stream(IStreamer* streamer) {
         Node::stream(streamer);
-        streamer->stream(_ruleLineNr);
         streamer->stream(_inputAspectsName);
         streamer->streamVector(_cmdInputs);
         streamer->streamVector(_orderOnlyInputs);

@@ -150,7 +150,7 @@ namespace
         } else {
             std::stringstream ss;
             ss <<
-                "Unkown flag %" << flag << " in " << stringWithFlags
+                "Unknown flag %" << flag << " in " << stringWithFlags
                 << " at line " << node.line << " at column " << node.column
                 << " in build file " << buildFile.string()
                 << std::endl;
@@ -193,6 +193,24 @@ namespace
 
     bool isOutputFlag(char c) {
         return c == 'o';
+    }
+
+    void assertValidFlag(
+        std::filesystem::path const& buildFile,
+        BuildFile::Node const& node, 
+        std::string stringWithFlags, 
+        char flag
+    ) {
+        static std::vector<char> flags = { 'f','b','B', 'e', 'd', 'D', 'i', 'o' };
+        if (flags.end() == std::find(flags.begin(), flags.end(), flag)) {
+            std::stringstream ss;
+                ss <<
+                "Unknown flag %" << flag << " in " << stringWithFlags
+                << " at line " << node.line << " at column " << node.column
+                << " in build file " << buildFile.string()
+                << std::endl;
+                throw std::runtime_error(ss.str());
+        }
     }
 
     bool containsFlag(std::string const& stringWithFlags, bool (*isFlag)(char)) {
@@ -243,6 +261,7 @@ namespace
                     result.insert(result.end(), '%');
                     break;
                 }
+                assertValidFlag(buildFile, node, stringWithFlags, chars[i]);
                 std::size_t offset = parseOffset(buildFile, node, stringWithFlags, i);
                 if (allowOutputFlag && chars[i] == 'o') {
                     assertOffset(buildFile, node, stringWithFlags, offset, cmdOutputs.size());
@@ -324,10 +343,62 @@ namespace YAM {
         return groupNode;
     }
 
+    std::vector<std::shared_ptr<GeneratedFileNode>>& BuildFileCompiler::compileBin(
+        BuildFile::Node const& rule,
+        std::filesystem::path const& binPath
+    ) {
+        auto it = _bins.find(binPath);
+        if (it == _bins.end()) {
+            _bins.insert({ binPath, std::vector<std::shared_ptr<GeneratedFileNode>>()});
+        }
+        return _bins[binPath];
+    }
+
     std::shared_ptr<GroupNode> BuildFileCompiler::compileInputGroup(
         BuildFile::Input const& input
     ) {
-        return compileGroupNode(input, input.pathPattern);
+        return compileGroupNode(input, input.path);
+    }
+
+    std::vector<std::shared_ptr<GeneratedFileNode>>& BuildFileCompiler::compileInputBin(
+        BuildFile::Input const& input
+    ) {
+        auto it = _bins.find(input.path);
+        if (it == _bins.end()) {
+            std::stringstream ss;
+            ss << input.path.string() << ": no such input bin." << std::endl;
+            ss << "In rule at line " << input.line << " in buildfile " << _buildFile.string() << std::endl;
+            ss << "A bin can only be used as input when it was defined as" << std::endl;
+            ss << " output bin of an earlier defined rule." << std::endl;
+            throw std::runtime_error(ss.str());
+        }
+        return (*it).second;
+    }
+
+    std::shared_ptr<FileNode> BuildFileCompiler::compileInputPath(
+        BuildFile::Input const&input
+    ) {
+        auto optimizedBaseDir = _baseDir;
+        auto optimizedPattern = input.path;
+        Globber::optimize(optimizedBaseDir, optimizedPattern);
+        std::filesystem::path inputPath(optimizedBaseDir->name() / optimizedPattern);
+        auto match = _context->nodes().find(inputPath);
+        auto fileNode = dynamic_pointer_cast<FileNode>(match);
+        if (fileNode == nullptr) {
+            std::stringstream ss;
+            ss << input.path.string() << ": no such input file." << std::endl;
+            ss << "In rule at line " << input.line << " in buildfile " << _buildFile.string() << std::endl;
+            ss << "Possible causes:" << std::endl;
+            ss << "Reference to a non-existing source file, or" << std::endl;
+            ss << "Misspelled name of a source file or generated file, or" << std::endl;
+            ss << "Reference to a generated file that has not yet been defined." << std::endl;
+            ss << "If the generated file is defined in a rule in this buildfile " << std::endl;
+            ss << "then move that rule to a line above the offending rule." << std::endl;
+            ss << "If the generated file is defined in a rule in another buildfile" << std::endl;
+            ss << "then declare the dependency on that other buildfile in this buildfile." << std::endl;
+            throw std::runtime_error(ss.str());
+        }
+        return fileNode;
     }
 
     std::vector<std::shared_ptr<Node>> BuildFileCompiler::compileInput(
@@ -335,41 +406,24 @@ namespace YAM {
     ) {
         std::vector<std::shared_ptr<Node>> inputNodes;
         std::shared_ptr<FileNode> fileNode;
-        if (input.isGroup) {
+        if (input.pathType == BuildFile::PathType::Group) {
             inputNodes.push_back(compileInputGroup(input));
-        } else if (Glob::isGlob(input.pathPattern.string())) {
-            std::shared_ptr<GlobNode> globNode = compileGlob(input.pathPattern);
+        } else if (input.pathType == BuildFile::PathType::Bin) {
+            std::vector<std::shared_ptr<GeneratedFileNode>>& binContent = compileInputBin(input);
+            for (auto const& node : binContent) {
+                fileNode = dynamic_pointer_cast<FileNode>(node);
+                inputNodes.push_back(fileNode);
+            }
+        } else if (input.pathType == BuildFile::PathType::Glob) {
+            std::shared_ptr<GlobNode> globNode = compileGlob(input.path);
             for (auto const& match : globNode->matches()) {
                 fileNode = dynamic_pointer_cast<FileNode>(match);
                 if (fileNode == nullptr) throw std::runtime_error("not a file node");
                 inputNodes.push_back(fileNode);
             }
-        } else {
+        } else if (input.pathType == BuildFile::PathType::Path) {
             // Using GlobNode is inefficient in case of a single input path.
-            // Also GlobNode will only find nodes for source file input paths
-            // because it searches in DirectoryNodes which only contain source
-            // files. Therefor do a direct lookup if the (source or generated) 
-            // input path in context.
-            auto optimizedBaseDir = _baseDir;
-            auto optimizedPattern = input.pathPattern;
-            Globber::optimize(optimizedBaseDir, optimizedPattern);
-            std::filesystem::path inputPath(optimizedBaseDir->name() / optimizedPattern);
-            auto match = _context->nodes().find(inputPath);
-            fileNode = dynamic_pointer_cast<FileNode>(match);
-            if (fileNode == nullptr) {
-                std::stringstream ss;
-                ss << input.pathPattern.string() << ": no such input file." << std::endl;
-                ss << "In rule at line " << input.line << " in buildfile " << _buildFile.string() << std::endl;
-                ss << "Possible causes:" << std::endl;
-                ss << "Reference to a non-existing source file, or" << std::endl;
-                ss << "Misspelled name of a source file or generated file, or" << std::endl;
-                ss << "Reference to a generated file that has not yet been defined." << std::endl;
-                ss << "If the generated file is defined in a rule in this buildfile " << std::endl;
-                ss << "then move that rule to a line above the offending rule." << std::endl;
-                ss << "If the generated file is defined in a rule in another buildfile" << std::endl;
-                ss << "then declare the dependency on that other buildfile in this buildfile." << std::endl;
-                throw std::runtime_error(ss.str());
-            }
+            std::shared_ptr<FileNode> fileNode = compileInputPath(input);
             inputNodes.push_back(fileNode);
         }
         return inputNodes;
@@ -614,6 +668,7 @@ namespace YAM {
         if (outputPaths.empty()) assertHasNoOutputFlag(rule.script.line, rule.script.script);
 
         std::shared_ptr<CommandNode> cmdNode = createCommand(rule, outputPaths);
+        _ruleLineNrs[cmdNode] = rule.line;
         std::vector<std::shared_ptr<GeneratedFileNode>> outputs = createGeneratedFileNodes(rule, cmdNode, outputPaths);
         // Compile the script to check for semantic errors
         std::string notused = compileScript(_buildFile, rule.script, _baseDir.get(), cmdInputs, orderOnlyInputs, outputs);
@@ -627,16 +682,20 @@ namespace YAM {
         cmdNode->script(rule.script.script);
         cmdNode->outputs(outputs);
         cmdNode->ignoreOutputs(ignoredOutputs);
-        compileOutputGroup(rule, outputs);
+        for (auto const& groupPath : rule.outputGroups) {
+            compileOutputGroup(rule, groupPath, outputs);
+        }
+        for (auto const& binPath : rule.bins) {
+            compileOutputBin(rule, binPath, outputs);
+        }
     }
 
     void BuildFileCompiler::compileOutputGroup(
         BuildFile::Rule const& rule,
+        std::filesystem::path const& groupPath,
         std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs
     ) {
-        if (rule.outputGroup.empty()) return;
-
-        std::shared_ptr<GroupNode> groupNode = compileGroupNode(rule, rule.outputGroup);
+        std::shared_ptr<GroupNode> groupNode = compileGroupNode(rule, groupPath);
         if (!_outputGroups.contains(groupNode->name())) {
             _outputGroups.insert({ groupNode->name(), groupNode });
         }
@@ -645,6 +704,17 @@ namespace YAM {
             group.push_back(n);
         }
         groupNode->group(group);
+    }
+
+    void BuildFileCompiler::compileOutputBin(
+        BuildFile::Rule const& rule,
+        std::filesystem::path const& binPath,
+        std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs
+    ) {
+        std::vector<std::shared_ptr<GeneratedFileNode>>& binContent = compileBin(rule, binPath);
+        for (auto const& n : outputs) {
+            binContent.push_back(n);
+        }
     }
 
     void BuildFileCompiler::assertHasNoCmdInputFlag(std::size_t line, std::string const& str) const {

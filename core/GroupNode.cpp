@@ -42,7 +42,7 @@ namespace YAM
             for (auto const& node : _group) unsubscribe(node.get(), this);
             _group = newGroup;
             for (auto const& node : _group) subscribe(node.get(), this);
-            modified(_hash != computeHash());
+            modified(true);
             setState(Node::State::Dirty);
         }
     }
@@ -68,8 +68,8 @@ namespace YAM
         if (groupState == Node::State::Ok) {
             XXH64_hash_t prevHash = _hash;
             _hash = computeHash();
-            modified(prevHash != _hash);
-            if (modified() && context()->logBook()->mustLogAspect(LogRecord::Aspect::DirectoryChanges)) {
+            modified(true);
+            if (prevHash != _hash && context()->logBook()->mustLogAspect(LogRecord::Aspect::DirectoryChanges)) {
                 std::stringstream ss;
                 ss << className() << " " << name().string() << " has changed.";
                 LogRecord change(LogRecord::DirectoryChanges, ss.str());

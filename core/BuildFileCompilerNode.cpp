@@ -131,6 +131,23 @@ namespace
         toUpdate = newSet;
     }
 
+    void updateLineNrs(
+        std::vector<std::size_t>& lineNrs, 
+        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const& cmds,
+        std::map<std::shared_ptr<CommandNode>, std::size_t> const& lineNrsMap,
+        std::shared_ptr<SourceFileNode> buildFile
+    ) {
+        lineNrs.clear();
+        for (auto const& pair : cmds) {
+            auto cmd = pair.second;
+            auto it = lineNrsMap.find(cmd);
+            std::size_t lineNr = it->second;
+            lineNrs.push_back(lineNr);
+            cmd->buildFile(buildFile.get());
+            cmd->ruleLineNr(lineNr);
+        }
+    }
+
     BuildFileParserNode const* findParser(
         std::vector<BuildFileParserNode const*> const& parsers,
         SourceFileNode const* buildFile
@@ -294,10 +311,8 @@ namespace YAM
             updateMap(context(), this, _commands, compiler.commands());
             updateMap(context(), this, _outputGroups, compiler.outputGroups());
             updateMap(context(), this, _outputs, compiler.outputs());
-            for (auto const& pair : _commands) {
-                pair.second->buildFile(_buildFileParser->buildFile().get());
-            }
-
+            updateLineNrs(_ruleLineNrs, _commands, compiler.ruleLineNrs(), _buildFileParser->buildFile());
+   
             if (validGeneratedInputs()) {
                 XXH64_hash_t newHash = computeExecutionHash();
                 if (_executionHash != newHash) modified(true);
@@ -427,6 +442,7 @@ namespace YAM
         NodeMapStreamer::stream(streamer, _commands);
         NodeMapStreamer::stream(streamer, _outputs);
         NodeMapStreamer::stream(streamer, _outputGroups);
+        streamer->streamVector(_ruleLineNrs);
         streamer->stream(_executionHash);
     }
 
@@ -440,6 +456,7 @@ namespace YAM
         _commands.clear();
         _outputs.clear();
         _outputGroups.clear();
+        _ruleLineNrs.clear();
 
     }
     bool BuildFileCompilerNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
@@ -454,16 +471,22 @@ namespace YAM
         NodeMapStreamer::restore(_outputs);
         NodeMapStreamer::restore(_outputGroups);
         for (auto const& i : _depCompilers) {
-            i.second->restore(context, restored);
-            i.second->addObserver(this);
+            auto const& compiler = i.second;
+            compiler->restore(context, restored);
+            compiler->addObserver(this);
         }
         for (auto const& i : _depGlobs) {
-            i.second->restore(context, restored);
-            i.second->addObserver(this);
+            auto const& glob = i.second;
+            glob->restore(context, restored);
+            glob->addObserver(this);
         }
+        std::size_t ruleIndex = 0;
         for (auto const& i : _commands) {
-            i.second->restore(context, restored);
-            i.second->buildFile(_buildFileParser->buildFile().get());
+            auto const& cmd = i.second;
+            cmd->restore(context, restored);
+            cmd->buildFile(_buildFileParser->buildFile().get());
+            cmd->ruleLineNr(_ruleLineNrs[ruleIndex]);
+            ruleIndex++;
         }
         return true;
     }

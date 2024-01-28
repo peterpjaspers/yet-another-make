@@ -39,7 +39,7 @@ namespace {
         ASSERT_EQ(1, rule->cmdInputs.inputs.size());
         auto const& input = rule->cmdInputs.inputs[0];
         EXPECT_FALSE(input.exclude);
-        Glob glob(input.pathPattern);
+        Glob glob(input.path);
         EXPECT_TRUE(glob.matches(std::string("hello.c")));
 
         std::string expectedScript(R"(
@@ -60,12 +60,13 @@ namespace {
             glob src\*.cpp
         : 
             foreach 
-                hello.c <someGroup>
+                "hello world.c" <someGroup>
                 | hi.obj <..\modules\<someOtherGroup>
             |>
                 gcc hello.c -o hello
             |> 
-            %B.obj <objects>
+            %B.obj {objectsBin0} <objectsGroup0>
+            %B.dep {objectsBin1} <objectsGroup1>
         )";
         BuildFileParser parser(rules);
 
@@ -83,36 +84,51 @@ namespace {
 
         ASSERT_NE(nullptr, rule);
         EXPECT_TRUE(rule->forEach);
-        EXPECT_EQ("<objects>", rule->outputGroup);
-        ASSERT_EQ(2, rule->cmdInputs.inputs.size());
 
+        ASSERT_EQ(2, rule->cmdInputs.inputs.size());
         auto const& input0 = rule->cmdInputs.inputs[0];
+        EXPECT_EQ(BuildFile::PathType::Path, input0.pathType);
         EXPECT_FALSE(input0.exclude);
-        EXPECT_EQ("hello.c", input0.pathPattern);
+        EXPECT_EQ("hello world.c", input0.path);
 
         auto const& input1 = rule->cmdInputs.inputs[1];
         EXPECT_FALSE(input1.exclude);
-        EXPECT_TRUE(input1.isGroup);
-        EXPECT_EQ("<someGroup>", input1.pathPattern);
+        EXPECT_EQ(BuildFile::PathType::Group, input1.pathType);
+        EXPECT_TRUE(input1.pathType == BuildFile::PathType::Group);
+        EXPECT_EQ("<someGroup>", input1.path);
 
         ASSERT_EQ(2, rule->orderOnlyInputs.inputs.size());
         auto const& ooinput0 = rule->orderOnlyInputs.inputs[0];
         EXPECT_FALSE(ooinput0.exclude);
-        EXPECT_FALSE(ooinput0.isGroup);
-        EXPECT_EQ("hi.obj", ooinput0.pathPattern);
+        EXPECT_EQ(BuildFile::PathType::Path, ooinput0.pathType);
+        EXPECT_EQ("hi.obj", ooinput0.path);
         auto const& ooinput1 = rule->orderOnlyInputs.inputs[1];
         EXPECT_FALSE(ooinput1.exclude);
-        EXPECT_TRUE(ooinput1.isGroup);
-        EXPECT_EQ(R"(<..\modules\<someOtherGroup>)", ooinput1.pathPattern);
+        EXPECT_EQ(BuildFile::PathType::Group, ooinput1.pathType);
+        EXPECT_EQ(R"(<..\modules\<someOtherGroup>)", ooinput1.path);
 
         std::string expectedScript(R"(
                 gcc hello.c -o hello
             )");
         EXPECT_EQ(expectedScript, rule->script.script);
 
-        ASSERT_EQ(1, rule->outputs.outputs.size());
-        auto const& output = rule->outputs.outputs[0];
-        EXPECT_EQ("%B.obj", output.path);
+        ASSERT_EQ(2, rule->outputs.outputs.size());
+        auto const& output0 = rule->outputs.outputs[0];
+        EXPECT_EQ("%B.obj", output0.path);
+        auto const& output1 = rule->outputs.outputs[1];
+        EXPECT_EQ("%B.dep", output1.path);
+
+        ASSERT_EQ(2, rule->outputGroups.size());
+        auto const& group0 = rule->outputGroups[0];
+        EXPECT_EQ("<objectsGroup0>", group0);
+        auto const& group1 = rule->outputGroups[1];
+        EXPECT_EQ("<objectsGroup1>", group1);
+
+        ASSERT_EQ(2, rule->bins.size());
+        auto const& bin0 = rule->bins[0];
+        EXPECT_EQ("{objectsBin0}", bin0);
+        auto const& bin1 = rule->bins[1];
+        EXPECT_EQ("{objectsBin1}", bin1);
     }
 
 
@@ -145,7 +161,7 @@ namespace {
     }
 
 
-    TEST(BuildFileParser, illegalInputPath) {
+    TEST(BuildFileParser, illegalAbsoluteInputPath) {
         const std::string file = R"(: C:\hello.c |> gcc hello.c -o hello |> hello)";
         try
         {
@@ -153,6 +169,32 @@ namespace {
         } catch (std::runtime_error e)
         {
             std::string expected("Illegal use of absolute path 'C:\\hello.c' at line 0, from column 2 to 12 in file test\n");
+            std::string actual = e.what();
+            EXPECT_EQ(expected, actual);
+        }
+    }
+
+    TEST(BuildFileParser, illegalMissingEndQuoteInputPath) {
+        const std::string file = R"(: "hello world |> gcc hello.c -o hello |> hello)";
+        try
+        {
+            BuildFileParser parser(file);
+        } catch (std::runtime_error e)
+        {
+            std::string expected("Missing endquote on input path at line 0, from column 2 to 47 in file test\n");
+            std::string actual = e.what();
+            EXPECT_EQ(expected, actual);
+        }
+    }
+
+    TEST(BuildFileParser, illegalMissingEndQuoteOutputPath) {
+        const std::string file = R"(: hello.c |> gcc hello.c -o hello |> "hello)";
+        try
+        {
+            BuildFileParser parser(file);
+        } catch (std::runtime_error e)
+        {
+            std::string expected("Missing endquote on output path at line 0, from column 37 to 43 in file test\n");
             std::string actual = e.what();
             EXPECT_EQ(expected, actual);
         }
@@ -182,5 +224,4 @@ namespace {
         EXPECT_EQ(0, buildFile->deps.depGlobs.size());
         ASSERT_EQ(2, buildFile->variablesAndRules.size());
     }
-
 }

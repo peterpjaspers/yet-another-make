@@ -148,13 +148,14 @@ namespace YAM {
         BuildFile::Outputs outputs;
         parseOutputs(outputs);
         for (auto const& output : outputs.outputs) {
-            if (output.isGroup) {
-                if (rulePtr->outputGroup.empty()) {
-                    rulePtr->outputGroup = output.path;
-                } else {
-                    syntaxError(); // only 1 output group allowed
-                }
-            } else {
+            if (output.pathType == BuildFile::PathType::Group) {
+                rulePtr->outputGroups.push_back(output.path);
+            } else if (output.pathType == BuildFile::PathType::Bin) {
+                rulePtr->bins.push_back(output.path);
+            } else if (output.pathType == BuildFile::PathType::Path) {
+                rulePtr->outputs.outputs.push_back(output);
+            } else if (output.pathType == BuildFile::PathType::Glob) {
+                // in case of output.ignore
                 rulePtr->outputs.outputs.push_back(output);
             }
         }
@@ -182,19 +183,32 @@ namespace YAM {
         input.line = _tokenizer.tokenStartLine();
         input.column = _tokenizer.tokenStartColumn();
         input.exclude = false;
-        input.isGroup = false;
         if (_lookAhead.spec == ignore) {
             input.exclude = true;
             lookAhead({ glob });
         }
         if (_lookAhead.spec == glob) {
             if (_lookAhead.type == "group") {
-                input.isGroup = true;
-                input.pathPattern = eatPath();
+                input.pathType = BuildFile::PathType::Group;
+                input.path = eatPath();
+            } else if (_lookAhead.type == "bin") {
+                input.pathType = BuildFile::PathType::Bin;
+                input.path = eatPath();
             } else if (_lookAhead.type == "glob") {
-                input.pathPattern = eatGlob();
+                input.pathType = BuildFile::PathType::Glob;
+                input.path = eatGlob();
             } else if (_lookAhead.type == "path") {
-                input.pathPattern = eatPath();
+                input.pathType = BuildFile::PathType::Path;
+                input.path = eatPath();
+            } else if (_lookAhead.type == "no_endquote") {
+                std::stringstream ss;
+                    ss << "Missing endquote on input path"
+                    << " at line " << _tokenizer.tokenStartLine()
+                    << ", from column " << _tokenizer.tokenStartColumn()
+                    << " to " << _tokenizer.tokenEndColumn()
+                    << " in file " << _tokenizer.filePath().string()
+                    << std::endl;
+                    throw std::runtime_error(ss.str());
             } else {
                 syntaxError();
             }
@@ -235,19 +249,36 @@ namespace YAM {
         output.line = _tokenizer.tokenStartLine();
         output.column = _tokenizer.tokenStartColumn();
         output.ignore = false;
-        output.isGroup = false;
         if (_lookAhead.spec == ignore) {
             output.ignore = true;
             lookAhead({ glob });
         }
         if (_lookAhead.spec == glob) {
             if (_lookAhead.type == "group") {
-                output.isGroup = true;
+                output.pathType = BuildFile::PathType::Group;
+                output.path = eatPath();
+            } else if (_lookAhead.type == "bin") {
+                output.pathType = BuildFile::PathType::Bin;
+                output.path = eatPath();
+            } else if (_lookAhead.type == "path") {
+                output.pathType = BuildFile::PathType::Path;
                 output.path = eatPath();
             } else if (_lookAhead.type == "glob") {
-                output.path = eatPath(); // will raise glob-not-allowed
-            } else if (_lookAhead.type == "path") {
-                output.path = eatPath();
+                if (output.ignore) {
+                    output.pathType = BuildFile::PathType::Glob;
+                    output.path = eatGlob();
+                } else {
+                    eatPath(); // will throw glob-not-allowed
+                }
+            } else if (_lookAhead.type == "no_endquote") {
+                std::stringstream ss;
+                ss << "Missing endquote on output path"
+                    << " at line " << _tokenizer.tokenStartLine()
+                    << ", from column " << _tokenizer.tokenStartColumn()
+                    << " to " << _tokenizer.tokenEndColumn()
+                    << " in file " << _tokenizer.filePath().string()
+                    << std::endl;
+                throw std::runtime_error(ss.str());
             } else {
                 syntaxError();
             }

@@ -54,13 +54,9 @@ namespace YAM
 					result.push_back(*s);
 				}
 			}
-			if (quoted) {
-				std::stringstream ss;
-				ss << "Missing endquote on string: " << str;
-				throw std::runtime_error(ss.str());
-			}
 		}
-		if (result.empty()) {
+		token.consumed = s - str;
+		if (token.consumed == 0) {
 			token.spec = nullptr;
 		} else {
 			token.spec = this;
@@ -73,8 +69,8 @@ namespace YAM
 			} else {
 				token.type = "path";
 			}
+			if (quoted) token.type = "no_endquote";
 			token.value = result;
-			token.consumed = result.length();
 		}
 		return token.spec != nullptr;
     }

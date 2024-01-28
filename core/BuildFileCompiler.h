@@ -12,6 +12,7 @@ namespace YAM {
     class Node;
     class GeneratedFileNode;
     class DirectoryNode;
+    class FileNode;
     class CommandNode;
     class GlobNode;
     class GroupNode;
@@ -42,21 +43,25 @@ namespace YAM {
         // or output flags.
         static bool isLiteralScript(std::string const& script);
 
-        std::map<std::filesystem::path, std::shared_ptr<CommandNode>>  const& commands() {
+        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const& commands() const {
             return _commands;
         }
 
-        std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const& outputs() {
+        std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const& outputs() const {
             return _outputs;
         }
 
-        std::map<std::filesystem::path, std::shared_ptr<GroupNode>> const& outputGroups() {
+        std::map<std::filesystem::path, std::shared_ptr<GroupNode>> const& outputGroups() const {
             return _outputGroups;
         }
 
         // Return the globs that were used to resolve rule inputs.
-        std::map<std::filesystem::path, std::shared_ptr<GlobNode>> const& globs() {
+        std::map<std::filesystem::path, std::shared_ptr<GlobNode>> const& globs() const {
             return _globs;
+        }
+
+        std::map<std::shared_ptr<CommandNode>, std::size_t> ruleLineNrs() const {
+            return _ruleLineNrs;
         }
 
         std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const& newCommands() const {
@@ -83,8 +88,19 @@ namespace YAM {
             BuildFile::Node const& rule,
             std::filesystem::path const& groupName);
 
+        std::vector<std::shared_ptr<GeneratedFileNode>>& compileBin(
+            BuildFile::Node const& rule,
+            std::filesystem::path const& binPath);
+
+        std::vector<std::shared_ptr<GeneratedFileNode>>& compileInputBin(
+            BuildFile::Input const& input);
+
         std::shared_ptr<GroupNode> compileInputGroup(
             BuildFile::Input const& input);
+
+        std::shared_ptr<FileNode> compileInputPath(
+            BuildFile::Input const& input
+        );
 
         std::vector<std::shared_ptr<Node>> compileInput(
             BuildFile::Input const& input);
@@ -104,6 +120,16 @@ namespace YAM {
             BuildFile::Rule const& rule,
             std::shared_ptr<CommandNode> const& cmdNode,
             std::vector<std::filesystem::path> const& outputPaths);
+
+        void compileOutputGroup(
+            BuildFile::Rule const& rule,
+            std::filesystem::path const& groupPath,
+            std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs);
+
+        void compileOutputBin(
+            BuildFile::Rule const& rule,
+            std::filesystem::path const& binPath,
+            std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs);
 
         std::filesystem::path compileOutputPath(
             BuildFile::Output const& output,
@@ -129,8 +155,9 @@ namespace YAM {
             std::vector<std::shared_ptr<Node>> const& cmdInputs,
             std::vector<std::shared_ptr<Node>> const& orderOnlyInputs);
 
-        void compileOutputGroup(
+        void compileBin(
             BuildFile::Rule const& rule,
+            std::filesystem::path const& binPath,
             std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs);
 
         void assertHasNoCmdInputFlag(std::size_t line, std::string const& str) const;
@@ -149,6 +176,9 @@ namespace YAM {
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _outputs;
         std::map<std::filesystem::path, std::shared_ptr<GlobNode>> _globs;
         std::map<std::filesystem::path, std::shared_ptr<GroupNode>> _outputGroups;
+        std::map<std::filesystem::path, std::vector<std::shared_ptr<GeneratedFileNode>>> _bins;
+
+        std::map<std::shared_ptr<CommandNode>, std::size_t> _ruleLineNrs;
 
         std::map<std::filesystem::path, std::shared_ptr<CommandNode>> _newCommands;
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _newOutputs;

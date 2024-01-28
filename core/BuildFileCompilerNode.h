@@ -37,13 +37,13 @@ namespace YAM {
         void buildFileParser(std::shared_ptr<BuildFileParserNode> const& newFile);
         std::shared_ptr<BuildFileParserNode> buildFileParser() const;
 
-        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const& commands() {
+        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const& commands() const {
             return _commands; 
         }
-        std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const & outputs() {
+        std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const & outputs() const {
             return _outputs;
         }
-        std::map<std::filesystem::path, std::shared_ptr<GroupNode>> const& outputGroups() {
+        std::map<std::filesystem::path, std::shared_ptr<GroupNode>> const& outputGroups() const {
             return _outputGroups;
         }
 
@@ -94,6 +94,9 @@ namespace YAM {
         std::map<std::filesystem::path, std::shared_ptr<CommandNode>> _commands;
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _outputs;
         std::map<std::filesystem::path, std::shared_ptr<GroupNode>> _outputGroups;
+
+        // Ordered as in _commands
+        std::vector<std::size_t> _ruleLineNrs;
 
         // _executionHash is the hash of the hashes of _buildFileParser, 
         // _depBFPNs and _depGlobs. A change in execution hash invalidates the 

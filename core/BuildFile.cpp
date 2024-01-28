@@ -86,15 +86,18 @@ namespace YAM {namespace BuildFile {
     void Input::addHashes(std::vector<XXH64_hash_t>& hashes) {
         Node::addHashes(hashes);
         hashes.push_back(exclude);
-        hashes.push_back(isGroup);
-        hashes.push_back(XXH64_string(pathPattern.string()));
+        hashes.push_back(XXH64_string(path.string()));
+        hashes.push_back(static_cast<uint16_t>(pathType));
     }
 
     void Input::stream(IStreamer* streamer) {
         Node::stream(streamer);
         streamer->stream(exclude);
-        streamer->stream(pathPattern);
-        streamer->stream(isGroup);
+        streamer->stream(path);
+        uint16_t ptype;
+        if (streamer->writing()) ptype = pathType;
+        streamer->stream(ptype);
+        if (streamer->reading()) pathType = static_cast<PathType>(ptype);
     }
     
     void Inputs::addHashes(std::vector<XXH64_hash_t>& hashes) {
@@ -124,12 +127,17 @@ namespace YAM {namespace BuildFile {
         Node::addHashes(hashes);
         hashes.push_back(ignore);
         hashes.push_back(XXH64_string(path.string()));
+        hashes.push_back(static_cast<uint16_t>(pathType));
     }
 
     void Output::stream(IStreamer* streamer) {
         Node::stream(streamer);
         streamer->stream(ignore);
         streamer->stream(path);
+        uint16_t ptype;
+        if (streamer->writing()) ptype = pathType;
+        streamer->stream(ptype);
+        if (streamer->reading()) pathType = static_cast<PathType>(ptype);
     }
 
     void Outputs::addHashes(std::vector<XXH64_hash_t>& hashes) {
@@ -151,7 +159,8 @@ namespace YAM {namespace BuildFile {
         orderOnlyInputs.addHashes(hashes);
         script.addHashes(hashes);
         outputs.addHashes(hashes);
-        hashes.push_back(XXH64_string(outputGroup.string()));
+        for (auto const& grp : outputGroups) hashes.push_back(XXH64_string(grp.string()));
+        for (auto const& bin : bins) hashes.push_back(XXH64_string(bin.string()));
     }
 
     uint32_t Rule::typeId() const { return ruleType; }
@@ -163,7 +172,8 @@ namespace YAM {namespace BuildFile {
         orderOnlyInputs.stream(streamer);
         script.stream(streamer);
         outputs.stream(streamer);
-        streamer->stream(outputGroup);
+        streamer->streamVector(outputGroups);
+        streamer->streamVector(bins);
     }
 
     void Deps::addHashes(std::vector<XXH64_hash_t>& hashes) {
