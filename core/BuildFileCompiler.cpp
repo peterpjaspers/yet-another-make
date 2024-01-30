@@ -41,27 +41,6 @@ namespace
         return uid;
     }
 
-    std::filesystem::path relativePathOf(
-        std::filesystem::path const& root,
-        std::filesystem::path const& p
-    ) {
-        auto relPath = p.lexically_relative(root);
-        return relPath;
-    }
-
-    // If symPath is in same repo as baseDir: return path relative to baseDir
-    // Else: return absolute path.
-    std::filesystem::path resolvePath(DirectoryNode const* baseDir, Node const* fileNode) {
-        std::filesystem::path resolved;
-        std::shared_ptr<FileRepository> repo = baseDir->repository();
-        if (repo->lexicallyContains(fileNode->name())) {
-            resolved = relativePathOf(baseDir->name(), fileNode->name());
-        } else {
-            resolved = fileNode->absolutePath();
-        }
-        return resolved;
-    }
-
     template<typename TNode>
     std::vector<std::filesystem::path> relativePathsOf(
         DirectoryNode const* baseDir,
@@ -318,11 +297,15 @@ namespace YAM {
             ExecutionContext* context,
             std::shared_ptr<DirectoryNode> const& baseDir,
             BuildFile::File const& buildFile,
+            std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const &commands,
+            std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const &outputs,
             std::filesystem::path const& globNameSpace)
         : _context(context)
         , _baseDir(baseDir)
-        , _globNameSpace(globNameSpace)
         , _buildFile(buildFile.buildFile)
+        , _oldCommands(commands)
+        , _oldOutputs(outputs)
+        , _globNameSpace(globNameSpace)
     {
         for (auto const& glob : buildFile.deps.depGlobs) {
             compileGlob(glob);
@@ -408,7 +391,8 @@ namespace YAM {
             auto it = _outputs.find(inputPath);
             if (it != _outputs.end()) fileNode = dynamic_pointer_cast<FileNode>(it->second);
         }
-        if (fileNode == nullptr || fileNode->state() == Node::State::Deleted) {
+        auto it = _oldOutputs.find(inputPath);
+        if (fileNode == nullptr || it != _oldOutputs.end()) {
             std::stringstream ss;
             ss << input.path.string() << ": no such input file." << std::endl;
             ss << "In rule at line " << input.line << " in buildfile " << _buildFile.string() << std::endl;
@@ -540,44 +524,52 @@ namespace YAM {
         std::filesystem::path const& outputPath
     ) {
         std::shared_ptr<GeneratedFileNode> outputNode;
-        std::shared_ptr<Node> node = _context->nodes().find(outputPath);
-        if (node == nullptr) {
-            auto it = _newOutputs.find(outputPath);
-            if (it != _newOutputs.end()) {
-                node = it->second;
-            }
-        }
-        if (node != nullptr) {
-            outputNode = dynamic_pointer_cast<GeneratedFileNode>(node);
-            if (outputNode == nullptr) {
-                auto sourceFileNode = dynamic_pointer_cast<SourceFileNode>(node);
-                if (sourceFileNode == nullptr) {
-                    throw std::runtime_error("No such file node: " + node->name().string());
-                } else {
-                    std::stringstream ss;
-                    ss << "In rule at line " << rule.line << " in buildfile " << _buildFile.string() << ":" << std::endl;
-                    ss << "Output file is either a source file or a stale output file: " << node->name().string() << std::endl;
-                    ss << "If a source file: modify the rule definition." << std::endl;
-                    ss << "If a stale output file: delete it." << std::endl;
-                    ss << "Note: output files become stale when you delete yam's buildstate." << std::endl;
-                    ss << "When deleting yam's buildstate also delete all output files before running a build." << std::endl;
-                    ss << "In all other cases you have found a bug in yam" << std::endl;
-                    throw std::runtime_error(ss.str());
+
+        auto it = _oldOutputs.find(outputPath);
+        if (it != _oldOutputs.end()) {
+            outputNode = it->second;
+            _oldOutputs.erase(it);
+        } else {
+            std::shared_ptr<Node> node = _context->nodes().find(outputPath);
+            if (node == nullptr) {
+                auto it = _newOutputs.find(outputPath);
+                if (it != _newOutputs.end()) {
+                    node = it->second;
                 }
             }
-            if (outputNode->producer() != cmdNode.get()) {
-                auto producer = outputNode->producer();
-                std::stringstream ss;
-                ss << "In rule at line " << rule.line << " in buildfile " << _buildFile.string() << ":" << std::endl;
-                ss << "Output file " << outputNode->name().string()
-                    << " already owned by the rule at line " << producer->ruleLineNr()
-                    << " in buildfile " << producer->buildFile()->absolutePath() << std::endl;
-                throw std::runtime_error(ss.str());
+            if (node != nullptr) {
+                outputNode = dynamic_pointer_cast<GeneratedFileNode>(node);
+                if (outputNode == nullptr) {
+                    auto sourceFileNode = dynamic_pointer_cast<SourceFileNode>(node);
+                    if (sourceFileNode == nullptr) {
+                        throw std::runtime_error("No such file node: " + node->name().string());
+                    } else {
+                        std::stringstream ss;
+                        ss << "In rule at line " << rule.line << " in buildfile " << _buildFile.string() << ":" << std::endl;
+                        ss << "Output file is either a source file or a stale output file: " << node->name().string() << std::endl;
+                        ss << "If a source file: modify the rule definition." << std::endl;
+                        ss << "If a stale output file: delete it." << std::endl;
+                        ss << "Note: output files become stale when you delete yam's buildstate." << std::endl;
+                        ss << "When deleting yam's buildstate also delete all output files before running a build." << std::endl;
+                        ss << "In all other cases you have found a bug in yam" << std::endl;
+                        throw std::runtime_error(ss.str());
+                    }
+                }
+                if (outputNode->producer() != cmdNode.get()) {
+                    auto producer = outputNode->producer();
+                    std::stringstream ss;
+                    ss << "In rule at line " << rule.line << " in buildfile " << _buildFile.string() << ":" << std::endl;
+                    ss << "Output file " << outputNode->name().string()
+                        << " already owned by the rule at line " << producer->ruleLineNr()
+                        << " in buildfile " << producer->buildFile()->absolutePath() << std::endl;
+                    throw std::runtime_error(ss.str());
+                }
+                auto it = _oldOutputs.find(outputPath);
+                if (it != _oldOutputs.end()) _oldOutputs.erase(it);
+            } else {
+                outputNode = std::make_shared<GeneratedFileNode>(_context, outputPath, cmdNode);
+                _newOutputs.insert({ outputPath, outputNode });
             }
-            if (outputNode->state() == Node::State::Deleted) outputNode->setState(Node::State::Dirty);
-        } else {
-            outputNode = std::make_shared<GeneratedFileNode>(_context, outputPath, cmdNode);
-            _newOutputs.insert({ outputPath, outputNode });
         }
         _outputs.insert({ outputNode->name(), outputNode });
         return outputNode;
@@ -657,16 +649,22 @@ namespace YAM {
         BuildFile::Rule const& rule,
         std::vector<std::filesystem::path> const& outputPaths)
     {
-        std::shared_ptr<CommandNode> cmdNode;
         std::filesystem::path cmdName;
         if (outputPaths.empty()) {
             cmdName = uniqueCmdName(_context->nodes(), _newCommands);
         } else {
             cmdName = outputPaths[0] / "__cmd";
         }
-        std::shared_ptr<Node> node = _context->nodes().find(cmdName);
-        cmdNode = dynamic_pointer_cast<CommandNode>(node);
-
+        std::shared_ptr<CommandNode> cmdNode;
+        // TODO: use uid for command name and _oldCommands is map of first
+        // output file name to command. This allows re-use of command nodes
+        // on subsequent compilation
+        //auto it = _oldCommands.find(cmdName);
+        //if (it != _oldCommands.end()) cmdNode = it->second;
+        if (cmdNode == nullptr) {
+            std::shared_ptr<Node> node = _context->nodes().find(cmdName);
+            cmdNode = dynamic_pointer_cast<CommandNode>(node);
+        }
         if (cmdNode == nullptr) {
             cmdNode = std::make_shared<CommandNode>(_context, cmdName);
             _newCommands.insert({ cmdNode->name(), cmdNode });

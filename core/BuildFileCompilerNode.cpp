@@ -304,15 +304,12 @@ namespace YAM
     void BuildFileCompilerNode::compileBuildFile() {
         try {
             for (auto const& pair : _outputGroups) cleanOutputGroup(pair.second.get());
-            // Mark output nodes deleted to inform BuildFileCompiler that, although
-            // these nodes still exist in context->nodes(), they cannot be used
-            // as input until defined and unmarked Deleted by earlier rules in the
-            // buildfile.
-            for (auto const& pair : _outputs) pair.second->setState(Node::State::Deleted);
             BuildFileCompiler compiler(
                 context(),
                 _buildFileParser->workingDirectory(),
-                _buildFileParser->parseTree());
+                _buildFileParser->parseTree(),
+                _commands,
+                _outputs);
             updateMap(context(), this, _commands, compiler.commands());
             updateMap(context(), this, _outputGroups, compiler.outputGroups());
             updateMap(context(), this, _outputs, compiler.outputs());

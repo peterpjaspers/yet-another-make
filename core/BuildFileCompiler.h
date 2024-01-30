@@ -23,6 +23,8 @@ namespace YAM {
             ExecutionContext* context,
             std::shared_ptr<DirectoryNode> const& baseDir,
             BuildFile::File const& buildFile,
+            std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const& commands,
+            std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const &outputs,
             std::filesystem::path const& globNameSpace = "");
 
         static std::string compileScript(
@@ -171,7 +173,9 @@ namespace YAM {
         std::shared_ptr<DirectoryNode> _baseDir;
         std::filesystem::path _globNameSpace;
         std::filesystem::path _buildFile;
-
+        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> _oldCommands;
+        std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _oldOutputs;
+        
         std::map<std::filesystem::path, std::shared_ptr<CommandNode>> _commands;
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _outputs;
         std::map<std::filesystem::path, std::shared_ptr<GlobNode>> _globs;
