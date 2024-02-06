@@ -333,6 +333,7 @@ namespace YAM
                 }
                 notifyProcessingCompletion(Node::State::Ok);
             } else {
+                _executionHash = rand();
                 modified(true);
                 notifyProcessingCompletion(Node::State::Failed);
             }
@@ -391,18 +392,16 @@ namespace YAM
             if (!findDefiningParsers(cmd->cmdInputs(), usedParsers)) valid = false;
             if (!findDefiningParsers(cmd->orderOnlyInputs(), usedParsers)) valid = false;
         }
-        if (!validParserDependencies(usedParsers)) valid = false;
+        logNotUsedParserDependencies(usedParsers);
         return valid;
     }
 
-    bool BuildFileCompilerNode::validParserDependencies(
+    void BuildFileCompilerNode::logNotUsedParserDependencies(
         std::unordered_set<BuildFileParserNode const*> const& usedParsers
     ) const {
-        bool valid = true;
         std::vector<BuildFileParserNode const*> notUsedParsers;
         findNotUsedParsers(_buildFileParser->dependencies(), usedParsers, notUsedParsers); 
-        valid = notUsedParsers.empty();
-        if (!valid) {
+        if (!notUsedParsers.empty()) {
             auto thisBuildFile = _buildFileParser->buildFile().get();
             std::stringstream ss;
             ss << "Buildfile " << thisBuildFile->name() << std::endl;
@@ -414,11 +413,9 @@ namespace YAM
                 for (auto nu : notUsedParsers) ss << "\t" << nu->buildFile()->name() << std::endl;
             }
             ss << "Not-used buildfile dependencies may slowdown your build." << std::endl;
-            ss << "Please remove them." << std::endl;
-            LogRecord error(LogRecord::Error, ss.str());
-            context()->logBook()->add(error);
+            LogRecord warning(LogRecord::Warning, ss.str());
+            context()->logBook()->add(warning);
         }
-        return valid;
     }
 
     void BuildFileCompilerNode::notifyProcessingCompletion(Node::State state) {

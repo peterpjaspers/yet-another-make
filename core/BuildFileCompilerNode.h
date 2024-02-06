@@ -72,7 +72,7 @@ namespace YAM {
             std::vector<std::shared_ptr<Node>> const& inputs,
             std::unordered_set<BuildFileParserNode const*>& parsers) const;
         BuildFileParserNode const* findDefiningParser(GeneratedFileNode const* genFile) const;
-        bool validParserDependencies(std::unordered_set<BuildFileParserNode const*> const& usedParsers) const;
+        void logNotUsedParserDependencies(std::unordered_set<BuildFileParserNode const*> const& usedParsers) const;
         void notifyProcessingCompletion(Node::State state);
 
 
