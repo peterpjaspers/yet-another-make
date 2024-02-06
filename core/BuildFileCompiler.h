@@ -25,6 +25,7 @@ namespace YAM {
             BuildFile::File const& buildFile,
             std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const& commands,
             std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const &outputs,
+            std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const& allowedInputs,
             std::filesystem::path const& globNameSpace = "");
 
         static std::string compileScript(
@@ -175,6 +176,7 @@ namespace YAM {
         std::filesystem::path _buildFile;
         std::map<std::filesystem::path, std::shared_ptr<CommandNode>> _oldCommands;
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _oldOutputs;
+        std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _allowedInputs;
         
         std::map<std::filesystem::path, std::shared_ptr<CommandNode>> _commands;
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _outputs;

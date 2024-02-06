@@ -298,13 +298,15 @@ namespace YAM {
             std::shared_ptr<DirectoryNode> const& baseDir,
             BuildFile::File const& buildFile,
             std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const &commands,
-            std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const &outputs,
+            std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const& outputs,
+            std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const& allowedInputs,
             std::filesystem::path const& globNameSpace)
         : _context(context)
         , _baseDir(baseDir)
         , _buildFile(buildFile.buildFile)
         , _oldCommands(commands)
         , _oldOutputs(outputs)
+        , _allowedInputs(allowedInputs)
         , _globNameSpace(globNameSpace)
     {
         for (auto const& glob : buildFile.deps.depGlobs) {
@@ -424,10 +426,29 @@ namespace YAM {
             }
         } else if (input.pathType == BuildFile::PathType::Glob) {
             std::shared_ptr<GlobNode> globNode = compileGlob(input.path);
+            // Match source files
             for (auto const& match : globNode->matches()) {
                 fileNode = dynamic_pointer_cast<FileNode>(match);
                 if (fileNode == nullptr) throw std::runtime_error("not a file node");
                 inputNodes.push_back(fileNode);
+            }
+            // Match generated files
+            if (!_allowedInputs.empty()) {
+                bool toFwdSlash = (std::filesystem::path::preferred_separator == '\\');
+                std::string pattern = (globNode->baseDirectory()->name() / globNode->pattern()).string();
+                if (toFwdSlash) {
+                    std::replace(pattern.begin(), pattern.end(), '\\', '/');
+                }
+                Glob glob(pattern);
+                for (auto const& pair : _allowedInputs) {
+                    std::string pathStr = pair.second->name().string();
+                    if (toFwdSlash) {
+                        std::replace(pathStr.begin(), pathStr.end(), '\\', '/');
+                    }
+                    if (glob.matches(pathStr)) {
+                        inputNodes.push_back(pair.second);
+                    }
+                }
             }
         } else if (input.pathType == BuildFile::PathType::Path) {
             // Using GlobNode is inefficient in case of a single input path.
@@ -572,6 +593,7 @@ namespace YAM {
             }
         }
         _outputs.insert({ outputNode->name(), outputNode });
+        _allowedInputs.insert({ outputNode->name(), outputNode });
         return outputNode;
     }
 

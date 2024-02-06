@@ -310,12 +310,20 @@ namespace YAM
     void BuildFileCompilerNode::compileBuildFile() {
         try {
             for (auto const& pair : _outputGroups) cleanOutputGroup(pair.second.get());
+            std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> allowedInputs;
+            for (auto const& pair : _depCompilers) {
+                auto const& outputs = pair.second->_outputs;
+                for (auto const& opair : pair.second->_outputs) {
+                    allowedInputs.insert(opair);
+                }
+            }
             BuildFileCompiler compiler(
                 context(),
                 _buildFileParser->buildFileDirectory(),
                 _buildFileParser->parseTree(),
                 _commands,
-                _outputs);
+                _outputs,
+                allowedInputs);
             updateMap(context(), this, _commands, compiler.commands());
             updateMap(context(), this, _outputGroups, compiler.outputGroups());
             updateMap(context(), this, _outputs, compiler.outputs());

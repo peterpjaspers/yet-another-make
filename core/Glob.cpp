@@ -11,7 +11,7 @@ namespace {
         for (std::size_t i = 0; i < input.length(); i++) {
             char c = input[i];
             switch (c) {
-            case '/':
+            //case '/':
             case '$':
             case '^':
             case '+':

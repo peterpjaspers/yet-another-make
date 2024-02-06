@@ -171,6 +171,7 @@ namespace
             &setup.context,
             setup.repo->directoryNode(), file,
             emptyCmds, emptyOutputs,
+            std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>>(),
             globNameSpace);
         verifyForEach(setup, compiler1, ignoredOutput, globNameSpace);
 
@@ -190,6 +191,7 @@ namespace
             &setup.context,
             setup.repo->directoryNode(), file,
             compiler1.commands(), compiler1.outputs(),
+            std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>>(),
             globNameSpace);
         EXPECT_EQ(compiler1.commands(), compiler2.commands());
         EXPECT_EQ(compiler1.outputs(), compiler2.outputs());
@@ -267,7 +269,8 @@ namespace
         BuildFileCompiler compiler(
             &setup.context, 
             setup.repo->directoryNode(), file,
-            emptyCmds, emptyOutputs);
+            emptyCmds, emptyOutputs,
+            std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>>());
         auto const& commands = compiler.commands();
         ASSERT_EQ(1, commands.size());
         auto command0 = (commands.begin())->second;
@@ -288,7 +291,8 @@ namespace
         std::shared_ptr<DirectoryNode> baseDir;
         BuildFileCompiler compiler(
             &context, baseDir, file,
-            emptyCmds, emptyOutputs);
+            emptyCmds, emptyOutputs,
+            std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>>());
         EXPECT_EQ(0, compiler.commands().size());
     }
 
@@ -306,7 +310,8 @@ namespace
 
         BuildFileCompiler compiler(
             &context, baseDir, file,
-            emptyCmds, emptyOutputs);
+            emptyCmds, emptyOutputs,
+            std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>>());
         EXPECT_EQ(1, compiler.commands().size());
         std::shared_ptr<CommandNode> cmd = compiler.commands().begin()->second;
         EXPECT_EQ(script.script, cmd->script());

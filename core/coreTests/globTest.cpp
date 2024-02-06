@@ -1,18 +1,24 @@
 #include "../Glob.h"
 #include "gtest/gtest.h"
+#include <filesystem>
 
 namespace {
     using namespace YAM;
 
-    void assertMatch(std::string const& globPattern, std::string const& str, bool globstar = true) {
+    bool assertMatch(std::string const& globPattern, std::string const& str, bool globstar = true) {
         Glob glob(globPattern, globstar);
         bool match = glob.matches(str);
-        EXPECT_TRUE(glob.matches(str));
+        if (!match) {
+            EXPECT_TRUE(match);
+        }
+        return match;
     }
     void assertNotMatch(std::string const& globPattern, std::string const& str, bool globstar = true) {
         Glob glob(globPattern, globstar);
         bool match = glob.matches(str);
-        EXPECT_FALSE(glob.matches(str));
+        if (match) {
+            EXPECT_FALSE(match);
+        }
     }
 
     void test(bool globstar) {
@@ -196,6 +202,25 @@ namespace {
 
     TEST(Glob, noGlobstar) {
         test(false);
+    }
+
+    TEST(Glob, path) {
+        wchar_t separator = std::filesystem::path::preferred_separator;
+        wchar_t backslash = '\\';
+        wchar_t slash = '/';
+        if (separator == backslash) {
+            std::filesystem::path pattern(R"(@@repo\*.js)");
+            std::filesystem::path path(R"(@@repo\jquery.js)");
+            std::string patternStr = pattern.string();
+            std::string pathStr = path.string();
+            std::replace(patternStr.begin(), patternStr.end(), '\\', '/');
+            std::replace(pathStr.begin(), pathStr.end(), '\\', '/');
+            EXPECT_TRUE(assertMatch(patternStr, pathStr, true));
+        }
+        EXPECT_TRUE(assertMatch(R"(@@repo/*.js)", R"(@@repo/jquery.js)", true));
+
+
+        EXPECT_TRUE(assertMatch("@@repo/js/*.js", "@@repo/js/jquery.min.js", false));
     }
 
 }
