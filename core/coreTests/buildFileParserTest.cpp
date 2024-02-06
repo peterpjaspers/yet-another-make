@@ -55,7 +55,7 @@ namespace {
     TEST(BuildFileParser, depsAndForeachRule) {
         const std::string rules = R"(
             buildfile ..\comp1\buildfile_yam.rb
-            buildfile ..\comp2\buildfile_yam.rb
+            buildfile ..\comp2\**\
             glob *.cpp
             glob src\*.cpp
         : 
@@ -74,7 +74,7 @@ namespace {
         ASSERT_NE(nullptr, buildFile);
         EXPECT_EQ(2, buildFile->deps.depBuildFiles.size());
         EXPECT_EQ(R"(..\comp1\buildfile_yam.rb)", buildFile->deps.depBuildFiles[0]);
-        EXPECT_EQ(R"(..\comp2\buildfile_yam.rb)", buildFile->deps.depBuildFiles[1]);
+        EXPECT_EQ(R"(..\comp2\**\)", buildFile->deps.depBuildFiles[1]);
         EXPECT_EQ(2, buildFile->deps.depGlobs.size());
         EXPECT_EQ(R"(*.cpp)", buildFile->deps.depGlobs[0]);
         EXPECT_EQ(R"(src\*.cpp)", buildFile->deps.depGlobs[1]);

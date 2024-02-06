@@ -20,7 +20,7 @@ namespace YAM { namespace BuildFile {
         virtual ~Node();
         Node();
 
-        virtual void addHashes(std::vector<XXH64_hash_t>& hashes);
+        virtual void addHashes(std::vector<XXH64_hash_t>& hashes) const;
 
         // Inherited from IStreamable
         uint32_t typeId() const override { 
@@ -34,21 +34,21 @@ namespace YAM { namespace BuildFile {
         std::filesystem::path path;
         PathType pathType;
 
-        void addHashes(std::vector<XXH64_hash_t>& hashes) override;
+        void addHashes(std::vector<XXH64_hash_t>& hashes) const override;
         void stream(IStreamer* streamer) override;
     };
 
     struct __declspec(dllexport) Inputs : public Node {
         std::vector<Input> inputs;
 
-        void addHashes(std::vector<XXH64_hash_t>& hashes) override;
+        void addHashes(std::vector<XXH64_hash_t>& hashes) const override;
         void stream(IStreamer* streamer) override;
     };
 
     struct __declspec(dllexport) Script: public Node {
         std::string script;
 
-        void addHashes(std::vector<XXH64_hash_t>& hashes) override;
+        void addHashes(std::vector<XXH64_hash_t>& hashes) const override;
         void stream(IStreamer* streamer) override ;
     };
 
@@ -57,14 +57,14 @@ namespace YAM { namespace BuildFile {
         std::filesystem::path path;
         PathType pathType;
 
-        void addHashes(std::vector<XXH64_hash_t>& hashes) override;
+        void addHashes(std::vector<XXH64_hash_t>& hashes) const override;
         void stream(IStreamer* streamer) override;
     };
 
     struct __declspec(dllexport) Outputs : public Node {
         std::vector<Output> outputs;
 
-        void addHashes(std::vector<XXH64_hash_t>& hashes) override;
+        void addHashes(std::vector<XXH64_hash_t>& hashes) const override;
         void stream(IStreamer* streamer) override;
     };
 
@@ -78,7 +78,7 @@ namespace YAM { namespace BuildFile {
         std::vector<std::filesystem::path> outputGroups;
         std::vector<std::filesystem::path> bins;
 
-        void addHashes(std::vector<XXH64_hash_t>& hashes) override;
+        void addHashes(std::vector<XXH64_hash_t>& hashes) const override;
         uint32_t typeId() const override;
         void stream(IStreamer* streamer) override;
     }; 
@@ -88,7 +88,7 @@ namespace YAM { namespace BuildFile {
         std::vector<std::filesystem::path> depBuildFiles;
         std::vector<std::filesystem::path> depGlobs;
 
-        void addHashes(std::vector<XXH64_hash_t>& hashes) override;
+        void addHashes(std::vector<XXH64_hash_t>& hashes) const override;
         void stream(IStreamer* streamer) override;
     };
 
@@ -98,7 +98,7 @@ namespace YAM { namespace BuildFile {
         Deps deps;
         std::vector<std::shared_ptr<Node>> variablesAndRules;
 
-        XXH64_hash_t computeHash();
+        XXH64_hash_t computeHash() const;
         void stream(IStreamer* streamer) override;
     };
 }}

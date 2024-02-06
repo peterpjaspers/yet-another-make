@@ -617,29 +617,22 @@ namespace YAM
         } else {
             MonitoredProcessResult scriptResult = executeMonitoredScript(result->_log);
             if (scriptResult.exitCode != 0) {
-                result->newState(canceling() ? Node::State::Canceled : Node::State::Failed);
+                result->_newState = canceling() ? Node::State::Canceled : Node::State::Failed;
             } else {
-                result->newState(Node::State::Ok);
-                auto postResult = postProcess(scriptResult.stdOut);
-                if (postResult != nullptr) {
-                    result->_postResult = postResult;
-                    result->newState(postResult->newState);
-                    scriptResult.readFiles.insert(postResult->readFiles.begin(), postResult->readFiles.end());
-                    scriptResult.writtenFiles.insert(postResult->writtenFiles.begin(), postResult->writtenFiles.end());
-                    scriptResult.readOnlyFiles.insert(postResult->readOnlyFiles.begin(), postResult->readOnlyFiles.end());
-                }
-                if (result->newState() == Node::State::Ok) {
-                    std::set<std::filesystem::path> previousInputPaths;
-                    for (auto const& pair : _detectedInputs) {
-                        previousInputPaths.insert(pair.second->name());
-                    }                    
-                    auto currentInputPaths = convertToSymbolicPaths(scriptResult.readOnlyFiles, result->_log);
-                    computePathSetsDifference(
-                        previousInputPaths, currentInputPaths,
-                        result->_keptInputPaths,
-                        result->_removedInputPaths,
-                        result->_addedInputPaths);
-                    result->_outputPaths = convertToSymbolicPaths(scriptResult.writtenFiles, result->_log);
+                result->_newState = Node::State::Ok;
+                std::set<std::filesystem::path> previousInputPaths;
+                for (auto const& pair : _detectedInputs) {
+                    previousInputPaths.insert(pair.second->name());
+                }                    
+                auto currentInputPaths = convertToSymbolicPaths(scriptResult.readOnlyFiles, result->_log);
+                computePathSetsDifference(
+                    previousInputPaths, currentInputPaths,
+                    result->_keptInputPaths,
+                    result->_removedInputPaths,
+                    result->_addedInputPaths);
+                result->_outputPaths = convertToSymbolicPaths(scriptResult.writtenFiles, result->_log);
+                if (_postProcessor != nullptr) {
+                    _postProcessor->process(scriptResult);
                 }
             }
         }
@@ -714,15 +707,11 @@ namespace YAM
     void CommandNode::handleOutputAndNewInputFilesCompletion(Node::State newState, std::shared_ptr<ExecutionResult> sresult) {
         ExecutionResult& result = *sresult;
         result._newState = newState;
-        if (result._postResult != nullptr) {
-            commitPostProcessResult(result._postResult);
-            result.newState(result._postResult->newState);
-        }
-        if (result.newState() == Node::State::Ok) {
+        if (newState == Node::State::Ok) {
             auto prevHash = _executionHash;
             _executionHash = computeExecutionHash();
             if (
-                result._postResult == nullptr 
+                _postProcessor == nullptr 
                 && prevHash != _executionHash 
                 && context()->logBook()->mustLogAspect(LogRecord::Aspect::DirectoryChanges)
             ) {
@@ -743,8 +732,7 @@ namespace YAM
     }
 
     void CommandNode::notifyCommandCompletion(std::shared_ptr<ExecutionResult> sresult) {
-        ExecutionResult& result = *sresult;
-        Node::notifyCompletion(result.newState());
+        Node::notifyCompletion(sresult->_newState);
     }
 
     bool CommandNode::verifyCmdFlag(

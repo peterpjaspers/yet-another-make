@@ -59,7 +59,6 @@ namespace
             glob->context()->nodes().remove(glob);
         }
     }
-
     void removeNode(std::shared_ptr<CommandNode> cmd, StateObserver* observer) {
         static std::vector<std::shared_ptr<GeneratedFileNode>> emptyOutputs;
         static std::vector<std::shared_ptr<Node>> emptyCmdInputs;
@@ -177,6 +176,18 @@ namespace
             }
         }
     }
+
+    std::map<std::filesystem::path, std::shared_ptr<BuildFileCompilerNode>> findCompilerDependencies(
+        std::shared_ptr<BuildFileParserNode> const& parser
+    ) {
+        std::map<std::filesystem::path, std::shared_ptr<BuildFileCompilerNode>> depCompilers;
+        for (auto depParser : parser->dependencies()) {
+            auto dir = depParser->buildFileDirectory();
+            auto depCompiler = dir->buildFileCompilerNode();
+            depCompilers.insert({ depCompiler->name(), depCompiler });
+        }
+        return depCompilers;
+    }
 }
 
 namespace YAM
@@ -228,7 +239,7 @@ namespace YAM
 
     XXH64_hash_t BuildFileCompilerNode::computeExecutionHash() const {
         std::vector<XXH64_hash_t> hashes;
-        hashes.push_back(_buildFileParser->parseTreeHash());
+        hashes.push_back(_buildFileParser->executionHash());
         for (auto pair : _depCompilers) hashes.push_back(pair.second->_executionHash);
         for (auto pair : _depGlobs) hashes.push_back(pair.second->executionHash());
         XXH64_hash_t hash = XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
@@ -237,40 +248,37 @@ namespace YAM
 
     void BuildFileCompilerNode::start() {
         Node::start();
-        if (
-            _buildFileParser == nullptr
-            || !updateBuildFileDependencies()
-        ) {
+        if (_buildFileParser == nullptr) {
             postCompletion(Node::State::Ok);
-            return;
+        } else {
+            if (!updateBuildFileDependencies()) {
+                postCompletion(Node::State::Failed);
+            } else {
+                std::vector<std::shared_ptr<Node>> requisites;
+                getInputs(requisites);
+                auto callback = Delegate<void, Node::State>::CreateLambda(
+                    [this](Node::State state) { handleRequisitesCompletion(state); });
+                startNodes(requisites, std::move(callback));
+            }
         }
-        std::vector<std::shared_ptr<Node>> requisites;
-        getInputs(requisites);
-        auto callback = Delegate<void, Node::State>::CreateLambda(
-            [this](Node::State state) { handleRequisitesCompletion(state); }
-        );
-        startNodes(requisites, std::move(callback));
     }
 
     bool BuildFileCompilerNode::updateBuildFileDependencies() {
-        bool updated;
         try {
             BuildFileDependenciesCompiler compiler(
                 context(),
-                _buildFileParser->workingDirectory(),
-                _buildFileParser->parseTree());
-
-            updateMap(context(), this, _depCompilers, compiler.compilers());
+                _buildFileParser->buildFileDirectory(),
+                _buildFileParser->parseTree(),
+                BuildFileDependenciesCompiler::Mode::InputGlobs);
             updateMap(context(), this, _depGlobs, compiler.globs());
-            modified(_executionHash != computeExecutionHash());
-            updated = true;
+            auto depCompilers = findCompilerDependencies(_buildFileParser);
+            updateMap(context(), this, _depCompilers, depCompilers);
+            return true;
         } catch (std::runtime_error e) {
-            updated = false;
-            _executionHash = rand();
             LogRecord error(LogRecord::Error, e.what());
             context()->logBook()->add(error);
+            return false;
         }
-        return updated;
     }
 
     void BuildFileCompilerNode::handleRequisitesCompletion(Node::State state) {
@@ -278,13 +286,11 @@ namespace YAM
             notifyProcessingCompletion(state);
         } else if (canceling()) {
             notifyProcessingCompletion(Node::State::Canceled);
+        } else if (_executionHash == computeExecutionHash()) {
+            notifyProcessingCompletion(Node::State::Ok);
         } else {
-            if (_executionHash == computeExecutionHash()) {
-                notifyProcessingCompletion(Node::State::Ok);
-            } else {
-                context()->statistics().registerSelfExecuted(this);
-                compileBuildFile();
-            }
+            context()->statistics().registerSelfExecuted(this);
+            compileBuildFile();
         }
     }
 
@@ -306,7 +312,7 @@ namespace YAM
             for (auto const& pair : _outputGroups) cleanOutputGroup(pair.second.get());
             BuildFileCompiler compiler(
                 context(),
-                _buildFileParser->workingDirectory(),
+                _buildFileParser->buildFileDirectory(),
                 _buildFileParser->parseTree(),
                 _commands,
                 _outputs);
@@ -316,15 +322,15 @@ namespace YAM
             updateLineNrs(_ruleLineNrs, _commands, compiler.ruleLineNrs(), _buildFileParser->buildFile());
    
             if (validGeneratedInputs()) {
-                XXH64_hash_t newHash = computeExecutionHash();
-                if (_executionHash != newHash) modified(true);
-                if (newHash != _executionHash && context()->logBook()->mustLogAspect(LogRecord::Aspect::FileChanges)) {
+                XXH64_hash_t oldHash = _executionHash;
+                _executionHash = computeExecutionHash();
+                if (_executionHash != oldHash) modified(true);
+                if (_executionHash != oldHash && context()->logBook()->mustLogAspect(LogRecord::Aspect::FileChanges)) {
                     std::stringstream ss;
                     ss << className() << " " << name().string() << " has compiled because of changed parseTree/glob deps/buildfile deps.";
                     LogRecord change(LogRecord::FileChanges, ss.str());
                     context()->logBook()->add(change);
                 }
-                _executionHash = newHash;
                 notifyProcessingCompletion(Node::State::Ok);
             } else {
                 modified(true);

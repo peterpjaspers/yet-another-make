@@ -37,6 +37,12 @@ namespace YAM
     {
     public:
         typedef std::map<std::filesystem::path, std::shared_ptr<FileNode>> InputNodes;
+        class __declspec(dllexport) PostProcessor {
+        public:
+            // Called after successfull completion of script.
+            // Called in threadpool context.
+            virtual void process(MonitoredProcessResult const& scriptResult) = 0;
+        };
 
         CommandNode(); // needed for deserialization
         CommandNode(ExecutionContext* context, std::filesystem::path const& name);
@@ -91,6 +97,9 @@ namespace YAM
         void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const override;
         void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const override;
 
+        void postProcessor(std::shared_ptr<PostProcessor> const& processor) {
+            _postProcessor = processor;
+        }
         void start() override;
         void cancel() override;
 
@@ -107,27 +116,6 @@ namespace YAM
         void prepareDeserialize() override;
         bool restore(void* context, std::unordered_set<IPersistable const*>& restored) override;
 
-    protected:
-        struct PostProcessResult {
-            virtual ~PostProcessResult() {}
-
-            Node::State newState;
-            std::set<std::filesystem::path> readFiles;     // read-accessed files
-            std::set<std::filesystem::path> writtenFiles;  // write-accessed files
-            std::set<std::filesystem::path> readOnlyFiles; // readFiles except writtenFiles 
-        };
-
-        // Called, in threadpool context, only after successfull completion of 
-        // script execution.
-        // Todo: pass stdout of the script.
-        // Returned result->newState will be used as result state of script
-        // execution.
-        virtual std::shared_ptr<PostProcessResult> postProcess(std::string const& stdOut) { return nullptr; }
-
-        // Called, in mainthread context. 
-        // Called just before Node::notifyCompletion is called.
-        virtual void commitPostProcessResult(std::shared_ptr<PostProcessResult>& result) {}
-
     private:
         struct ExecutionResult {
             MemoryLogBook _log;
@@ -137,24 +125,6 @@ namespace YAM
             std::set<std::filesystem::path> _removedInputPaths;
             std::set<std::filesystem::path> _addedInputPaths;
             std::vector<std::shared_ptr<FileNode>> _addedInputNodes;
-            std::shared_ptr<PostProcessResult> _postResult;
-
-            void newState(Node::State newState) {
-                _newState = newState;
-                if (_postResult != nullptr) _postResult->newState = newState;
-            }
-
-            Node::State newState() const {
-                Node::State newPRState = 
-                    _postResult != nullptr ? _postResult->newState : Node::State::Ok;
-                Node::State newState = Node::State::Ok;
-                if (_newState != Node::State::Ok) {
-                    newState = _newState;
-                } else if (newPRState != Node::State::Ok) {
-                    newState = newPRState;
-                }
-                return newState;
-            }
         };
 
         std::filesystem::path convertToSymbolicPath(std::filesystem::path const& absPath, MemoryLogBook& logBook);
@@ -218,6 +188,7 @@ namespace YAM
         std::vector<std::filesystem::path> _ignoredOutputs;
 
         std::atomic<std::shared_ptr<IMonitoredProcess>> _scriptExecutor;
+        std::shared_ptr<PostProcessor> _postProcessor;
         
         // Inputs detected during last script execution
         InputNodes _detectedInputs;

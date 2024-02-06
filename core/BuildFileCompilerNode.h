@@ -46,7 +46,7 @@ namespace YAM {
         std::map<std::filesystem::path, std::shared_ptr<GroupNode>> const& outputGroups() const {
             return _outputGroups;
         }
-
+        
         // Inherited from Node
         void start() override;
         void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const override;
@@ -76,14 +76,14 @@ namespace YAM {
         void notifyProcessingCompletion(Node::State state);
 
 
-        // The buildfile to be processed by this processing node.
+        // _buildFileParser->parseTree is compiled by this compiler node.
         std::shared_ptr<BuildFileParserNode> _buildFileParser;
 
-        // _depCompilers compile the buildfiles declared as dependencies of
-        // this buildfile, extracted from _buildFileParser->parseTree().
-        // These compiler nodes must be executed before this file can be 
-        // compiled in order to make sure that all input generated files  
-        // referenced by this buildfile exist.
+        // The compilers that compile the buildfiles declared as dependencies
+        // in the buildfile parsed by _buildFileParser->buildFile.
+        // These compilers must be executed before this file can be compiled in
+        // order to make sure that all input generated files referenced by this 
+        // buildfile exist.
         std::map<std::filesystem::path, std::shared_ptr<BuildFileCompilerNode>> _depCompilers;
 
         // _depGlobs represent the glob dependencies declared in the buildfile,
@@ -95,12 +95,13 @@ namespace YAM {
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _outputs;
         std::map<std::filesystem::path, std::shared_ptr<GroupNode>> _outputGroups;
 
+        // For each command the line nr of the rule from which it was compiled.
         // Ordered as in _commands
         std::vector<std::size_t> _ruleLineNrs;
 
         // _executionHash is the hash of the hashes of _buildFileParser, 
-        // _depBFPNs and _depGlobs. A change in execution hash invalidates the 
-        // compiled CommandNodes and triggers re-processing of _buildFile.
+        // _depCompilers and _depGlobs. A change in execution requires re-compilation
+        // of the buildfile parse tree.
         XXH64_hash_t _executionHash;
     };
 }

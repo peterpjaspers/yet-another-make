@@ -165,7 +165,7 @@ namespace
     TEST(DirectoryNode, buildFileParserNode) {
         std::string tmpDir(std::tmpnam(nullptr));
         std::filesystem::path rootDir(std::string(tmpDir + "_dirNodeTest"));
-        std::filesystem::path buildFilePath(rootDir / R"(buildfile_yam.cmd)");
+        std::filesystem::path buildFilePath(rootDir / R"(buildfile_yam.txt)");
         DirectoryTree testTree(rootDir, 2, RegexSet());
         std::ofstream buildFileStream(buildFilePath.string().c_str());
         EXPECT_TRUE(buildFileStream.is_open());

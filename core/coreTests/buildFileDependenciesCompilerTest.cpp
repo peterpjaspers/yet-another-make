@@ -1,7 +1,8 @@
-#include "../BuildFileDependenciesCompiler.h"
+#include "../BuildFile.h"
+#include "../SourceFileNode.h"
 #include "../FileRepository.h"
 #include "../DirectoryNode.h"
-#include "../BuildFileCompilerNode.h"
+#include "../BuildFileDependenciesCompiler.h"
 #include "../GlobNode.h"
 #include "../ExecutionContext.h"
 #include "../FileSystem.h"
@@ -23,8 +24,8 @@ namespace
         DirectoryTree repoTree;
         ExecutionContext context;
         std::shared_ptr<FileRepository> fileRepo;
-        std::shared_ptr<BuildFileCompilerNode> bfcn1;
-        std::shared_ptr<BuildFileCompilerNode> bfcn2;
+        std::shared_ptr<SourceFileNode> bfn1;
+        std::shared_ptr<SourceFileNode> bfn2;
 
         TestSetup()
             : repoTree(FileSystem::createUniqueDirectory("_buildFileDepenciesCompilerTest"), 1, RegexSet())
@@ -46,14 +47,10 @@ namespace
             auto dirNode = fileRepo->directoryNode();
             bool completed = YAMTest::executeNode(dirNode.get());
             EXPECT_TRUE(completed);
-            auto bfcn1Dir = dynamic_pointer_cast<DirectoryNode>(context.nodes().find(dirNode->name() / "src1"));
-            auto bfcn2Dir = dynamic_pointer_cast<DirectoryNode>(context.nodes().find(dirNode->name() / "src2"));
-            bfcn1 = bfcn1Dir->buildFileCompilerNode();
-            bfcn2 = bfcn2Dir->buildFileCompilerNode();
+            bfn1 = dynamic_pointer_cast<SourceFileNode>(context.nodes().find(dirNode->name() / "src1\\buildfile_yam.bat"));
+            bfn2 = dynamic_pointer_cast<SourceFileNode>(context.nodes().find(dirNode->name() / "src2\\buildfile_yam.bat"));
         }
     };
-
-
     TEST(BuildFileDependenciesCompiler, twoBFPNsAndThreeGlobs) {
         TestSetup setup;
         BuildFile::Input input1;
@@ -75,16 +72,19 @@ namespace
         file.variablesAndRules.push_back(rule);
 
         std::filesystem::path globNameSpace("private");
-        BuildFileDependenciesCompiler compiler(&setup.context, setup.fileRepo->directoryNode(), file, globNameSpace);
+        BuildFileDependenciesCompiler compiler(
+            &setup.context, 
+            setup.fileRepo->directoryNode(), 
+            file, 
+            BuildFileDependenciesCompiler::Mode::Both,
+            globNameSpace);
 
-        auto const& bfcns = compiler.compilers();
-        ASSERT_EQ(2, bfcns.size());
-        auto const& bfcn1It = bfcns.find(setup.bfcn1->name());
-        auto const& bfcn2It = bfcns.find(setup.bfcn2->name());
-        ASSERT_NE(bfcns.end(), bfcn1It);
-        ASSERT_NE(bfcns.end(), bfcn1It);
-        EXPECT_EQ(setup.bfcn1, bfcn1It->second);
-        EXPECT_EQ(setup.bfcn2, bfcn2It->second);
+        auto const& bfs = compiler.buildFiles();
+        ASSERT_EQ(2, bfs.size());
+        auto const& bfsDir1It = bfs.find(setup.bfn1->name());
+        auto const& bfsDir2It = bfs.find(setup.bfn2->name());
+        ASSERT_NE(bfs.end(), bfsDir1It);
+        ASSERT_NE(bfs.end(), bfsDir2It);
 
         auto const& globs = compiler.globs();
         ASSERT_EQ(3, globs.size());

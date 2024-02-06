@@ -119,15 +119,27 @@ namespace YAM {
     void BuildFileParser::eatDepBuildFile(BuildFile::Deps& deps) {
         Token t = eat(depBuildFile);
         lookAhead({ glob });
-        std::filesystem::path path = eatPath();
-        deps.depBuildFiles.push_back(path);
+        if (_lookAhead.spec == glob) {
+            if (_lookAhead.type == "glob") {
+                deps.depBuildFiles.push_back(eatGlob());
+            } else if (_lookAhead.type == "path") {
+                deps.depBuildFiles.push_back(eatGlob());
+            } else {
+                syntaxError();
+            }
+        } else {
+            syntaxError();
+        }
     }
 
     void BuildFileParser::eatDepGlob(BuildFile::Deps& deps) {
         Token t = eat(depGlob);
         lookAhead({ glob });
-        std::filesystem::path path = eatGlob();
-        deps.depGlobs.push_back(path);
+        if (_lookAhead.spec == glob && _lookAhead.type == "glob") {
+            deps.depGlobs.push_back(eatGlob());
+        } else {
+            syntaxError();
+        }
     }
 
     std::shared_ptr<BuildFile::Rule> BuildFileParser::eatRule() {

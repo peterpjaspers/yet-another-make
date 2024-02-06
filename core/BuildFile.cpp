@@ -73,7 +73,7 @@ namespace YAM {namespace BuildFile {
     Node::Node() : line(0), column(0) {}
     Node::~Node() {}
 
-    void Node::addHashes(std::vector<XXH64_hash_t>& hashes) {
+    void Node::addHashes(std::vector<XXH64_hash_t>& hashes) const {
         hashes.push_back(line);
         hashes.push_back(column);
     }
@@ -83,7 +83,7 @@ namespace YAM {namespace BuildFile {
         streamer->stream(column);
     }
 
-    void Input::addHashes(std::vector<XXH64_hash_t>& hashes) {
+    void Input::addHashes(std::vector<XXH64_hash_t>& hashes) const {
         Node::addHashes(hashes);
         hashes.push_back(exclude);
         hashes.push_back(XXH64_string(path.string()));
@@ -100,7 +100,7 @@ namespace YAM {namespace BuildFile {
         if (streamer->reading()) pathType = static_cast<PathType>(ptype);
     }
     
-    void Inputs::addHashes(std::vector<XXH64_hash_t>& hashes) {
+    void Inputs::addHashes(std::vector<XXH64_hash_t>& hashes) const {
         Node::addHashes(hashes);
         for (auto& input : inputs) {
             input.addHashes(hashes);
@@ -113,7 +113,7 @@ namespace YAM {namespace BuildFile {
         streamVector(streamer, inputs);
     }
 
-    void Script::addHashes(std::vector<XXH64_hash_t>& hashes) {
+    void Script::addHashes(std::vector<XXH64_hash_t>& hashes) const {
         Node::addHashes(hashes);
         hashes.push_back(XXH64_string(script));
     }
@@ -123,7 +123,7 @@ namespace YAM {namespace BuildFile {
         streamer->stream(script);
     }
 
-    void Output::addHashes(std::vector<XXH64_hash_t>& hashes) {
+    void Output::addHashes(std::vector<XXH64_hash_t>& hashes) const {
         Node::addHashes(hashes);
         hashes.push_back(ignore);
         hashes.push_back(XXH64_string(path.string()));
@@ -140,7 +140,7 @@ namespace YAM {namespace BuildFile {
         if (streamer->reading()) pathType = static_cast<PathType>(ptype);
     }
 
-    void Outputs::addHashes(std::vector<XXH64_hash_t>& hashes) {
+    void Outputs::addHashes(std::vector<XXH64_hash_t>& hashes) const {
         Node::addHashes(hashes);
         for (auto& output : outputs) {
             output.addHashes(hashes);
@@ -152,7 +152,7 @@ namespace YAM {namespace BuildFile {
         streamVector(streamer, outputs);
     }
 
-    void Rule::addHashes(std::vector<XXH64_hash_t>& hashes) {
+    void Rule::addHashes(std::vector<XXH64_hash_t>& hashes) const {
         Node::addHashes(hashes);
         hashes.push_back(forEach);
         cmdInputs.addHashes(hashes);
@@ -176,7 +176,7 @@ namespace YAM {namespace BuildFile {
         streamer->streamVector(bins);
     }
 
-    void Deps::addHashes(std::vector<XXH64_hash_t>& hashes) {
+    void Deps::addHashes(std::vector<XXH64_hash_t>& hashes) const {
         Node::addHashes(hashes);
         for (auto const& path : depBuildFiles) {
             hashes.push_back(XXH64_string(path.string()));
@@ -192,7 +192,7 @@ namespace YAM {namespace BuildFile {
         streamer->streamVector(depGlobs);
     }
 
-    XXH64_hash_t File::computeHash() {
+    XXH64_hash_t File::computeHash() const {
         std::vector<XXH64_hash_t> hashes;
         hashes.push_back(XXH64_string(buildFile.string()));
         Node::addHashes(hashes);

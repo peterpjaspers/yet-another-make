@@ -5,6 +5,7 @@
 #include "../FileRepository.h"
 #include "../DirectoryNode.h"
 #include "../SourceFileNode.h"
+#include "../GeneratedFileNode.h"
 #include "../CommandNode.h"
 #include "../GlobNode.h"
 #include "../ExecutionContext.h"
@@ -46,16 +47,27 @@ namespace
         TestSetup(bool syntaxError = false)
             : repoTree(FileSystem::createUniqueDirectory("_buildFileProcessingTest"), 1, RegexSet())
             , fileRepo(std::make_shared<FileRepository>("repo", repoTree.path(), &context))
-            , absBuildFilePath(repoTree.path() / R"(buildfile_yam.txt)")
+            , absBuildFilePath(repoTree.path() / R"(buildfile_yam.bat)")
             , absBuildFilePathSD1(repoTree.path() / R"(SubDir1\buildfile_yam.txt)")
             , absBuildFilePathSD2(repoTree.path() / R"(SubDir2\buildfile_yam.txt)")
         {
             if (syntaxError) {
-                rule = R"(: *.cpp >| echo main > main.obj |> %%B.obj)";
+                std::stringstream ss;
+                ss
+                    << "@echo off" << std::endl
+                    << R"(echo : buildfile SubDir1 buildfile SubDir2 : foreach *.cpp ^|^> echo main ^> main.obj ^|^> %%B.obj)"
+                    << std::endl;
+                rule = ss.str();
                 ruleSD1 = rule;
                 ruleSD2 = rule;
             } else {
-                rule = R"(buildfile SubDir1 buildfile SubDir2 : foreach *.cpp |> echo main > main.obj |> %%B.obj)";
+                std::stringstream ss;
+                ss
+                    << "@echo off" << std::endl
+                    << R"(echo buildfile SubDir1 buildfile SubDir2 : foreach *.cpp ^|^> echo main ^> main.obj ^|^> %%B.obj)"
+                    << std::endl;
+                rule = ss.str();
+                //rule = R"(buildfile SubDir1 buildfile SubDir2 : foreach *.cpp |> echo main > main.obj |> %%B.obj)";
                 ruleSD1 = R"(buildfile .. : foreach *.cpp |> echo main > main.obj |> %%B.obj )";
                 ruleSD2 = R"(buildfile ..\SubDir1 : foreach *.cpp |> echo main > main.obj |> %%B.obj )";
             }
@@ -91,8 +103,6 @@ namespace
         ASSERT_EQ(Node::State::Ok, parser->state());
         ASSERT_EQ(Node::State::Ok, setup.buildFileParserNodeSD1->state());
         ASSERT_EQ(Node::State::Ok, setup.buildFileParserNodeSD2->state());
-        ASSERT_EQ(1, parser->detectedInputs().size());
-        EXPECT_NE(parser->detectedInputs().end(), parser->detectedInputs().find(parser->buildFile()->name()));
 
         BuildFile::File const& parseTree = parser->parseTree();
         ASSERT_EQ(1, parseTree.variablesAndRules.size());
@@ -151,11 +161,13 @@ namespace
         ASSERT_EQ(Node::State::Ok, parser->state());
 
         // update buildfile
-        std::ofstream stream(setup.absBuildFilePath.string().c_str());
-        EXPECT_TRUE(stream.is_open());
-        stream << R"(// this is comment
-: *.cpp |> type main > main.obj |> %B.obj)";
-        stream.close();
+        std::stringstream ss;
+        ss
+            << "@echo off" << std::endl
+            << R"(echo : *.cpp ^|^> type main ^> main.obj ^|^> %%B.obj)"
+            << std::endl;
+        writeFile(setup.absBuildFilePath, ss.str());
+
         // Wait until file change events have resulted in processingNode to
         // become dirty. Take care: node states are updated in main thread.
         // Hence getting node state in test thread is not reliable. Therefore
@@ -192,10 +204,18 @@ namespace
         EXPECT_FALSE(rule.forEach);
         EXPECT_EQ(" type main > main.obj ", rule.script.script);
 
-        EXPECT_EQ(2, setup.context.statistics().nSelfExecuted);
+        EXPECT_EQ(4, setup.context.statistics().nSelfExecuted);
         auto const& selfExecuted = setup.context.statistics().selfExecuted;
-        EXPECT_NE(selfExecuted.end(), selfExecuted.find(parser.get()));
+        EXPECT_NE(selfExecuted.end(), selfExecuted.find(setup.buildFileParserNode.get()));
         EXPECT_NE(selfExecuted.end(), selfExecuted.find(setup.buildFileNode.get()));
+        auto executor = setup.buildFileParserNode->executor();
+        auto const& genBuildFile = executor->outputs()[0];
+        EXPECT_NE(selfExecuted.end(), selfExecuted.find(executor.get()));
+        EXPECT_NE(selfExecuted.end(), selfExecuted.find(genBuildFile.get()));
+        EXPECT_EQ(2, setup.context.statistics().nRehashedFiles);
+        auto const& rehashed = setup.context.statistics().rehashedFiles;
+        EXPECT_NE(rehashed.end(), rehashed.find(setup.buildFileNode.get()));
+        EXPECT_NE(rehashed.end(), rehashed.find(genBuildFile.get()));
     }
 
     TEST(BuildFileParserNode, noReParse) {
@@ -207,10 +227,7 @@ namespace
         ASSERT_EQ(Node::State::Ok, parser->state());
 
         // update buildfile with same content => same hash => no reparse
-        std::ofstream stream(setup.absBuildFilePath.string().c_str());
-        EXPECT_TRUE(stream.is_open());
-        stream << setup.rule;
-        stream.close();
+        writeFile(setup.absBuildFilePath, setup.rule);
 
         // Wait until file change events have resulted in processingNode to
         // become dirty. Take care: node states are updated in main thread.

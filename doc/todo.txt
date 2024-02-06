@@ -53,6 +53,12 @@ Todo: core
   <repo>\file is <repo
 - investigate use of std::filesystem::path.string() and intialing paths
   from a std::string. Shouldn't we use wstring?
+- optimize group update in buildfilecompiler(node):
+    split old groups in map old grp name -> old outputs
+    compile parseTree into map new grp name -> new outputs
+    @end: update old grp when old out != new out
+  NB: GroupNode must maintain group content sorted by name for reproducable
+  hash.
 
 Done
 - Decide how to deal with using generated files from other repos
