@@ -309,7 +309,6 @@ namespace YAM
 
     void BuildFileCompilerNode::compileBuildFile() {
         try {
-            for (auto const& pair : _outputGroups) cleanOutputGroup(pair.second.get());
             std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> allowedInputs;
             for (auto const& pair : _depCompilers) {
                 auto const& outputs = pair.second->_outputs;
@@ -323,6 +322,7 @@ namespace YAM
                 _buildFileParser->parseTree(),
                 _commands,
                 _outputs,
+                _outputGroups,
                 allowedInputs);
             updateMap(context(), this, _commands, compiler.commands());
             updateMap(context(), this, _outputGroups, compiler.outputGroups());

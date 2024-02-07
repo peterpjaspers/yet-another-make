@@ -16,6 +16,7 @@
 #include <sstream>
 #include <chrono>
 #include <ctype.h>
+#include <algorithm>
 
 namespace
 {
@@ -290,6 +291,67 @@ namespace
         }
         return nullptr;
     }
+
+
+    std::vector<std::shared_ptr<Node>> contributionToGroup(
+        std::shared_ptr<GroupNode> const& group,
+        std::vector<std::shared_ptr<Node>> const& nodes
+    ) {
+        static Node::CompareName cmp;
+        std::vector<std::shared_ptr<Node>> contrib;
+        std::vector<std::shared_ptr<Node>> const& content = group->group();
+        for (auto const& node : nodes) {
+            auto it = std::find(content.begin(), content.end(), node);
+            if (it != content.end()) contrib.push_back(node);
+        }
+        return contrib;
+    }
+
+    std::map<std::filesystem::path, std::vector<std::shared_ptr<Node>>> contributionToGroups(
+        std::map<std::filesystem::path, std::shared_ptr<GroupNode>> const& groups,
+        std::vector<std::shared_ptr<Node>> const& nodes
+    ) {
+        std::map<std::filesystem::path, std::vector<std::shared_ptr<Node>>> contribs;
+        for (auto const& pair : groups) {
+            contribs.insert({ pair.first, contributionToGroup(pair.second, nodes)});
+        }
+        return contribs;
+    }
+
+    std::vector<std::shared_ptr<Node>> nodesIn(
+        std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const& outputs
+    ) {
+        std::vector<std::shared_ptr<Node>> nodes;
+        for (auto const& pair : outputs) {
+            nodes.push_back(pair.second);
+        }
+        return nodes;
+    }
+
+    void removeFromGroup(
+        std::shared_ptr<GroupNode> const& groupNode,
+        std::vector<std::shared_ptr<Node>> const& nodes
+     ) {
+        bool updated = false;
+        std::vector<std::shared_ptr<Node>> content = groupNode->group();
+        for (auto const& node : nodes) {
+            auto it = std::find(content.begin(), content.end(), node);
+            if (it != content.end()) {
+                content.erase(it);
+                updated = true;
+            }
+        }
+        if (updated) groupNode->group(content);
+    }
+
+    void addToGroup(
+        std::shared_ptr<GroupNode> const& groupNode,
+        std::vector<std::shared_ptr<Node>> const& nodes
+    ) {
+        std::vector<std::shared_ptr<Node>> content = groupNode->group();
+        for (auto const& node : nodes) content.push_back(node);
+        groupNode->group(content);
+    }
 }
 
 namespace YAM {
@@ -299,6 +361,7 @@ namespace YAM {
             BuildFile::File const& buildFile,
             std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const &commands,
             std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const& outputs,
+            std::map<std::filesystem::path, std::shared_ptr<GroupNode>> outputGroups,
             std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const& allowedInputs,
             std::filesystem::path const& globNameSpace)
         : _context(context)
@@ -306,6 +369,8 @@ namespace YAM {
         , _buildFile(buildFile.buildFile)
         , _oldCommands(commands)
         , _oldOutputs(outputs)
+        , _oldOutputGroups(outputGroups)
+        , _oldOutputGroupsContent(contributionToGroups(_oldOutputGroups, nodesIn(_oldOutputs)))
         , _allowedInputs(allowedInputs)
         , _globNameSpace(globNameSpace)
     {
@@ -316,10 +381,31 @@ namespace YAM {
             auto rule = dynamic_cast<BuildFile::Rule*>(varOrRule.get());
             if (rule != nullptr) compileRule(*rule);
         }
+        updateOutputGroups();
+    }
+
+    void BuildFileCompiler::updateOutputGroups() {
+        static Node::CompareName cmp;
+        for (auto const& pair : _outputGroupsContent) {
+            auto const& groupPath = pair.first;
+            auto content = pair.second;
+            auto groupNode = compileOutputGroup(groupPath);
+            auto oldIt = _oldOutputGroupsContent.find(groupPath);
+            if (oldIt == _oldOutputGroupsContent.end()) {
+                addToGroup(groupNode, content);
+            } else {
+                auto oldContent = oldIt->second;
+                std::sort(oldContent.begin(), oldContent.end(), cmp);
+                std::sort(content.begin(), content.end(), cmp);
+                if (oldContent != content) {
+                    removeFromGroup(groupNode, oldContent);
+                    addToGroup(groupNode, content);
+                }
+            }
+        }
     }
 
     std::shared_ptr<GroupNode> BuildFileCompiler::compileGroupNode(
-        BuildFile::Node const& rule,
         std::filesystem::path const& groupName
     ) {
         auto optimizedBaseDir = _baseDir;
@@ -331,18 +417,21 @@ namespace YAM {
         auto it = _outputGroups.find(groupPath);
         if (it != _outputGroups.end()) groupNode = it->second;
         if (groupNode == nullptr) {
+            auto it = _newGroups.find(groupPath);
+            if (it != _newGroups.end()) groupNode = it->second;
+        }
+        if (groupNode == nullptr) {
             auto node = _context->nodes().find(groupPath);
             groupNode = dynamic_pointer_cast<GroupNode>(node);
             if (node != nullptr && groupNode == nullptr) {
                 std::stringstream ss;
-                ss << "In rule at line " << rule.line << " in buildfile " << _buildFile.string() << ":" << std::endl;
-                ss << "The input group name " << groupName.string()
+                ss << "In buildfile " << _buildFile.string() << ":" << std::endl;
+                ss << "The group name " << groupName.string()
                     << " is already in use by a node that is not a group," << std::endl;
                 throw std::runtime_error(ss.str());
             }
             if (groupNode == nullptr) {
                 groupNode = std::make_shared<GroupNode>(_context, groupPath);
-                _context->nodes().add(groupNode);
                 _newGroups.insert({ groupNode->name(), groupNode});
             }
         }
@@ -350,7 +439,6 @@ namespace YAM {
     }
 
     std::vector<std::shared_ptr<GeneratedFileNode>>& BuildFileCompiler::compileBin(
-        BuildFile::Node const& rule,
         std::filesystem::path const& binPath
     ) {
         auto it = _bins.find(binPath);
@@ -363,7 +451,9 @@ namespace YAM {
     std::shared_ptr<GroupNode> BuildFileCompiler::compileInputGroup(
         BuildFile::Input const& input
     ) {
-        return compileGroupNode(input, input.path);
+        auto groupNode = compileGroupNode(input.path);
+        _context->nodes().addIfAbsent(groupNode);
+        return groupNode;
     }
 
     std::vector<std::shared_ptr<GeneratedFileNode>>& BuildFileCompiler::compileInputBin(
@@ -727,39 +817,48 @@ namespace YAM {
         cmdNode->script(rule.script.script);
         cmdNode->outputs(outputs);
         cmdNode->ignoreOutputs(ignoredOutputs);
+
         for (auto const& groupPath : rule.outputGroups) {
-            compileOutputGroup(rule, groupPath, outputs);
+            compileOutputGroupContent(groupPath, outputs);
         }
         for (auto const& binPath : rule.bins) {
-            compileOutputBin(rule, binPath, outputs);
+            compileOutputBin(binPath, outputs);
         }
     }
 
-    void BuildFileCompiler::compileOutputGroup(
-        BuildFile::Rule const& rule,
-        std::filesystem::path const& groupPath,
-        std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs
+    std::shared_ptr<GroupNode> BuildFileCompiler::compileOutputGroup(
+        std::filesystem::path const& groupPath
     ) {
-        std::shared_ptr<GroupNode> groupNode = compileGroupNode(rule, groupPath);
+        std::shared_ptr<GroupNode> groupNode = compileGroupNode(groupPath);
         if (!_outputGroups.contains(groupNode->name())) {
             _outputGroups.insert({ groupNode->name(), groupNode });
         }
-        std::vector<std::shared_ptr<Node>> group = groupNode->group();
-        for (auto const& n : outputs) {
-            group.push_back(n);
-        }
-        groupNode->group(group);
+        return groupNode;
     }
 
     void BuildFileCompiler::compileOutputBin(
-        BuildFile::Rule const& rule,
         std::filesystem::path const& binPath,
         std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs
     ) {
-        std::vector<std::shared_ptr<GeneratedFileNode>>& binContent = compileBin(rule, binPath);
-        for (auto const& n : outputs) {
-            binContent.push_back(n);
+        std::vector<std::shared_ptr<GeneratedFileNode>>& binContent = compileBin(binPath);
+        binContent.insert(binContent.end(), outputs.begin(), outputs.end());
+    }
+
+    void BuildFileCompiler::compileOutputGroupContent(
+        std::filesystem::path const& groupName,
+        std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs
+    ) {
+        auto optimizedBaseDir = _baseDir;
+        auto optimizedPattern = groupName;
+        Globber::optimize(optimizedBaseDir, optimizedPattern);
+        std::filesystem::path groupPath(optimizedBaseDir->name() / optimizedPattern);
+
+        auto it = _outputGroupsContent.find(groupPath);
+        if (it == _outputGroupsContent.end()) {
+            _outputGroupsContent.insert({ groupPath, std::vector<std::shared_ptr<Node>>() });
         }
+        auto& content = _outputGroupsContent[groupPath];
+        content.insert(content.end(), outputs.begin(), outputs.end());
     }
 
     void BuildFileCompiler::assertHasNoCmdInputFlag(std::size_t line, std::string const& str) const {

@@ -23,9 +23,13 @@ namespace YAM {
             ExecutionContext* context,
             std::shared_ptr<DirectoryNode> const& baseDir,
             BuildFile::File const& buildFile,
+            // Results of previous compilation of this file
             std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const& commands,
             std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const &outputs,
+            std::map<std::filesystem::path, std::shared_ptr<GroupNode>> outputGroups,
             std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const& allowedInputs,
+            // Optional, to allow globs to be named in a private workspace as  
+            // to limit their re-usability across buildfiles.
             std::filesystem::path const& globNameSpace = "");
 
         static std::string compileScript(
@@ -84,15 +88,15 @@ namespace YAM {
         }
 
     private:
+        void updateOutputGroups();
+
         std::shared_ptr<GlobNode> compileGlob(
             std::filesystem::path const& pattern);
 
         std::shared_ptr<GroupNode> compileGroupNode(
-            BuildFile::Node const& rule,
             std::filesystem::path const& groupName);
 
         std::vector<std::shared_ptr<GeneratedFileNode>>& compileBin(
-            BuildFile::Node const& rule,
             std::filesystem::path const& binPath);
 
         std::vector<std::shared_ptr<GeneratedFileNode>>& compileInputBin(
@@ -124,14 +128,15 @@ namespace YAM {
             std::shared_ptr<CommandNode> const& cmdNode,
             std::vector<std::filesystem::path> const& outputPaths);
 
-        void compileOutputGroup(
-            BuildFile::Rule const& rule,
-            std::filesystem::path const& groupPath,
-            std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs);
+        std::shared_ptr<GroupNode> compileOutputGroup(
+            std::filesystem::path const& groupPath);
 
         void compileOutputBin(
-            BuildFile::Rule const& rule,
             std::filesystem::path const& binPath,
+            std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs);
+
+        void compileOutputGroupContent(
+            std::filesystem::path const& groupName,
             std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs);
 
         std::filesystem::path compileOutputPath(
@@ -174,18 +179,35 @@ namespace YAM {
         std::shared_ptr<DirectoryNode> _baseDir;
         std::filesystem::path _globNameSpace;
         std::filesystem::path _buildFile;
+
+        // Results of previous compilations.
         std::map<std::filesystem::path, std::shared_ptr<CommandNode>> _oldCommands;
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _oldOutputs;
+        std::map<std::filesystem::path, std::shared_ptr<GroupNode>> _oldOutputGroups;
+        std::map<std::filesystem::path, std::vector<std::shared_ptr<Node>>> _oldOutputGroupsContent;
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _allowedInputs;
         
+        // Results of this compilation. The globs are the globs found in cmd and
+        // order-only input of rules.
         std::map<std::filesystem::path, std::shared_ptr<CommandNode>> _commands;
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _outputs;
         std::map<std::filesystem::path, std::shared_ptr<GlobNode>> _globs;
         std::map<std::filesystem::path, std::shared_ptr<GroupNode>> _outputGroups;
-        std::map<std::filesystem::path, std::vector<std::shared_ptr<GeneratedFileNode>>> _bins;
+        // For each group in _oldOutputGroups the subset of _oldOutputs in that group.
 
+        std::map<std::filesystem::path, std::vector<std::shared_ptr<GeneratedFileNode>>> _bins;
+        // Used to collect the new contributions to output groups. Once all 
+        // commands have been created _outputGroups is updated with this info.
+        // Rationale: only update groups when needed.
+        std::map<std::filesystem::path, std::vector<std::shared_ptr<Node>>> _outputGroupsContent;
+
+        // The line nrs of the rules from which the commands were compiled.
+        // Ordering is as in _commands.
         std::map<std::shared_ptr<CommandNode>, std::size_t> _ruleLineNrs;
 
+        // Newly created objects because existing ones were not found in the 
+        // execution context. It is up-to the user of this class to add them to
+        // the context.
         std::map<std::filesystem::path, std::shared_ptr<CommandNode>> _newCommands;
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _newOutputs;
         std::map<std::filesystem::path, std::shared_ptr<GlobNode>> _newGlobs;
