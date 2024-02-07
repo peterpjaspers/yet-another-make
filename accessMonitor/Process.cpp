@@ -13,6 +13,8 @@ namespace AccessMonitor {
 
     ProcessID CurrentProcessID() { return static_cast<ProcessID>( GetCurrentProcessId() ); }
     ProcessID GetProcessID( unsigned long id ) { return static_cast<ProcessID>( id ); }
+    ThreadID CurrentThreadID() { return static_cast<ThreadID>( GetCurrentThreadId() ); }
+    ThreadID GetThreadID( unsigned long id ) { return static_cast<ThreadID>( id ); }
 
     string uniqueEventName( const string& tag, ProcessID pid ) {
         stringstream name;
@@ -20,7 +22,7 @@ namespace AccessMonitor {
         return name.str();
     }
 
-    EventID AccesstEvent( const string& tag, const ProcessID pid ) {
+    EventID AccessEvent( const string& tag, const ProcessID pid ) {
         HANDLE handle = CreateEventA( nullptr, false, false, uniqueEventName( tag, pid ).c_str() );
         return static_cast<EventID>( handle );
     }

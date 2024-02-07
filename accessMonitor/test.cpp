@@ -13,17 +13,12 @@ using namespace AccessMonitor;
 using namespace std;
 using namespace std::filesystem;
 
-// Convert wide character string to ANSI character string
-string narrow( const wstring& string ){
-    static wstring_convert< codecvt_utf8_utf16< wstring::value_type >, wstring::value_type > utf16conv;
-    return utf16conv.to_bytes( string );
-}
+static bool multithreaded = false;
+static bool remoteProcess = false;
+
+Log logger;
 
 void worker( const path directoryPath ) {
-    path externals = directoryPath / ".." / "externals.txt";
-    auto command = (wstring( L"listDLLExternals.exe \"\" " ) + externals.wstring());
-    auto exitCode = system( narrow( command ).c_str() );
-    log() << "Process " << command << " exitted with " << hex << uppercase << noshowbase << static_cast<uint32_t>( exitCode ) << endLine;
     create_directory( directoryPath, current_path() );
     ofstream file( directoryPath / "junk.txt" );
     file << "Hello world!\n";
@@ -38,7 +33,12 @@ void worker( const path directoryPath ) {
     remove_all( directoryPath );
 }
 
-void doFileAccess( bool multithreaded = true ) {
+void doFileAccess() {
+    if (remoteProcess) {
+        wstring command = L"C:\\Users\\philv\\Code\\yam\\yet-another-make\\accessMonitor\\remoteTest.exe";
+        auto exitCode = system( narrow( command ).c_str() );
+        logger() << "Process " << command << " exitted with " << hex << uppercase << noshowbase << static_cast<uint32_t>( exitCode ) << dec << record;
+    }
     if (multithreaded) {
         auto t = jthread( worker, path( "./fileAccessTest" ) );
         auto t0 = jthread( worker, path( "./fileAccessTest0" ) );
@@ -50,31 +50,37 @@ void doFileAccess( bool multithreaded = true ) {
     }
 }
 
-int main() {
-    bool multithreaded = false;
+bool condition( const string& argument ) {
+    if ((argument == "t") || (argument == "T")) return true;
+    if ((argument == "true") || (argument == "TRUE")) return true;
+    return false;
+}
+
+int main( int argc, char* argv[] ) {
+    multithreaded = false;
+    remoteProcess = false;
+    if (2 < argc) { remoteProcess = condition( argv[ 2 ] ); }
+    if (1 < argc) { multithreaded = condition( argv[ 1 ] ); }
     try {
-        enableLog( "test", Verbose );
-        log() << "Performing file access without monitoring..." << endLine;
-        doFileAccess( multithreaded );
-        log() << "Start monitoring..." << endLine;
+        logger = Log( "TestLog", false, true );
+        logger.enable( PatchedFunction | ParseLibrary | PatchExecution | FileAccess );
+        logger() << "Performing file access without monitoring..." << record;
+        doFileAccess();
+        logger() << "Start monitoring..." << record;
         startMonitoring();
-        log() << "Performing file access with monitoring..." << endLine;
-        doFileAccess( multithreaded );
-        log() << "Stop monitoring..." << endLine;
+        logger() << "Performing file access with monitoring..." << record;
+        doFileAccess();
+        logger() << "Stop monitoring..." << record;
         stopMonitoring();
-        wofstream files( "./accessedFiles.txt" );
-        streamAccessedFiles( files );
-        files.close();
-        log() << "Performing file access without monitoring..." << endLine;
-        doFileAccess( multithreaded );
-        log() << "Done..." << endLine;
+        logger() << "Performing file access without monitoring..." << record;
+        doFileAccess();
+        logger() << "Done..." << record;
     }
     catch ( string message ) {
-        log() << widen( message ) << endLine;
+        logger() << widen( message ) << record;
     }
     catch (...) {
-        log() << "Exception!" << endLine;
+        logger() << "Exception!" << record;
     }
-    if (logging(None)) disableLog();
 };
 

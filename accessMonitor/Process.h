@@ -6,6 +6,7 @@
 namespace AccessMonitor {
 
     typedef unsigned long ProcessID;
+    typedef unsigned long ThreadID;
     typedef void* EventID;
 
     // Get ProcessID of current process
@@ -13,9 +14,14 @@ namespace AccessMonitor {
     // Convert OS specific ID of process to ProcessID
     ProcessID GetProcessID( unsigned long id );
     
+    // Get ThreadID of current thread
+    ThreadID CurrentThreadID();
+    // Convert OS specific ID of process to ThreadID
+    ThreadID GetThreadID( unsigned long id );
+    
     // Request access to (unique) named event for a process.
     // The event is created if it does not already exist.
-    EventID AccesstEvent( const std::string& tag, const ProcessID pid );
+    EventID AccessEvent( const std::string& tag, const ProcessID pid );
     // Release access to (unique) named event for a process.
     // The event is destroyed when it is no longer accessed.
     void ReleaseEvent( EventID event );

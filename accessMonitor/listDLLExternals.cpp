@@ -97,7 +97,12 @@ using namespace AccessMonitor;
 int main( int argc, char* argv[] ) {
     ofstream out( ( (2 < argc) ? argv[ 2 ] : "externals.txt" ) );
     uint32_t index = 1;
-    auto dlls = EnumerateModules( ( (1 < argc) ? argv[ 1 ] : "" ) );
+    string library = ( (1 < argc) ? argv[ 1 ] : "" );
+    if (library != "") {
+        HANDLE lib = LoadLibraryA( library.c_str() );
+        if (lib == nullptr) throw "Could not load library!";
+    }
+    auto dlls = EnumerateModules( "" );
     for ( auto dll : dlls ){
         out << "Module " << dll.name << " in " << dll.directory << "\n";
         auto exports = EnumerateExports( dll );

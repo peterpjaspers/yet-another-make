@@ -2,86 +2,88 @@
 #include "Process.h"
 
 #include <fstream>
+#include <iostream>
 #include <chrono>
 #include <clocale>
+#include <codecvt>
 #include <cstdlib>
 
 using namespace std;
-
-// ToDo: Fix bug (presumably due to multi=threaded logging)
-// terminate called after throwing an instance of 'std::logic_error'
-//  what():  basic_string::_M_construct null not valid
+using namespace std::filesystem;
 
 // ToDo: Conditionally compile logging code while compiling in debug controlled via NDEBUG
 
 namespace AccessMonitor {
     
-    // ToDo: Implement multi-thread safe access to log file, thread_local does not work
-    namespace {
-        static wostream* logFile = nullptr;
-//        thread_local wostringstream* logStream = nullptr;
-        static wostringstream* logStream = nullptr;
-        static LogLevel logLevel = LogLevel::Normal;
-        bool levelValid( LogLevel level ) { return ((level == Terse) || (level == Normal) || (level == Verbose)); }
-    }
-
-    // Enable logging to file.
-    LogLevel enableLog( std::string file, LogLevel level ) {
-        static const char* signature = "void enableLog( std::string file, LogLevel level )";
-        if (logFile != nullptr) throw string( signature ) + " - Enabling enabled Monitor log on " + file;
-        if (!levelValid( level )) throw string( signature ) + " - Invalid logging level";
+    Log::Log( const path& file, bool time, bool interval ) :
+        logTime( time ), logInterval( interval ), previousTime( chrono::system_clock::now() )
+    {
         // Add process PID to file name to generate unique file name for log file...
-        stringstream uniqueFile;
-        uniqueFile << file << "_" << hex << CurrentProcessID() << ".log";
-        logFile = new wofstream( uniqueFile.str() );
-/*
-        // ToDo: Write BOM to log file (this code does not work for some reason!)
-        static uint8_t UTF16BOM[ 2 ] = { 0xFE, 0xFF }; 
-        logStream->write( reinterpret_cast<wchar_t*>(&UTF16BOM[ 0 ]), 2 );
-*/
-        logLevel = level;
-        return( logLevel );
+        wstringstream uniqueFile;
+        uniqueFile << file.c_str() << "_" << hex << CurrentProcessID() << ".log";
+        logFile = new wofstream( temp_directory_path() / uniqueFile.str() );
+        // static uint8_t UTF16BOMCodes[ 2 ] = { 0xFE, 0xFF };
+        // static wchar_t* UTF16BOM = reinterpret_cast<wchar_t*>( &UTF16BOMCodes[ 0 ] );
+        // *logFile << UTF16BOM;
+        logMutex = new mutex;
+        logRecords = new map<ThreadID,LogRecord*>;
     }
 
-    // Switch logging level.
-    // Switch to LogLevel::None to (temporarily suppress logging).
-    LogLevel enableLog( LogLevel level ) {
-        static const char* signature = "void enableLog( LogLevel level )";
-        if (!levelValid( level )) throw string( signature ) + " - Invalid logging level!";
-        LogLevel oldLevel = logLevel;
-        logLevel = level;
-        return( oldLevel );
+    Log::~Log() { close(); }
+
+    void Log::close() {
+        if (logFile != nullptr) { logFile->close(); delete( logFile ); logFile = nullptr; }
+        if (logMutex != nullptr) { delete( logMutex ); logMutex = nullptr; }
+        if (logRecords != nullptr) {
+            for ( auto record : *logRecords ) { delete record.second; }
+            delete logRecords; logRecords = nullptr;
+        }
     }
 
-    // Disable logging and close log file.
-    void disableLog() {
-        static const char* signature = "void disableLog()";
-        if (logFile == nullptr) throw string( signature ) + " - Disabling disabled Monitor log!";
-        static_cast<wfstream*>(logFile)->close();
-        delete logFile;
-        logFile = nullptr;
-    };
-
-    // Test if logging is enabled for a particular level.
-    // Returns true is logging is enabled for level or lower, false otherwise.
-    bool logging( LogLevel level ) { return( (logFile != nullptr) && (level <= logLevel) ); }
+    Log& Log::operator=( Log&& other ) {
+        logFile = other.logFile;
+        logMutex = other.logMutex;
+        logRecords = other.logRecords;
+        enabledAspects = other.enabledAspects;
+        logTime = other.logTime;
+        logInterval = other.logInterval;
+        previousTime = other.previousTime;
+        other.logFile = nullptr;
+        other.logMutex = nullptr;
+        other.logRecords = nullptr;
+        return *this;
+    }
 
     // Return logging stream on enabled log.
-    wostringstream& log() {
-        static const char* signature = "wostringstream& log()";
-        if (logFile == nullptr) throw string( signature ) + " - Monitor log not enabled!";
-        if (logStream == nullptr) logStream = new wostringstream();
-        (*logStream) << chrono::system_clock::now() << " : ";
-        return( *logStream );
+    LogRecord& Log::operator()() {
+        static const char* signature = "LogRecord& Log::operator()() const";
+        LogRecord* record = (*logRecords)[ CurrentThreadID() ];
+        if (record == nullptr) {
+            record = new LogRecord( *this );
+            (*logRecords)[ CurrentThreadID() ] = record;
+        }
+        if (logTime || logInterval) {
+            auto time = chrono::system_clock::now();
+            if (logTime) (*record) << time << " : ";
+            if (logInterval) (*record) << "[ " << fixed << setprecision( 3 ) << setw( 6 ) <<
+                chrono::duration_cast<chrono::microseconds >(time - previousTime).count() / 1000.0 << " ms ] ";
+            previousTime = time;
+        }
+        return( *record );
+    }
+
+    void Log::record( const wstring& string ) {
+        const lock_guard<mutex> lock( *logMutex ); 
+        *logFile << string << flush;
     }
 
     // Complete log entry and write to log file.
-    wostream& endLine( wostream& stream ) {
-        wostringstream& sstream = static_cast<wostringstream&>( stream );
-        sstream << "\n";
-        *logFile << sstream.str() << flush;
-        sstream.str( L"" );
-        return stream;
+    wostream& record( wostream& stream ) {
+        LogRecord& logRecord = static_cast<LogRecord&>( stream );
+        logRecord << "\n";
+        logRecord.record( logRecord.str() );
+        logRecord.str( L"" );
+        return logRecord;
     }
 
     // Convert ANSI string to wide character string.
@@ -90,6 +92,12 @@ namespace AccessMonitor {
         wstring dst(len + 1, 0);
         mbstowcs(&dst[0], src.c_str(), len);
         return dst;
+    }
+
+    // Convert wide character string to ANSI character string
+    string narrow( const wstring& string ){
+        static wstring_convert< codecvt_utf8_utf16< wstring::value_type >, wstring::value_type > utf16conv;
+        return utf16conv.to_bytes( string );
     }
 
 } // namespace AccessMonitor

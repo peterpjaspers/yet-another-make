@@ -6,11 +6,11 @@
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}\\${fileBasenameNoExtension}.exe",
-            "args": [],
+            "args": [ "false", "false" ],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],
-            "console": "externalTerminal"
+            "console": "internalConsole"
         },
         {
             "name": "(Windows) Attach",

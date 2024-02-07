@@ -1,28 +1,37 @@
 #include "MonitorFiles.h"
-#include "Monitor.h"
+#include "MonitorProcess.h"
 #include "Patch.h"
 #include "Log.h"
-#include "FileAccessEvents.h"
 
 #include <windows.h>
-#include <map>
+#include <winternl.h>
 #include <chrono>
-#include <mutex>
-
-// CreateHardLinkW, GetFileAttributesW, GetFullPathNameW, GetLongPathNameW, MoveFileExW, ReplaceFileW
-// SearchPathW, FindFirstStreamW, FindNextStreamW, GetCompressedFileSizeW, GetFinalPathNameByHandleW
+#include <string>
+#include <filesystem>
 
 using namespace std;
+using namespace std::filesystem;
 
 namespace AccessMonitor {
 
     namespace {
+
+        typedef unsigned long FileAccessMode;
+        typedef std::chrono::time_point<std::chrono::system_clock> FileTime;
+
+        static const FileAccessMode AccessNone = (1 << 0);
+        static const FileAccessMode AccessRead = (1 << 1);
+        static const FileAccessMode AccessWrite = (1 << 2);
+        static const FileAccessMode AccessDelete = (1 << 3);
+        static const FileAccessMode AccessVariable = (1 << 4);
+        static const FileAccessMode AccessStopMonitoring = (1 << 10);
 
         FileAccessMode requestedAccessMode( DWORD desiredAccess );
 
         wstring fileAccess( const string& fileName, FileAccessMode mode );
         wstring fileAccess( const wstring& fileName, FileAccessMode mode );
         wstring fileAccess( HANDLE handle, FileAccessMode mode = AccessNone );
+        wstring fileAccess( HANDLE handle, const OBJECT_ATTRIBUTES* attributes );
 
         typedef BOOL(*TypeCreateDirectoryA)(LPCSTR,LPSECURITY_ATTRIBUTES);
         BOOL PatchCreateDirectoryA(
@@ -31,7 +40,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateDirectoryA>(original( (PatchFunction)PatchCreateDirectoryA ));
             BOOL created = function( pathName, securityAttributes );
-            if (logging( Terse )) log() << L"MonitorFiles - CreateDirectoryA( " << pathName << L", ... ) -> " << created << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - CreateDirectoryA( " << pathName << L", ... ) -> " << created << record;
             fileAccess( pathName, AccessWrite );
             return created;
         }
@@ -42,7 +51,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateDirectoryW>(original( (PatchFunction)PatchCreateDirectoryW ));
             BOOL created = function( pathName, securityAttributes );
-            if (logging( Terse )) log() << L"MonitorFiles - CreateDirectoryW( " << pathName << L", ... ) -> " << created << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - CreateDirectoryW( " << pathName << L", ... ) -> " << created << record;
             fileAccess( pathName, AccessWrite );
             return created;
         }
@@ -54,7 +63,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateDirectoryExA>(original( (PatchFunction)PatchCreateDirectoryExA ));
             BOOL created = function( templateDirectory, newDirectory, securityAttributes );
-            if (logging( Terse )) log() << L"MonitorFiles - CreateDirectoryExA( " << newDirectory << L", ... ) -> " << created << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - CreateDirectoryExA( " << newDirectory << L", ... ) -> " << created << record;
             fileAccess( newDirectory, AccessWrite );
             return created;
         }
@@ -66,7 +75,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateDirectoryExW>(original( (PatchFunction)PatchCreateDirectoryExW ));
             BOOL created = function( templateDirectory, newDirectory, securityAttributes );
-            if (logging( Terse )) log() << L"MonitorFiles - CreateDirectoryExA( " << newDirectory << L", ... ) -> " << created << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - CreateDirectoryExA( " << newDirectory << L", ... ) -> " << created << record;
             fileAccess( newDirectory, AccessWrite );
             return created;
         }
@@ -76,7 +85,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeRemoveDirectoryA>(original( (PatchFunction)PatchRemoveDirectoryA ));
             BOOL removed = function( pathName );
-            if (logging( Terse )) log() << L"MonitorFiles - RemoveDirectoryA( " << pathName << L", ... ) -> " << removed << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - RemoveDirectoryA( " << pathName << L", ... ) -> " << removed << record;
             fileAccess( pathName, AccessDelete );
             return removed;
         }
@@ -86,7 +95,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeRemoveDirectoryW>(original( (PatchFunction)PatchRemoveDirectoryW ));
             BOOL removed = function( pathName );
-            if (logging( Terse )) log() << L"MonitorFiles - RemoveDirectoryW( " << pathName << L", ... ) -> " << removed << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - RemoveDirectoryW( " << pathName << L", ... ) -> " << removed << record;
             fileAccess( pathName, AccessDelete );
             return removed;
         }
@@ -102,7 +111,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateFileA>(original( (PatchFunction)PatchCreateFileA ));
             HANDLE handle = function( fileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile );
-            if (logging( Terse )) log() << L"MonitorFiles - CreateFileA( " << fileName << L", ... ) -> " << handle << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - CreateFileA( " << fileName << L", ... ) -> " << handle << record;
             fileAccess( handle, requestedAccessMode( dwDesiredAccess ) );
             return handle;
         }
@@ -118,7 +127,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateFileW>(original( (PatchFunction)PatchCreateFileW ));
             HANDLE handle = function( fileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile );
-            if (logging( Terse )) log() << L"MonitorFiles - CreateFileW( " << fileName << L", ... ) -> " << handle << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - CreateFileW( " << fileName << L", ... ) -> " << handle << record;
             fileAccess( handle, requestedAccessMode( dwDesiredAccess ) );
             return handle;
         }
@@ -132,7 +141,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateFile2>(original( (PatchFunction)PatchCreateFile2 ));
             HANDLE handle = function( fileName, dwDesiredAccess, dwShareMode, dwCreationDisposition, pCreateExParams );
-            if (logging( Terse )) log() << L"MonitorFiles - CreateFile2( " << fileName << L", ... ) -> " << handle << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - CreateFile2( " << fileName << L", ... ) -> " << handle << record;
             fileAccess( handle, requestedAccessMode( dwDesiredAccess ) );
             return handle;
         }
@@ -140,7 +149,7 @@ namespace AccessMonitor {
         BOOL PatchDeleteFileA( LPCSTR fileName ) {
             TypeDeleteFIleA function = reinterpret_cast<TypeDeleteFIleA>(original( (PatchFunction)PatchDeleteFileA ));
             BOOL deleted = function( fileName );
-            if (logging( Terse )) log() << L"MonitorFiles - DeleteFileA( " << fileName << L", ... ) -> " << deleted << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - DeleteFileA( " << fileName << L", ... ) -> " << deleted << record;
             fileAccess( fileName, AccessDelete );
             return deleted;
         }
@@ -148,7 +157,7 @@ namespace AccessMonitor {
         BOOL PatchDeleteFileW( LPCWSTR fileName ) {
             auto function = reinterpret_cast<TypeDeleteFIleW>(original( (PatchFunction)PatchDeleteFileW ));
             BOOL deleted = function( fileName );
-            if (logging( Terse )) log() << L"MonitorFiles - DeleteFileW( " << fileName << L", ... ) -> " << deleted << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - DeleteFileW( " << fileName << L", ... ) -> " << deleted << record;
             fileAccess( fileName, AccessDelete );
             return deleted;
         }
@@ -160,7 +169,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCopyFileA>(original( (PatchFunction)PatchCopyFileA ));
             BOOL copied = function( existingFileName, newFileName, failIfExists );
-            if (logging( Terse )) log() << L"MonitorFiles - CopyFileA( " << existingFileName << L", " << newFileName << L", ... ) -> " << copied << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - CopyFileA( " << existingFileName << L", " << newFileName << L", ... ) -> " << copied << record;
             fileAccess( existingFileName, AccessRead );
             fileAccess( newFileName, AccessWrite );
             return copied;
@@ -173,7 +182,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCopyFileW>(original( (PatchFunction)PatchCopyFileW ));
             BOOL copied = function( existingFileName, newFileName, failIfExists );
-            if (logging( Terse )) log() << L"MonitorFiles - CopyFileW( " << existingFileName << L", " << newFileName << L", ... ) -> " << copied << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - CopyFileW( " << existingFileName << L", " << newFileName << L", ... ) -> " << copied << record;
             fileAccess( existingFileName, (AccessRead | AccessDelete) );
             fileAccess( newFileName, AccessWrite );
             return copied;
@@ -189,7 +198,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCopyFileExA>(original( (PatchFunction)PatchCopyFileExA ));
             BOOL copied = function( existingFileName, newFileName, lpProgressRoutine, lpData, pbCancel, dwCopyFlags );
-            if (logging( Terse )) log() << L"MonitorFiles - CopyFileExA( " << existingFileName << L", " << newFileName << L", ... ) -> " << copied << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - CopyFileExA( " << existingFileName << L", " << newFileName << L", ... ) -> " << copied << record;
             fileAccess( existingFileName, AccessRead );
             fileAccess( newFileName, AccessWrite );
             return copied;
@@ -205,7 +214,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCopyFileExW>(original( (PatchFunction)PatchCopyFileExW ));
             BOOL copied = function( existingFileName, newFileName, lpProgressRoutine, lpData, pbCancel, dwCopyFlags );
-            if (logging( Terse )) log() << L"MonitorFiles - CopyFileExW( " << existingFileName << L", " << newFileName << L", ... ) -> " << copied << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - CopyFileExW( " << existingFileName << L", " << newFileName << L", ... ) -> " << copied << record;
             fileAccess( existingFileName, AccessRead );
             fileAccess( newFileName, AccessWrite );
             return copied;
@@ -218,7 +227,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCopyFile2>(original( (PatchFunction)PatchCopyFile2 ));
             BOOL copied = function( existingFileName, newFileName, pExtendedParameters );
-            if (logging( Terse )) log() << L"MonitorFiles - CopyFile2( " << existingFileName << L", " << newFileName << L", ... ) -> " << copied << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - CopyFile2( " << existingFileName << L", " << newFileName << L", ... ) -> " << copied << record;
             fileAccess( existingFileName, AccessRead );
             fileAccess( newFileName, AccessWrite );
             return copied;
@@ -230,7 +239,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeMoveFileA>(original( (PatchFunction)PatchMoveFileA ));
             BOOL moved = function( existingFileName, newFileName );
-            if (logging( Terse )) log() << L"MonitorFiles - MoveFileA( " << existingFileName << L", " << newFileName << L", ... ) -> " << moved << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - MoveFileA( " << existingFileName << L", " << newFileName << L", ... ) -> " << moved << record;
             fileAccess( existingFileName, AccessDelete );
             fileAccess( newFileName, AccessWrite );
             return moved;
@@ -242,7 +251,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeMoveFileW>(original( (PatchFunction)PatchMoveFileW ));
             BOOL moved = function( existingFileName, newFileName );
-            if (logging( Terse )) log() << L"MonitorFiles - MoveFileW( " << existingFileName << L", " << newFileName << L", ... ) -> " << moved << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - MoveFileW( " << existingFileName << L", " << newFileName << L", ... ) -> " << moved << record;
             fileAccess( existingFileName, AccessDelete );
             fileAccess( newFileName, AccessWrite );
             return moved;
@@ -257,7 +266,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeMoveFileWithProgressA>(original( (PatchFunction)PatchMoveFileWithProgressA ));
             BOOL moved = function( existingFileName, newFileName, lpProgressRoutine, lpData, dwFlags );
-            if (logging( Terse )) log() << L"MonitorFiles - MoveFileWithProgressA( " << existingFileName << L", " << newFileName << L", ... ) -> " << moved << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - MoveFileWithProgressA( " << existingFileName << L", " << newFileName << L", ... ) -> " << moved << record;
             fileAccess( existingFileName, AccessDelete );
             fileAccess( newFileName, AccessWrite );
             // ToDo: Record last write time on newFileName (wait until copy coplete!)
@@ -273,7 +282,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeMoveFileWithProgressW>(original( (PatchFunction)PatchMoveFileWithProgressW ));
             BOOL moved = function( existingFileName, newFileName, lpProgressRoutine, lpData, dwFlags );
-            if (logging( Terse )) log() << L"MonitorFiles - MoveFileWithProgressW( " << existingFileName << L", " << newFileName << L", ... ) -> " << moved << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - MoveFileWithProgressW( " << existingFileName << L", " << newFileName << L", ... ) -> " << moved << record;
             fileAccess( existingFileName, AccessDelete );
             fileAccess( newFileName, AccessWrite );
             // ToDo: Record last write time on newFileName (wait until copy complete!)
@@ -286,7 +295,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeFindFirstFileA>(original( (PatchFunction)PatchFindFirstFileA ));
             HANDLE handle = function( fileName, lpFindFileData );
-            if (logging( Terse )) log() << L"MonitorFiles - FindFirstFileA( " << fileName << L", ... ) -> " << handle << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - FindFirstFileA( " << fileName << L", ... ) -> " << handle << record;
             fileAccess( fileName, AccessRead );
             return handle;
         }        
@@ -297,7 +306,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeFindFirstFileW>(original( (PatchFunction)PatchFindFirstFileW ));
             HANDLE handle = function( fileName, lpFindFileData );
-            if (logging( Terse )) log() << L"MonitorFiles - FindFirstFileW( " << fileName << L", ... ) -> " << handle << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - FindFirstFileW( " << fileName << L", ... ) -> " << handle << record;
             fileAccess( fileName, AccessRead );
             return handle;
         }
@@ -312,7 +321,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeFindFirstFileExA>(original( (PatchFunction)PatchFindFirstFileExA ));
             HANDLE handle = function( fileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags );
-            if (logging( Terse )) log() << L"MonitorFiles - FindFirstFileExA( " << fileName << L", ... ) -> " << handle << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - FindFirstFileExA( " << fileName << L", ... ) -> " << handle << record;
             fileAccess( fileName, AccessRead );
             return handle;
         }
@@ -327,7 +336,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeFindFirstFileExW>(original( (PatchFunction)PatchFindFirstFileExW ));
             HANDLE handle = function( fileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags );
-            if (logging( Terse )) log() << L"MonitorFiles - FindFirstFileExW( " << fileName << L", ... ) -> " << handle << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - FindFirstFileExW( " << fileName << L", ... ) -> " << handle << record;
             fileAccess( fileName, AccessRead );
             return handle;
         }
@@ -337,7 +346,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeGetFileAttributesA>(original( (PatchFunction)PatchGetFileAttributesA ));
             DWORD attributes = function( fileName );
-            if (logging( Terse )) log() << L"MonitorFiles - GetFileAttributesA( " << fileName << L", ... ) -> " << attributes << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - GetFileAttributesA( " << fileName << L", ... ) -> " << attributes << record;
             fileAccess( fileName, AccessRead );
             return attributes;
         }
@@ -347,7 +356,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeGetFileAttributesW>(original( (PatchFunction)PatchGetFileAttributesW ));
             DWORD attributes = function( fileName );
-            if (logging( Terse )) log() << L"MonitorFiles - GetFileAttributesW( " << fileName << L", ... ) -> " << attributes << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - GetFileAttributesW( " << fileName << L", ... ) -> " << attributes << record;
             fileAccess( fileName, AccessRead );
             return attributes;
         }
@@ -359,7 +368,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeGetFileAttributesExA>(original( (PatchFunction)PatchGetFileAttributesExA ));
             DWORD attributes = function( fileName, fInfoLevelId, lpFileInformation );
-            if (logging( Terse )) log() << L"MonitorFiles - GetFileAttributesExA( " << fileName << L", ... ) -> " << attributes << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - GetFileAttributesExA( " << fileName << L", ... ) -> " << attributes << record;
             fileAccess( fileName, AccessRead );
             return attributes;
         }
@@ -371,7 +380,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeGetFileAttributesExW>(original( (PatchFunction)PatchGetFileAttributesExW ));
             DWORD attributes = function( fileName, fInfoLevelId, lpFileInformation );
-            if (logging( Terse )) log() << L"MonitorFiles - GetFileAttributesExW( " << fileName << L", ... ) -> " << attributes << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - GetFileAttributesExW( " << fileName << L", ... ) -> " << attributes << record;
             fileAccess( fileName, AccessRead );
             return attributes;
         }
@@ -382,7 +391,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeSetFileAttributesA>(original( (PatchFunction)PatchSetFileAttributesA ));
             BOOL set = function( fileName, dwFileAttributes );
-            if (logging( Terse )) log() << L"MonitorFiles - SetFileAttributesA( " << fileName << L", ... ) -> " << set << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - SetFileAttributesA( " << fileName << L", ... ) -> " << set << record;
             fileAccess( fileName, AccessWrite );
             return set;
         }
@@ -393,7 +402,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeSetFileAttributesW>(original( (PatchFunction)PatchSetFileAttributesW ));
             BOOL set = function( fileName, dwFileAttributes );
-            if (logging( Terse )) log() << L"MonitorFiles - SetFileAttributesW( " << fileName << L", ... ) -> " << set << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - SetFileAttributesW( " << fileName << L", ... ) -> " << set << record;
             fileAccess( fileName, AccessWrite );
             return set;
         }
@@ -403,8 +412,49 @@ namespace AccessMonitor {
             // Record last write time when closing file opened for write
             wstring fileName = fileAccess( handle );
             BOOL closed = function( handle );
-            if (logging( Terse )) log() << L"MonitorFiles - CloseHandle( " << fileName.c_str() << L", ... ) -> " << closed << endLine;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - CloseHandle( " << fileName.c_str() << L", ... ) -> " << closed << record;
             return closed;
+        }
+        typedef NTSTATUS(*TypeNtCreateFile)(HANDLE*,ACCESS_MASK,OBJECT_ATTRIBUTES*,IO_STATUS_BLOCK*,LARGE_INTEGER*,ULONG,ULONG,ULONG,ULONG,void*,ULONG);
+        NTSTATUS PatchNtCreateFile(
+            HANDLE*            FileHandle,
+            ACCESS_MASK        DesiredAccess,
+            OBJECT_ATTRIBUTES* ObjectAttributes,
+            IO_STATUS_BLOCK*   IoStatusBlock,
+            LARGE_INTEGER*     AllocationSize,
+            ULONG              FileAttributes,
+            ULONG              ShareAccess,
+            ULONG              CreateDisposition,
+            ULONG              CreateOptions,
+            void*              EaBuffer,
+            ULONG              EaLength
+        ) {
+            auto function = reinterpret_cast<TypeNtCreateFile>(original( (PatchFunction)PatchNtCreateFile ));
+            unpatchFunction( (PatchFunction)PatchNtCreateFile );
+            auto status = function( FileHandle, DesiredAccess, ObjectAttributes, IoStatusBlock, AllocationSize, FileAttributes, ShareAccess, CreateDisposition, CreateOptions, EaBuffer, EaLength );
+            // wstring fileName = fileAccess( *FileHandle, ObjectAttributes );
+            // if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - NtCreateFile( ... " << fileName << " ... ) -> " << status << record;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - NtCreateFile( ... ) -> " << status << record;
+            repatchFunction( (PatchFunction)PatchNtCreateFile );
+            return status;
+        }
+        typedef NTSTATUS(*TypeNtOpenFile)(HANDLE*,ACCESS_MASK,OBJECT_ATTRIBUTES*,IO_STATUS_BLOCK*,ULONG,ULONG);
+        NTSTATUS PatchNtOpenFile(
+            HANDLE*            FileHandle,
+            ACCESS_MASK        DesiredAccess,
+            OBJECT_ATTRIBUTES* ObjectAttributes,
+            IO_STATUS_BLOCK*   IoStatusBlock,
+            ULONG              ShareAccess,
+            ULONG              OpenOptions
+        ) {
+            auto function = reinterpret_cast<TypeNtOpenFile>(original( (PatchFunction)PatchNtOpenFile ));
+            unpatchFunction( (PatchFunction)PatchNtOpenFile );
+            auto status = function( FileHandle, DesiredAccess, ObjectAttributes, IoStatusBlock, ShareAccess, OpenOptions );
+            // wstring fileName = fileAccess( *FileHandle, ObjectAttributes );
+            // if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - NtOpenFile( ... " << fileName << " ... ) -> " << status << record;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - NtOpenFile( ... ) -> " << status << record;
+            repatchFunction( (PatchFunction)PatchNtOpenFile );
+            return status;
         }
         // Convert Windows access mode value to FileAccessMode value
         FileAccessMode requestedAccessMode( DWORD desiredAccess ) {
@@ -463,6 +513,17 @@ namespace AccessMonitor {
         wstring fullName( const wstring& fileName ) {
             return fullName( fileName.c_str() );
         }
+        // ToDo: Fix this function
+        wstring fullName( const OBJECT_ATTRIBUTES* attributes ) {
+            UNICODE_STRING* unicodeString = attributes->ObjectName;
+            wstring name( unicodeString->Buffer, unicodeString->Length );
+            path filePath( name );
+            if (attributes->RootDirectory != nullptr) {
+                filePath = fullName( attributes->RootDirectory );
+                filePath /= name;
+            }
+            return filePath.wstring();
+        }
 
         // Retrieve last write time on a file (handle)
         // Note that Windows file times have (limited) millisecond resolution
@@ -498,7 +559,7 @@ namespace AccessMonitor {
             DWORD createError = GetLastError();
             if (createError == ERROR_SUCCESS) {
                 time = getLastWriteTime( handle );
-                if (logging( Verbose )) log() << L"MonitorFiles - Last write time " << time << L" for access on " << fileName << endLine;
+                if (monitorLog( WriteTime )) monitorLog() << L"MonitorFiles - Last write time " << time << L" for access on " << fileName << record;
                 auto closeFile = reinterpret_cast<TypeCloseHandle>(original( (PatchFunction)PatchCloseHandle ));
                 closeFile( handle );
             }
@@ -508,11 +569,25 @@ namespace AccessMonitor {
             return getLastWriteTime( widen( fileName ) );
         }
 
+        // Convert FileAccessMode value to string
+        wstring modeString( FileAccessMode mode ) {
+            auto s = wstring( L"" );
+            if ((mode & AccessRead) != 0) s += L"Read";
+            if ((mode & AccessWrite) != 0) s += L"Write";
+            if ((mode & AccessDelete) != 0) s += L"Delete";
+            if ((mode & AccessVariable) != 0) s += L"Variable";
+            return s;
+        }
+
+        void recordFileEvent( const wstring& file, FileAccessMode mode, const FileTime& time ) {
+            monitorEvents() << file << L" [ " << time << L" ] " << modeString( mode ) << record;
+        }
+
         // Register file access mode on file (path)
         wstring fileAccess( const wstring& fileName, FileAccessMode mode ) {
             DWORD error = GetLastError();
             auto fullFileName = fullName( fileName.c_str() );
-            if (logging( Terse )) log() << L"MonitorFiles - " << modeString( mode ) << L"access by name on file " << fullFileName << endLine;
+            if (monitorLog( FileAccess )) monitorLog() << L"MonitorFiles - " << modeString( mode ) << L" access by name on file " << fullFileName << record;
             if (fullFileName != L"") recordFileEvent( fullFileName, mode, getLastWriteTime( fileName ) );
             SetLastError( error );
             return fullFileName;
@@ -524,11 +599,22 @@ namespace AccessMonitor {
             DWORD error = GetLastError();
             auto fullFileName = fullName( handle );
             if (mode == AccessNone) mode = accessMode( handle );
-            if (logging( Terse )) log() << L"MonitorFiles - " << modeString( mode ) << L"access by handle on file " << fullFileName << endLine;
+            if (monitorLog( FileAccess )) monitorLog() << L"MonitorFiles - " << modeString( mode ) << L" access by handle on file " << fullFileName << record;
             if (fullFileName != L"") recordFileEvent( fullFileName, mode, getLastWriteTime( handle ) );
             SetLastError( error );
             return fullFileName;
         }
+        // ToDo: Fix this function...
+        wstring fileAccess( HANDLE handle, const OBJECT_ATTRIBUTES* attributes ) {
+            DWORD error = GetLastError();
+            auto fullFileName = fullName( attributes );
+            FileAccessMode  mode = accessMode( handle );
+            if (monitorLog( FileAccess )) monitorLog() << L"MonitorFiles - " << modeString( mode ) << L" access by handle on file " << fullFileName << record;
+            if (fullFileName != L"") recordFileEvent( fullFileName, mode, getLastWriteTime( handle ) );
+            SetLastError( error );
+            return fullFileName;            
+        }
+
 
     }
 
@@ -562,6 +648,8 @@ namespace AccessMonitor {
         registerPatch( "SetFileAttributesA", (PatchFunction)PatchSetFileAttributesA );
         registerPatch( "SetFileAttributesW", (PatchFunction)PatchSetFileAttributesW );
         registerPatch( "CloseHandle", (PatchFunction)PatchCloseHandle );
+        registerPatch( "NtCreateFile", (PatchFunction)PatchNtCreateFile );
+        registerPatch( "NtOpenFile", (PatchFunction)PatchNtOpenFile );
     }
     void unregisterFileAccess() {
         unregisterPatch( "CreateDirectoryA" );
@@ -593,6 +681,8 @@ namespace AccessMonitor {
         unregisterPatch( "SetFileAttributesA" );
         unregisterPatch( "SetFileAttributesW" );
         unregisterPatch( "CloseHandle" );
+        unregisterPatch( "NtCreateFile" );
+        unregisterPatch( "NtOpenFile" );
     }
 
 } // namespace AccessMonitor

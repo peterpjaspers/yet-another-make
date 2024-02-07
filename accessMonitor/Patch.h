@@ -24,14 +24,21 @@ namespace AccessMonitor {
     // Return patched library for a patched function
     const std::string& patchedLibrary( PatchFunction function );
 
-    // Validate if a patch was re-patched by a third party
-    bool repatched( std::string name );
+    // Validate if a patch was overridden by a third party
+    bool pathOverridden( std::string name );
 
     // Patch libraries with all registered patches
     void patch();
     // Un-patch libraries with all registered patches
     void unpatch();
 
+    // Patches may be suppressed to avoid recursive calls to patch functions.
+    // Functions return true if repatched or unpatched respectively.
+    // Re-patch a specific (suppressed) patch function.
+    bool repatchFunction( const PatchFunction function );
+    // Unpatch (suppress patch of) a specific patch function.
+    bool unpatchFunction( const PatchFunction function );
+    
 } // namespace AccessMonitor
 
 #endif // ACCESS_MONITOR_PATCH_H

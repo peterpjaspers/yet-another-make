@@ -32,12 +32,11 @@ namespace AccessMonitor {
                         if (function != nullptr) {
                             HANDLE thread = CreateRemoteThread( process, nullptr, 0, function, fileName, CREATE_SUSPENDED, nullptr );
                             if (thread != nullptr) {
-                                if (!SetThreadPriority( thread, THREAD_PRIORITY_HIGHEST )) {
-                                    throw exceptionText( signature, "Failed to set remote thread priority" );
-                                }
-                                if (!ResumeThread( thread )) {
-                                    throw exceptionText( signature, "Failed to resume remote thread" );
-                                }
+                                auto monitor = AccessEvent( "Monitor", pid );
+                                if (ResumeThread( thread ) == 1) {
+                                    if (!EventWait( monitor )) throw exceptionText( signature, "Failed to synchronize with remote thread" );
+                                } else throw exceptionText( signature, "Failed to resume remote thread" );
+                                ReleaseEvent( monitor );
                                 CloseHandle( thread );
                             } else throw exceptionText( signature, "Failed to create remote thread" );
                         } else throw exceptionText( signature, "Failed to access LoadLibraryW function pointer" );

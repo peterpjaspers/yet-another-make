@@ -1,17 +1,17 @@
 #include "Process.h"
+#include "Log.h"
 
 #include <windows.h>
+#include <string>
 #include <filesystem>
-#include <iostream>
 #include <fstream>
-#include <chrono>
 #include <thread>
 
 using namespace std;
 using namespace std::filesystem;
 using namespace AccessMonitor;
 
-// Test the patch DLL by simply loading it (without injection in a process)...
+Log debugLog;
 
 void worker( const path directoryPath ) {
     create_directory( directoryPath, current_path() );
@@ -29,6 +29,7 @@ void worker( const path directoryPath ) {
 }
 
 void doFileAccess( bool multithreaded = true ) {
+    debugLog() << "Remote test do file access" << record;
     if (multithreaded) {
         auto t = jthread( worker, path( "./remoteFileAccessTest" ) );
         auto t0 = jthread( worker, path( "./remoteFileAccessTest0" ) );
@@ -45,24 +46,18 @@ void doFileAccess( bool multithreaded = true ) {
     }
 }
 
-int main( int argc, char* argv[] ) {
-    const wstring patchDLLFile( L"C:\\Users\\philv\\Code\\yam\\yet-another-make\\accessMonitor\\patchDLL.dll" );
-    // Manually inject path DLL for debugging...
-    HMODULE module = LoadLibraryW( L"C:\\Users\\philv\\Code\\yam\\yet-another-make\\accessMonitor\\patchDLL.dll" );
-    if (module == nullptr) cout << "DLL load failed with error code " << GetLastError() << "!" << endl;
-    auto monitor = AccessEvent( "Monitor", CurrentProcessID() );
-    auto exit = AccessEvent( "ExitProcess", CurrentProcessID() );
-    EventWait( monitor );
+int main() {
+    debugLog = Log( "RemoteTest", true, true );
+    debugLog() << "Remote test main begin" << record;
     try {
         doFileAccess( true );
     }
     catch (...) {
+        debugLog() << "Remote test exception" << record;
         ofstream file( "./exception.txt" );
         file << "Exception caught!\n";
         file.close();
     }
-    EventSignal( exit );
-    EventWait( monitor );
-    ReleaseEvent( monitor );
-    ReleaseEvent( exit );
-}
+    debugLog() << "Remote test main end" << record;
+};
+

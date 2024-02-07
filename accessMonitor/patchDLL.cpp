@@ -1,32 +1,24 @@
-#include "Monitor.h"
-#include "FileAccessEvents.h"
+#include "MonitorProcess.h"
 #include "Log.h"
 
 #include <windows.h>
 #include <iostream>
 #include <fstream>
 
-// #pragma comment(lib, "User32")
-
 using namespace AccessMonitor;
 using namespace std;
 
 DWORD monitorMain( void* argument ) {
-    auto monitor = AccesstEvent( "Monitor", CurrentProcessID() );
-    auto exit = AccesstEvent( "ExitProcess", CurrentProcessID() );
-    enableLog( "patch", Verbose );
-    log() << "Start monitoring..." << endLine;
-    startMonitoring();
+    auto monitor = AccessEvent( "Monitor", CurrentProcessID() );
+    auto exit = AccessEvent( "ExitProcess", CurrentProcessID() );
+    monitorLog.enable( PatchedFunction | ParseLibrary | PatchExecution | FileAccess );
+    monitorLog() << "Start monitoring..." << record;
+    startMonitoringProcess();
     EventSignal( monitor ); // Signal parent process that monitoring has started
     // Wait for this process to exit
     if (EventWait( exit )) {
-        log() << "Stop monitoring..." << endLine;
-        stopMonitoring();
-        wofstream files( "./remoteAccessedFiles.txt" );
-        streamAccessedFiles( files );
-        files.close();
-        log() << "Done monitoring..." << endLine;
-        disableLog();
+        monitorLog() << "Stop monitoring..." << record;
+        stopMonitoringProcess();
         EventSignal( monitor ); // Signal parent process that monitoring has stopped
         EventSignal( exit ); // Signal this process that it can exit
     }
