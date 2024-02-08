@@ -17,22 +17,33 @@ namespace YAM
 
 
     // A FileRepository is associated with a directory tree. 
-    // The directory tree may contain:
-    //      - subdirectories (recursively)
-    //      - source files
-    //      - build files
-    //      - generated files
-    //
+    // The directory tree may contain one or more of:
+    //      - source file
+    //      - build file
+    //      - generated file
+    // 
     // FileRepository represents the root of the directory tree by a
-    // DirectoryNode. This node can be used, by executing it, to mirror (cache)
-    // the content of the directory tree in yam's buildstate.
+    // DirectoryNode.
     // 
-    // FileRepository continuously watches the directory tree for changes.
-    // See consumeChanges().
-    // 
-    // Yam will register, in its buildstate, input and output dependencies on 
-    // files/directories in known FileRepositories. Dependencies on files and
-    // directories outside known FileRepositories are silently ignored.
+    // A FileRepository can be configured to be tracked. In a tracked 
+    // repository yam will:
+    //     - execute the repository root DirectoryNode to mirror the tree in
+    //       the buildstate and to find buildfiles.
+    //     - register input file dependencies of command and other nodes in 
+    //       the buildstate
+    //     - watch the directory tree for changes and set the state of file 
+    //       and directory nodes associated with these changes to Dirty.
+    // If a repository is not tracked then yam will do none of the above.
+    //  
+    // Watching of a tracked repository is done on request. This allows:
+    //     - applications that only read buildstate to not unnecessarily
+    //       watch the directory tree
+    //     - applications that update the buildstate (e.g. yam itself) to
+    //       choose whether to watch or not to watch. The former is needed
+    //       to obtain beta-build behavior, the latter will result in 
+    //       alpha-build behavior.
+    //     - yam to run on platforms for which watching is not (yet) 
+    //       implemented.
     // 
     // FileRepository supports the conversion of so-called symbolic paths
     // to/from absolute paths. The format of a symbolic path is
@@ -50,15 +61,41 @@ namespace YAM
         FileRepository(
             std::string const& repoName,
             std::filesystem::path const& directory,
-            ExecutionContext* context);
+            ExecutionContext* context,
+            bool tracked);
 
         virtual ~FileRepository();
+
+        bool tracked() const { return _tracked; }
+
+        // Stop/start watching. Ignored when !tracked().
+        // Also ignored when watching is not implemented.
         void stopWatching();
+        void startWatching();
+
+        // Return whether directory tree is actually being watched for changes.
+        bool watching() const;
+
+        // If watching(): consume the changes that occurred in the repo 
+        // directory tree since the previous consumeChanges() call by marking
+        // directory and file nodes associated with these changes as Dirty.
+        // If !watching(): mark all directory and file nodes Dirty
+        void consumeChanges();
+
+        // If watching():
+        // Return whether dir/file identified by 'path' has changed since 
+        // previous consumeChanges().
+        // If !watching(): return true
+        bool hasChanged(std::filesystem::path const& path);
         
+        // Return whether path starts with @@
         static bool isSymbolicPath(std::filesystem::path const& path);
+
+        // Extract the repository name from path
         // Return empty string when !isSymbolicPath(path)
         static std::string repoNameFromPath(std::filesystem::path const& path);
-        // Return <repoName>, e.g. when repoName="main" return "$R(main)"
+
+        // Return @@repoName, e.g. when repoName="main" return @@main
         static std::filesystem::path repoNameToSymbolicPath(std::string const& repoName);
 
         std::string const& name() const;
@@ -66,9 +103,8 @@ namespace YAM
         std::shared_ptr<DirectoryNode> directoryNode() const;
         std::shared_ptr<FileExecSpecsNode> fileExecSpecsNode() const;
 
-        // Return repositoryNameOf(name())
-        std::filesystem::path const& symbolicDirectory() const {
-            return _symbolicDirectory;
+        std::filesystem::path symbolicDirectory() const {
+            return repoNameToSymbolicPath(_name);
         }
 
         // Return whether 'path' is an absolute path or symbolic path in
@@ -99,15 +135,6 @@ namespace YAM
         // Return empty path when !lexicallyContains(symbolicPath).
         std::filesystem::path absolutePathOf(std::filesystem::path const& symbolicPath) const;
 
-        // Consume the changes that occurred in the repo directory tree since
-        // the previous consumeChanges() call by marking directory and file nodes
-        // associated with these changes as Dirty.
-        void consumeChanges();
-
-        // Return whether dir/file identified by 'path' has changed since 
-        // previous consumeChanges().
-        bool hasChanged(std::filesystem::path const& path);
-
         // Recursively remove the directory node from context->nodes().
         // Intended to be used when the repo is removed from the set of
         // known repositories.
@@ -130,11 +157,11 @@ namespace YAM
     private:
         std::string _name;
         std::filesystem::path _directory;
-        std::filesystem::path _symbolicDirectory;
         ExecutionContext* _context;
-        std::shared_ptr<FileRepositoryWatcher> _watcher;
+        bool _tracked;
         std::shared_ptr<DirectoryNode> _directoryNode;
         std::shared_ptr<FileExecSpecsNode> _fileExecSpecsNode;
+        std::shared_ptr<FileRepositoryWatcher> _watcher;
         bool _modified;
     };
 }

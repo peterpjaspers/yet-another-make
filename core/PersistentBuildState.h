@@ -44,9 +44,11 @@ namespace YAM
         typedef uint64_t Key;
 
         // Construct for storage of build state in given directory.
+        // If startRepoWatching: start watching repositories after retrieval.
         PersistentBuildState(
             std::filesystem::path const& directory,
-            ExecutionContext* context);
+            ExecutionContext* context,
+            bool startRepoWatching);
 
         ~PersistentBuildState();
 
@@ -97,6 +99,7 @@ namespace YAM
 
         std::filesystem::path _directory;
         ExecutionContext* _context;
+        bool _startRepoWatching;
         std::shared_ptr<BTree::PersistentPagePool> _pool;
         std::shared_ptr<BTree::Forest> _forest;
         std::map<BTree::TreeIndex, BTree::StreamingTree<Key>*> _typeToTree;

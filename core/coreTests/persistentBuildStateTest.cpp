@@ -83,13 +83,16 @@ namespace
             : repoDir(repoDirectory)
             , yamDir(DotYamDirectory::create(repoDir))
             , testTree(repoDir, 3, RegexSet({ ".yam" }))
-            , persistentState(repoDir / "buildState", &context)
+            , persistentState(repoDir / "buildState", &context, true)
         {
             //context.threadPool().size(1);
             context.addRepository(std::make_shared<FileRepository>(
                 "repo",
                 repoDir,
-                &context));
+                &context,
+                true));
+            sourceFileRepo()->startWatching();
+
             bool completed = YAMTest::executeNode(sourceFileRepo()->directoryNode().get());
             EXPECT_TRUE(completed);
 

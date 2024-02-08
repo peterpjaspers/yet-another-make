@@ -1,11 +1,18 @@
 Todo for R1.0.0
-- invoke buildfile configuration
-- multi-repo configuration
+- improve buildfile cycle detection (see group cycle detection)
+- multi-repo configuration => FileRepositoriesNode
+  reads yamConfig/repositories.txt
+  properties: path (relative to home repo or absolute), track, notTracked
+              track => watch and register file deps
+              notTracked => do not watch and do not register file deps
+  In buildfile: @@./... meaning of @@. is buildfile repo, NOT root repo.
 - fileaspect configuration
-- build configurations
-- command line arguments
+- variants (tup variants, MR build configurations)
+- command line arguments for scope and logging
+- build yam with yam
+- testing testing testing
 - documentation
-- ask Mike Shal for feedback
+- inform Mike Shal
 
 
 Todo: core

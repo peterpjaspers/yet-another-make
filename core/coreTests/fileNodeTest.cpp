@@ -42,7 +42,8 @@ namespace
             , repo(std::make_shared<FileRepository>(
                 ".",
                 repoDir,
-                &context))
+                &context,
+                true))
         {
             context.addRepository(repo);
         }

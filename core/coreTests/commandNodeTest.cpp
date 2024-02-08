@@ -70,12 +70,14 @@ namespace
                 std::make_shared<FileRepository>(
                     "windows",
                     std::filesystem::path("c:\\windows"),
-                    &context));
+                    &context,
+                    false));
             context.addRepository(
                 std::make_shared<FileRepository>(
                     ".",
                     repoDir,
-                    &context));
+                    &context,
+                    true));
 
             stats.registerNodes = true;
             //context.threadPool().size(1); // to ease debugging

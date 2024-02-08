@@ -25,7 +25,7 @@ namespace
         TestSetup(bool syntaxError)
             : repoDir(FileSystem::createUniqueDirectory("_fileExecSpecsTest"))
             , logBook(std::make_shared<MemoryLogBook>())
-            , fileRepo(std::make_shared<FileRepository>("repo", repoDir, &context))
+            , fileRepo(std::make_shared<FileRepository>("repo", repoDir, &context, false))
             , fileExecSpecsNode(fileRepo->fileExecSpecsNode())
         {
             context.logBook(logBook);

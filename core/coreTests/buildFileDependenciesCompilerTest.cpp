@@ -29,7 +29,7 @@ namespace
 
         TestSetup()
             : repoTree(FileSystem::createUniqueDirectory("_buildFileDepenciesCompilerTest"), 1, RegexSet())
-            , fileRepo(std::make_shared<FileRepository>("repo", repoTree.path(), &context))
+            , fileRepo(std::make_shared<FileRepository>("repo", repoTree.path(), &context, false))
         {
             std::filesystem::create_directory(repoTree.path() / "src1");
             std::filesystem::create_directory(repoTree.path() / "src2");

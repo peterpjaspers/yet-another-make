@@ -53,14 +53,14 @@ namespace
     TEST(FileRepository, construct) {
         RepoProps repoProps;
         ExecutionContext context;
-        FileRepository repo(repoProps.name, repoProps.dir, &context);
+        FileRepository repo(repoProps.name, repoProps.dir, &context, false);
         EXPECT_EQ(repoProps.name, repo.name());
         EXPECT_EQ(repoProps.dir, repo.directory());
     }
     TEST(FileRepository, lexicallyContains) {
         RepoProps repoProps;
         ExecutionContext context;
-        FileRepository repo(repoProps.name, repoProps.dir, &context);
+        FileRepository repo(repoProps.name, repoProps.dir, &context, false);
         EXPECT_TRUE(repo.lexicallyContains(R"(C:\aap\noot\mies)"));
         EXPECT_TRUE(repo.lexicallyContains(R"(C:\aap\noot\mies\)"));
         EXPECT_TRUE(repo.lexicallyContains(R"(C:\aap\noot\mies\file.cpp)"));
@@ -82,7 +82,7 @@ namespace
     TEST(FileRepository, relativePathOf) {
         RepoProps repoProps;
         ExecutionContext context;
-        FileRepository repo(repoProps.name, repoProps.dir, &context);
+        FileRepository repo(repoProps.name, repoProps.dir, &context, false);
         EXPECT_EQ("file.cpp", repo.relativePathOf(R"(C:\aap\noot\mies\file.cpp)"));
         EXPECT_ANY_THROW(repo.relativePathOf(R"(@@testRepo/file.cpp)"));
         EXPECT_ANY_THROW(repo.relativePathOf(R"(file.cpp)"));
@@ -96,7 +96,7 @@ namespace
     TEST(FileRepository, symbolicPath) {
         RepoProps repoProps;
         ExecutionContext context;
-        FileRepository repo(repoProps.name, repoProps.dir, &context);
+        FileRepository repo(repoProps.name, repoProps.dir, &context, false);
         EXPECT_EQ(R"(@@testRepo\file.cpp)", repo.symbolicPathOf(R"(C:\aap\noot\mies\file.cpp)"));
         EXPECT_EQ(R"(@@testRepo)", repo.symbolicPathOf(R"(C:\aap\noot\mies)"));
         EXPECT_EQ(R"(@@testRepo\)", repo.symbolicPathOf(R"(C:\aap\noot\mies\)"));
@@ -108,7 +108,7 @@ namespace
     TEST(FileRepository, absolutePath) {
         RepoProps repoProps;
         ExecutionContext context;
-        FileRepository repo(repoProps.name, repoProps.dir, &context);
+        FileRepository repo(repoProps.name, repoProps.dir, &context, false);
         EXPECT_EQ(R"(C:\aap\noot\mies\file.cpp)", repo.absolutePathOf(R"(@@testRepo\file.cpp)"));
         EXPECT_EQ(R"(C:\aap\noot\mies)", repo.absolutePathOf(R"(@@testRepo)"));
         EXPECT_EQ(R"(C:\aap\noot\mies\)", repo.absolutePathOf(R"(@@testRepo\)"));
@@ -159,8 +159,11 @@ namespace
         auto repo = std::make_shared<FileRepository>(
             std::string("testRepo"), 
             rootDir,
-            &context);
+            &context,
+            true);
         context.addRepository(repo);
+        repo->startWatching();
+
         DirectoryNode* dirNode = repo->directoryNode().get();
 
         repo->consumeChanges();

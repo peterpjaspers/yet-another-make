@@ -34,14 +34,14 @@ namespace YAM
     FileRepository::FileRepository(
         std::string const& repoName,
         std::filesystem::path const& directory,
-        ExecutionContext* context)
+        ExecutionContext* context,
+        bool tracked)
         : _name(repoName)
         , _directory(directory)
-        , _symbolicDirectory(repoNameToSymbolicPath(repoName))
         , _context(context)
-        , _watcher(std::make_shared<FileRepositoryWatcher>(this, context))
-        , _directoryNode(std::make_shared<DirectoryNode>(context, _symbolicDirectory, nullptr))
-        , _fileExecSpecsNode(std::make_shared<FileExecSpecsNode>(context, _symbolicDirectory))
+        , _tracked(tracked)
+        , _directoryNode(std::make_shared<DirectoryNode>(context, symbolicDirectory(), nullptr))
+        , _fileExecSpecsNode(std::make_shared<FileExecSpecsNode>(context, symbolicDirectory()))
         , _modified(true)
     {
         _context->nodes().add(_directoryNode);
@@ -53,8 +53,31 @@ namespace YAM
         stopWatching();
     }
 
+    void FileRepository::startWatching() {
+        if (_tracked) {
+            if (_watcher == nullptr) {
+                _watcher = std::make_shared<FileRepositoryWatcher>(this, _context);
+            }
+        }
+    }
+
     void FileRepository::stopWatching() {
-        _watcher->stop();
+        if (_watcher != nullptr) {
+            _watcher->stop();
+            _watcher = nullptr;
+        }
+    }
+
+    bool FileRepository::watching() const {
+        return _watcher != nullptr;
+    }
+
+    void FileRepository::consumeChanges() {
+        if (_watcher != nullptr) _watcher->consumeChanges();
+    }
+
+    bool FileRepository::hasChanged(std::filesystem::path const& path) {
+        return (_watcher == nullptr) ? true : _watcher->hasChanged(path);
     }
 
     std::string const& FileRepository::name() const {
@@ -174,14 +197,6 @@ namespace YAM
         return _fileExecSpecsNode;
     }
 
-    void FileRepository::consumeChanges() {
-        _watcher->consumeChanges();
-    }
-
-    bool FileRepository::hasChanged(std::filesystem::path const& path) {
-        return _watcher->hasChanged(path);
-    }
-
     void FileRepository::clear() {
         _context->nodes().removeIfPresent(_fileExecSpecsNode);
         _context->nodes().removeIfPresent(_fileExecSpecsNode->configFileNode());
@@ -202,6 +217,7 @@ namespace YAM
     void FileRepository::stream(IStreamer* streamer) {
         streamer->stream(_name);
         streamer->stream(_directory);
+        streamer->stream(_tracked);
         streamer->stream(_directoryNode);
     }
 
@@ -211,10 +227,14 @@ namespace YAM
     bool FileRepository::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
         if (!restored.insert(this).second) return false;
         _context = reinterpret_cast<ExecutionContext*>(context);
-        if (_watcher == nullptr || _watcher->directory() != _directory) {
-            _watcher = std::make_shared<FileRepositoryWatcher>(this, _context);
+        if (_tracked) {
+            if (_watcher != nullptr && _watcher->directory() != _directory) {
+                stopWatching();
+                startWatching();
+            }
+        } else {
+            stopWatching();
         }
-        _symbolicDirectory = repoNameToSymbolicPath(_name);
         return true;
     }
 }

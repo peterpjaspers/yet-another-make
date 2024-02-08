@@ -24,7 +24,7 @@ namespace
 
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
-        auto repo = std::make_shared<FileRepository>("repo", rootDir, &context);
+        auto repo = std::make_shared<FileRepository>("repo", rootDir, &context, true);
         context.addRepository(repo);
         auto dirNode = repo->directoryNode();
         EXPECT_EQ(Node::State::Dirty, dirNode->state());
@@ -41,7 +41,7 @@ namespace
 
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
-        auto repo = std::make_shared<FileRepository>("repo", rootDir, &context);
+        auto repo = std::make_shared<FileRepository>("repo", rootDir, &context, true);
         context.addRepository(repo);
         auto dirNode = repo->directoryNode();
         bool completed = YAMTest::executeNode(dirNode.get());
@@ -104,7 +104,7 @@ namespace
 
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
-        auto repo = std::make_shared<FileRepository>("repo", rootDir, &context);
+        auto repo = std::make_shared<FileRepository>("repo", rootDir, &context, true);
         context.addRepository(repo);
         auto dirNode = repo->directoryNode();
         bool completed = YAMTest::executeNode(dirNode.get());
@@ -173,7 +173,7 @@ namespace
 
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
-        auto repo = std::make_shared<FileRepository>("repo", rootDir, &context);
+        auto repo = std::make_shared<FileRepository>("repo", rootDir, &context, true);
         context.addRepository(repo);
         auto dirNode = repo->directoryNode();
         EXPECT_EQ(Node::State::Dirty, dirNode->state());

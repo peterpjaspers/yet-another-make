@@ -63,7 +63,8 @@ namespace
             repo = std::make_shared<FileRepository>(
                 "repo",
                 repoDir,
-                &context);
+                &context,
+                false);
             context.addRepository(repo);
             bool completed = YAMTest::executeNode(repo->directoryNode().get());
             EXPECT_TRUE(completed);

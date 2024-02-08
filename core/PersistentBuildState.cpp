@@ -346,10 +346,12 @@ namespace YAM
 {
     PersistentBuildState::PersistentBuildState(
         std::filesystem::path const& directory,
-        ExecutionContext* context
+        ExecutionContext* context,
+            bool startRepoWatching
     )
         : _directory(directory)
         , _context(context)
+        , _startRepoWatching(startRepoWatching)
         , _pool(createPagePool(directory/"buildstate.bt"))
         , _nextId(1)
     {
@@ -367,6 +369,11 @@ namespace YAM
         for (auto pair : _keyToObject) addToBuildState(pair.second);
         std::unordered_set<IPersistable const*> restored;
         for (auto pair : _keyToObject) pair.second->restore(_context, restored);
+        if (_startRepoWatching) {
+            for (auto const& pair : _context->repositories()) {
+                pair.second->startWatching();
+            }
+        }
     }
 
     void PersistentBuildState::reset() {
@@ -529,6 +536,10 @@ namespace YAM
                 _objectToKey.insert({ object.get(), key });
             }
             addToBuildState(object);
+            auto repo = dynamic_pointer_cast<FileRepository>(object);
+            if (repo != nullptr && _startRepoWatching) {
+                repo->startWatching();
+            }
         }
         for (auto const& object : _toInsert) {
             if (recoverForest) {

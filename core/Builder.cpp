@@ -212,16 +212,18 @@ namespace YAM
 
         if (_buildState == nullptr) {
             if (_result->succeeded()) {
-                _buildState = std::make_shared<PersistentBuildState>(yamDir, &_context);
+                _buildState = std::make_shared<PersistentBuildState>(yamDir, &_context, true);
                 _buildState->retrieve();
                 if (_context.findRepository(".") == nullptr) {
                     std::filesystem::path repoPath = yamDir.parent_path();
                     auto repo = std::make_shared<FileRepository>(
                         ".",
                         repoPath,
-                        &_context);
+                        &_context,
+                        true);
                     _context.addRepository(repo);
                     _storeBuildState();
+                    repo->startWatching();
                 }
             }
         }

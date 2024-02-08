@@ -46,7 +46,7 @@ namespace
 
         TestSetup(bool syntaxError = false)
             : repoTree(FileSystem::createUniqueDirectory("_buildFileProcessingTest"), 1, RegexSet())
-            , fileRepo(std::make_shared<FileRepository>("repo", repoTree.path(), &context))
+            , fileRepo(std::make_shared<FileRepository>("repo", repoTree.path(), &context, true))
             , absBuildFilePath(repoTree.path() / R"(buildfile_yam.bat)")
             , absBuildFilePathSD1(repoTree.path() / R"(SubDir1\buildfile_yam.txt)")
             , absBuildFilePathSD2(repoTree.path() / R"(SubDir2\buildfile_yam.txt)")
@@ -76,6 +76,8 @@ namespace
             writeFile(absBuildFilePathSD2, ruleSD2);
 
             context.addRepository(fileRepo);
+            fileRepo->startWatching();
+
             auto dirNode = fileRepo->directoryNode();
             bool completed = YAMTest::executeNode(dirNode.get());
             EXPECT_TRUE(completed);
