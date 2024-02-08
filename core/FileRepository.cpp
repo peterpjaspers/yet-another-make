@@ -1,7 +1,9 @@
 #include "FileRepository.h"
 #include "DirectoryNode.h"
+#include "SourceFileNode.h"
 #include "FileRepositoryWatcher.h"
 #include "ExecutionContext.h"
+#include "FileExecSpecsNode.h"
 #include "IStreamer.h"
 
 namespace
@@ -39,13 +41,20 @@ namespace YAM
         , _context(context)
         , _watcher(std::make_shared<FileRepositoryWatcher>(this, context))
         , _directoryNode(std::make_shared<DirectoryNode>(context, _symbolicDirectory, nullptr))
+        , _fileExecSpecsNode(std::make_shared<FileExecSpecsNode>(context, _symbolicDirectory))
         , _modified(true)
     {
         _context->nodes().add(_directoryNode);
+        _context->nodes().add(_fileExecSpecsNode);
         _directoryNode->addPrerequisitesToContext();
     }
 
     FileRepository::~FileRepository() {
+        stopWatching();
+    }
+
+    void FileRepository::stopWatching() {
+        _watcher->stop();
     }
 
     std::string const& FileRepository::name() const {
@@ -161,6 +170,10 @@ namespace YAM
         return _directoryNode; 
     }
 
+    std::shared_ptr<FileExecSpecsNode> FileRepository::fileExecSpecsNode() const {
+        return _fileExecSpecsNode;
+    }
+
     void FileRepository::consumeChanges() {
         _watcher->consumeChanges();
     }
@@ -170,6 +183,8 @@ namespace YAM
     }
 
     void FileRepository::clear() {
+        _context->nodes().removeIfPresent(_fileExecSpecsNode);
+        _context->nodes().removeIfPresent(_fileExecSpecsNode->configFileNode());
         _context->nodes().removeIfPresent(_directoryNode);
         _directoryNode->clear();
         _directoryNode->setState(Node::State::Dirty);

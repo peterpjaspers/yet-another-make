@@ -13,6 +13,7 @@ namespace YAM
     class Node;
     class ExecutionContext;
     class FileRepositoryWatcher;
+    class FileExecSpecsNode;
 
 
     // A FileRepository is associated with a directory tree. 
@@ -52,6 +53,7 @@ namespace YAM
             ExecutionContext* context);
 
         virtual ~FileRepository();
+        void stopWatching();
         
         static bool isSymbolicPath(std::filesystem::path const& path);
         // Return empty string when !isSymbolicPath(path)
@@ -62,6 +64,7 @@ namespace YAM
         std::string const& name() const;
         std::filesystem::path const& directory() const;
         std::shared_ptr<DirectoryNode> directoryNode() const;
+        std::shared_ptr<FileExecSpecsNode> fileExecSpecsNode() const;
 
         // Return repositoryNameOf(name())
         std::filesystem::path const& symbolicDirectory() const {
@@ -131,6 +134,7 @@ namespace YAM
         ExecutionContext* _context;
         std::shared_ptr<FileRepositoryWatcher> _watcher;
         std::shared_ptr<DirectoryNode> _directoryNode;
+        std::shared_ptr<FileExecSpecsNode> _fileExecSpecsNode;
         bool _modified;
     };
 }

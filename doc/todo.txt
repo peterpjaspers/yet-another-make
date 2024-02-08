@@ -1,3 +1,13 @@
+Todo for R1.0.0
+- invoke buildfile configuration
+- multi-repo configuration
+- fileaspect configuration
+- build configurations
+- command line arguments
+- documentation
+- ask Mike Shal for feedback
+
+
 Todo: core
 - TODO: Builder::_dirtyCommands nodes must not be registered as dirty
   nor modified. Solution: only register dirty/modified node when it is

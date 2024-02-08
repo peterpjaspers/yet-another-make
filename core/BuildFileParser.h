@@ -27,26 +27,32 @@ namespace YAM
         BuildFile :== {Dependency}* {Rule}*
 
         Dependency :== DepBuildFile | DepGlob
-        BuildFile :== 'buildfile' DirPath
+        BuildFile :== 'buildfile' Path | Glob
         DepGlob :== 'glob' Glob
         DirPath :== Path
 
-        Rule :== ':' [foreach] [CmdInputs] [ '|' OrderOnlyInputs ] '|>' Script '|>' [Outputs [Group]]
+        // TODO: add ignored outputs.
+        // Move syntax description to documentation.
+        //
+        Rule :== ':' [foreach] [CmdInputs] [ '|' OrderOnlyInputs ] '|>' Script '|>' [Output] { [Output] | [Group] | [Bin] }*
         CmdInputs :== [Input]*
         Input :== Path | Glob | Exclude | [Group]
         Exclude :== '^'Path | '^'Glob
-        Glob :== Path 
+        Glob :== Path with glob special characters (* ? [])
         OrderOnlyInputs :== { Path | [Group] }*
         Script :== { identifier | InputPathFlag | OutputPathFlag }+
         InputPathFlag :== %[Index] 'f' | '%b' | '%B' | '%e' | '%D' | '%d'
         Index :== integer
         OutputPathFlag :== '%o'
-        Outputs :== { Path | InputPathFlag }+
+        Output :== OutputPath | '^'Path // ^path excludes tracking of path
+        OutputPath :== Path containing InputPathFlag
         Path :== RelPath | RepoPath
         RelPath :== identifier [ { '/'identifier }* ]
         RepoPath :== '<' RepoName '>/' AbsPath
         RepoName :== identifier
-        Group :== '{' identifier '}
+        Group :== Path where last path component is between angled brackets.
+                  E.g. ..\modules\<someGroupName>
+        Bin :== '{' identifier '}'
 
     Semantics:
 

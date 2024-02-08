@@ -56,6 +56,10 @@ namespace YAM
             FileRepository* repo,
             ExecutionContext* context);
 
+        ~FileRepositoryWatcher();
+
+        void stop();
+
         std::filesystem::path const& directory();
 
         // Consume the changes that occurred in the filesystem since the previous

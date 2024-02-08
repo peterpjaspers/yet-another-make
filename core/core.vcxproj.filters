@@ -318,6 +318,9 @@
     <ClInclude Include="TokenRegexSpec.h">
       <Filter>Header Files\BuildFileCompiler</Filter>
     </ClInclude>
+    <ClInclude Include="FileExecSpecsNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -520,6 +523,9 @@
     </ClCompile>
     <ClCompile Include="TokenPathSpec.cpp">
       <Filter>Source Files\BuildFileCompiler</Filter>
+    </ClCompile>
+    <ClCompile Include="FileExecSpecsNode.cpp">
+      <Filter>Source Files\Node</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

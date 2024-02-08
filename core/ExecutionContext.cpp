@@ -79,6 +79,7 @@ namespace YAM
         bool found = it != _repositories.end();
         if (found) {
             auto srcRepo = it->second;
+            srcRepo->stopWatching();
             srcRepo->clear();
             _repositories.erase(it);
         }

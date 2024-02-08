@@ -71,6 +71,7 @@
     <ClCompile Include="fileSystemTest.cpp" />
     <ClCompile Include="globberTest.cpp" />
     <ClCompile Include="globTest.cpp" />
+    <ClCompile Include="fileExecSpecsNodesTest.cpp" />
     <ClCompile Include="memoryStreamTest.cpp" />
     <ClCompile Include="monitoredProcessWin32Test.cpp" />
     <ClCompile Include="msBuildTrackerOutputReaderTest.cpp" />

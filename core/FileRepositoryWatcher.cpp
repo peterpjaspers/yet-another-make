@@ -60,6 +60,13 @@ namespace YAM
         _repository = repo;
     }
 
+    FileRepositoryWatcher::~FileRepositoryWatcher() {
+        stop();
+    }
+
+    void FileRepositoryWatcher::stop() {
+        _watcher->stop();
+    }
 
     std::filesystem::path const& FileRepositoryWatcher::directory() {
         return _watcher->directory();

@@ -105,6 +105,7 @@
     <ClInclude Include="BuildFileCompilerNode.h" />
     <ClInclude Include="BuildFileCompiler_2.h" />
     <ClInclude Include="BuildFileDependenciesCompiler.h" />
+    <ClInclude Include="FileExecSpecsNode.h" />
     <ClInclude Include="BuildFileParserNode.h" />
     <ClInclude Include="BuildFilePreCompiler.h" />
     <ClInclude Include="BuildState.h" />
@@ -197,6 +198,7 @@
     <ClCompile Include="BuildFile.cpp" />
     <ClCompile Include="BuildFileCompilerNode.cpp" />
     <ClCompile Include="BuildFileDependenciesCompiler.cpp" />
+    <ClCompile Include="FileExecSpecsNode.cpp" />
     <ClCompile Include="BuildFileParserNode.cpp" />
     <ClCompile Include="BuildFileTokenSpecs.cpp" />
     <ClCompile Include="Glob.cpp" />

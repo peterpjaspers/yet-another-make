@@ -28,8 +28,10 @@ namespace
     // Nodes: per directory 4 nodes (dir node, dotignore .yamignore and
     // .gitignore). Per file 1 node. 
     // Node: 1 command node.
-    // Total nodes: 42*4 + 120 + 1 = 289
-    const std::size_t nNodes = 289; // in context->nodes()
+    // FileRepostory has 2 additional nodes: FileExecConfigNode, which has
+    // SourceFileNode.
+    // Total nodes: 42*4 + 120 + 1 + 2 = 291
+    const std::size_t nNodes = 291; // in context->nodes()
 
     // Wait for file change event to be received for given paths.
     // When event is received then consume the changes.

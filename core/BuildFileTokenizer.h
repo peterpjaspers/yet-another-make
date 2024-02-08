@@ -49,7 +49,7 @@ namespace YAM {
         void captureLocation(std::size_t consumed);
 
         std::filesystem::path const& _filePath;
-        std::string const& _content; 
+        std::string _content; 
 
         Token _token;
         std::size_t _tokenStartOffset;

@@ -1,5 +1,7 @@
 #include "BuildFileParserNode.h"
 #include "BuildFileDependenciesCompiler.h"
+#include "FileRepository.h"
+#include "FileExecSpecsNode.h"
 #include "DirectoryNode.h"
 #include "SourceFileNode.h"
 #include "GeneratedFileNode.h"
@@ -200,9 +202,20 @@ namespace YAM
                     context()->nodes().add(genNode);
                     _executor->outputs({ genNode });
 
-                    // TODO: find interpreter needed to run the stript
-                    // For now: only .bat files are supported.
-                    std::string script = srcBfName.string() + " > " + genBfName.string();
+                    auto fileExecSpecsNode = repository()->fileExecSpecsNode();
+                    std::string cmd = fileExecSpecsNode->command(srcBfName);
+                    if (cmd.empty()) {
+                        std::stringstream ss;
+                        ss << "Cannot find the command needed to execute buildfile "
+                           << _buildFile->absolutePath() << std::endl;
+                        ss << "Fix this by adding an entry to file "
+                           << fileExecSpecsNode->absoluteConfigFilePath()  << std::endl;
+                        ss << "Fallback: the file will be executed as is." << std::endl;
+                        LogRecord warning(LogRecord::Aspect::Warning, ss.str());
+                        context()->addToLogBook(warning);
+                        cmd = srcBfName.string();
+                    }
+                    std::string script = cmd + " > " + genBfName.string();
                     _executor->script(script);
                 }
             }

@@ -121,7 +121,7 @@ namespace YAM
             FILE_NOTIFY_CHANGE_DIR_NAME |
             FILE_NOTIFY_CHANGE_LAST_WRITE,
             NULL, &_overlapped, NULL);
-        if (!success) {
+        if (!success && !_stop) {
             throw std::exception("ReadDirectoryChangesW failed");
         }
     }

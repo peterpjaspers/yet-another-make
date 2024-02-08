@@ -124,6 +124,10 @@ namespace
             << "Fix: declare input file as input of command." << std::endl
             << "Command   : " << cmd->name().string() << std::endl
             << "Input file: " << inputFile->absolutePath().string() << std::endl;
+        if (cmd->buildFile() != nullptr) {
+            ss << "The command is defined in buildfile " << cmd->buildFile()->absolutePath()
+               << " by the rule at line " << cmd->ruleLineNr() << std::endl;
+        }
         LogRecord record(LogRecord::Error, ss.str());
         logBook.add(record);
     }
@@ -140,6 +144,10 @@ namespace
             << "or change command script to not depend on the input file." << std::endl
             << "Command   : " << cmd->name().string() << std::endl
             << "Input file: " << inputFile.string() << std::endl;
+        if (cmd->buildFile() != nullptr) {
+            ss << "The command is defined in buildfile " << cmd->buildFile()->absolutePath()
+               << " by the rule at line " << cmd->ruleLineNr() << std::endl;
+        }
         LogRecord record(LogRecord::IgnoredInputFiles, ss.str());
         logBook.add(record);
     }
@@ -155,6 +163,10 @@ namespace
             << "Fix: change command script to not update the source file." << std::endl
             << "Command    : " << cmd->name().string() << std::endl
             << "Source file: " << outputFile->name().string() << std::endl;
+        if (cmd->buildFile() != nullptr) {
+            ss << "The command is defined in buildfile " << cmd->buildFile()->absolutePath()
+                << " by the rule at line " << cmd->ruleLineNr() << std::endl;
+        }
         LogRecord record(LogRecord::Error, ss.str());
         logBook.add(record);
     }
@@ -170,6 +182,10 @@ namespace
             << "Fix: declare the file as output of command." << std::endl
             << "Command    : " << cmd->name().string() << std::endl
             << "Output file: " << outputFile.string() << std::endl;
+        if (cmd->buildFile() != nullptr) {
+            ss << "The command is defined in buildfile " << cmd->buildFile()->absolutePath()
+                << " by the rule at line " << cmd->ruleLineNr() << std::endl;
+        }
         LogRecord record(LogRecord::Error, ss.str());
         logBook.add(record);
     }
@@ -186,6 +202,10 @@ namespace
             << "Command 1  : " << outputFile->producer()->name().string() << std::endl
             << "Command 2  : " << cmd->name().string() << std::endl
             << "Output file: " << outputFile->name().string() << std::endl;
+        if (cmd->buildFile() != nullptr) {
+            ss << "The command is defined in buildfile " << cmd->buildFile()->absolutePath()
+                << " by the rule at line " << cmd->ruleLineNr() << std::endl;
+        }
         LogRecord record(LogRecord::Error, ss.str());
         logBook.add(record);
     }
@@ -205,6 +225,10 @@ namespace
         for (auto const& n : declared) ss << "    " << n->name().string() << std::endl;
          ss << "Actual outputs  : " << std::endl;
         for (auto const& n : actual) ss << "    " << n->name().string() << std::endl;
+        if (cmd->buildFile() != nullptr) {
+            ss << "The command is defined in buildfile " << cmd->buildFile()->absolutePath()
+                << " by the rule at line " << cmd->ruleLineNr() << std::endl;
+        }
         LogRecord record(LogRecord::Error, ss.str());
         logBook.add(record);
     }
@@ -226,6 +250,10 @@ namespace
         if (!result.stdErr.empty()) {
             ss << "script stderr: " << std::endl << result.stdErr << std::endl;
         }
+        if (cmd->buildFile() != nullptr) {
+            ss << "The command is defined in buildfile " << cmd->buildFile()->absolutePath()
+                << " by the rule at line " << cmd->ruleLineNr() << std::endl;
+        }
         LogRecord record(LogRecord::Error, ss.str());
         logBook.add(record);
     }
@@ -242,6 +270,10 @@ namespace
             << "Command : " << cmd->name().string() << std::endl
             << "Tmp dir : " << dir.string() << std::endl
             << "Reason: " << ec.message() << std::endl;
+        if (cmd->buildFile() != nullptr) {
+            ss << "The command is defined in buildfile " << cmd->buildFile()->absolutePath()
+                << " by the rule at line " << cmd->ruleLineNr() << std::endl;
+        }
         LogRecord record(LogRecord::Error, ss.str());
         logBook.add(record);
     }
@@ -924,16 +956,6 @@ namespace YAM
         return streamableTypeId;
     }
 
-    /*
-    * 
-
-        InputNodes _detectedInputs;
-
-        // The hash of the hashes of all items that, when changed, invalidate
-        // the output files. Items include the script, the output files and 
-        // the relevant aspects of the input files.
-        XXH64_hash_t _executionHash;
-    */
     void CommandNode::stream(IStreamer* streamer) {
         Node::stream(streamer);
         streamer->stream(_inputAspectsName);

@@ -63,6 +63,7 @@ namespace
             setup.nodes.size() // 3 file nodes
             + setup.repos.size() // 3 repo root dir nodes
             + setup.repos.size() * 3 // per repo dir .ignore, .yamignore, .gitignore
+            + setup.repos.size() * 2 // per repo FileExecSpecs + its configfile
             + setup.repos.size(), // 3 repos
             buildState.size());
         for (auto n : setup.nodes) EXPECT_TRUE(buildState.contains(n));
