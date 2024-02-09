@@ -222,6 +222,7 @@ namespace YAM
             _parseTree = BuildFile::File();
             updateMap(context(), this, _buildFileDeps, emptyNodes);
             _dependencies.clear();
+            _buildFileHash = rand();
             _executionHash = rand();
             modified(true);
             setState(Node::State::Dirty);

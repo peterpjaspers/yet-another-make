@@ -222,12 +222,12 @@ namespace YAM
                 updateMap(context(), this, _outputs, emptyOutputs);
                 updateMap(context(), this, _depCompilers, emptyCompilers);
                 updateMap(context(), this, _depGlobs, emptyGlobs);
-                _executionHash = rand();
             }
             _buildFileParser = newParser;
             if (_buildFileParser != nullptr) {
                 _buildFileParser->addObserver(this);
             }
+            _executionHash = rand();
             modified(true);
             setState(Node::State::Dirty);
         }
