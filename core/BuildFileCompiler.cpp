@@ -403,6 +403,14 @@ namespace YAM {
                 }
             }
         }
+        for (auto const& pair : _oldOutputGroups) {
+            auto const& groupPath = pair.first;
+            auto groupNode = pair.second;
+            if (!_outputGroups.contains(groupPath)) {
+                auto oldIt = _oldOutputGroupsContent.find(groupPath);
+                removeFromGroup(groupNode, oldIt->second);
+            }
+        }
     }
 
     std::shared_ptr<GroupNode> BuildFileCompiler::compileGroupNode(
