@@ -1,0 +1,96 @@
+---
+import "@picocss/pico/css/pico.min.css";
+import MainLayout from "./MainLayout.astro";
+import DocumentationMenu from "@components/DocumentationMenu.astro";
+import HamburgerIcon from "@components/HamburgerIcon.astro";
+import CloseIcon from "@components/CloseIcon.astro";
+
+const { frontmatter } = Astro.props;
+---
+
+<MainLayout title={frontmatter.title}>
+  <div class="container">
+    <button
+      class="menu-toggle outline"
+      title="Open menu"
+      aria-label="Open menu"
+    >
+      <HamburgerIcon />
+    </button>
+  </div>
+  <main class="container with-side-menu">
+    <aside id="documentation-menu">
+      <button
+        class="menu-toggle outline"
+        title="Close menu"
+        aria-label="Close menu"
+      >
+        <CloseIcon />
+      </button>
+      <DocumentationMenu />
+    </aside>
+    <div>
+      <slot />
+    </div>
+  </main>
+</MainLayout>
+
+<style>
+  .with-side-menu {
+    display: grid;
+    grid-template-rows: auto;
+    grid-template-columns: 11rem minmax(0, 1fr);
+    grid-template-areas: "menu body";
+    gap: 2rem;
+  }
+
+  .menu-toggle {
+    display: none;
+  }
+
+  @media (max-width: 768px) {
+    .menu-toggle {
+      display: block;
+    }
+
+    aside .menu-toggle {
+      margin-bottom: 2rem;
+    }
+
+    .with-side-menu {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas: "body";
+    }
+    aside#documentation-menu {
+      display: none;
+      position: fixed;
+      z-index: 10;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: var(--pico-background-color);
+    }
+
+    /* Toon het menu wanneer .open-on-mobile is toegevoegd */
+    #documentation-menu.open-on-mobile {
+      display: block;
+      padding: 2rem;
+    }
+  }
+</style>
+
+<script>
+  document.querySelectorAll(".menu-toggle")!.forEach((el) => {
+    el.addEventListener("click", function () {
+      toggleMenu();
+    });
+  });
+
+  function toggleMenu() {
+    document
+      .querySelector("#documentation-menu")!
+      .classList.toggle("open-on-mobile");
+  }
+</script>

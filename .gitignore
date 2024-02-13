@@ -396,3 +396,10 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Mac OS
+.DS_Store
+
+# Website
+website/**/node_modules
+website/**/dist

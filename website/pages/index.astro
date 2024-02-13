@@ -1,0 +1,80 @@
+---
+import MainLayout from "../layouts/MainLayout.astro";
+---
+
+<MainLayout title="Yet Another Make">
+  <main class="container">
+    <section id="hero">
+      <div class="hook">
+        <h1>Extremely Fast Build System</h1>
+        <p>
+          Yet Another Make is a build system that is designed to be extremely
+          fast and easy to use. It is designed to be a drop-in replacement for
+          Make, and is compatible with Makefiles.
+        </p>
+        <div class="call-to-action">
+          <a role="button" href="/docs/getting-started/quick-start"
+            >Get Started</a
+          >
+          <a
+            role="button"
+            class="outline"
+            href="https://github.com/peterpjaspers/yet-another-make"
+            >View Source Code</a
+          >
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="grid">
+        <article>
+          <h3>Fast</h3>
+          <p>
+            Yet Another Make is designed to be extremely fast. It is written in
+            Rust, and is designed to be a drop-in replacement for Make.
+          </p>
+        </article>
+        <article>
+          <h3>Easy To Use</h3>
+          <p>
+            Yet Another Make is designed to be easy to use. It is designed to be
+            a drop-in replacement for Make, and is compatible with Makefiles.
+          </p>
+        </article>
+        <article>
+          <h3>Extensible</h3>
+          <p>
+            Yet Another Make is designed to be extensible. It is designed to be
+            a drop-in replacement for Make, and is compatible with Makefiles.
+          </p>
+        </article>
+      </div>
+    </section>
+  </main>
+</MainLayout>
+
+<style>
+  main {
+    display: flex;
+    flex-direction: column;
+    gap: 5rem;
+  }
+
+  #hero {
+    display: flex;
+  }
+
+  .hook {
+    margin: auto;
+    max-width: 700px;
+    text-align: center;
+  }
+
+  .call-to-action {
+    display: flex;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+</style>

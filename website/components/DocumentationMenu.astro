@@ -1,0 +1,115 @@
+---
+interface MenuGroup {
+  label: string;
+  category: string;
+  items: MenuItem[];
+}
+
+interface MenuItem {
+  title: string;
+  url: string;
+  order: number;
+  category: string;
+}
+
+const menuItems: MenuItem[] = (await Astro.glob("./../pages/docs/**/*.md"))
+  .map((file) => ({ ...file.frontmatter, url: file.url }) as MenuItem)
+  .toSorted((a, b) => a.order - b.order);
+
+const menuGroups: MenuGroup[] = [
+  {
+    label: "Getting started",
+    category: "getting-started",
+  },
+  {
+    label: "Core Concepts",
+    category: "core-concepts",
+  },
+  {
+    label: "Configuration",
+    category: "configuration",
+  },
+  {
+    label: "Advanced Usage",
+    category: "advanced-usage",
+  },
+  {
+    label: "Integration",
+    category: "integration",
+  },
+  {
+    label: "Tutorials & Examples",
+    category: "examples",
+  },
+].map((group) => {
+  const items = menuItems.filter((item) => item.category === group.category);
+  return { ...group, items };
+});
+---
+
+<nav class="sticky-top">
+  {
+    menuGroups.map((group) => (
+      <details id={group.category}>
+        <summary>{group.label}</summary>
+        <ul>
+          {group.items.map((item) => (
+            <li>
+              <a class="secondary" href={item.url}>
+                {item.title}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </details>
+    ))
+  }
+</nav>
+
+<style>
+  summary {
+    font-weight: bold;
+  }
+  summary,
+  li {
+    font-size: small;
+  }
+  li {
+    padding: calc(var(--pico-nav-element-spacing-vertical) * 0.2)
+      calc(var(--pico-nav-element-spacing-horizontal) * 2);
+    border-left: 1px solid var(--pico-card-border-color);
+  }
+
+  .sticky-top {
+    position: sticky;
+    top: 2rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .active {
+    font-weight: bold;
+  }
+</style>
+
+<script>
+  function normalizePath(path: string) {
+    // Verwijder de trailing slash als deze bestaat, tenzij het pad slechts '/' is.
+    return path.endsWith("/") && path !== "/" ? path.slice(0, -1) : path;
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    const currentPath = normalizePath(window.location.pathname);
+
+    const menuLinks = document.querySelectorAll("nav a");
+
+    menuLinks.forEach((link) => {
+      const itemPath = normalizePath(link.getAttribute("href")!);
+      if (itemPath === currentPath) {
+        link.classList.add("active");
+        link.closest("details")?.setAttribute("open", "true");
+      }
+    });
+  });
+</script>
