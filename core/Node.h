@@ -84,7 +84,14 @@ namespace YAM
         std::filesystem::path absolutePath() const;
 
         State state() const { return _state; }
+
+        // Pre: state() != Node::State::Deleted, see undelete()
         virtual void setState(State newState);
+
+        // Pre: state() == Node::State::Deleted.
+        // Post: state() == Node::State::Dirty.
+        // State changed will not be notified to subscribers.
+        void undelete();
 
         // Start asynchronous execution.
         // Sub-classes must override this function as follows:
@@ -151,7 +158,8 @@ namespace YAM
         //      sub-class specific logic
         //      Node::handleCompletionOf(observedNode)
         void handleCompletionOf(Node* observedNode) override;
-        void handleDirtyOf(Node* observedNode) override { setState(Node::State::Dirty); }
+        // Set state Dirty iff not Deleted
+        void handleDirtyOf(Node* observedNode) override;
 
         // Start asynchronous execution of given set of 'nodes'.
         // On completion call callback.Execute(state), where state

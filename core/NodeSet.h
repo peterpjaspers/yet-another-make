@@ -53,6 +53,10 @@ namespace YAM
         std::size_t size() const;
 
         std::vector<std::shared_ptr<Node>> nodes() const;
+        std::unordered_map<std::filesystem::path, std::shared_ptr<Node>> nodesMap() const;
+
+        // Remove all nodes in state Node::State::Deleted
+        void collectGarbage();
 
     private:
         std::unordered_map<std::filesystem::path, std::shared_ptr<Node>> _nodes;

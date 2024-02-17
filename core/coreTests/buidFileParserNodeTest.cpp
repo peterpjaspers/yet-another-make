@@ -8,6 +8,7 @@
 #include "../GeneratedFileNode.h"
 #include "../CommandNode.h"
 #include "../GlobNode.h"
+#include "../RepositoriesNode.h"
 #include "../ExecutionContext.h"
 #include "../FileSystem.h"
 #include "../RegexSet.h"
@@ -75,7 +76,8 @@ namespace
             writeFile(absBuildFilePathSD1, ruleSD1);
             writeFile(absBuildFilePathSD2, ruleSD2);
 
-            context.addRepository(fileRepo);
+            auto repos = std::make_shared<RepositoriesNode>(&context, fileRepo);
+            context.repositoriesNode(repos);
             fileRepo->startWatching();
 
             auto dirNode = fileRepo->directoryNode();

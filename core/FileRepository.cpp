@@ -84,6 +84,21 @@ namespace YAM
         return _name;
     }
 
+    void FileRepository::directory(std::filesystem::path const& dir) {
+        if (_directory != dir) {
+            std::stringstream ss;
+            ss 
+                << "Repository was moved from " 
+                << _directory << " to " 
+                << dir << std::endl;
+            LogRecord progress(LogRecord::Aspect::Progress, ss.str());
+            _context->addToLogBook(progress);
+
+            _directory = dir;
+            modified(true);
+        }
+    }
+
     std::filesystem::path const& FileRepository::directory() const {
         return _directory;
     }
@@ -197,6 +212,17 @@ namespace YAM
         return _fileExecSpecsNode;
     }
 
+    void FileRepository::inputRepoNames(std::vector<std::string> const& names) {
+        if (_inputRepoNames != names) {
+            _inputRepoNames = names;
+            modified(true);
+        }
+    }
+
+    std::vector<std::string> const& FileRepository::inputRepoNames() const {
+        return _inputRepoNames;
+    }
+
     void FileRepository::clear() {
         _context->nodes().removeIfPresent(_fileExecSpecsNode);
         _context->nodes().removeIfPresent(_fileExecSpecsNode->configFileNode());
@@ -219,6 +245,7 @@ namespace YAM
         streamer->stream(_directory);
         streamer->stream(_tracked);
         streamer->stream(_directoryNode);
+        streamer->stream(_fileExecSpecsNode);
     }
 
     void FileRepository::prepareDeserialize() {

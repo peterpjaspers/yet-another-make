@@ -9,6 +9,7 @@
 #include "../CommandNode.h"
 #include "../GlobNode.h"
 #include "../GroupNode.h"
+#include "../RepositoriesNode.h"
 #include "../ExecutionContext.h"
 #include "../FileSystem.h"
 #include "../RegexSet.h"
@@ -73,7 +74,8 @@ namespace
             std::filesystem::path f1(repoTree.path() / "main.cpp");
             writeFile(f1, "void main() {}");
 
-            context.addRepository(fileRepo);
+            auto repos = std::make_shared<RepositoriesNode>(&context, fileRepo);
+            context.repositoriesNode(repos);
             fileRepo->startWatching();
 
             auto dirNode = fileRepo->directoryNode();

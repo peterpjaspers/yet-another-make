@@ -10,6 +10,7 @@
 #include "GlobNode.h"
 #include "GroupNode.h"
 #include "SourceFileNode.h"
+#include "RepositoriesNode.h"
 #include "FileRepository.h"
 #include "BinaryValueStreamer.h"
 #include "ISharedObjectStreamer.h"
@@ -78,6 +79,25 @@ namespace
         LogRecord r(LogRecord::Aspect::BuildStateUpdate, ss.str());
         logBook.add(r);
     }
+
+    void logPersistentState(
+        ILogBook& logBook,
+        std::map<PersistentBuildState::Key, std::shared_ptr<IPersistable>> const& keyToObject
+    ) {
+        if (!logBook.mustLogAspect(LogRecord::BuildStateUpdate)) return;
+
+        std::stringstream ss;
+        ss << "Number of objects in persistent buildstate: " << keyToObject.size() << std::endl;
+        for (auto const& pair : keyToObject) {
+            ss 
+                << std::hex << pair.first 
+                << " " << pair.second->describeName() 
+                << " " << pair.second->describeType()
+                << std::endl;
+        }
+        LogRecord r(LogRecord::Aspect::BuildStateUpdate, ss.str());
+        logBook.add(r);
+    }
 }
 
 namespace YAM
@@ -99,9 +119,10 @@ namespace YAM
             GeneratedFileNode = 7,
             GlobNode = 8,
             GroupNode = 9,
-            SourceFileNode = 10,
-            FileRepository = 11,
-            Max = 12
+            RepositoriesNode = 10,
+            SourceFileNode = 11,
+            FileRepository = 12,
+            Max = 13
         };
         std::vector<TypeId> ids;
 
@@ -115,6 +136,7 @@ namespace YAM
             YAM::GeneratedFileNode::setStreamableType(static_cast<uint32_t>(GeneratedFileNode));
             YAM::GlobNode::setStreamableType(static_cast<uint32_t>(GlobNode));
             YAM::GroupNode::setStreamableType(static_cast<uint32_t>(GroupNode));
+            YAM::RepositoriesNode::setStreamableType(static_cast<uint32_t>(RepositoriesNode));
             YAM::SourceFileNode::setStreamableType(static_cast<uint32_t>(SourceFileNode));
             YAM::FileRepository::setStreamableType(static_cast<uint32_t>(FileRepository));
 
@@ -127,6 +149,7 @@ namespace YAM
             ids.push_back(GeneratedFileNode);
             ids.push_back(GlobNode);
             ids.push_back(GroupNode);
+            ids.push_back(RepositoriesNode);
             ids.push_back(SourceFileNode);
             ids.push_back(FileRepository);
         }
@@ -149,6 +172,7 @@ namespace YAM
             case TypeId::GeneratedFileNode: return std::make_shared<YAM::GeneratedFileNode>();
             case TypeId::GlobNode: return std::make_shared<YAM::GlobNode>();
             case TypeId::GroupNode: return std::make_shared<YAM::GroupNode>();
+            case TypeId::RepositoriesNode: return std::make_shared<YAM::RepositoriesNode>();
             case TypeId::SourceFileNode: return std::make_shared<YAM::SourceFileNode>();
             case TypeId::FileRepository: return std::make_shared<YAM::FileRepository>();
             default: throw std::exception("unknown node type");
@@ -363,12 +387,18 @@ namespace YAM
         _pool.reset();
     }
 
+    void PersistentBuildState::logState(ILogBook& logBook) {
+        logPersistentState(logBook, _keyToObject);
+    }
+
     void PersistentBuildState::retrieve() {
         reset();
         retrieveAll();
-        for (auto pair : _keyToObject) addToBuildState(pair.second);
+        for (auto const& pair : _keyToObject) {
+            addToBuildState(pair.second);
+        }
         std::unordered_set<IPersistable const*> restored;
-        for (auto pair : _keyToObject) pair.second->restore(_context, restored);
+        for (auto const& pair : _keyToObject) pair.second->restore(_context, restored);
         if (_startRepoWatching) {
             for (auto const& pair : _context->repositories()) {
                 pair.second->startWatching();
@@ -392,7 +422,6 @@ namespace YAM
         for (auto pair : _typeToTree) {
             BTree::TreeIndex type = pair.first;
             auto tree = pair.second;
-            auto size = tree->size();
             for (auto& reader : *tree) {
                 PersistentBuildState::Key key = reader.key();
                 KeyCode code(key);
@@ -436,7 +465,11 @@ namespace YAM
     }
 
     std::shared_ptr<IPersistable> PersistentBuildState::retrieve(Key key) {
-        return _keyToObject[key];
+        auto it = _keyToObject.find(key);
+        if (it == _keyToObject.end()) {
+            throw std::runtime_error("Attempt to retrieve unknown key");
+        }
+        return it->second;
     }
 
     std::size_t PersistentBuildState::store() {
@@ -587,27 +620,35 @@ namespace YAM
     }
 
     void PersistentBuildState::addToBuildState(std::shared_ptr<IPersistable> const& object) {
-        auto node = dynamic_pointer_cast<Node>(object);
-        auto repo = dynamic_pointer_cast<FileRepository>(object);
         if (object == nullptr) {
-        } else if (node != nullptr) {
-            _context->nodes().add(node);
-        } else if (repo != nullptr) {
-            _context->addRepository(repo);
         } else {
-            throw std::exception("unknown object class");
+            auto node = dynamic_pointer_cast<Node>(object);
+            if (node == nullptr) {
+                auto repo = dynamic_pointer_cast<FileRepository>(object);
+                if (repo == nullptr) {
+                    throw std::exception("unknown object class");
+                }
+            } else {
+                _context->nodes().add(node);
+                auto repos = dynamic_pointer_cast<RepositoriesNode>(node);
+                if (repos != nullptr) _context->repositoriesNode(repos);
+            }
         }
     }
 
     void PersistentBuildState::removeFromBuildState(std::shared_ptr<IPersistable> const& object) {
         auto node = dynamic_pointer_cast<Node>(object);
-        auto repo = dynamic_pointer_cast<FileRepository>(object);
         if (node != nullptr) {
             _context->nodes().remove(node);
-        } else if (repo != nullptr) {
-            _context->removeRepository(repo->name());
+            auto repos = dynamic_pointer_cast<RepositoriesNode>(object);
+            if (repos != nullptr) {
+                _context->repositoriesNode(nullptr);
+            }
         } else {
-            throw std::exception("unknown object class");
+            auto repo = dynamic_pointer_cast<FileRepository>(object);
+            if (repo == nullptr) {
+                throw std::exception("unknown object class");
+            }
         }
     }
 }

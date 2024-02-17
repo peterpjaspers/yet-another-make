@@ -2,6 +2,7 @@
 #include "../ExecutionContext.h"
 #include "../FileRepository.h"
 #include "../FileSystem.h"
+#include "../RepositoriesNode.h"
 
 #include "gtest/gtest.h"
 #include <memory>
@@ -45,12 +46,18 @@ namespace
         {
             nodes.push_back(std::make_shared<FileNode>(&context, "n1"));
             nodes.push_back(std::make_shared<FileNode>(&context, "n2"));
-            nodes.push_back(std::make_shared<FileNode>(&context, "n3"));
-            repos.push_back(std::make_shared<FileRepository>(repo1.name, repo1.dir, &context, false));
+            nodes.push_back(std::make_shared<FileNode>(&context, "n3"));           
+            for (auto n : nodes) context.nodes().add(n);
+
+            auto homeRepo = std::make_shared<FileRepository>(repo1.name, repo1.dir, &context, false);
+            auto repositories = std::make_shared<RepositoriesNode>(&context, homeRepo);
+            context.repositoriesNode(repositories);
+
+            repos.push_back(homeRepo);
             repos.push_back(std::make_shared<FileRepository>(repo2.name, repo2.dir, &context, false));
             repos.push_back(std::make_shared<FileRepository>(repo3.name, repo3.dir, &context, false));
-            for (auto n : nodes) context.nodes().add(n);
-            for (auto r : repos) context.addRepository(r);
+
+            for (auto n : repos) repositories->addRepository(n);
         }
     };
 
@@ -61,13 +68,14 @@ namespace
         setup.context.getBuildState(buildState);
         EXPECT_EQ(
             setup.nodes.size() // 3 file nodes
+            + 2 // RepositoriesNode + its config file
+            + setup.repos.size() // 3 FileRepository
             + setup.repos.size() // 3 repo root dir nodes
             + setup.repos.size() * 3 // per repo dir .ignore, .yamignore, .gitignore
-            + setup.repos.size() * 2 // per repo FileExecSpecs + its configfile
-            + setup.repos.size(), // 3 repos
+            + setup.repos.size() * 2, // per repo FileExecSpecs + its configfile
             buildState.size());
         for (auto n : setup.nodes) EXPECT_TRUE(buildState.contains(n));
-        for (auto r : setup.repos) EXPECT_TRUE(buildState.contains(r));
+        EXPECT_TRUE(buildState.contains(setup.context.repositoriesNode()));
     }
 
     TEST(ExecutionContext, clearBuildState) {

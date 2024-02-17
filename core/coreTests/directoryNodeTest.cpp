@@ -7,6 +7,7 @@
 #include "../ExecutionContext.h"
 #include "../BuildFileParserNode.h"
 #include "../BuildFileCompilerNode.h"
+#include "../RepositoriesNode.h"
 #include "../../xxhash/xxhash.h"
 
 #include <chrono>
@@ -25,7 +26,8 @@ namespace
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
         auto repo = std::make_shared<FileRepository>("repo", rootDir, &context, true);
-        context.addRepository(repo);
+        auto repos = std::make_shared<RepositoriesNode>(&context, repo);
+        context.repositoriesNode(repos);
         auto dirNode = repo->directoryNode();
         EXPECT_EQ(Node::State::Dirty, dirNode->state());
 
@@ -42,7 +44,8 @@ namespace
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
         auto repo = std::make_shared<FileRepository>("repo", rootDir, &context, true);
-        context.addRepository(repo);
+        auto repos = std::make_shared<RepositoriesNode>(&context, repo);
+        context.repositoriesNode(repos);
         auto dirNode = repo->directoryNode();
         bool completed = YAMTest::executeNode(dirNode.get());
         EXPECT_TRUE(completed);
@@ -105,7 +108,8 @@ namespace
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
         auto repo = std::make_shared<FileRepository>("repo", rootDir, &context, true);
-        context.addRepository(repo);
+        auto repos = std::make_shared<RepositoriesNode>(&context, repo);
+        context.repositoriesNode(repos);
         auto dirNode = repo->directoryNode();
         bool completed = YAMTest::executeNode(dirNode.get());
         EXPECT_TRUE(completed);
@@ -174,7 +178,8 @@ namespace
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
         auto repo = std::make_shared<FileRepository>("repo", rootDir, &context, true);
-        context.addRepository(repo);
+        auto repos = std::make_shared<RepositoriesNode>(&context, repo);
+        context.repositoriesNode(repos);
         auto dirNode = repo->directoryNode();
         EXPECT_EQ(Node::State::Dirty, dirNode->state());
 

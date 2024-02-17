@@ -12,6 +12,7 @@ namespace {
 
     bool allNodesAreOk(std::unordered_set<Node*> const& nodes) {
         for (auto const& n : nodes) {
+            if (n->state() == Node::State::Deleted) continue;
             if (n->state() != Node::State::Ok) return false;
         }
         return true;
@@ -58,6 +59,9 @@ namespace YAM
 
     void Node::setState(State newState) {
         if (_state != newState) {
+            if (_state == Node::State::Deleted) {
+                throw std::runtime_error("Not allowwed to update state of Deleted object, user undelete");
+            }
             bool wasExecuting = _state == Node::State::Executing;
             _state = newState;
             bool nowCompleted =
@@ -85,6 +89,13 @@ namespace YAM
             }
             _addedAndRemovedObservers.clear();
         }
+    }
+
+    void Node::undelete() {
+        if (_state != Node::State::Deleted) {
+            throw std::runtime_error("Not allowwed to undelete an object that is not in deleted state");
+        }
+        _state = Node::State::Dirty;
     }
 
     void Node::addObserver(StateObserver* observer) {
@@ -161,8 +172,15 @@ namespace YAM
         case Node::State::Ok: break;
         case Node::State::Failed: break;
         case Node::State::Canceled: break;
+        case Node::State::Deleted:break;
         default:
         throw std::runtime_error("Unknown Node::State");
+        }
+    }
+
+    void Node::handleDirtyOf(Node* observedNode) { 
+        if (_state != Node::State::Deleted) {
+            setState(Node::State::Dirty);
         }
     }
 
@@ -272,10 +290,13 @@ namespace YAM
 
     void Node::stream(IStreamer* streamer) {
         streamer->stream(_name);
+        uint32_t state;
+        if (streamer->writing()) state = static_cast<uint32_t>(_state);
+        streamer->stream(state);
+        if (streamer->reading()) _state = static_cast<Node::State>(state);
     }
 
     void Node::prepareDeserialize() {
-        _state = Node::State::Dirty;
     }
 
     bool Node::restore(void* context, std::unordered_set<IPersistable const*>& restored) {

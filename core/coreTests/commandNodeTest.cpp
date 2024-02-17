@@ -2,6 +2,7 @@
 #include "../CommandNode.h"
 #include "../SourceFileNode.h"
 #include "../GeneratedFileNode.h"
+#include "../RepositoriesNode.h"
 #include "../ThreadPool.h"
 #include "../ExecutionContext.h"
 #include "../FileSystem.h"
@@ -66,18 +67,23 @@ namespace
             logBook->add(memLogBook);
             logBook->add(stdoutLogBook);
             context.logBook(logBook);
-            context.addRepository(
-                std::make_shared<FileRepository>(
-                    "windows",
-                    std::filesystem::path("c:\\windows"),
-                    &context,
-                    false));
-            context.addRepository(
+
+            auto homeRepo =
                 std::make_shared<FileRepository>(
                     ".",
                     repoDir,
                     &context,
-                    true));
+                    true);
+            auto repos = std::make_shared<RepositoriesNode>(&context, homeRepo);
+            context.repositoriesNode(repos);
+
+            auto winRepo =
+                std::make_shared<FileRepository>(
+                    "windows",
+                    std::filesystem::path("c:\\windows"),
+                    &context,
+                    false);
+            //repos->addRepository(winRepo);
 
             stats.registerNodes = true;
             //context.threadPool().size(1); // to ease debugging
@@ -143,7 +149,7 @@ namespace
             context.nodes().remove(pietjanOut);
             context.nodes().remove(pietSrc);
             context.nodes().remove(janSrc);
-            context.removeRepository(".");
+            context.repositoriesNode()->removeRepository(".");
             std::filesystem::remove_all(repoDir);
         }
 

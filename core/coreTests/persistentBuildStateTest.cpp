@@ -6,6 +6,7 @@
 #include "../SourceFileNode.h"
 #include "../CommandNode.h"
 #include "../DotIgnoreNode.h"
+#include "../RepositoriesNode.h"
 #include "../ExecutionContext.h"
 #include "../DotYamDirectory.h"
 #include "../PersistentBuildState.h"
@@ -24,14 +25,14 @@ namespace
 
     // repoDir contains .yam dir, buildstate dir, subdirs 1,2,3 and files 1,2,3
     // Each subdir contains 39 files and 12 directories.
-    // Including repoDir and .yam dir: 42 dirs, 120 files.
+    // Including repoDir, .yam dir, buildstate dir: 42 dirs, 120 files.
     // Nodes: per directory 4 nodes (dir node, dotignore .yamignore and
-    // .gitignore). Per file 1 node. 
-    // Node: 1 command node.
-    // FileRepostory has 2 additional nodes: FileExecConfigNode, which has
-    // SourceFileNode.
-    // Total nodes: 42*4 + 120 + 1 + 2 = 291
-    const std::size_t nNodes = 291; // in context->nodes()
+    // .gitignore). Per file 1 node.
+    // cmdNode: 1 command node.
+    // RepositoriesNode + config file node: 2
+    // FileRepostory (not a node) has 2: FileExecConfigNode + SourceFileNode: 3
+    // Total nodes: 42*4 + 120 + 1 + 2 + 2=293
+    const std::size_t nNodes = 42 * 4 + 120 + 1 + 2 + 2; // in context->nodes()
 
     // Wait for file change event to be received for given paths.
     // When event is received then consume the changes.
@@ -86,11 +87,13 @@ namespace
             , persistentState(repoDir / "buildState", &context, true)
         {
             //context.threadPool().size(1);
-            context.addRepository(std::make_shared<FileRepository>(
+            auto homeRepo = std::make_shared<FileRepository>(
                 "repo",
                 repoDir,
                 &context,
-                true));
+                true);
+            auto repos = std::make_shared<RepositoriesNode>(&context, homeRepo);
+            context.repositoriesNode(repos);
             sourceFileRepo()->startWatching();
 
             bool completed = YAMTest::executeNode(sourceFileRepo()->directoryNode().get());
@@ -301,6 +304,7 @@ namespace
         // Verify that the retrieved build state can be executed
         bool completed = YAMTest::executeNode(repoDirNode.get());
         EXPECT_TRUE(completed);
+        // +1 because buildstate file is now in buildstate dir
         EXPECT_EQ(nNodes, setup.context.nodes().size());
         storage.store(); // executeNode put all nodes to modified state
 
@@ -310,14 +314,14 @@ namespace
         ASSERT_NE(nullptr, fileNode);
         auto updatedHash = storage.addFileAndUpdateFileAndExecuteNode(fileNode);
         EXPECT_TRUE(fileNode->modified());
-        EXPECT_EQ(nNodes+2, setup.context.nodes().size()); // new FileNode for File4, new dir buildstate
+        EXPECT_EQ(nNodes+1, setup.context.nodes().size()); // new FileNode for File4
         auto newFileNode = dynamic_pointer_cast<FileNode>(setup.context.nodes().find(root / "File4"));
         EXPECT_NE(nullptr, newFileNode);
         EXPECT_TRUE(newFileNode->modified());
 
         // Verify that the modified file node is updated in storage.
         std::size_t nStored = storage.store(); // store the modified file node.
-        EXPECT_EQ(5, nStored); // repo dir, file3, file4, buildstate dir, buildstate file
+        EXPECT_EQ(3, nStored); // repo dir, file3, file4
         storage.retrieve(); // replace all nodes in storage.context by ones freshly retrieved from storage
         fileNode = dynamic_pointer_cast<FileNode>(setup.context.nodes().find(root / "File3"));
         ASSERT_NE(nullptr, fileNode);
@@ -335,8 +339,8 @@ namespace
         SetupHelper setup(FileSystem::createUniqueDirectory());
 
         std::string repoName = setup.sourceFileRepo()->name();
-        EXPECT_TRUE(setup.context.removeRepository(repoName));
-        EXPECT_EQ(1, setup.context.nodes().size()); // the command node
+        EXPECT_TRUE(setup.context.repositoriesNode()->removeRepository(repoName));
+        EXPECT_EQ(3, setup.context.nodes().size()); // repositoriesn, repositoriesconfigfile and cmd node
 
         setup.persistentState.rollback();
 

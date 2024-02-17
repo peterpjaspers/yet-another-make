@@ -1,14 +1,18 @@
 Todo for R1.0.0
-- improve buildfile cycle detection (see group cycle detection)
-- multi-repo configuration => FileRepositoriesNode
+- multi-repo configuration => RepositoriesNode
   reads yamConfig/repositories.txt
   properties: path (relative to home repo or absolute), track, notTracked
               track => watch and register file deps
               notTracked => do not watch and do not register file deps
-  In buildfile: @@./... meaning of @@. is buildfile repo, NOT root repo.
+  In buildfile: @@./something meaning of @@. is buildfile repo, NOT root repo.
+- specify repo name @ yam init
+- RepositoriesNode: cycle detection
+- Version in PersistentBuildState
+- improve buildfile cycle detection (see group cycle detection)
 - fileaspect configuration
 - variants (tup variants, MR build configurations)
 - command line arguments for scope and logging
+- yam init, make user confirm proper root dir of repo (think of git submod dirs with own .git dir)
 - build yam with yam
 - testing testing testing
 - documentation
@@ -37,7 +41,7 @@ Todo: core
           createFileRepositories(fileRepo->repoConfigFile())
       }
 - Handle changes in RepoConfig
-  Add FileRepositoriesNode to buildstate with well known name “.\FileRepositories”.
+  Add RepositoriesNode to buildstate with well known name “.\FileRepositories”.
   This node executes createFileRepositories and adds dependencies on the 
    RepoConfigFiles.
   On change: compute kept/added/removed repo names. Update root dirs of kept 

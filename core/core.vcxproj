@@ -108,7 +108,8 @@
     <ClInclude Include="FileExecSpecsNode.h" />
     <ClInclude Include="BuildFileParserNode.h" />
     <ClInclude Include="BuildFilePreCompiler.h" />
-    <ClInclude Include="BuildState.h" />
+    <ClInclude Include="FileRepository.h" />
+    <ClInclude Include="RepositoriesNode.h" />
     <ClInclude Include="Glob.h" />
     <ClInclude Include="Globber.h" />
     <ClInclude Include="BuildFileParser.h" />
@@ -175,7 +176,6 @@
     <ClInclude Include="NodeSet.h" />
     <ClInclude Include="Node.h" />
     <ClInclude Include="SourceFileNode.h" />
-    <ClInclude Include="FileRepository.h" />
     <ClInclude Include="BuildFile.h" />
     <ClInclude Include="BuildFileCompiler.h" />
     <ClInclude Include="TcpStream.h" />
@@ -201,6 +201,8 @@
     <ClCompile Include="FileExecSpecsNode.cpp" />
     <ClCompile Include="BuildFileParserNode.cpp" />
     <ClCompile Include="BuildFileTokenSpecs.cpp" />
+    <ClCompile Include="FileRepository.cpp" />
+    <ClCompile Include="RepositoriesNode.cpp" />
     <ClCompile Include="Glob.cpp" />
     <ClCompile Include="Globber.cpp" />
     <ClCompile Include="BuildFileParser.cpp" />
@@ -272,7 +274,6 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="SourceFileNode.cpp" />
-    <ClCompile Include="FileRepository.cpp" />
     <ClCompile Include="BuildFileCompiler.cpp" />
     <ClCompile Include="TcpStream.cpp" />
     <ClCompile Include="Thread.cpp" />

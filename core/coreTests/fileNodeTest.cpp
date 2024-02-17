@@ -5,6 +5,7 @@
 #include "../FileSystem.h"
 #include "../ExecutionContext.h"
 #include "../FileRepository.h"
+#include "../RepositoriesNode.h"
 #include "../../xxhash/xxhash.h"
 
 #include <chrono>
@@ -45,11 +46,12 @@ namespace
                 &context,
                 true))
         {
-            context.addRepository(repo);
+            auto repos = std::make_shared<RepositoriesNode>(&context, repo);
+            context.repositoriesNode(repos);
         }
 
         ~Driver() {
-            context.removeRepository(repo->name());
+            context.repositoriesNode()->removeRepository(repo->name());
             repo = nullptr;
             std::filesystem::remove_all(repoDir);
         }

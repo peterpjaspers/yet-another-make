@@ -185,9 +185,6 @@ namespace YAM
                 if (_buildFile->name().extension() == ".txt") {
                     _buildFile->addObserver(this);
                 } else {
-                    if (_buildFile->name().extension() != ".bat") {
-                        throw std::runtime_error("Buildfile must be a .txt or a .bat file");
-                    }
                     _executor = std::make_shared<CommandNode>(context(), _buildFile->name() / "__bfExecutor");
                     context()->nodes().add(_executor);
                     _executor->addObserver(this);
@@ -196,7 +193,7 @@ namespace YAM
                     std::filesystem::path srcBfDirPath = _buildFile->name().parent_path();
                     std::filesystem::path srcBfName = _buildFile->name().filename();
                     std::filesystem::path srcBfStem = srcBfName.stem().string();
-                    std::filesystem::path genBfName = srcBfStem.string() + ".txt";
+                    std::filesystem::path genBfName = srcBfStem.string() + "_gen.txt";
                     std::filesystem::path genBfPath(srcBfDirPath / genBfName);
                     auto genNode = std::make_shared<GeneratedFileNode>(context(), genBfPath, _executor);
                     context()->nodes().add(genNode);

@@ -4,6 +4,7 @@
 #include "../FileRepository.h"
 #include "../ExecutionContext.h"
 #include "../MemoryLogBook.h"
+#include "../RepositoriesNode.h"
 
 #include "gtest/gtest.h"
 #include <memory>
@@ -43,11 +44,12 @@ namespace
                 ss << ".fun => This is %%f %f" << std::endl;
             }
             writeFile(fileExecSpecsPath, ss.str());
-            context.addRepository(fileRepo);
+            auto repos = std::make_shared<RepositoriesNode>(&context, fileRepo);
+            context.repositoriesNode(repos);
         }
 
         ~TestSetup() {
-            context.removeRepository(fileRepo->name());
+            context.repositoriesNode()->removeRepository(fileRepo->name());
             std::filesystem::remove_all(repoDir);
         }
 

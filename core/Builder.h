@@ -2,6 +2,7 @@
 
 #include "Delegates.h"
 #include "ExecutionContext.h"
+#include "Node.h"
 
 #include <memory>
 #include <filesystem>
@@ -44,20 +45,22 @@ namespace YAM
         void _init(std::filesystem::path directory);
         void _start();
         void _clean(std::shared_ptr<BuildRequest> request);
+        void _handleConfigNodesCompletion(Node* n);
         void _handleDirectoriesCompletion(Node* n);
         void _handleBuildFileParsersCompletion(Node* n);
         void _handleBuildFileCompilersCompletion(Node* n);
         bool _containsBuildFileCycles(std::vector<std::shared_ptr<Node>> const& buildFileParserNodes) const;
         bool _containsGroupCycles(std::vector<std::shared_ptr<Node>> const& buildFileCompilerNodes) const;
-        void _rollback();
         void _handleCommandsCompletion(Node* n);
-        void _notifyCompletion();
+        void _postCompletion(Node::State resultState);
+        void _notifyCompletion(Node::State resultState);
         void _storeBuildState(bool logSave = false);
 
         ExecutionContext _context;
         std::shared_ptr<PersistentBuildState> _buildState;
         MulticastDelegate<std::shared_ptr<BuildResult>> _completor;
 
+        std::shared_ptr<GroupNode> _dirtyConfigNodes;
         std::shared_ptr<GroupNode> _dirtyDirectories;
         std::shared_ptr<GroupNode> _dirtyBuildFileParsers;
         std::shared_ptr<GroupNode> _dirtyBuildFileCompilers;

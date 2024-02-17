@@ -56,7 +56,8 @@ namespace
         // A glob node can be shared by multiple compilers.
         glob->removeObserver(observer);
         if (glob->observers().empty()) {
-            glob->context()->nodes().remove(glob);
+            glob->setState(Node::State::Deleted);
+            glob->modified(true);
         }
     }
     void removeNode(std::shared_ptr<CommandNode> cmd, StateObserver* observer) {
@@ -69,17 +70,16 @@ namespace
         cmd->cmdInputs(emptyCmdInputs);
         cmd->orderOnlyInputs(emptyOrderOnlyInputs);
         cmd->setState(Node::State::Deleted);
-        context->nodes().remove(cmd);
+        cmd->modified(true);
     }
     void removeNode(std::shared_ptr<GeneratedFileNode> node, StateObserver* observer) {
         ExecutionContext* context = node->context();
         node->setState(Node::State::Deleted);
-        if (!node->observers().empty()) throw std::runtime_error("generated file node still being observed");
-        context->nodes().remove(node);
+        node->modified(true);
     }
     void removeNode(std::shared_ptr<GroupNode> group, StateObserver* observer) {
         // owned by all compiler nodes that reference the group
-        // When can it me removed from context?
+        // When can it be removed from context?
     }
 
     template<class TNode>

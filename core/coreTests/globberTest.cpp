@@ -4,6 +4,7 @@
 #include "../ExecutionContext.h"
 #include "../FileSystem.h"
 #include "../Globber.h"
+#include "../RepositoriesNode.h"
 
 #include "gtest/gtest.h"
 #include "executeNode.h"
@@ -31,11 +32,14 @@ namespace
             , testTree(repoDir, 3, RegexSet({ }))
         {
             //context.threadPool().size(1);
-            context.addRepository(std::make_shared<FileRepository>(
+            auto homeRepo = std::make_shared<FileRepository>(
                 "repo",
                 repoDir,
                 &context,
-                true));
+                true); 
+            auto repos = std::make_shared<RepositoriesNode>(&context, homeRepo);
+            context.repositoriesNode(repos);
+
             bool completed = YAMTest::executeNode(rootDir().get());
             EXPECT_TRUE(completed);
         }

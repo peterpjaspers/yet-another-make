@@ -352,6 +352,15 @@ namespace
         for (auto const& node : nodes) content.push_back(node);
         groupNode->group(content);
     }
+
+    void resurrect(std::shared_ptr<Node> const& node) {
+        if (node->state() == Node::State::Deleted) {
+            node->undelete();
+            // Remove because BuildFileCompilerNode expects newly found
+            // command, output, glob nodes to be absent in context.
+            node->context()->nodes().remove(node);
+        }
+    }
 }
 
 namespace YAM {
@@ -443,6 +452,7 @@ namespace YAM {
                 _newGroups.insert({ groupNode->name(), groupNode});
             }
         }
+        resurrect(groupNode);
         return groupNode;
     }
 
@@ -506,6 +516,7 @@ namespace YAM {
             ss << "then declare the dependency on that other buildfile in this buildfile." << std::endl;
             throw std::runtime_error(ss.str());
         }
+        resurrect(fileNode);
         return fileNode;
     }
 
@@ -576,6 +587,7 @@ namespace YAM {
             _newGlobs.insert({ globNode->name(), globNode });
         }
         _globs.insert({ globNode->name(), globNode });
+        resurrect(globNode);
         return globNode;
     }
 
@@ -692,6 +704,7 @@ namespace YAM {
         }
         _outputs.insert({ outputNode->name(), outputNode });
         _allowedInputs.insert({ outputNode->name(), outputNode });
+        resurrect(outputNode);
         return outputNode;
     }
 
@@ -797,7 +810,7 @@ namespace YAM {
             throw std::runtime_error(ss.str());
         }
         _commands.insert({ cmdNode->name(), cmdNode });
-
+        resurrect(cmdNode);
         return cmdNode;
     }
 
@@ -873,7 +886,7 @@ namespace YAM {
         if (containsFlag(str, isCmdInputFlag)) {
             std::stringstream ss;
             ss << "At line " << line << " in buildfile " << _buildFile.string() << ":" << std::endl;
-            ss << "No cmd input files while '" << str << "' contains percentage flag that operates on cmd input." << std::endl;
+            ss << "No cmd input files while '" << str << "' contains percentage flag that requires cmd input." << std::endl;
             throw std::runtime_error(ss.str());
         }
     }
@@ -882,7 +895,7 @@ namespace YAM {
         if (containsFlag(str, isOrderOnlyInputFlag)) {
             std::stringstream ss;
             ss << "At line " << line << " in buildfile " << _buildFile.string() << ":" << std::endl;
-            ss << "No order-only input files while '" << str << "' contains percentage flag that operates on order-only input." << std::endl;
+            ss << "No order-only input files while '" << str << "' contains percentage flag that requires order-only input." << std::endl;
             throw std::runtime_error(ss.str());
         }
     }

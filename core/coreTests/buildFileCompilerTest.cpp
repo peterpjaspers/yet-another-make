@@ -6,6 +6,7 @@
 #include "../GroupNode.h"
 #include "../CommandNode.h"
 #include "../GlobNode.h"
+#include "../RepositoriesNode.h"
 #include "../ExecutionContext.h"
 #include "../FileSystem.h"
 #include "../Globber.h" 
@@ -65,7 +66,8 @@ namespace
                 repoDir,
                 &context,
                 false);
-            context.addRepository(repo);
+            auto repos = std::make_shared<RepositoriesNode>(&context, repo);
+            context.repositoriesNode(repos);
             bool completed = YAMTest::executeNode(repo->directoryNode().get());
             EXPECT_TRUE(completed);
             mainFile = dynamic_pointer_cast<SourceFileNode>(context.nodes().find(repo->symbolicPathOf(f1)));

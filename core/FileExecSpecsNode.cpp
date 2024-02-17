@@ -6,7 +6,6 @@
 #include "LogRecord.h"
 #include "IStreamer.h"
 
-#include <regex>
 #include <fstream>
 
 namespace
@@ -17,7 +16,7 @@ namespace
 
     TokenRegexSpec _whiteSpace(R"(^\s+)", "'skip'whitespace", 0);
     TokenRegexSpec _comment(R"(^\/\/.*)", "comment1", 0); // single-line comment
-    TokenRegexSpec _stem(R"(^\.\w+)", "stem");
+    TokenRegexSpec _ext(R"(^\.\w+)", "stem");
     TokenRegexSpec _arrow(R"(^=>)", "arrow");
     TokenRegexSpec _fmt(R"(^.*$)", "fmt");
 
@@ -34,20 +33,20 @@ namespace
         Parser(std::filesystem::path const& path)
             : _tokenizer(path, readFile(path))
         {
-            lookAhead({ &_stem });
-            while (_lookAhead.spec == &_stem) {
-                parseInvokation();
-                lookAhead({ &_stem });
+            lookAhead({ &_ext });
+            while (_lookAhead.spec == &_ext) {
+                parseExecSpec();
+                lookAhead({ &_ext });
             }
         }
 
-        void parseInvokation() {
-            Token stem = eat(&_stem);
+        void parseExecSpec() {
+            Token stem = eat(&_ext);
             lookAhead({ &_arrow });
             eat(&_arrow);
             lookAhead({ &_fmt });
             Token fmt = eat(&_fmt);
-            _invokations.insert({ stem.value, fmt.value });
+            _execSpecs.insert({ stem.value, fmt.value });
         }
 
         void lookAhead(std::vector<ITokenSpec const*> const& specs) {
@@ -73,13 +72,13 @@ namespace
         }
 
         std::map<std::filesystem::path, std::string> const& invokations() const {
-            return _invokations;
+            return _execSpecs;
         }
 
     private:
         BuildFileTokenizer _tokenizer;
         Token _lookAhead;
-        std::map<std::filesystem::path, std::string> _invokations;
+        std::map<std::filesystem::path, std::string> _execSpecs;
     };
 
     std::string replace(std::string fmt, std::string const& buildFile) {

@@ -4,6 +4,7 @@
 #include "../DirectoryNode.h"
 #include "../BuildFileDependenciesCompiler.h"
 #include "../GlobNode.h"
+#include "../RepositoriesNode.h"
 #include "../ExecutionContext.h"
 #include "../FileSystem.h"
 #include "../Globber.h"
@@ -43,7 +44,8 @@ namespace
             EXPECT_TRUE(bf2.is_open());
             bf2.close();
 
-            context.addRepository(fileRepo);
+            auto repos = std::make_shared<RepositoriesNode>(&context, fileRepo);
+            context.repositoriesNode(repos);
             auto dirNode = fileRepo->directoryNode();
             bool completed = YAMTest::executeNode(dirNode.get());
             EXPECT_TRUE(completed);

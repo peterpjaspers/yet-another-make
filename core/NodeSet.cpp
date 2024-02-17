@@ -62,9 +62,33 @@ namespace YAM
         return _nodes.size(); 
     }
 
+    std::unordered_map<std::filesystem::path, std::shared_ptr<Node>> NodeSet::nodesMap() const {
+        return _nodes;
+    }
+
     std::vector<std::shared_ptr<Node>> NodeSet::nodes() const {
         std::vector<std::shared_ptr<Node>> nodes;
         for (auto const& pair : _nodes) nodes.push_back(pair.second);
         return nodes;
+    }
+
+    void NodeSet::collectGarbage() {
+        std::vector<std::shared_ptr<Node>> garbage;
+        for (auto const& pair : _nodes) {
+            if (pair.second->state() == Node::State::Deleted) {
+                garbage.push_back(pair.second);
+            }
+        }
+        for (auto const& node : garbage) {
+            if (!node->observers().empty()) {
+                throw std::runtime_error("garbage node still being observed: " + node->name().string());
+            }
+            if (node.use_count() > 2) {
+                // When node has been stored it is still in-use in PersistentBuildState
+                remove(node);
+            } else {
+                remove(node);
+            }
+        }
     }
 }

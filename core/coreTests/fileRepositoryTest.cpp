@@ -4,6 +4,7 @@
 #include "../DirectoryNode.h"
 #include "../SourceFileNode.h"
 #include "../ExecutionContext.h"
+#include "../RepositoriesNode.h"
 #include "../RegexSet.h"
 #include "../FileSystem.h"
 #include "../Dispatcher.h"
@@ -161,7 +162,8 @@ namespace
             rootDir,
             &context,
             true);
-        context.addRepository(repo);
+        auto repos = std::make_shared<RepositoriesNode>(&context, repo);
+        context.repositoriesNode(repos);
         repo->startWatching();
 
         DirectoryNode* dirNode = repo->directoryNode().get();

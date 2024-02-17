@@ -342,7 +342,7 @@ namespace YAM
                 result._lastWriteTime == _lastWriteTime
                 && result._executionHash == _executionHash
             ) {
-                notifyCompletion(result._newState);
+                startSubDirs();
             } else {
                 commitResult(result);
                 startSubDirs();
@@ -351,17 +351,21 @@ namespace YAM
     }
 
     void DirectoryNode::startSubDirs() {
-        std::vector<Node*> children;
+        std::vector<Node*> dirtyChildren;
         for (auto it = _content.begin(); it != _content.end(); ++it) {
             auto sdir = dynamic_pointer_cast<DirectoryNode>(it->second);
-            if (sdir != nullptr) {
-                children.push_back(sdir.get());
+            if (sdir != nullptr && sdir->state() == Node::State::Dirty) {
+                dirtyChildren.push_back(sdir.get());
             }
         }
-        auto callback = Delegate<void, Node::State>::CreateLambda(
-            [this](Node::State s) { Node::notifyCompletion(s); }
-        );
-        Node::startNodes(children, std::move(callback));
+        if (dirtyChildren.empty()) {
+            Node::notifyCompletion(Node::State::Ok);
+        } else {
+            auto callback = Delegate<void, Node::State>::CreateLambda(
+                [this](Node::State s) { Node::notifyCompletion(s); }
+            );
+            Node::startNodes(dirtyChildren, std::move(callback));
+        }
     }
 
     // Executes in main thread

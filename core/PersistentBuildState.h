@@ -71,6 +71,8 @@ namespace YAM
         // Rollback the build state to its state at last successfull commit.
         void rollback();
 
+        void logState(ILogBook &logBook);
+
     private:
         // retrieve for use by SharedPersistableReader
         std::shared_ptr<IPersistable> retrieve(Key key);

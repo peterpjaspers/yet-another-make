@@ -175,7 +175,9 @@ namespace YAM
     }
 
     void FileRepositoryWatcher::_invalidateNodeRecursively(std::shared_ptr<Node> const& node) {
-        node->setState(Node::State::Dirty);
+        if (node->state() != Node::State::Deleted) {
+            node->setState(Node::State::Dirty);
+        }
         auto dirNode = dynamic_pointer_cast<DirectoryNode>(node);
         if (dirNode != nullptr) {
             for (auto const& pair : dirNode->getContent()) {

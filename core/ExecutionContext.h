@@ -15,6 +15,7 @@ namespace YAM
     class FileRepository;
     class BuildRequest;
     class IPersistable;
+    class RepositoriesNode;
     class ILogBook;
     class LogRecord;
 
@@ -35,10 +36,8 @@ namespace YAM
 
         ExecutionStatistics& statistics();
 
-        // Add repository, return whether it was added, i..e had a unique name.
-        bool addRepository(std::shared_ptr<FileRepository> repo);
-        // Remove repository, return whether it was removed.
-        bool removeRepository(std::string const& repoName);
+        void repositoriesNode(std::shared_ptr<RepositoriesNode> const& node);
+        std::shared_ptr<RepositoriesNode> const& repositoriesNode() const;
 
         // Find repository by name, return found repo, nullptr when not found.
         std::shared_ptr<FileRepository> const& findRepository(std::string const& repoName) const;
@@ -91,6 +90,7 @@ namespace YAM
         ThreadPool _threadPool;
         ExecutionStatistics _statistics;
 
+        std::shared_ptr<RepositoriesNode> _repositoriesNode;
         std::map<std::string, std::shared_ptr<FileRepository>> _repositories;
 
         //TODO: add interfaces to add/remove aspects and aspectSets

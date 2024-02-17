@@ -1,5 +1,6 @@
 #include "ExecutionContext.h"
 #include "Node.h"
+#include "RepositoriesNode.h"
 #include "FileRepository.h"
 #include "BuildRequest.h"
 #include "ConsoleLogBook.h"
@@ -64,40 +65,32 @@ namespace YAM
         return _statistics;
     }
 
-    bool ExecutionContext::addRepository(std::shared_ptr<FileRepository> repo)
-    {
-        std::shared_ptr<FileRepository> duplicateRepo = findRepository(repo->name());
-        bool duplicateName = nullptr != duplicateRepo;
-        if (!duplicateName) {
-            _repositories.insert({ repo->name(), repo });
+    void ExecutionContext::repositoriesNode(std::shared_ptr<RepositoriesNode> const& node) {
+        if (_repositoriesNode != node) {
+            if (_repositoriesNode != nullptr) {
+                _nodes.removeIfPresent(_repositoriesNode);
+            }
+            _repositoriesNode = node;
+            if (_repositoriesNode != nullptr) {
+                _nodes.addIfAbsent(_repositoriesNode);
+            }
         }
-        return !duplicateName;
     }
-
-    bool ExecutionContext::removeRepository(std::string const& repoName) {
-        auto it = _repositories.find(repoName);
-        bool found = it != _repositories.end();
-        if (found) {
-            auto srcRepo = it->second;
-            srcRepo->stopWatching();
-            srcRepo->clear();
-            _repositories.erase(it);
-        }
-        return found;
+    
+    std::shared_ptr<RepositoriesNode> const& ExecutionContext::repositoriesNode() const {
+        return _repositoriesNode;
     }
 
     std::shared_ptr<FileRepository> const& ExecutionContext::findRepository(std::string const& repoName) const {
-        auto const it = _repositories.find(repoName);
-        bool found = it != _repositories.end();
-        if (found) {
-            auto const& repo = it->second;
-            return repo;
-        }
-        return nullRepo;
+        return 
+            _repositoriesNode == nullptr 
+            ? nullRepo 
+            : _repositoriesNode->findRepository(repoName);
     }
 
     std::shared_ptr<FileRepository> const& ExecutionContext::findRepositoryContaining(std::filesystem::path const& path) const {
-        for (auto const& pair : _repositories) {
+        auto const& repos = repositories();
+        for (auto const& pair : repos) {
             auto const& repo = pair.second;
             if (repo->lexicallyContains(path)) return repo;
         }
@@ -105,7 +98,8 @@ namespace YAM
     }
 
     std::map<std::string, std::shared_ptr<FileRepository>> const& ExecutionContext::repositories() const {
-        return _repositories;
+        static std::map<std::string, std::shared_ptr<FileRepository>> empty;
+        return _repositoriesNode == nullptr ? empty : _repositoriesNode->repositories();
     }
 
     // Return the file aspects applicable to the file with the given path name.
@@ -158,11 +152,14 @@ namespace YAM
                 [&](std::shared_ptr<Node> node) {buildState.insert(node); });
 
         _nodes.foreach(addToState);
-        for (auto const& pair : _repositories) { buildState.insert(pair.second); }
+        for (auto const& pair : repositories()) buildState.insert(pair.second);
     }
 
     void ExecutionContext::clearBuildState() {
-        _repositories.clear();
+        for (auto const& pair : repositories()) {
+            pair.second->clear();
+        }
         _nodes.clear();
+        _repositoriesNode = nullptr;
     }
 }

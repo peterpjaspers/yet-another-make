@@ -81,9 +81,6 @@
     <ClInclude Include="DirectoryWatcherWin32.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="FileRepository.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="IMonitoredProcess.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -294,9 +291,6 @@
     <ClInclude Include="AcyclicTrail.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="BuildState.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="NodeMapStreamer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -319,6 +313,12 @@
       <Filter>Header Files\BuildFileCompiler</Filter>
     </ClInclude>
     <ClInclude Include="FileExecSpecsNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="FileRepository.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RepositoriesNode.h">
       <Filter>Header Files\Node</Filter>
     </ClInclude>
   </ItemGroup>
@@ -348,9 +348,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="DirectoryWatcherWin32.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="FileRepository.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="MonitoredProcessWin32.cpp">
@@ -525,6 +522,12 @@
       <Filter>Source Files\BuildFileCompiler</Filter>
     </ClCompile>
     <ClCompile Include="FileExecSpecsNode.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="FileRepository.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="RepositoriesNode.cpp">
       <Filter>Source Files\Node</Filter>
     </ClCompile>
   </ItemGroup>
