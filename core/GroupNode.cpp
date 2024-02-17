@@ -56,7 +56,7 @@ namespace YAM
         for (auto const& node : _group) {
             auto genFileNode = dynamic_cast<GeneratedFileNode*>(node.get());
             if (genFileNode != nullptr) {
-                requisites.push_back(genFileNode->producer());
+                requisites.push_back(genFileNode->producer().get());
             } else {
                 requisites.push_back(node.get());
             }

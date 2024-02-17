@@ -99,7 +99,7 @@ namespace
     }
 
     void getOutputFileNodes(
-        std::unordered_set<Node*> const& producers,
+        std::unordered_set<std::shared_ptr<Node>> const& producers,
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>>& outputFiles
     ) {
         std::vector<std::shared_ptr<Node>> outputs;
@@ -318,7 +318,7 @@ namespace YAM
         if (_cmdInputs != newInputs) {
             _cmdInputs = newInputs;
             updateInputProducers();
-            _executionHash = rand();
+            clearDetectedInputs();
             modified(true);
             setState(State::Dirty);
         }
@@ -328,7 +328,7 @@ namespace YAM
         if (_orderOnlyInputs != newInputs) {
             _orderOnlyInputs = newInputs;
             updateInputProducers();
-            _executionHash = rand();
+            clearDetectedInputs();
             modified(true);
             setState(State::Dirty);
         }
@@ -336,7 +336,7 @@ namespace YAM
 
     void appendInputProducers(
         std::vector<std::shared_ptr<Node>>const& inputs,
-        std::unordered_set<Node*>& inputProducers
+        std::unordered_set<std::shared_ptr<Node>>& inputProducers
     ) {
         for (auto const& node : inputs) {
             auto genFileNode = dynamic_pointer_cast<GeneratedFileNode>(node);
@@ -344,7 +344,7 @@ namespace YAM
                 inputProducers.insert(genFileNode->producer());
             } else {
                 auto groupNode = dynamic_pointer_cast<GroupNode>(node);
-                if (groupNode != nullptr) inputProducers.insert(groupNode.get());
+                if (groupNode != nullptr) inputProducers.insert(groupNode);
             }
         }
     }
@@ -385,6 +385,7 @@ namespace YAM
     void CommandNode::script(std::string const& newScript) {
         if (newScript != _script) {
             _script = newScript;
+            clearDetectedInputs();
             modified(true);
             setState(State::Dirty);
         }
@@ -393,6 +394,7 @@ namespace YAM
     void CommandNode::workingDirectory(std::shared_ptr<DirectoryNode> const& dir) {
         if (_workingDir.lock() != dir) {
             _workingDir = dir;
+            clearDetectedInputs();
             modified(true);
             setState(State::Dirty);
         }
@@ -516,7 +518,7 @@ namespace YAM
                 valid = false;
                 logOutputFileNotDeclared(this, outputSymPath, logBook);
             }
-        } else if (outputNode->producer() != this) {
+        } else if (outputNode->producer().get() != this) {
             valid = false;
             logAlreadyProducedByOtherCommand(this, outputNode.get(), logBook);
         }
@@ -582,7 +584,7 @@ namespace YAM
     void CommandNode::start() {
         Node::start();
         std::vector<Node*> requisites;
-        for (auto const& ip : _inputProducers) requisites.push_back(ip);
+        for (auto const& ip : _inputProducers) requisites.push_back(ip.get());
         getSourceInputs(requisites);
         for (auto const& n : _outputs) requisites.push_back(n.get());
         auto callback = Delegate<void, Node::State>::CreateLambda(

@@ -181,7 +181,7 @@ namespace YAM
         std::vector<std::shared_ptr<Node>> _cmdInputs;
         std::vector<std::shared_ptr<Node>> _orderOnlyInputs;
         // _inputProducers contains pointers to CommandNode and/or GroupNode
-        std::unordered_set<Node*> _inputProducers;
+        std::unordered_set<std::shared_ptr<Node>> _inputProducers;
         std::string _script;
         std::weak_ptr<DirectoryNode> _workingDir;
         std::vector<std::shared_ptr<GeneratedFileNode>> _outputs;

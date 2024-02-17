@@ -352,15 +352,6 @@ namespace
         for (auto const& node : nodes) content.push_back(node);
         groupNode->group(content);
     }
-
-    void resurrect(std::shared_ptr<Node> const& node) {
-        if (node->state() == Node::State::Deleted) {
-            node->undelete();
-            // Remove because BuildFileCompilerNode expects newly found
-            // command, output, glob nodes to be absent in context.
-            node->context()->nodes().remove(node);
-        }
-    }
 }
 
 namespace YAM {
@@ -452,7 +443,6 @@ namespace YAM {
                 _newGroups.insert({ groupNode->name(), groupNode});
             }
         }
-        resurrect(groupNode);
         return groupNode;
     }
 
@@ -516,7 +506,6 @@ namespace YAM {
             ss << "then declare the dependency on that other buildfile in this buildfile." << std::endl;
             throw std::runtime_error(ss.str());
         }
-        resurrect(fileNode);
         return fileNode;
     }
 
@@ -587,7 +576,6 @@ namespace YAM {
             _newGlobs.insert({ globNode->name(), globNode });
         }
         _globs.insert({ globNode->name(), globNode });
-        resurrect(globNode);
         return globNode;
     }
 
@@ -686,7 +674,7 @@ namespace YAM {
                         throw std::runtime_error(ss.str());
                     }
                 }
-                if (outputNode->producer() != cmdNode.get()) {
+                if (outputNode->producer() != cmdNode) {
                     auto producer = outputNode->producer();
                     std::stringstream ss;
                     ss << "In rule at line " << rule.line << " in buildfile " << _buildFile.string() << ":" << std::endl;
@@ -704,7 +692,6 @@ namespace YAM {
         }
         _outputs.insert({ outputNode->name(), outputNode });
         _allowedInputs.insert({ outputNode->name(), outputNode });
-        resurrect(outputNode);
         return outputNode;
     }
 
@@ -810,7 +797,6 @@ namespace YAM {
             throw std::runtime_error(ss.str());
         }
         _commands.insert({ cmdNode->name(), cmdNode });
-        resurrect(cmdNode);
         return cmdNode;
     }
 

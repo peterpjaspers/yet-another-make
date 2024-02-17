@@ -13,19 +13,6 @@
 #include <chrono>
 #include <ctype.h>
 
-namespace
-{
-    using namespace YAM;
-
-    void resurrect(std::shared_ptr<Node> const& node) {
-        if (node->state() == Node::State::Deleted) {
-            node->undelete();
-            // Remove because BuildFileCompilerNode expects newly found
-            // command, output, glob nodes to be absent in context.
-            node->context()->nodes().remove(node);
-        }
-    }
-}
 namespace YAM {
     BuildFileDependenciesCompiler::BuildFileDependenciesCompiler(
             ExecutionContext* context,
@@ -69,7 +56,6 @@ namespace YAM {
             globNode->pattern(optimizedPattern);
             _newGlobs.insert({ globNode->name(), globNode });
         }
-        resurrect(globNode);
         return globNode;
     }
 

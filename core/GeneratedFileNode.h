@@ -20,7 +20,8 @@ namespace YAM
 
         std::string className() const override { return "GeneratedFileNode"; }
 
-        CommandNode* producer() const;
+        std::shared_ptr<CommandNode> producer() const;
+
         bool deleteFile(bool setDirty = false);
 
         static void setStreamableType(uint32_t type);

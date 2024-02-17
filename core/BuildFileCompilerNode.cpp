@@ -58,6 +58,7 @@ namespace
         if (glob->observers().empty()) {
             glob->setState(Node::State::Deleted);
             glob->modified(true);
+            glob->context()->nodes().remove(glob);
         }
     }
     void removeNode(std::shared_ptr<CommandNode> cmd, StateObserver* observer) {
@@ -66,16 +67,20 @@ namespace
         static std::vector<std::shared_ptr<Node>> emptyOrderOnlyInputs;
         ExecutionContext* context = cmd->context();
         std::vector<std::shared_ptr<GeneratedFileNode>> outputs = cmd->outputs();
-        cmd->outputs(emptyOutputs);
         cmd->cmdInputs(emptyCmdInputs);
         cmd->orderOnlyInputs(emptyOrderOnlyInputs);
+        cmd->script("");
+        cmd->outputs(emptyOutputs);
+        cmd->ignoreOutputs({});
         cmd->setState(Node::State::Deleted);
         cmd->modified(true);
+        cmd->context()->nodes().remove(cmd);
     }
     void removeNode(std::shared_ptr<GeneratedFileNode> node, StateObserver* observer) {
         ExecutionContext* context = node->context();
         node->setState(Node::State::Deleted);
         node->modified(true);
+        node->context()->nodes().remove(node);
     }
     void removeNode(std::shared_ptr<GroupNode> group, StateObserver* observer) {
         // owned by all compiler nodes that reference the group

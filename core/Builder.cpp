@@ -212,6 +212,8 @@ namespace YAM
                 auto node = pair.second;
                 if (node->state() != Node::State::Deleted) {
                     node->setState(Node::State::Dirty);
+                } else {
+                    throw std::runtime_error("Unexpected Node::State::Delete");
                 }
             }
             repositoriesNode->homeRepository()->startWatching();
@@ -416,15 +418,6 @@ namespace YAM
              }
              _postCompletion(Node::State::Failed);
         } else {
-             // Compilation may have resulted in garbage command, generated file
-             // and glob nodes. This nodes were set to state Node::State::Deleted.
-             // Remove these nodes from buildstate now.
-             // Note: these nodes could be removed from buildstate earlier 
-             // because dependent compilers can still reference them. Once all
-             // compilations have completed no references to garbage node will 
-             // exist.
-             _context.nodes().collectGarbage();
-
             std::vector<std::shared_ptr<Node>> dirtyCommands;
             appendDirtyCommands(_context.nodes(), dirtyCommands);
             if (

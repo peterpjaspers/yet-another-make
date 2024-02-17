@@ -18,8 +18,8 @@ namespace YAM
         , _producer(producer) 
     {}
 
-    CommandNode* GeneratedFileNode::producer() const {
-        return _producer.get();
+    std::shared_ptr<CommandNode> GeneratedFileNode::producer() const {
+        return _producer;
     }
 
     bool GeneratedFileNode::deleteFile(bool setDirty) {
