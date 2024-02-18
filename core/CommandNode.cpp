@@ -429,6 +429,10 @@ namespace YAM
         return _ruleLineNr;
     }
 
+    XXH64_hash_t CommandNode::executionHash() const {
+        return _executionHash;
+    }
+
     XXH64_hash_t CommandNode::computeExecutionHash() const {
         std::vector<XXH64_hash_t> hashes;
         auto wdir = _workingDir.lock();

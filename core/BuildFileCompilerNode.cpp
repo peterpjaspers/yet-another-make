@@ -70,6 +70,7 @@ namespace
         cmd->cmdInputs(emptyCmdInputs);
         cmd->orderOnlyInputs(emptyOrderOnlyInputs);
         cmd->script("");
+        cmd->workingDirectory(nullptr);
         cmd->outputs(emptyOutputs);
         cmd->ignoreOutputs({});
         cmd->setState(Node::State::Deleted);

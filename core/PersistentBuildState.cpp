@@ -252,8 +252,7 @@ namespace YAM
             if (key == nullPtrKey) {
                 object.reset();
             } else {
-                std::shared_ptr<YAM::IPersistable> node = _buildState.retrieve(key);
-                object = dynamic_pointer_cast<IStreamable>(node);
+                object = _buildState.retrieve(key);
             }
         }
 

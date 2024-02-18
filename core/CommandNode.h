@@ -108,6 +108,8 @@ namespace YAM
         SourceFileNode const* buildFile() const;
         std::size_t ruleLineNr() const;
 
+        XXH64_hash_t executionHash() const;
+
         static void setStreamableType(uint32_t type);
         // Inherited from IStreamable
         uint32_t typeId() const override;

@@ -1,122 +1,126 @@
-New nodes are added to context:
+New nodes are added to the context:
 - during repo mirroring
 - during build file parsing: globnodes for the buildfile dependency declaration
-- during build file compilation: command, genfile, input glob, output group nodes
-- during cmd execution when cmd detects dependency on Tracked FileRepository.
+- during build file compilation: glob nodes for the cmd and order-only inputs,
+  command, genfile, output group nodes. Also group nodes can be created from
+  cmd/order-only grouo inputs.
+- during cmd execution when cmd detects a file dependency in a Tracked 
+  FileRepository or a dependency on a non-existing file
+  
+References to nodes are held by:
+- DirectoryNode to other dir/file nodes and to buildfile parser+compiler
+- GlobNodes to input DirectoryNodes
+- BuildFileParser to GlobNodes and to requisite parser nodes
+- BuildFileCompiler to input glob, file, input/output group, command, genfile
+  (output) and output group nodes and to requisite compiler nodes
+- CommandNode to cmd and order-only input genfile and group nodes, to 
+  genfile output nodes, to srcfile/genfile nodes associated with the detected
+  script file dependencies, to working dir directory node.
+- GroupNode to genfile nodes
 
-Nodes become obsolete when:
-- during repo mirroring when dirs/files are deleted
-  These nodes are immediately removed from context
+Nodes are removed, and marked Deleted, from the context:
+- during repo mirroring: nodes associated with deleted dirs/files are removed.
+  Also buildfile parser&compiler nodes are removed.
 - during build file parsing: when previously defined buildfile dependency
-  globs are removed from build file.
-  The associated glob nodes can only be removed from context when other
-  build file parsers do not rely on the same glob. WHY? This can be detected by
-  checking that the globnode is no longer observed.
+  globs are removed from build file. The glob is possibly shared by multiple
+  buildfile parsers (because multiple buildfiles can have same deps.)
+  So removing the glob from context requires the glob to be no longer
+  referenced from these buildfiles/parsers. The parsers subscribe at these
+  globs for changes. So the glob can be removed from context when it is
+  no longer observed.
 - during build file compilation: previously defined command, output genfile, 
   input glob, output group nodes definitions are removed from build file. 
-  Also input groups may have been removed.
+  Also input groups can possibly be removed.
 
-  Immediate removal of command and output genfiles:
-  Cmd nodes from build files that depend on the recompiled buildfile may 
-  reference the output genfiles as input.A cmd node with such a input 
-  genfile node stores a raw pointer to the genfile's producer cmd node in
-  its _inputProducers while the referencing cmd node does NOT have a 
-  shared_ptr reference to the producer cmd. Immediate removal of the cmd
-  from context (which holds the last reference to the shared ptr cmd) will 
-  then cause a dangling pointer in _inputProducers.
-  Solution: change _inputProducers to  store shared ptr to cmd.
-  Problem: if after removal of cmd a later compilation fails then the build
-  is canceled and the compilation that would remove the cmd from _inputProducers
-  may not be executed. _inputProducers is not stored (it is redundant: derived 
-  from input genfile nodes). So storing the buildstate would not pose a problem.
-  However in combination with immediate removal of output genfiles from context
-  this will be a problem because the cmd that depends on the removed genfile
-  holds a reference to an object that no longer exists in the persistent
-  buildstate.
-  Solution: when immediately removing nodes from context then only store when 
-  all compilations have completed successfully.
+Removing references to removed nodes:
+Nodes that are removed from the context can still be referenced by other
+nods as described in 'References to nodes are held by' section.
+Node references are shared_ptr references. So removing a node from the 
+context will only delete the node from memory when there are no more
+references to it. So in memory references never turn into dangling ptrs.
+That is different in persistent storage: when context is stored to persistent
+store then the set of removed/inserted/modified nodes since previous
+storage is removed/inserted/replaced in persistent store. This implies
+that a reference from node P to a Deleted node G in memory translates to a
+dangling reference in persistent store. This is trapped during storage of
+P when P is stored in same transaction as removal of G. Else it is trapped
+on next retrieval of P when P tries to stream(read) G and key-of-G is not
+known.
+It is therefor mandatory that ALL references to Deleted nodes are removed
+before storage of context to persistent buildstate.
 
-  Immediate removal of output groups.
-  Mulitple compilers may contribute to the group. An output group that is
-  not referenced as input has no observers and can be removed from context.
-  However other compilers may still reference the group. They then must
-  re-create the group. 
-  Another approach: the group can be removed from context when it is only
-  refd by context, i.e. when its usecount==1. Problem is that usecount==2 
-  when group was previously stored. This requires check in 
-  PersistentBuildState to verify that second ref is from storage.
+Avoiding dangling references:
+First the repo mirroring, build file parsing and compilation must be done.
+This results in a set of Directory and File nodes in Deleted state associated
+with dirs/files that were deleted from filesystem and with Deleted Command,
+GeneratedFile (output) and GroupNodes associated with modified/removed rules 
+in buildfiles. The update of command and group nodes will remove references 
+to most of the Deleted nodes. At least one exception exists: CommandNodes
+that reference in their _detectedInputs a Deleted source file node.
+This reference will be removed by re-executing the CommandNode. Until then
+storing the buildstate will cause a dangling reference from the command node
+to the Deleted filenode.
+A robust, but O(total nr of nodes), approach is to request each node in the
+context to release its refs to Deleted nodes.
+Another, O(total nr of modified nodes), approach is to code the streaming method 
+of each class such that Deleted objects are not streamed. Note: objects are only
+streamed when stored, objects are only stored when modified (since previous
+storage). This seems to be the most attractive method, also because it allows
+storage at arbitrary phases in the build process.
+Oeps: when node P references Deleted node G, P and G were stored previously,
+now G is removed from storage and P is not modified, hence not stored/streamed.
+End state: stored P holds dangling reference to G. 
+This can be worked-around when during retrieval an attempt to stream a
+non-existing key results in an empty Node in state Deleted (or in nullptr). 
+This requires the streaming(reading) method of P to be robust for such null/
+Deleted results. In fact this is an aspect of streaming symmetry: during writing
+filter-out Deleted nodes, during reading filter-out null/Deleted nodes.
+Note: this requires deleted state to be part of IPersistable class.
 
-  Immediate removal of input groups.
-  An input dependency on group G is removed from all rules in the buildfile.
-  When can the group node be removed from context.
-  Again when its usecount==1. Again above problem of stored group.
+Removing output group node from context.
+Multiple compilers may contribute to a group. A compiler that no longer 
+contributes to a group can therefore only remove/Delete that group when
+it is empty because compilers will not reference groups to which they
+did not contribute (right?).
+Problem: the output group may be referenced in input sections. In that case
+you cannot deleted the group. This situation can be detected because an
+input group is observed by the command node for which it is input.
+Conclusion: an empty output group can be removed/Deleted when it is empty
+and not observed.
 
-  Immediate removal of input globs.
-  Remove when input glob is not observed, or when usecount==1;
-  Again above problem of stored glob.
+Removing glob node from context
+Glob nodes only make sense when observed. Hence a parser/compiler that no
+longer depends on a glob can remove that glob when it is no longer observed.
 
-  Checking persistent buildstate is agains design idea: context nor nodes
-  know about persistent store.
-  Therefore alternative design is used:
+Alternative storage design
+Current design requires that all streamed nodes are in context: when streaming
+(writing) an object to storage an error is raised when the object was not 
+registered as to-be-inserted or replaced. When streaming(reading) a key that 
+is not known an error is raised.
+The following design does not have this constraint:
+When during storage node P streams (writes) Deleted node G and persistentstore
+finds no key for G (in _objectToKey) it creates this key on-the-fly and 
+streams/stores G. 
+When during retrieval node P streams (reads) G and key-of G is not in storage
+then an object in Deleted state is returned.
+Note that without further measures G is left as garbage in storage when a future 
+version of P no longer references G. Such garbage can be collected by retrieving 
+all objects from storage and, in addition to current implementation (first 
+retrieve all keys in storage and create placeholder objects, then for each key 
+the stream its value into the placeholder object) keeping track of all keys 
+passed to retrieve(key). garbage == all_keys - refd_keys.
 
-  An obsolete cmd and genfile node is NOT immediately removed from context.
-  Instead it is set to Deleted state. 
-  Once all compilations have succeeded all nodes in Deleted state are
-  removed from context and context is persisted.
-
-  An obsolete glob node is only set Deleted when it is not  observed, i.e. 
-  no other nodes have the glob as input.
-
-  An obsolete output group node 
-  
-
-  Current design/implementation:
-	- nodes to be removed are moved to State::Deleted and not (yet) removed
-	  from context.
-	  Rationale: CommandNode::_inputProducers may hold dangling pointers
-	  when immediate remove from context.
-	- Deleted nodes are removed from context when ALL compilations have
-	  succeeded
-	  Rationale: because then we can be sure (in absence of bugs) that all
-	  references to these nodes have been removed.
-    - Context is stored when ALL compilations have succeeded.
-	  Storing before all succeedd may cause storage to hold dangling references.
-
-  Why postpone removal of Delete node from context and context storage?
-  Suppose Deleted output (genfile) node G is immediately removed and a subsequent 
-  compilation fails => build is canceled and context is stored. In this store action
-  node G is deleted from storaged.
-  Pending Dirty compilations are not executed due to the canceled build. Assume 
-  that a pending compilation P has a command that references G (in its cmd or
-  order-only inputs).  Assume that P is in storage. Now P in storage has a dangling
-  reference to the deleted G.
-
-  Reminder storage design: at each store the difference between nodes in context and
-  nodes in store is computed => nodes to replace/insert/delete.
-  This means that all nodes referenced by nodes in context must be nodes in context.
-  E.g. in above example storing P after removal of G from context would fail because
-  G is no longer in context.
-  So when a store request is made one must be sure that the above is true.
-
-  An alternative storage design can remove this constraint: when P streams G and
-  persistentstore finds no key for G it can create this key on-the-fly and store G.
-  Note that without further measures G is left as garbage in storage when P removes 
-  its reference to G. Such garbage can be collected by retrieving all objects
-  from store: first all keys are retrieved and placeholder objects are created
-  (_keyToObjects), then for each key the value is streamed into the placeholder.
-  During this streaming references to other keys are made. By keeping track of the
-  refd keys. Now garbage == all - refd.
-  In this design dangling references can be avoided as follows: the difference between 
-  context and stored state still determines which objects must be inserted/replaced/
-  removed. Removal of objects however is ignored to avoid dangling pointers. Garbage 
-  collection is done when the entire store content is read (during first build of 
-  newly started yamServer) or on explicit request.
-
-  The above makes clear why, with current storage design, storage must be postponed
-  until all compilations succeeded. 
-  The rationale for delayed removal of node from context is poor: it is caused by
-  raw pointers in _inputProducers. Consider fixing that instead.
-
+In this design still the difference between context and stored state determines 
+which objects must be inserted/replaced/removed. Removal request from stoarge
+can now either be executed or ignored:
+When removal is executed:
+     - storage may result in a Deleted node to be stored. 
+     - retrieval may result in unknown key to be retrieved => return Deleted node
+When removal is ignored:
+     - storage may result in a Deleted node to be stored. 
+     - retrieval of Deleted node never fails (because Deleted nodes get stored)
+     - Deleted node in storage may end as garbage
+     - Garbage can be detected/collection during retrieveAll.
 
 
 
