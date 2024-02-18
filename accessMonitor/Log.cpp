@@ -89,7 +89,7 @@ namespace AccessMonitor {
     // Convert ANSI string to wide character string.
     wstring widen(const string& src) {
         int len = src.size();
-        wstring dst(len + 1, 0);
+        wstring dst(len, 0);
         mbstowcs(&dst[0], src.c_str(), len);
         return dst;
     }

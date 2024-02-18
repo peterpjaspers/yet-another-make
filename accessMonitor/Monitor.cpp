@@ -5,8 +5,6 @@
 #include <fstream>
 #include <filesystem>
 
-// ToDo: Add function calling convention to all externals
-
 using namespace std;
 using namespace std::filesystem;
 

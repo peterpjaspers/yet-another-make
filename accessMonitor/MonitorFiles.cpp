@@ -12,6 +12,8 @@
 using namespace std;
 using namespace std::filesystem;
 
+// ToDo: Add function calling convention to all externals
+
 namespace AccessMonitor {
 
     namespace {
@@ -32,6 +34,8 @@ namespace AccessMonitor {
         wstring fileAccess( const wstring& fileName, FileAccessMode mode );
         wstring fileAccess( HANDLE handle, FileAccessMode mode = AccessNone );
         wstring fileAccess( HANDLE handle, const OBJECT_ATTRIBUTES* attributes );
+
+        inline uint64_t handleCode( HANDLE handle ) { return reinterpret_cast<uint64_t>( handle ); }
 
         typedef BOOL(*TypeCreateDirectoryA)(LPCSTR,LPSECURITY_ATTRIBUTES);
         BOOL PatchCreateDirectoryA(
@@ -111,7 +115,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateFileA>(original( (PatchFunction)PatchCreateFileA ));
             HANDLE handle = function( fileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile );
-            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - CreateFileA( " << fileName << L", ... ) -> " << handle << record;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - CreateFileA( " << fileName << L", ... ) -> " << handleCode( handle ) << record;
             fileAccess( handle, requestedAccessMode( dwDesiredAccess ) );
             return handle;
         }
@@ -127,7 +131,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateFileW>(original( (PatchFunction)PatchCreateFileW ));
             HANDLE handle = function( fileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile );
-            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - CreateFileW( " << fileName << L", ... ) -> " << handle << record;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - CreateFileW( " << fileName << L", ... ) -> " << handleCode( handle ) << record;
             fileAccess( handle, requestedAccessMode( dwDesiredAccess ) );
             return handle;
         }
@@ -141,7 +145,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateFile2>(original( (PatchFunction)PatchCreateFile2 ));
             HANDLE handle = function( fileName, dwDesiredAccess, dwShareMode, dwCreationDisposition, pCreateExParams );
-            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - CreateFile2( " << fileName << L", ... ) -> " << handle << record;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - CreateFile2( " << fileName << L", ... ) -> " << handleCode( handle ) << record;
             fileAccess( handle, requestedAccessMode( dwDesiredAccess ) );
             return handle;
         }
@@ -295,7 +299,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeFindFirstFileA>(original( (PatchFunction)PatchFindFirstFileA ));
             HANDLE handle = function( fileName, lpFindFileData );
-            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - FindFirstFileA( " << fileName << L", ... ) -> " << handle << record;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - FindFirstFileA( " << fileName << L", ... )" << record;
             fileAccess( fileName, AccessRead );
             return handle;
         }        
@@ -306,7 +310,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeFindFirstFileW>(original( (PatchFunction)PatchFindFirstFileW ));
             HANDLE handle = function( fileName, lpFindFileData );
-            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - FindFirstFileW( " << fileName << L", ... ) -> " << handle << record;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - FindFirstFileW( " << fileName << L", ... )" << record;
             fileAccess( fileName, AccessRead );
             return handle;
         }
@@ -321,7 +325,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeFindFirstFileExA>(original( (PatchFunction)PatchFindFirstFileExA ));
             HANDLE handle = function( fileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags );
-            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - FindFirstFileExA( " << fileName << L", ... ) -> " << handle << record;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - FindFirstFileExA( " << fileName << L", ... )" << record;
             fileAccess( fileName, AccessRead );
             return handle;
         }
@@ -336,7 +340,7 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeFindFirstFileExW>(original( (PatchFunction)PatchFindFirstFileExW ));
             HANDLE handle = function( fileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags );
-            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - FindFirstFileExW( " << fileName << L", ... ) -> " << handle << record;
+            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - FindFirstFileExW( " << fileName << L", ... )" << record;
             fileAccess( fileName, AccessRead );
             return handle;
         }
@@ -412,7 +416,7 @@ namespace AccessMonitor {
             // Record last write time when closing file opened for write
             wstring fileName = fileAccess( handle );
             BOOL closed = function( handle );
-            if (monitorLog( PatchExecution )) monitorLog() << L"MonitorFiles - CloseHandle( " << fileName.c_str() << L", ... ) -> " << closed << record;
+            if (monitorLog( PatchExecution ) && (fileName != L"")) monitorLog() << L"MonitorFiles - CloseHandle( " << handleCode( handle ) << L") on " << fileName.c_str() << L" -> " << (closed ? L"closed" : L"failed") << record;
             return closed;
         }
         typedef NTSTATUS(*TypeNtCreateFile)(HANDLE*,ACCESS_MASK,OBJECT_ATTRIBUTES*,IO_STATUS_BLOCK*,LARGE_INTEGER*,ULONG,ULONG,ULONG,ULONG,void*,ULONG);
@@ -488,7 +492,7 @@ namespace AccessMonitor {
         }
 
         // Extract file name from handle to opened file
-        // Will return null string if handle does not refer to a file
+        // Will return empty string if handle does not refer to a file
         wstring fullName( HANDLE handle ) {
             wchar_t fileNameString[ MaxFileName ];
             wstring fileName;
@@ -513,7 +517,7 @@ namespace AccessMonitor {
         wstring fullName( const wstring& fileName ) {
             return fullName( fileName.c_str() );
         }
-        // ToDo: Fix this function
+        // ToDo: Fix this function, required for patched NT functions...
         wstring fullName( const OBJECT_ATTRIBUTES* attributes ) {
             UNICODE_STRING* unicodeString = attributes->ObjectName;
             wstring name( unicodeString->Buffer, unicodeString->Length );
@@ -598,19 +602,22 @@ namespace AccessMonitor {
         wstring fileAccess( HANDLE handle, FileAccessMode mode ) {
             DWORD error = GetLastError();
             auto fullFileName = fullName( handle );
-            if (mode == AccessNone) mode = accessMode( handle );
-            if (monitorLog( FileAccess )) monitorLog() << L"MonitorFiles - " << modeString( mode ) << L" access by handle on file " << fullFileName << record;
-            if (fullFileName != L"") recordFileEvent( fullFileName, mode, getLastWriteTime( handle ) );
+            if (fullFileName != L"") {
+                if (mode == AccessNone) mode = accessMode( handle );
+                if (monitorLog( FileAccess )) monitorLog() << L"MonitorFiles - " << modeString( mode ) << L" access by handle on file " << fullFileName << record;
+                if (fullFileName != L"") recordFileEvent( fullFileName, mode, getLastWriteTime( handle ) );
+            }
             SetLastError( error );
             return fullFileName;
         }
-        // ToDo: Fix this function...
         wstring fileAccess( HANDLE handle, const OBJECT_ATTRIBUTES* attributes ) {
             DWORD error = GetLastError();
             auto fullFileName = fullName( attributes );
-            FileAccessMode  mode = accessMode( handle );
-            if (monitorLog( FileAccess )) monitorLog() << L"MonitorFiles - " << modeString( mode ) << L" access by handle on file " << fullFileName << record;
-            if (fullFileName != L"") recordFileEvent( fullFileName, mode, getLastWriteTime( handle ) );
+            if (fullFileName != L"") {
+                FileAccessMode  mode = accessMode( handle );
+                if (monitorLog( FileAccess )) monitorLog() << L"MonitorFiles - " << modeString( mode ) << L" access by handle on file " << fullFileName << record;
+                if (fullFileName != L"") recordFileEvent( fullFileName, mode, getLastWriteTime( handle ) );
+            }
             SetLastError( error );
             return fullFileName;            
         }
