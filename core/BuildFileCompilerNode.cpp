@@ -84,8 +84,11 @@ namespace
         node->context()->nodes().remove(node);
     }
     void removeNode(std::shared_ptr<GroupNode> group, StateObserver* observer) {
-        // owned by all compiler nodes that reference the group
-        // When can it be removed from context?
+        if (group->group().empty() && group->observers().empty()) {
+            group->setState(Node::State::Deleted);
+            group->modified(true);
+            group->context()->nodes().remove(group);
+        }
     }
 
     template<class TNode>

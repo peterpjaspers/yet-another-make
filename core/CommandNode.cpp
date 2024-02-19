@@ -588,7 +588,19 @@ namespace YAM
     void CommandNode::start() {
         Node::start();
         std::vector<Node*> requisites;
-        for (auto const& ip : _inputProducers) requisites.push_back(ip.get());
+        for (auto const& ip : _inputProducers) {
+            auto const& group = dynamic_pointer_cast<GroupNode>(ip);
+            if (group != nullptr && group->group().empty()) {
+                std::stringstream ss;
+                ss 
+                    << "Input group " << ip->name() << " at line " << _ruleLineNr
+                    << " in file " << _buildFile->name() << " is empty." << std::endl;
+                ss << "Did you misspell the group name?" << std::endl;
+                LogRecord w(LogRecord::Aspect::Warning, ss.str());
+                context()->addToLogBook(w);
+            }
+            requisites.push_back(ip.get());
+        }
         getSourceInputs(requisites);
         for (auto const& n : _outputs) requisites.push_back(n.get());
         auto callback = Delegate<void, Node::State>::CreateLambda(

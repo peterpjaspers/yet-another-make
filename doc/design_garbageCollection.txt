@@ -32,79 +32,85 @@ Nodes are removed, and marked Deleted, from the context:
   input glob, output group nodes definitions are removed from build file. 
   Also input groups can possibly be removed.
 
-Removing references to removed nodes:
-Nodes that are removed from the context can still be referenced by other
-nods as described in 'References to nodes are held by' section.
-Node references are shared_ptr references. So removing a node from the 
-context will only delete the node from memory when there are no more
-references to it. So in memory references never turn into dangling ptrs.
-That is different in persistent storage: when context is stored to persistent
-store then the set of removed/inserted/modified nodes since previous
-storage is removed/inserted/replaced in persistent store. This implies
-that a reference from node P to a Deleted node G in memory translates to a
-dangling reference in persistent store. This is trapped during storage of
-P when P is stored in same transaction as removal of G. Else it is trapped
-on next retrieval of P when P tries to stream(read) G and key-of-G is not
-known.
-It is therefor mandatory that ALL references to Deleted nodes are removed
-before storage of context to persistent buildstate.
 
-Avoiding dangling references:
-First the repo mirroring, build file parsing and compilation must be done.
-This results in a set of Directory and File nodes in Deleted state associated
-with dirs/files that were deleted from filesystem and with Deleted Command,
-GeneratedFile (output) and GroupNodes associated with modified/removed rules 
-in buildfiles. The update of command and group nodes will remove references 
-to most of the Deleted nodes. At least one exception exists: CommandNodes
-that reference in their _detectedInputs a Deleted source file node.
-This reference will be removed by re-executing the CommandNode. Until then
-storing the buildstate will cause a dangling reference from the command node
-to the Deleted filenode.
-A robust, but O(total nr of nodes), approach is to request each node in the
-context to release its refs to Deleted nodes.
-Another, O(total nr of modified nodes), approach is to code the streaming method 
-of each class such that Deleted objects are not streamed. Note: objects are only
-streamed when stored, objects are only stored when modified (since previous
-storage). This seems to be the most attractive method, also because it allows
-storage at arbitrary phases in the build process.
-Oeps: when node P references Deleted node G, P and G were stored previously,
-now G is removed from storage and P is not modified, hence not stored/streamed.
-End state: stored P holds dangling reference to G. 
-This can be worked-around when during retrieval an attempt to stream a
-non-existing key results in an empty Node in state Deleted (or in nullptr). 
-This requires the streaming(reading) method of P to be robust for such null/
-Deleted results. In fact this is an aspect of streaming symmetry: during writing
-filter-out Deleted nodes, during reading filter-out null/Deleted nodes.
-Note: this requires deleted state to be part of IPersistable class.
+Requirement
+Buildstate storage must be possible at arbitrary points during build without 
+compromising integrity of persistent state. 
+How does this requirement impact the design of YAM? 
 
-Removing output group node from context.
-Multiple compilers may contribute to a group. A compiler that no longer 
-contributes to a group can therefore only remove/Delete that group when
-it is empty because compilers will not reference groups to which they
-did not contribute (right?).
-Problem: the output group may be referenced in input sections. In that case
-you cannot deleted the group. This situation can be detected because an
-input group is observed by the command node for which it is input.
-Conclusion: an empty output group can be removed/Deleted when it is empty
-and not observed.
+Impact on current design
+A store request computes the difference between the set of stored nodes and
+the set of nodes in execution context. This yields the set of nodes that were
+removed/added/modified-in-place since the previous store request.
+In this design a reference from a node X to a node Y is only allowed when Y 
+is also in storage or about to be added to storage. Things go wrong, i.e.
+an exception is thrown when X tries to serialize its reference to Y and Y
+is not in storage nor in the set of nodes to be added to storage.
+Things also go wrong if stored X references stored Y and Y is deleted from
+storage and X is not updated in storage to remove its reference to Y. Stored 
+X now holds a dangling reference to Y. At next retrieval X tries to dereference 
+Y which results in an exception. 
+Note: in memory a reference to a node-removed-from context is not a problem
+because of the use of shared_ptrs. In persistent memory a reference to a
+node-removed-from-storage is a dangling pointer.
 
-Removing glob node from context
-Glob nodes only make sense when observed. Hence a parser/compiler that no
-longer depends on a glob can remove that glob when it is no longer observed.
+Conclusion for current storage design:
+Given:
+    - Storage must be possible at arbitrary points during build
+    - Stored and to-be-stored/replaced nodes are not allowed to reference 
+      nodes that are not part of execution context
+Then: 
+    - deletion (removal from context) of node Y AND removing all references
+      to Y must be an atomic operation.
 
-Alternative storage design
-Current design requires that all streamed nodes are in context: when streaming
-(writing) an object to storage an error is raised when the object was not 
-registered as to-be-inserted or replaced. When streaming(reading) a key that 
-is not known an error is raised.
+How can this be implemented? The following design options are considered:
+    - brute force
+    - state observation 
+    - filtered streaming 
+
+Brute force: on removal of node Y, request each node in the context to remove 
+its references to Y. Requires changes in all node classes that hold refs
+tp other nodes.
+Disadvantage: time complexity O(total nr of nodes * nr of removed nodes).
+
+State observation: use the Node observer mechanism. If:
+    - node X that references node Y also observes state of Y
+    - removal of Y updates state of Y to Deleted 
+    - callback from Y to X takes care of removing references to Y and
+      setting X modified (to ensure its replacement in storage at next
+      store request). Note: do not set dirty because node is already
+      set dirty by filerepowatcher and dirty propagation.
+Time complexity is nice: O(total nr of modified nodes)
+Problem: Not all nodes that reference Y also observe Y.
+E.g. CommandNode does not observe its source and generated file cmd inputs.
+It only observes the producers of its input generated file nodes and
+the file nodes associated with files detected during cmd script execution.
+Requires changes in StateObserver and all node classes that hold refs to
+other nodes.
+Take care: when Y notifies X to remove reference to Y then observation 
+of Y by X must be stopped.
+
+Filtered streaming: he streaming method of node X is modified to remove refs
+Y in Deleted state before serializing X. This only works if X is part of storage
+request, i.e. if X was marked modified. Else stored X will reference not-stored Y.
+On next retrieval of X dereferencing Y will return a, not-initalized node, in
+state Deleted (requires change in PersistentBuildState). Deserialization code
+of X must be robust for this and remove such nodes from its state.
+Ideally X is marked modified. This suggests that state observeration is a more
+attractive alternative.
+
+
+Alternative storage design: allow storage of nodes in Deleted state
+Current design requires that all referenced nodes are in context.
 The following design does not have this constraint:
-When during storage node P streams (writes) Deleted node G and persistentstore
-finds no key for G (in _objectToKey) it creates this key on-the-fly and 
-streams/stores G. 
-When during retrieval node P streams (reads) G and key-of G is not in storage
-then an object in Deleted state is returned.
+When during storage node X streams (writes) Deleted node G and 
+PersistentBuildState contains no key for G (in _objectToKey) then it creates
+this key on-the-fly and streams/stores G. 
+When during retrieval node X streams (reads) G and key-of G is not in storage
+then an object in Deleted state is returned. This resembles earlier discussed
+'filtered streaming' scenario.
 Note that without further measures G is left as garbage in storage when a future 
-version of P no longer references G. Such garbage can be collected by retrieving 
+version of X no longer references G. Such garbage can be collected by retrieving 
 all objects from storage and, in addition to current implementation (first 
 retrieve all keys in storage and create placeholder objects, then for each key 
 the stream its value into the placeholder object) keeping track of all keys 
@@ -121,8 +127,43 @@ When removal is ignored:
      - retrieval of Deleted node never fails (because Deleted nodes get stored)
      - Deleted node in storage may end as garbage
      - Garbage can be detected/collection during retrieveAll.
-
-
-
-
+Best solution seems to be to allow deleted nodes in storage.
+Take care: deleted nodes must not be added to context as side effect of their 
+retrieval. This requires separate btree that stores the keys of nodes in context. 
+Retrieving these keys causes retrieval of refd keys. Refd keys that are not in 
+context, i.e are not in separate btree, are added to set of keys of deleted nodes.
+When this set is empty we can remove the deleted nodes from the node btrees: 
+garbage = keys in node btrees - keys in context tree. 
+Note: this GC can only be done immediately after retrieving entire context.
   
+
+The following sections contain insights obtained during above design study.
+
+Inconsistent behavior between rules with input paths and input globs
+when source files are deleted. Input path==path without glob chars.
+With input globs: Rule is recompiled, compile error when empty input.
+With input path: rule is not recompiled. Deleted file is noticed on next
+execution of command scripts that require the file to exist.
+Reason: no glob for input path nor observation of Deleted state. 
+What if input path is generated file? Input glob makes no sense in this case.
+Proposal: also use glob for source file input path as this has minimal
+impact on implementation.
+
+Removing output group node from context.
+Multiple compilers may contribute to a group. A compiler that no longer 
+contributes to a group can therefore only remove/Delete that group when
+it is empty because compilers will not reference groups to which they
+did not contribute.
+Problem: the output group may be referenced in input sections. This situation 
+can be detected because an input group is observed by the command node for
+which it is a cmd or order-only input.
+Conclusion: an empty output group can be removed/Deleted when it is empty
+and not observed.
+Note: a rule that has in input group node while that group did not yet exist
+causes the group to be created. This group will never be deleted in case 
+later compilations do not contribute outputs to that group. A command node
+could raise a warning that an input group is empty.
+
+Removing glob node from context
+Glob nodes only make sense when observed. Hence a parser/compiler that no
+longer depends on a glob can remove that glob when it is no longer observed.
