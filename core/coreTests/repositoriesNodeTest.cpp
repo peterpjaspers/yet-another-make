@@ -1,5 +1,6 @@
 #include "executeNode.h"
 #include "../RepositoriesNode.h"
+#include "../DirectoryNode.h"
 #include "../FileSystem.h"
 #include "../FileRepository.h"
 #include "../ExecutionContext.h"
@@ -73,8 +74,12 @@ namespace
         EXPECT_TRUE(completed);
         EXPECT_EQ(Node::State::Ok, setup.repositoriesNode->state());
         EXPECT_NE(nullptr, setup.context.findRepository("."));
-        EXPECT_NE(nullptr, setup.context.findRepository("repo1"));
-        EXPECT_NE(nullptr, setup.context.findRepository("repo2"));
+        auto frepo1 = setup.context.findRepository("repo1");
+        EXPECT_NE(nullptr, frepo1);
+        EXPECT_EQ(setup.repo1Dir, frepo1->directoryNode()->absolutePath());
+        auto frepo2 = setup.context.findRepository("repo2");
+        EXPECT_NE(nullptr, frepo2);
+        EXPECT_EQ(setup.repo2Dir, frepo2->directoryNode()->absolutePath());
     }
 
     TEST(RepositoriesNode, parseError) {

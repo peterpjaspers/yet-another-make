@@ -60,7 +60,7 @@ namespace YAM
     void Node::setState(State newState) {
         if (_state != newState) {
             if (_state == Node::State::Deleted) {
-                throw std::runtime_error("Not allowed to update state of Deleted object, user undelete");
+                throw std::runtime_error("Not allowed to update state of Deleted object, use undelete");
             }
             bool wasExecuting = _state == Node::State::Executing;
             _state = newState;

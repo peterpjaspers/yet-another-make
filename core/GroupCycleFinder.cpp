@@ -45,7 +45,7 @@ namespace
             cycles.push_back(cycle);
             return;
         }
-        for (auto const& node : group->group()) {
+        for (auto const& node : group->content()) {
             auto genFile = dynamic_pointer_cast<GeneratedFileNode>(node);
             if (genFile != nullptr) {
                 auto inputGroups = genFile->producer()->inputGroups();

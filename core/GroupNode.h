@@ -17,8 +17,8 @@ namespace YAM
 
         std::string className() const override { return "GroupNode"; }
 
-        void group(std::vector<std::shared_ptr<Node>> newGroup);
-        std::vector<std::shared_ptr<Node>> const& group() const { return _group; }
+        void content(std::vector<std::shared_ptr<Node>> newContent);
+        std::vector<std::shared_ptr<Node>> const& content() const { return _content; }
 
         // Override Node
         void start() override;
@@ -39,7 +39,7 @@ namespace YAM
         XXH64_hash_t computeHash() const;
         void handleGroupCompletion(Node::State groupState);
 
-        std::vector<std::shared_ptr<Node>> _group;
+        std::vector<std::shared_ptr<Node>> _content;
         XXH64_hash_t _hash;
     };
 }

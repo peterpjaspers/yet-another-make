@@ -68,6 +68,7 @@ namespace YAM
     }
 
     XXH64_hash_t FileNode::hashOf(std::string const& aspectName) {
+        if (state() == Node::State::Deleted) return rand();
         auto it = _hashes.find(aspectName);
         if (it == _hashes.end()) throw std::runtime_error("no such aspect");
         return it->second;

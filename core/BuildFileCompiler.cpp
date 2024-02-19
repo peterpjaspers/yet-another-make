@@ -299,7 +299,7 @@ namespace
     ) {
         static Node::CompareName cmp;
         std::vector<std::shared_ptr<Node>> contrib;
-        std::vector<std::shared_ptr<Node>> const& content = group->group();
+        std::vector<std::shared_ptr<Node>> const& content = group->content();
         for (auto const& node : nodes) {
             auto it = std::find(content.begin(), content.end(), node);
             if (it != content.end()) contrib.push_back(node);
@@ -333,7 +333,7 @@ namespace
         std::vector<std::shared_ptr<Node>> const& nodes
      ) {
         bool updated = false;
-        std::vector<std::shared_ptr<Node>> content = groupNode->group();
+        std::vector<std::shared_ptr<Node>> content = groupNode->content();
         for (auto const& node : nodes) {
             auto it = std::find(content.begin(), content.end(), node);
             if (it != content.end()) {
@@ -341,16 +341,16 @@ namespace
                 updated = true;
             }
         }
-        if (updated) groupNode->group(content);
+        if (updated) groupNode->content(content);
     }
 
     void addToGroup(
         std::shared_ptr<GroupNode> const& groupNode,
         std::vector<std::shared_ptr<Node>> const& nodes
     ) {
-        std::vector<std::shared_ptr<Node>> content = groupNode->group();
+        std::vector<std::shared_ptr<Node>> content = groupNode->content();
         for (auto const& node : nodes) content.push_back(node);
-        groupNode->group(content);
+        groupNode->content(content);
     }
 }
 

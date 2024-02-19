@@ -208,7 +208,7 @@ namespace
         EXPECT_FALSE(rule.forEach);
         EXPECT_EQ(" type main > main.obj ", rule.script.script);
 
-        EXPECT_EQ(4, setup.context.statistics().nSelfExecuted);
+        EXPECT_EQ(5, setup.context.statistics().nSelfExecuted); // buildfile_yam_gen.txt rehashes twice
         auto const& selfExecuted = setup.context.statistics().selfExecuted;
         EXPECT_NE(selfExecuted.end(), selfExecuted.find(setup.buildFileParserNode.get()));
         EXPECT_NE(selfExecuted.end(), selfExecuted.find(setup.buildFileNode.get()));
@@ -269,7 +269,8 @@ namespace
         EXPECT_TRUE(rule.forEach);
         EXPECT_EQ(" echo main > main.obj ", rule.script.script);
 
-        EXPECT_EQ(1, setup.context.statistics().nSelfExecuted);
+        // buildfile_yam.bat and buildfile_yam_gen.txt
+        EXPECT_EQ(2, setup.context.statistics().nSelfExecuted);
         auto const& selfExecuted = setup.context.statistics().selfExecuted;
         EXPECT_NE(selfExecuted.end(), selfExecuted.find(setup.buildFileNode.get()));
         EXPECT_EQ(1, setup.context.statistics().nRehashedFiles);

@@ -84,7 +84,7 @@ namespace
         node->context()->nodes().remove(node);
     }
     void removeNode(std::shared_ptr<GroupNode> group, StateObserver* observer) {
-        if (group->group().empty() && group->observers().empty()) {
+        if (group->content().empty() && group->observers().empty()) {
             group->setState(Node::State::Deleted);
             group->modified(true);
             group->context()->nodes().remove(group);
@@ -305,7 +305,7 @@ namespace YAM
 
     void BuildFileCompilerNode::cleanOutputGroup(GroupNode* group) {
         bool updated = false;
-        std::vector<std::shared_ptr<Node>> content = group->group();
+        std::vector<std::shared_ptr<Node>> content = group->content();
         for (auto const& pair : _outputs) {
             auto it = std::find(content.begin(), content.end(), pair.second);
             if (it != content.end()) {
@@ -313,7 +313,7 @@ namespace YAM
                 updated = true;
             }
         }
-        if (updated) group->group(content);
+        if (updated) group->content(content);
     }
 
     void BuildFileCompilerNode::compileBuildFile() {

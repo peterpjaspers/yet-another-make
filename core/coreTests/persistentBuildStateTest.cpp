@@ -126,6 +126,7 @@ namespace
         void retrieve() {
             std::filesystem::path repoSymPath = sourceFileRepo()->symbolicDirectory();
             persistentState.retrieve();
+            sourceFileRepo()->startWatching();
         }
 
         bool consumeFileChangeEvent(std::initializer_list<std::filesystem::path> paths) {
@@ -166,7 +167,10 @@ namespace
 
         void executeAll() {
             auto setDirty = Delegate<void, std::shared_ptr<Node> const&>::CreateLambda(
-                [](std::shared_ptr<Node> const& n) { n->setState(Node::State::Dirty); });
+                [](std::shared_ptr<Node> const& n) {
+                    if (n->state() == Node::State::Deleted) n->undelete();
+                    else n->setState(Node::State::Dirty);
+            });
             context.nodes().foreach(setDirty);
             std::vector<std::shared_ptr<Node>> dirtyNodes;
             context.getDirtyNodes(dirtyNodes);
@@ -314,14 +318,14 @@ namespace
         ASSERT_NE(nullptr, fileNode);
         auto updatedHash = storage.addFileAndUpdateFileAndExecuteNode(fileNode);
         EXPECT_TRUE(fileNode->modified());
-        EXPECT_EQ(nNodes+1, setup.context.nodes().size()); // new FileNode for File4
+        EXPECT_EQ(nNodes+2, setup.context.nodes().size()); // new FileNode for File4, buildstate
         auto newFileNode = dynamic_pointer_cast<FileNode>(setup.context.nodes().find(root / "File4"));
         EXPECT_NE(nullptr, newFileNode);
         EXPECT_TRUE(newFileNode->modified());
 
         // Verify that the modified file node is updated in storage.
         std::size_t nStored = storage.store(); // store the modified file node.
-        EXPECT_EQ(3, nStored); // repo dir, file3, file4
+        EXPECT_EQ(5, nStored); // repo dir, file3, file4, buildstate, repo/buildstate
         storage.retrieve(); // replace all nodes in storage.context by ones freshly retrieved from storage
         fileNode = dynamic_pointer_cast<FileNode>(setup.context.nodes().find(root / "File3"));
         ASSERT_NE(nullptr, fileNode);

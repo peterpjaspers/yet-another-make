@@ -34,7 +34,7 @@ namespace
         std::string repoName = (*(node->name().begin())).string();
         return
             (isFileNode(node) || isDirNode(node))
-            && (repoName == repo->name());
+            && (repo->lexicallyContains(node->name()));
     }
 }
 
@@ -50,7 +50,11 @@ namespace YAM
             directory,
             true,
             Delegate<void, FileChange const&>::CreateRaw(this, &FileRepositoryWatcher::_addChange)))
-    {}
+    {
+        FileChange overflow;
+        overflow.action = FileChange::Overflow;
+        _addChange(overflow);
+    }
 
     FileRepositoryWatcher::FileRepositoryWatcher(
         FileRepository* repo,

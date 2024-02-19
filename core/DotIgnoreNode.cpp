@@ -14,6 +14,7 @@ namespace
     uint32_t streamableTypeId = 0;
 
     void setDirtyRecursively(Node* node) {
+        if (node->state() == Node::State::Deleted) return;
         node->setState(Node::State::Dirty);
         DirectoryNode* dir = dynamic_cast<DirectoryNode*>(node);
         if (dir != nullptr) {

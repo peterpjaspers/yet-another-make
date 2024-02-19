@@ -328,6 +328,7 @@ namespace YAM
     //   if rollback: if object in toRemove and object is modified
     //   the object is also in toReplace.
     void computeStorageNeed(
+        ILogBook &logBook,
         std::unordered_set<std::shared_ptr<IPersistable>> const& buildState,
         std::unordered_set<std::shared_ptr<IPersistable>> const& storedState,
         std::unordered_set<std::shared_ptr<IPersistable>>& toInsert,
@@ -360,7 +361,7 @@ namespace YAM
         else if (!toRemove.empty()) p = *toRemove.begin();
         if (p != nullptr) {
             auto n = dynamic_cast<Node*>(p.get());
-            logStorageNeed(*(n->context()->logBook()), toInsert, toReplace, toRemove, rollback);
+            logStorageNeed(logBook, toInsert, toReplace, toRemove, rollback);
         }
     }
 }
@@ -398,11 +399,11 @@ namespace YAM
         }
         std::unordered_set<IPersistable const*> restored;
         for (auto const& pair : _keyToObject) pair.second->restore(_context, restored);
-        if (_startRepoWatching) {
-            for (auto const& pair : _context->repositories()) {
-                pair.second->startWatching();
-            }
-        }
+        //if (_startRepoWatching) {
+        //    for (auto const& pair : _context->repositories()) {
+        //        pair.second->startWatching();
+        //    }
+        //}
     }
 
     void PersistentBuildState::reset() {
@@ -476,7 +477,7 @@ namespace YAM
         std::unordered_set<std::shared_ptr<IPersistable>> storedState;
         _context->getBuildState(buildState);
         getStoredState(storedState);
-        computeStorageNeed(buildState, storedState, _toInsert, _toReplace, _toRemove, false);
+        computeStorageNeed(*(_context->logBook()), buildState, storedState, _toInsert, _toReplace, _toRemove, false);
         
         for (auto const& p : _toRemove) {
            // Save keys of removed object to enable rollback
@@ -607,7 +608,7 @@ namespace YAM
         std::unordered_set<std::shared_ptr<IPersistable>> storedState;
         _context->getBuildState(buildState);
         getStoredState(storedState);
-        computeStorageNeed(buildState, storedState, _toInsert, _toReplace, _toRemove, true);
+        computeStorageNeed(*(_context->logBook()), buildState, storedState, _toInsert, _toReplace, _toRemove, true);
         rollback(false);
         _toInsert.clear();
         _toReplace.clear();

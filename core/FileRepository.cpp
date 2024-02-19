@@ -95,6 +95,10 @@ namespace YAM
             _context->addToLogBook(progress);
 
             _directory = dir;
+            if (watching()) {
+                stopWatching();
+                startWatching();
+            }
             modified(true);
         }
     }
@@ -228,7 +232,6 @@ namespace YAM
         _context->nodes().removeIfPresent(_fileExecSpecsNode->configFileNode());
         _context->nodes().removeIfPresent(_directoryNode);
         _directoryNode->clear();
-        _directoryNode->setState(Node::State::Dirty);
         modified(true);
     }
 

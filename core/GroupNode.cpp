@@ -37,11 +37,13 @@ namespace YAM
         : Node(context, name)
     {}
 
-    void GroupNode::group(std::vector<std::shared_ptr<Node>> newGroup) {
-        if (_group != newGroup) {
-            for (auto const& node : _group) unsubscribe(node.get(), this);
-            _group = newGroup;
-            for (auto const& node : _group) subscribe(node.get(), this);
+    void GroupNode::content(std::vector<std::shared_ptr<Node>> newContent) {
+        Node::CompareName cmp;
+        std::sort(newContent.begin(), newContent.end(), cmp);
+        if (_content != newContent) {
+            for (auto const& node : _content) unsubscribe(node.get(), this);
+            _content = newContent;
+            for (auto const& node : _content) subscribe(node.get(), this);
             modified(true);
             setState(Node::State::Dirty);
         }
@@ -53,7 +55,7 @@ namespace YAM
             [this](Node::State state) { handleGroupCompletion(state); }
         );
         std::vector<Node*> requisites;
-        for (auto const& node : _group) {
+        for (auto const& node : _content) {
             auto genFileNode = dynamic_cast<GeneratedFileNode*>(node.get());
             if (genFileNode != nullptr) {
                 requisites.push_back(genFileNode->producer().get());
@@ -81,13 +83,13 @@ namespace YAM
 
     XXH64_hash_t GroupNode::computeHash() const {
         std::vector<XXH64_hash_t> hashes;
-        for (auto const& n : _group) hashes.push_back(XXH64_string(n->name().string()));
+        for (auto const& n : _content) hashes.push_back(XXH64_string(n->name().string()));
         XXH64_hash_t hash = XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
         return hash;
     }
 
     void GroupNode::getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const {
-        for (auto const& node : _group) {
+        for (auto const& node : _content) {
             auto const& groupNode = dynamic_pointer_cast<GroupNode>(node);
             if (groupNode != nullptr) {
                 groupNode->getOutputs(outputs);
@@ -107,20 +109,20 @@ namespace YAM
 
     void GroupNode::stream(IStreamer* streamer) {
         Node::stream(streamer);
-        streamer->streamVector(_group);
+        streamer->streamVector(_content);
         streamer->stream(_hash);
     }
 
     void GroupNode::prepareDeserialize() {
         Node::prepareDeserialize();
-        for (auto const& node : _group) unsubscribe(node.get(), this);
-        _group.clear();
+        for (auto const& node : _content) unsubscribe(node.get(), this);
+        _content.clear();
     }
 
     bool GroupNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
         if (!Node::restore(context, restored)) return false;
-        for (auto const& node : _group) node->restore(context, restored);
-        for (auto const& node : _group) subscribe(node.get(), this);
+        for (auto const& node : _content) node->restore(context, restored);
+        for (auto const& node : _content) subscribe(node.get(), this);
         return true;
     }
 }

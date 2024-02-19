@@ -137,7 +137,7 @@ namespace
         ASSERT_EQ(1, groups.size());
         auto groupIt = groups.find("@@repo\\outputGroup1");
         ASSERT_TRUE(groups.end() != groupIt);
-        auto const& grpContent = groupIt->second->group();
+        auto const& grpContent = groupIt->second->content();
         EXPECT_NE(grpContent.end(), std::find(grpContent.begin(), grpContent.end(), output00));
         EXPECT_NE(grpContent.end(), std::find(grpContent.begin(), grpContent.end(), output10));
     }

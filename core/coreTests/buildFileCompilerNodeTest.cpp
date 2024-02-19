@@ -44,6 +44,8 @@ namespace
         std::filesystem::path absSub1BuildFilePath;
         std::filesystem::path cmdOutputFile;
         std::filesystem::path objectFilesGroupPath;
+        std::shared_ptr<BuildFileParserNode> cParser;
+        std::shared_ptr<BuildFileParserNode> lParser;
         std::shared_ptr<BuildFileCompilerNode> cCompiler;
         std::shared_ptr<BuildFileCompilerNode> lCompiler;
         std::shared_ptr<CommandNode> cCommand;
@@ -84,18 +86,22 @@ namespace
 
             cCompiler = dirNode->buildFileCompilerNode();
             lCompiler = dynamic_pointer_cast<DirectoryNode>(dirNode->findChild("SubDir1"))->buildFileCompilerNode();
-            auto cParser = cCompiler->buildFileParser();
-            auto lParser = lCompiler->buildFileParser();
+            cParser = cCompiler->buildFileParser();
+            lParser = lCompiler->buildFileParser();
 
-            completed = YAMTest::executeNodes({ cParser, lParser });
-            EXPECT_TRUE(completed);
-            EXPECT_EQ(Node::State::Ok, cParser->state());
-            EXPECT_EQ(Node::State::Ok, lParser->state());
-
-            completed = YAMTest::executeNodes({ cCompiler, lCompiler });
-            EXPECT_TRUE(completed);
-            EXPECT_EQ(Node::State::Ok, cCompiler->state());
-            EXPECT_EQ(Node::State::Ok, lCompiler->state());
+            for (int i = 0; i < 3; i++) {
+                fileRepo->consumeChanges();
+                completed = YAMTest::executeNodes({ fileRepo->directoryNode() });
+                EXPECT_TRUE(completed);
+                completed = YAMTest::executeNodes({ cParser, lParser });
+                EXPECT_TRUE(completed);
+                EXPECT_EQ(Node::State::Ok, cParser->state());
+                EXPECT_EQ(Node::State::Ok, lParser->state());
+                completed = YAMTest::executeNodes({ cCompiler, lCompiler });
+                EXPECT_TRUE(completed);
+                EXPECT_EQ(Node::State::Ok, cCompiler->state());
+                EXPECT_EQ(Node::State::Ok, lCompiler->state());
+            }
 
             std::filesystem::path cmdName = fileRepo->symbolicDirectory() / "main.obj\\__cmd";
             cCommand = dynamic_pointer_cast<CommandNode>(context.nodes().find(cmdName));
@@ -116,8 +122,8 @@ namespace
             auto groupNode = dynamic_pointer_cast<GroupNode>(node);
             ASSERT_NE(nullptr, groupNode);
             EXPECT_EQ(Node::State::Dirty, groupNode->state());
-            ASSERT_EQ(1, groupNode->group().size());
-            EXPECT_EQ(setup.repoTree.path() / "main.obj", groupNode->group()[0]->absolutePath());
+            ASSERT_EQ(1, groupNode->content().size());
+            EXPECT_EQ(setup.repoTree.path() / "main.obj", groupNode->content()[0]->absolutePath());
         }
         {
             EXPECT_EQ(Node::State::Dirty, setup.cCommand->state());
@@ -170,20 +176,22 @@ namespace
         // to become dirty. It will only cause the lCommand/ to become dirty after 
         // completion of cCompiler.
         EXPECT_EQ(Node::State::Ok, setup.lCompiler->state());
-        
+
+        bool completed = YAMTest::executeNodes({ setup.cParser, setup.lParser});
+        EXPECT_TRUE(completed);
+
         setup.context.statistics().reset();
         setup.context.statistics().registerNodes = true;
-        bool completed = YAMTest::executeNode(setup.cCompiler.get());
+        completed = YAMTest::executeNode(setup.cCompiler.get());
         EXPECT_TRUE(completed);
         EXPECT_EQ(Node::State::Ok, setup.lCompiler->state());
         EXPECT_EQ(Node::State::Ok, setup.cCompiler->state());
         EXPECT_EQ(Node::State::Dirty, setup.cCommand->state());
         EXPECT_EQ(Node::State::Dirty, setup.lCommand->state());
         auto const& selfExecuted = setup.context.statistics().selfExecuted;
-        EXPECT_EQ(4, selfExecuted.size());
+        EXPECT_EQ(3, selfExecuted.size());
         auto const& notFound = selfExecuted.end();
         EXPECT_NE(notFound, selfExecuted.find(setup.fileRepo->directoryNode().get()));
-        EXPECT_NE(notFound, selfExecuted.find(setup.fileRepo->directoryNode()->findChild("SubDir1").get()));
         EXPECT_NE(notFound, selfExecuted.find(setup.cCompiler.get()));
         auto globName = setup.fileRepo->directoryNode()->name() / "*.cpp";
         auto globNode = setup.context.nodes().find(globName);

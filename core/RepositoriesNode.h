@@ -90,6 +90,9 @@ namespace YAM
         bool addRepository(std::shared_ptr<FileRepository> const& repo);
         bool removeRepository(std::string const& repoName);
 
+        // For synchronous update.
+        bool parseAndUpdate();
+
         // Inherited from Node
         void start() override;
         std::string className() const override { return "RepositoriesNode"; }
@@ -105,7 +108,6 @@ namespace YAM
     private:
 
         void handleRequisitesCompletion(Node::State newState);
-        bool parseAndUpdate();
         void updateRepos(std::map<std::string, RepositoriesNode::Repo> const& repos);
 
         bool _ignoreConfigFile;

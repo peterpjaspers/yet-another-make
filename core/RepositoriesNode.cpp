@@ -65,7 +65,7 @@ namespace //parser
             }
             consume(&_dirKey);
             consume(&_eq);
-            Token dir = consume(&_path);
+            repo.dir = consume(&_path).value;
             consume(&_typeKey);
             consume(&_eq);
             Token type = consume(&_identifier);
@@ -268,9 +268,12 @@ namespace YAM
             LogRecord change(LogRecord::FileChanges, ss.str());
             context()->addToLogBook(change);
 
+            _configFileHash = _configFile->hashOf(FileAspect::entireFileAspect().name());
             if (parseAndUpdate()) {
                 notifyCompletion(Node::State::Ok);
             } else {
+                _configFileHash = rand();
+                modified(true);
                 notifyCompletion(Node::State::Failed);
             }
         }
@@ -281,7 +284,6 @@ namespace YAM
             Parser parser(_configFile->absolutePath());
             //detectCycles(context(), parser.repos());
             updateRepos(parser.repos());
-            _configFileHash = _configFile->hashOf(FileAspect::entireFileAspect().name());
             modified(true); 
             return true;
         } catch (std::runtime_error e) {
@@ -347,6 +349,7 @@ namespace YAM
     bool RepositoriesNode::restore(void* context, std::unordered_set<IPersistable const*>& restored) {
         if (!Node::restore(context, restored)) return false;
         _configFile->addObserver(this);
+        for (auto& pair : _repositories) pair.second->restore(context, restored);
         return true;
     }
 }

@@ -36,7 +36,7 @@ namespace
         for (auto const& node : nodes) {
             auto groupNode = dynamic_pointer_cast<GroupNode>(node);
             if (groupNode != nullptr) {
-                auto const& content = groupNode->group();
+                auto const& content = groupNode->content();
                 expanded.insert(expanded.end(), content.begin(), content.end());
             } else {
                 expanded.push_back(node);
@@ -590,7 +590,7 @@ namespace YAM
         std::vector<Node*> requisites;
         for (auto const& ip : _inputProducers) {
             auto const& group = dynamic_pointer_cast<GroupNode>(ip);
-            if (group != nullptr && group->group().empty()) {
+            if (group != nullptr && group->content().empty()) {
                 std::stringstream ss;
                 ss 
                     << "Input group " << ip->name() << " at line " << _ruleLineNr
@@ -631,7 +631,7 @@ namespace YAM
         auto repo = context()->findRepositoryContaining(absPath);
         if (repo == nullptr) {
             std::stringstream ss;
-            ss << "File " << absPath.string() << "is used as input or output by script " << std::endl;
+            ss << "File " << absPath.string() << " is used as input or output by script: " << std::endl;
             ss << _script << std::endl;
             if (_buildFile != nullptr) {
                 ss << "This script is defined in buildfile " << _buildFile->name() << " by the rule at line " << _ruleLineNr << std::endl;

@@ -216,7 +216,11 @@ namespace YAM
                     throw std::runtime_error("Unexpected Node::State::Delete");
                 }
             }
-            repositoriesNode->homeRepository()->startWatching();
+            // Make sure that repositoriesNode is in sync with
+            // repositories.txt configuration file to ensure proper
+            // directories being watched.
+            _context.repositoriesNode()->parseAndUpdate();
+            for (auto& pair : _context.repositories()) pair.second->startWatching();
         }
     }
 
@@ -305,13 +309,17 @@ namespace YAM
     void Builder::_start() {
         resetNodeStates(_context.nodes());
         std::vector<std::shared_ptr<Node>> dirtyNodes;
+        for (auto const& pair : _context.repositories()) {
+            auto &repo = pair.second;
+            repo->consumeChanges();
+            auto fileExecSpecsNode = repo->fileExecSpecsNode(); 
+            if (fileExecSpecsNode->state() == Node::State::Dirty) {
+                dirtyNodes.push_back(fileExecSpecsNode);
+            }
+        }
         auto repositoriesNode = _context.repositoriesNode();
-        auto fileExecSpecsNode = repositoriesNode->homeRepository()->fileExecSpecsNode();
         if (repositoriesNode->state() == Node::State::Dirty) {
             dirtyNodes.push_back(repositoriesNode);
-        }
-        if (fileExecSpecsNode->state() == Node::State::Dirty) {
-            dirtyNodes.push_back(fileExecSpecsNode);
         }
         if (dirtyNodes.empty()) {
             _handleConfigNodesCompletion(_dirtyConfigNodes.get());
@@ -320,7 +328,7 @@ namespace YAM
             LogRecord scanning(LogRecord::Progress, "Processing configuration changes");
             logBook.add(scanning);
 
-            _dirtyConfigNodes->group(dirtyNodes);
+            _dirtyConfigNodes->content(dirtyNodes);
             _dirtyConfigNodes->start();
         }
     }
@@ -331,12 +339,11 @@ namespace YAM
         if (_dirtyConfigNodes->state() != Node::State::Ok) {
             _postCompletion(Node::State::Failed);
         } else {
-            if (!_dirtyConfigNodes->group().empty()) _storeBuildState();
+            //if (!_dirtyConfigNodes->content().empty()) _storeBuildState();
             std::map<std::filesystem::path, std::shared_ptr<DirectoryNode>> dirtyDirs;
             for (auto const& pair : _context.repositories()) {
                 auto repo = pair.second;
                 auto dirNode = repo->directoryNode();
-                repo->consumeChanges();
                 appendDirtyDirectoryNodes(dirNode, dirtyDirs);
             }
             std::vector<std::shared_ptr<Node>> prunedDirtyDirs = pruneDirtyDirectories(dirtyDirs);
@@ -347,7 +354,7 @@ namespace YAM
                 LogRecord scanning(LogRecord::Progress, "Scanning filesystem");
                 logBook.add(scanning);
 
-                _dirtyDirectories->group(prunedDirtyDirs);
+                _dirtyDirectories->content(prunedDirtyDirs);
                 _dirtyDirectories->start();
             }
         }
@@ -372,7 +379,7 @@ namespace YAM
                 LogRecord parsing(LogRecord::Progress, "Parsing buildfiles");
                 logBook.add(parsing);
 
-                _dirtyBuildFileParsers->group(dirtyBuildFiles);
+                _dirtyBuildFileParsers->content(dirtyBuildFiles);
                 _dirtyBuildFileParsers->start();
             }
         }
@@ -383,8 +390,8 @@ namespace YAM
         if (n != _dirtyBuildFileParsers.get()) throw std::exception("unexpected node");
         if (_dirtyBuildFileParsers->state() != Node::State::Ok) {
             _postCompletion(Node::State::Failed);
-        } else if (_containsBuildFileCycles(_dirtyBuildFileParsers->group())) {
-            for (auto const& node : _dirtyBuildFileParsers->group()) {
+        } else if (_containsBuildFileCycles(_dirtyBuildFileParsers->content())) {
+            for (auto const& node : _dirtyBuildFileParsers->content()) {
                 node->setState(Node::State::Failed);
             }
             _postCompletion(Node::State::Failed);
@@ -402,7 +409,7 @@ namespace YAM
                 LogRecord compiling(LogRecord::Progress, "Compiling parsed buildfiles");
                 logBook.add(compiling);
 
-                _dirtyBuildFileCompilers->group(dirtyBuildFileCompilers);
+                _dirtyBuildFileCompilers->content(dirtyBuildFileCompilers);
                 _dirtyBuildFileCompilers->start();
             }
         }
@@ -412,8 +419,8 @@ namespace YAM
         if (n != _dirtyBuildFileCompilers.get()) throw std::exception("unexpected node");
         if (_dirtyBuildFileCompilers->state() != Node::State::Ok) {
             _postCompletion(Node::State::Failed);
-         } else if (_containsGroupCycles(_dirtyBuildFileCompilers->group())) {
-             for (auto const& node : _dirtyBuildFileCompilers->group()) {
+         } else if (_containsGroupCycles(_dirtyBuildFileCompilers->content())) {
+             for (auto const& node : _dirtyBuildFileCompilers->content()) {
                  node->setState(Node::State::Failed);
              }
              _postCompletion(Node::State::Failed);
@@ -421,10 +428,10 @@ namespace YAM
             std::vector<std::shared_ptr<Node>> dirtyCommands;
             appendDirtyCommands(_context.nodes(), dirtyCommands);
             if (
-                !_dirtyBuildFileCompilers->group().empty()
+                !_dirtyBuildFileCompilers->content().empty()
                 || !dirtyCommands.empty()
             ) {
-                _storeBuildState();
+                //_storeBuildState();
             }
             if (dirtyCommands.empty()) {
                 _handleCommandsCompletion(_dirtyCommands.get());
@@ -433,7 +440,7 @@ namespace YAM
                 LogRecord executing(LogRecord::Progress, "Executing commands");
                 logBook.add(executing);
 
-                _dirtyCommands->group(dirtyCommands);
+                _dirtyCommands->content(dirtyCommands);
                 _dirtyCommands->start();
             }
         }
@@ -442,10 +449,13 @@ namespace YAM
     // Called in main thread
     void Builder::_handleCommandsCompletion(Node* n) {
         if (n != _dirtyCommands.get()) throw std::exception("unexpected node");
-        _storeBuildState();
+        Node::State newState = _dirtyCommands->state();
+        if (newState == Node::State::Ok) {
+            _storeBuildState();
+        }
         // Delay clearing the inputProducers of the _dirty* nodes to avoid
         // removing an observer on a node that is notifying.
-        _postCompletion(_dirtyCommands->state());
+        _postCompletion(newState);
     }
 
     void Builder::_postCompletion(Node::State resultState) {
@@ -465,11 +475,11 @@ namespace YAM
             _result->nRehashedFiles(_context.statistics().nRehashedFiles);
         }
 
-        _dirtyConfigNodes->group(emptyNodes);
-        _dirtyDirectories->group(emptyNodes);
-        _dirtyBuildFileParsers->group(emptyNodes);
-        _dirtyBuildFileCompilers->group(emptyNodes);
-        _dirtyCommands->group(emptyNodes);
+        _dirtyConfigNodes->content(emptyNodes);
+        _dirtyDirectories->content(emptyNodes);
+        _dirtyBuildFileParsers->content(emptyNodes);
+        _dirtyBuildFileCompilers->content(emptyNodes);
+        _dirtyCommands->content(emptyNodes);
         _dirtyConfigNodes->setState(Node::State::Ok);
         _dirtyDirectories->setState(Node::State::Ok);
         _dirtyBuildFileParsers->setState(Node::State::Ok);
