@@ -57,24 +57,25 @@ namespace
         }
 
         std::shared_ptr<BuildResult> init() {
-            auto request = std::make_shared<BuildRequest>(BuildRequest::RequestType::Init);
+            auto request = std::make_shared<BuildRequest>();
             if (!startBuild(request)) return std::make_shared<BuildResult>(false);
             return wait();
         }
 
         bool startBuild(std::shared_ptr<BuildRequest> request) {
-            request->directory(repoDir);
+            request->repoDirectory(repoDir);
+            request->repoName("test");
             return client->startBuild(request);
         }
 
         std::shared_ptr<BuildResult> build() {
-            auto request = std::make_shared<BuildRequest>(BuildRequest::RequestType::Build);
+            auto request = std::make_shared<BuildRequest>();
             if (!startBuild(request)) return std::make_shared<BuildResult>(false);
             return wait();
         }
 
         std::shared_ptr<BuildResult> clean() {
-            auto request = std::make_shared<BuildRequest>(BuildRequest::RequestType::Clean);
+            auto request = std::make_shared<BuildRequest>();
             if (!startBuild(request)) return std::make_shared<BuildResult>(false);
             return wait();
         }
@@ -120,7 +121,7 @@ namespace
     }
 
     TEST(BuildService, stopBuild) {
-        auto request = std::make_shared<BuildRequest>(BuildRequest::RequestType::Build);
+        auto request = std::make_shared<BuildRequest>();
         Session session;
 
         EXPECT_TRUE(session.startBuild(request));
@@ -159,7 +160,7 @@ namespace
         auto result = session.build();
         EXPECT_TRUE(result->succeeded());
 
-        auto request = std::make_shared<BuildRequest>(BuildRequest::RequestType::Build);
+        auto request = std::make_shared<BuildRequest>();
         EXPECT_FALSE(session.startBuild(request));
     }
 }

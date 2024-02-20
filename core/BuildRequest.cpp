@@ -12,28 +12,25 @@ namespace YAM
         stream(reader);
     }
 
-    BuildRequest::BuildRequest(RequestType type)
-        : _type(type)
-        , _logAspects(LogRecord::allAspects())
-    {
-    }
-
-    // Set/get the build command type.
-    void BuildRequest::requestType(BuildRequest::RequestType type) {
-        _type = type;
-    }
-
-    BuildRequest::RequestType BuildRequest::requestType() const {
-        return _type;
-    }
+    BuildRequest::BuildRequest()
+        : _logAspects(LogRecord::allAspects())
+    {}
 
     // Set/get the directory from which the build is started.
-    void BuildRequest::directory(std::filesystem::path const& directory) {
-        _directory = directory;
+    void BuildRequest::repoDirectory(std::filesystem::path const& directory) {
+        _repoDirectory = directory;
     }
 
-    std::filesystem::path const& BuildRequest::directory() {
-        return _directory;
+    std::filesystem::path const& BuildRequest::repoDirectory() {
+        return _repoDirectory;
+    }
+
+    void BuildRequest::repoName(std::string const& newName) {
+        _repoName = newName;
+    }
+
+    std::string const& BuildRequest::repoName() const {
+        return _repoName;
     }
 
     void BuildRequest::addToScope(std::filesystem::path const& path) {
@@ -61,10 +58,8 @@ namespace YAM
     }
 
     void BuildRequest::stream(IStreamer* streamer) {
-        int32_t t = static_cast<int32_t>(_type);
-        streamer->stream(t);
-        if (streamer->reading()) _type = static_cast<RequestType>(t);
-        streamer->stream(_directory);
+        streamer->stream(_repoDirectory);
+        streamer->stream(_repoName);
         streamer->streamVector(_pathsInScope);
         LogRecord::streamAspects(streamer, _logAspects);
     }

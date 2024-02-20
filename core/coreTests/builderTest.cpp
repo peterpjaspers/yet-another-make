@@ -12,6 +12,8 @@
 #include "../BuildResult.h"
 #include "../Dispatcher.h"
 #include "../DispatcherFrame.h"
+#include "../DotYamDirectory.h"
+#include "../RepositoryNameFile.h"
 
 #include "gtest/gtest.h"
 #include <stdlib.h>
@@ -96,6 +98,7 @@ namespace
     {
     public:
         TestRepository repo;
+        std::string repoName;
         Builder builder;
         ExecutionContext* context;
         std::shared_ptr<CommandNode> ccPiet;
@@ -111,18 +114,23 @@ namespace
         // files into a dll.
         TestDriver(bool initialize = true)
             : repo()
+            , repoName("testRepo")
             , context(builder.context())
-            , ccPiet(std::make_shared<CommandNode>(context, R"(@@.\ccpiet)"))
-            , ccJan(std::make_shared<CommandNode>(context, R"(@@.\ccjan)"))
-            , linkPietJan(std::make_shared<CommandNode>(context, R"(@@.\linkpietjan)"))
-            , pietOut(std::make_shared<GeneratedFileNode>(context, R"(@@.\generated\pietout.obj)", ccPiet))
-            , janOut(std::make_shared<GeneratedFileNode>(context, R"(@@.\generated\janout.obj)", ccJan))
-            , pietjanOut(std::make_shared<GeneratedFileNode>(context, R"(@@.\generated\pietjanout.dll)", linkPietJan))
+            , ccPiet(std::make_shared<CommandNode>(context, R"(@@testRepo\ccpiet)"))
+            , ccJan(std::make_shared<CommandNode>(context, R"(@@testRepo\ccjan)"))
+            , linkPietJan(std::make_shared<CommandNode>(context, R"(@@testRepo\linkpietjan)"))
+            , pietOut(std::make_shared<GeneratedFileNode>(context, R"(@@testRepo\generated\pietout.obj)", ccPiet))
+            , janOut(std::make_shared<GeneratedFileNode>(context, R"(@@testRepo\generated\janout.obj)", ccJan))
+            , pietjanOut(std::make_shared<GeneratedFileNode>(context, R"(@@testRepo\generated\pietjanout.dll)", linkPietJan))
             , stats(context->statistics())
         {
             stats.registerNodes = true;
             if (initialize) {
-                initializeYam();
+                DotYamDirectory::initialize(repo.dir, context->logBook().get());
+                RepositoryNameFile nameFile(repo.dir);
+                nameFile.repoName(repoName);
+                build();
+
                 // context->threadPool().size(1); // to ease debugging
 
                 // Simulate compilation and linking
@@ -182,7 +190,7 @@ namespace
         }
 
         std::shared_ptr<FileRepository> sourceRepo() {
-            return context->findRepository(".");
+            return context->findRepository(repoName);
         }
 
         Node* findNode(std::filesystem::path const& path) {
@@ -222,15 +230,10 @@ namespace
             context->mainThreadQueue().push(Delegate<void>::CreateLambda([this]() {builder.stop(); }));
         }
 
-        std::shared_ptr<BuildResult> initializeYam() {
-            auto request = std::make_shared< BuildRequest>(BuildRequest::RequestType::Init);
-            request->directory(repo.dir);
-            return executeRequest(request);
-        }
-
         std::shared_ptr<BuildResult> build() {
-            auto request = std::make_shared< BuildRequest>(BuildRequest::RequestType::Build);
-            request->directory(repo.dir);
+            auto request = std::make_shared< BuildRequest>();
+            request->repoDirectory(repo.dir);
+            request->repoName(repoName);
             return executeRequest(request);
         }
 
@@ -273,23 +276,6 @@ namespace
         std::string actualJanOutContent() { return readFile(janOut->absolutePath()); }
         std::string actualPietjanOutContent() { return readFile(pietjanOut->absolutePath()); }
     };
-
-    TEST(Builder, initOnce) {
-        TestDriver driver(false);
-
-        std::shared_ptr<BuildResult> result = driver.initializeYam();
-        EXPECT_TRUE(result->succeeded());
-        auto srcRepo = driver.sourceRepo();
-        EXPECT_NE(nullptr, srcRepo);
-        EXPECT_EQ(driver.repo.dir, srcRepo->directory());
-    }
-    TEST(Builder, initTwice) {
-        TestDriver driver(false);
-
-        driver.initializeYam();
-        std::shared_ptr<BuildResult> result = driver.initializeYam();
-        EXPECT_TRUE(result->succeeded());
-    }
 
     TEST(Builder, firstBuild) {
         TestDriver driver;
@@ -334,28 +320,19 @@ namespace
         EXPECT_TRUE(inputs.end() != std::find(inputs.begin(), inputs.end(), driver.janOut));
 
         // Verify nodes started for execution 
-        // 4 dir nodes repo.dir, repo.dir/.yam, repo.dir/generated, repo.dir/src
         // 2 source file nodes repo.dir/src/pietCpp, repo.dir/src/pietH
         // 2 source file nodes repo.dir/src/janCpp, repo.dir/src/janH
         // 3 generated file nodes pietOut, janOut, pietjanOut before script exec
         // 3 generated file nodes pietOut, janOut, pietjanOut after script exec
         // 3 commandNodes ccPiet, ccJan, linkPietjan
-        // repositoriesnode + configfile node
         // 3 groupnodes (__dirtyConfigNodes/dirctory/command
-        // 16 root, .yam, generated and src dir each have .ignore, .gitignore and .yamignore
-        // 35 total
-        EXPECT_EQ(36, driver.stats.nStarted); 
+        EXPECT_EQ(16, driver.stats.nStarted); 
         // pietOut, janOut, pietjanOut are started twice
-        EXPECT_EQ(33, driver.stats.started.size());
-        EXPECT_EQ(4, driver.stats.nDirectoryUpdates);
+        EXPECT_EQ(13, driver.stats.started.size());
+        EXPECT_EQ(1, driver.stats.nDirectoryUpdates);
         // 4 source + 3 generated (before cmd exec) + 3 generated (after cmd exec)
-        // + 4 .gitignore + 4 .yamignore
-        // + repositories config source file
-        // + configfileexecspecs source file
-        EXPECT_EQ(20, driver.stats.nRehashedFiles); 
+        EXPECT_EQ(10, driver.stats.nRehashedFiles); 
 
-        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.dir))));
-        EXPECT_TRUE(driver.stats.started.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.dir / "src"))));
         EXPECT_TRUE(driver.stats.started.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietCpp))));
         EXPECT_TRUE(driver.stats.started.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietH))));
         EXPECT_TRUE(driver.stats.started.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.janCpp))));
@@ -368,10 +345,8 @@ namespace
         EXPECT_TRUE(driver.stats.started.contains(driver.pietjanOut.get()));
 
         // Verify nodes self-executed 
-        EXPECT_EQ(31, driver.stats.nSelfExecuted);
-        EXPECT_EQ(28, driver.stats.selfExecuted.size());
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.dir))));
-        EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.dir / "src"))));
+        EXPECT_EQ(14, driver.stats.nSelfExecuted);
+        EXPECT_EQ(11, driver.stats.selfExecuted.size());
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietCpp))));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietH))));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.janCpp))));
@@ -387,7 +362,6 @@ namespace
     TEST(Builder, noDirtyNodesAfterConsumeChangesAfterBuild) {
         TestDriver driver;
 
-        driver.initializeYam();
         driver.build();
 
         // Assert that the source file repository has detected the changes made
@@ -420,7 +394,6 @@ namespace
         TestDriver driver;
 
         // First build
-        driver.initializeYam();
         driver.build();
 
         // driver.build() will modify .yam (due to first time write of 
@@ -440,7 +413,6 @@ namespace
         TestDriver driver;
         
         // First build
-        driver.initializeYam();
         driver.build();
         driver.stats.reset();
 
@@ -469,7 +441,7 @@ namespace
         // started and selfExecuted also contains 
         // _dirtyCommands from Builder.
         EXPECT_EQ(3, driver.stats.nRehashedFiles);
-        EXPECT_EQ(9, driver.stats.started.size());
+        EXPECT_EQ(8, driver.stats.started.size());
 
         // 1: pendingStartSelf of ccJan sees changed hash of janCpp
         // 2: self-execution of ccJan => updates and rehashes janOut 
@@ -477,7 +449,7 @@ namespace
         // 4: execution of linkPietJan updates and rehashes pietjanOut
         auto srcRepo = driver.sourceRepo();
         auto janCppNode = driver.context->nodes().find(srcRepo->symbolicPathOf(driver.repo.janCpp));
-        EXPECT_EQ(7, driver.stats.selfExecuted.size());
+        EXPECT_EQ(6, driver.stats.selfExecuted.size());
         EXPECT_TRUE(driver.stats.selfExecuted.contains(janCppNode.get()));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.ccJan.get()));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.janOut.get()));
@@ -489,7 +461,6 @@ namespace
         TestDriver driver;
 
         // First build
-        driver.initializeYam();
         driver.build();
         driver.stats.reset();
 
@@ -522,7 +493,7 @@ namespace
         EXPECT_EQ(Node::State::Ok, driver.pietjanOut->state());
 
         EXPECT_EQ(0, driver.stats.nRehashedFiles); // node in state Deleted is not executed
-        EXPECT_EQ(4, driver.stats.selfExecuted.size());
+        EXPECT_EQ(3, driver.stats.selfExecuted.size());
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.ccJan.get()));;
     }
 
@@ -539,8 +510,9 @@ namespace
         driver.linkPietJan->script(ping.string() + " -n 10 127.0.0.1");
         driver.linkPietJan->outputs({ });
 
-        auto request = std::make_shared< BuildRequest>(BuildRequest::RequestType::Build);
-        request->directory(driver.repo.dir);
+        auto request = std::make_shared<BuildRequest>();
+        request->repoDirectory(driver.repo.dir);
+        request->repoName(driver.repoName);
         std::atomic<std::shared_ptr<BuildResult>> result;
         Dispatcher requestDispatcher;
         driver.startExecuteRequest(request, result, requestDispatcher);

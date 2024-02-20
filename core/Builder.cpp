@@ -15,6 +15,7 @@
 #include "AcyclicTrail.h"
 #include "GroupCycleFinder.h"
 #include "PersistentBuildState.h"
+#include "RepositoryNameFile.h"
 
 #include <iostream>
 #include <map>
@@ -173,35 +174,39 @@ namespace YAM
         _context.statistics().reset();
         _context.buildRequest(request);
         _result = std::make_shared<BuildResult>();
-        if (request->requestType() == BuildRequest::Init) {
-            _init(request->directory());
-            _notifyCompletion(Node::State::Ok);
-        } else if (request->requestType() == BuildRequest::Clean) {
-            _clean(request);
-            _notifyCompletion(Node::State::Ok);
-        } else if (request->requestType() == BuildRequest::Build) {
-            _init(request->directory());
+        bool ok = _init(request);
+        if (ok) {
             _start();
         } else {
-            throw std::exception("unknown build request type");
+            _notifyCompletion(Node::State::Failed);
         }
     }
 
-    // Called in any thread
-    void Builder::_init(std::filesystem::path directory) {
-        std::filesystem::path yamDir = DotYamDirectory::initialize(directory, _context.logBook().get());
-        _result->succeeded(!yamDir.empty());
-        if (!_result->succeeded()) return;
+    void Builder::logRepoNotInitialized() {
+        LogRecord e(LogRecord::Error, "Repository not initialized");
+        _context.addToLogBook(e);
+    }
 
+    // Called in any thread
+    bool Builder::_init(std::shared_ptr<BuildRequest> const& request) {
+        std::filesystem::path repoDir = request->repoDirectory();
+        RepositoryNameFile nameFile(repoDir);
+        std::string repoName = nameFile.repoName();
+        _result->succeeded(!request->repoName().empty());
+        if (!_result->succeeded()) {
+            logRepoNotInitialized();
+            return false;
+        }
+        
         if (_buildState == nullptr) {
+            std::filesystem::path yamDir = repoDir / DotYamDirectory::yamName();
             _buildState = std::make_shared<PersistentBuildState>(yamDir, &_context, true);
             _buildState->retrieve();
             auto repositoriesNode = _context.repositoriesNode();
             if (repositoriesNode == nullptr) {
-                std::filesystem::path repoPath = yamDir.parent_path();
                 auto homeRepo = std::make_shared<FileRepository>(
-                    ".", // TODO: take repo name from buildrequest
-                    repoPath,
+                    repoName,
+                    repoDir,
                     &_context,
                     true);
                 repositoriesNode = std::make_shared<RepositoriesNode>(&_context, homeRepo);
@@ -216,12 +221,8 @@ namespace YAM
                     throw std::runtime_error("Unexpected Node::State::Delete");
                 }
             }
-            // Make sure that repositoriesNode is in sync with
-            // repositories.txt configuration file to ensure proper
-            // directories being watched.
-            _context.repositoriesNode()->parseAndUpdate();
-            for (auto& pair : _context.repositories()) pair.second->startWatching();
         }
+        return _result->succeeded();
     }
 
     // Called in main thread
@@ -309,6 +310,22 @@ namespace YAM
     void Builder::_start() {
         resetNodeStates(_context.nodes());
         std::vector<std::shared_ptr<Node>> dirtyNodes;
+        auto repositoriesNode = _context.repositoriesNode();
+        if (repositoriesNode->state() == Node::State::Dirty) {
+            if (repositoriesNode->parseAndUpdate()) {
+                for (auto& pair : _context.repositories()) pair.second->startWatching();
+            } else {
+                _postCompletion(Node::State::Failed);
+                return;
+            }
+            dirtyNodes.push_back(repositoriesNode);
+        }
+        if (_context.repositoriesNode()->parseAndUpdate()) {
+            for (auto& pair : _context.repositories()) pair.second->startWatching();
+        } else {
+            _postCompletion(Node::State::Failed);
+            return;
+        }
         for (auto const& pair : _context.repositories()) {
             auto &repo = pair.second;
             repo->consumeChanges();
@@ -316,10 +333,6 @@ namespace YAM
             if (fileExecSpecsNode->state() == Node::State::Dirty) {
                 dirtyNodes.push_back(fileExecSpecsNode);
             }
-        }
-        auto repositoriesNode = _context.repositoriesNode();
-        if (repositoriesNode->state() == Node::State::Dirty) {
-            dirtyNodes.push_back(repositoriesNode);
         }
         if (dirtyNodes.empty()) {
             _handleConfigNodesCompletion(_dirtyConfigNodes.get());

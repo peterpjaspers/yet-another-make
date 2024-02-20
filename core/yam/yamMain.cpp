@@ -6,6 +6,7 @@
 #include "../BuildResult.h"
 #include "../Dispatcher.h"
 #include "../BuildService.h"
+#include "../RepositoryNameFile.h"
 
 #include <thread>
 #include <filesystem>
@@ -143,6 +144,45 @@ public:
     }
 };
 
+bool yes(std::string const& input) {
+    return input == "y" || input == "Y";
+}
+
+bool no(std::string const& input) {
+    return input == "n" || input == "N";
+}
+
+bool confirmRepoDir(std::filesystem::path const& repoDir) {
+    std::cout << "Initializing yam on directory " << repoDir << std::endl;
+    std::string input;
+    do {
+        std::cout << "Is this the root of the source code tree that you want to build [y|n]:";
+        std::cout << std::endl;
+        std::cin >> input;
+    } while (!yes(input) && !no(input));
+    return yes(input);
+}
+
+bool initializeYam(ILogBook &logBook, std::filesystem::path &repoDir, std::string &repoName) {
+    std::filesystem::path yamDir = DotYamDirectory::find(std::filesystem::current_path());
+    if (yamDir.empty()) {
+        yamDir = DotYamDirectory::initialize(std::filesystem::current_path(), &logBook);
+    }
+    repoDir = yamDir.parent_path();
+    if (!repoDir.empty()) {
+        RepositoryNameFile repoNameFile(repoDir);
+        repoName = repoNameFile.repoName();
+        if (repoName.empty()) {
+            RepositoryNamePrompt prompt;
+            repoName = prompt(repoDir);
+            if (!repoName.empty()) {
+                repoNameFile.repoName(repoName);
+            }
+        }
+    }
+    return !repoName.empty();
+}
+
 int main(int argc, char argv[]) {
     ConsoleLogBook logBook;
     logBook.logElapsedTime(true);
@@ -150,31 +190,40 @@ int main(int argc, char argv[]) {
     logAspects.push_back(LogRecord::BuildStateUpdate);
     logBook.aspects(logAspects);
 
-    std::filesystem::path dotYamDir = DotYamDirectory::initialize(std::filesystem::current_path(), &logBook);
-    std::filesystem::path repoDir = dotYamDir.parent_path();
-    bool inProcess = false;
+    std::filesystem::path repoDir;
+    std::string repoName;
+    bool success = initializeYam(logBook, repoDir, repoName);
+
     std::shared_ptr<ServerAccess> server;
-
-    if (inProcess) {
-        server = std::make_shared<InProcessServer>(logBook, repoDir);
-    } else {
-        server = std::make_shared<OutProcessServer>(logBook, repoDir);
+    bool inProcess = false;
+    if (success) {
+        if (inProcess) {
+            server = std::make_shared<InProcessServer>(logBook, repoDir);
+        } else {
+            server = std::make_shared<OutProcessServer>(logBook, repoDir);
+        }
+        success = server->connected();
     }
-    if (!server->connected()) return 1;
+    if (success) {
+        auto request = std::make_shared<BuildRequest>();
+        request->repoDirectory(repoDir);
+        request->repoName(repoName);
+        request->logAspects(logAspects);
 
-    auto request = std::make_shared<BuildRequest>();
-    request->directory(repoDir);
-    request->logAspects(logAspects);
-    std::shared_ptr<BuildResult> result;
-    Dispatcher dispatcher;
-    BuildClient& client = server->client();
-    client.completor().AddLambda([&](std::shared_ptr<BuildResult> r) {
-        result = r;
-        dispatcher.push(Delegate<void>::CreateLambda([&dispatcher]() { dispatcher.stop(); }));
-    });
-    client.startBuild(request);
-    dispatcher.run();
-    if (inProcess) client.startShutdown();
-    logResult(logBook, *result);
-    return result->succeeded() ? 0 : 1;
+        std::shared_ptr<BuildResult> result;
+        Dispatcher dispatcher;
+        BuildClient& client = server->client();
+        client.completor().AddLambda([&](std::shared_ptr<BuildResult> r) {
+            result = r;
+            dispatcher.push(Delegate<void>::CreateLambda([&dispatcher]() { 
+                dispatcher.stop();
+            }));
+        });
+        client.startBuild(request);
+        dispatcher.run();
+        if (inProcess) client.startShutdown();
+        logResult(logBook, *result);
+        success = result->succeeded();
+    }
+    return success ? 0 : 1;
 }

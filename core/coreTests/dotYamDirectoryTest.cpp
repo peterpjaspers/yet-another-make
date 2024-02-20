@@ -61,8 +61,6 @@ namespace
         std::filesystem::path expectedYamDir(repoDir / ".yam");
         EXPECT_EQ(expectedYamDir, yamDir);
         EXPECT_TRUE(std::filesystem::exists(yamDir));
-        EXPECT_EQ(1, logBook.records().size());
-        EXPECT_EQ(LogRecord::Aspect::Progress, logBook.records()[0].aspect);
 
         std::filesystem::remove_all(repoDir);
     }

@@ -295,6 +295,7 @@ namespace YAM
     void RepositoriesNode::updateRepos(
         std::map<std::string, RepositoriesNode::Repo> const& repos
     ) {
+        // add new and update existing repos
         for (auto const& pair : repos) {
             std::shared_ptr<FileRepository> frepo;
             Repo const& repo = pair.second;
@@ -311,17 +312,21 @@ namespace YAM
             frepo->inputRepoNames(repo.inputs);
         }
         
+        // Find removed repos
         std::string homeRepoName = name().string();
-        std::map<std::string, std::shared_ptr<FileRepository>> frepos = _repositories;
-        for (auto const& pair : frepos) {
+        std::vector<std::shared_ptr<FileRepository>> toRemove;
+        for (auto const& pair : _repositories) {
             std::string frepoName = pair.first;
             if (frepoName != homeRepoName) {
                 auto it = repos.find(frepoName);
                 if (it == repos.end()) {
                     auto fit = _repositories.find(frepoName);
-                    _repositories.erase(fit);
+                    toRemove.push_back(fit->second);
                 }
             }
+        }
+        for (auto const& repo : toRemove) {
+            removeRepository(repo->name());
         }
     }
 

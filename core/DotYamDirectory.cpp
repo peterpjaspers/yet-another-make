@@ -46,11 +46,6 @@ namespace YAM
         std::filesystem::path yamDir(directory / yam);
         if (!std::filesystem::exists(yamDir)) {
             std::filesystem::create_directory(yamDir);
-            if (logBook != nullptr) {
-                std::stringstream ss;
-                ss << "YAM successfully initialized in directory " << yamDir.string() << std::endl;
-                logBook->add(LogRecord(LogRecord::Progress, ss.str()));
-            }
         }
         return yamDir;
     }

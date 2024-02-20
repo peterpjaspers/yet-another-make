@@ -42,7 +42,8 @@ namespace YAM
         MulticastDelegate<std::shared_ptr<BuildResult>>& completor();
 
     private:
-        void _init(std::filesystem::path directory);
+        void logRepoNotInitialized();
+        bool _init(std::shared_ptr<BuildRequest> const& request);
         void _start();
         void _clean(std::shared_ptr<BuildRequest> request);
         void _handleConfigNodesCompletion(Node* n);

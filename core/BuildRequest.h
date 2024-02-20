@@ -11,23 +11,17 @@ namespace YAM
     class __declspec(dllexport) BuildRequest : public IStreamable
     {
     public:
-        enum RequestType {
-            Init = 0,  // create a build state in directory()/.yam
-            Build = 1, // execute dirty nodes in build scope
-            Clean = 2  // delete output files of nodes in build scope
-        };
-
-        BuildRequest(RequestType type = Build);
+        BuildRequest();
         BuildRequest(IStreamer* reader);
 
-        void requestType(RequestType type);
-        RequestType requestType() const;
+        // Set/get the root directory of the repository to build.
+        void repoDirectory(std::filesystem::path const& directory);
+        std::filesystem::path const& repoDirectory();
 
-        // Set/get the directory from which the build was started.
-        void directory(std::filesystem::path const& directory);
-        std::filesystem::path const& directory();
+        // Set/get the name of the repository.
+        void repoName(std::string const& newName);
+        std::string const& repoName() const;
 
-        // Only applicable to Build and Clean requests.
         void addToScope(std::filesystem::path const& path);
         std::vector<std::filesystem::path> const& pathsInScope();
 
@@ -40,8 +34,8 @@ namespace YAM
         void stream(IStreamer* streamer) override;
 
     private:
-        RequestType _type;
-        std::filesystem::path _directory;
+        std::filesystem::path _repoDirectory;
+        std::string _repoName;
         std::vector<std::filesystem::path> _pathsInScope;
         std::vector<LogRecord::Aspect> _logAspects;
     };

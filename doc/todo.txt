@@ -4,7 +4,7 @@ Todo for R1.0.0
   In buildfile: @@./something meaning of @@. is buildfile repo, NOT root repo.
   Add type to filerepo, only support integrated, tracked and ignore
   Repo cycle detection
-  Specify repo name @ yam init (no longer use "." for home repo)
+  Verify repo is not contained in other repo
 - Version in PersistentBuildState
 - improve buildfile cycle detection (see group cycle detection)
 - fileaspect configuration
