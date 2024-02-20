@@ -345,16 +345,18 @@ namespace YAM
         for (auto const& pair : repos) {
             std::shared_ptr<FileRepository> frepo;
             Repo const& repo = pair.second;
+            std::filesystem::path absRepoDir(homeRepository()->directory() / repo.dir);
+            absRepoDir = std::filesystem::canonical(absRepoDir);
             auto it = _repositories.find(repo.name);
             if (it == _repositories.end()) {
-                frepo = std::make_shared<FileRepository>(repo.name, repo.dir, context(), true);
+                frepo = std::make_shared<FileRepository>(repo.name, absRepoDir, context(), true);
                 ok = addRepository(frepo);
                 if (!ok) return false;
                 modified(true);
             } else {
                 frepo = it->second;
             }
-            if (!updateRepoDirectory(*frepo, repo.dir)) return false;
+            if (!updateRepoDirectory(*frepo, absRepoDir)) return false;
             //frepo->type(repo.type);
             frepo->inputRepoNames(repo.inputs);
         }

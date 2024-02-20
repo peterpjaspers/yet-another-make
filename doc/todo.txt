@@ -1,7 +1,6 @@
 Todo for R1.0.0
 - RepositoriesNode
   Add type to filerepo, only support integrated, tracked and ignore
-  Verify repo is not contained in other repo
 - Version in PersistentBuildState
 - improve buildfile cycle detection (see group cycle detection)
 - fileaspect configuration

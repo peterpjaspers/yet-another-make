@@ -120,9 +120,11 @@ namespace
 
     TEST(RepositoriesNode, invalidRepoDirSub) {
         TestSetup setup;
+        std::filesystem::path subDir(setup.repo1Dir / "sub");
+        std::filesystem::create_directories(subDir);
         std::stringstream ss;
         ss << "name=repo1 dir=" << setup.repo1Dir << " type=Integrated ;" << std::endl;
-        ss << "name=repo2 dir=" << setup.repo1Dir/"sub" << " type=Integrated ;" << std::endl;
+        ss << "name=repo2 dir=" << subDir << " type=Integrated ;" << std::endl;
         writeFile(setup.repositoriesPath, ss.str());
         bool completed = YAMTest::executeNode(setup.repositoriesNode.get());
         EXPECT_TRUE(completed);
@@ -144,5 +146,22 @@ namespace
         LogRecord const& r = setup.logBook->records()[0];
         std::string msg("repository directory is equal to directory of repository repo1");
         EXPECT_NE(std::string::npos, r.message.find(msg));
+    }
+
+    TEST(RepositoriesNode, relativeRepoDir) {
+        TestSetup setup;
+        std::filesystem::path repoDir1(setup.homeRepoDir.parent_path() / "r1");
+        std::filesystem::create_directories(repoDir1);
+        std::stringstream ss;
+        ss << "name=repo1 dir=" << repoDir1 << " type=Integrated ;" << std::endl;
+        writeFile(setup.repositoriesPath, ss.str());
+        bool completed = YAMTest::executeNode(setup.repositoriesNode.get());
+        EXPECT_TRUE(completed);
+        EXPECT_EQ(Node::State::Ok, setup.repositoriesNode->state());
+
+        auto frepo1 = setup.context.findRepository("repo1");
+        EXPECT_EQ(repoDir1, frepo1->directory());
+
+        std::filesystem::remove_all(repoDir1);
     }
 }
