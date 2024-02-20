@@ -108,7 +108,8 @@ namespace YAM
     private:
 
         void handleRequisitesCompletion(Node::State newState);
-        void updateRepos(std::map<std::string, RepositoriesNode::Repo> const& repos);
+        bool updateRepos(std::map<std::string, RepositoriesNode::Repo> const& repos);
+        bool updateRepoDirectory(FileRepository& frepo, std::filesystem::path const& newDir);
 
         bool _ignoreConfigFile;
         std::shared_ptr<SourceFileNode> _configFile;

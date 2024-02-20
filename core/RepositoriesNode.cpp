@@ -5,7 +5,7 @@
 #include "BuildFileTokenizer.h"
 #include "TokenRegexSpec.h"
 #include "TokenPathSpec.h"
-#include "LogRecord.h"
+#include "ILogBook.h"
 #include "IStreamer.h"
 
 #include <fstream>
@@ -146,17 +146,47 @@ namespace //parser
     };
 }
 
-namespace // detect cycles
+namespace
 {
-    std::string trailToString(std::list<std::string> const& trail) {
+    using namespace YAM;
+
+    void logDuplicateRepo(ILogBook &logBook, FileRepository const &repo) {
         std::stringstream ss;
-        auto end = std::prev(trail.end());
-        auto it = trail.begin();
-        for (; it != end; ++it) {
-            ss << (*it) << " => ";
+        ss 
+            << "Cannot add repository " << repo.name() << " with directory " << repo.directory()
+            << " : repository name is already in use" << std::endl;
+        LogRecord e(LogRecord::Error, ss.str());
+        logBook.add(e);
+    }
+
+    void logSubRepo(ILogBook &logBook, FileRepository const& repo, FileRepository const& parent) {
+        bool equalDirs = repo.directory() == parent.directory();
+        std::stringstream ss;
+        if (equalDirs) {
+            ss
+                << "Cannot add repository " << repo.name() << " with directory " << repo.directory()
+                << " : repository directory is equal to directory of repository " << parent.name()
+                << std::endl;
+        } else {
+            ss
+                << "Cannot add repository " << repo.name() << " with directory " << repo.directory()
+                << " : repository directory is sub-directory of repository "
+                << parent.name() << " with directory " << parent.directory()
+                << std::endl;
         }
-        ss << (*it) << std::endl;
-        return ss.str();
+        LogRecord e(LogRecord::Error, ss.str());
+        logBook.add(e);
+    }
+
+    void logParentRepo(ILogBook &logBook, FileRepository const& repo, FileRepository const& sub) {
+        std::stringstream ss;
+        ss
+            << "Cannot add repository " << repo.name() << " with directory " << repo.directory()
+            << " : repository directory is parent directory of repository "
+            << sub.name() << " with directory " << sub.directory()
+            << std::endl;
+        LogRecord e(LogRecord::Error, ss.str());
+        logBook.add(e);
     }
 }
 
@@ -226,10 +256,27 @@ namespace YAM
 
     bool RepositoriesNode::addRepository(std::shared_ptr<FileRepository> const& repo) {
         auto it = _repositories.find(repo->name());
-        if (it != _repositories.end()) return false;
-        modified(true);
-        _repositories.insert({ repo->name(), repo });
-        return true;
+        if (it != _repositories.end()) {
+            logDuplicateRepo(*(context()->logBook()), *repo);
+            return false;
+        }
+        bool ok = true;
+        for (auto const& pair : _repositories) {
+            auto other = pair.second;
+            if (other->lexicallyContains(repo->directory())) {
+                logSubRepo(*(context()->logBook()), *repo, *other);
+                ok = false;
+            }
+            if (repo->lexicallyContains(other->directory())) {
+                logParentRepo(*(context()->logBook()), *repo, *other);
+                ok = false;
+            }
+        }
+        if (ok) {
+            modified(true);
+            _repositories.insert({ repo->name(), repo });
+        }
+        return ok;
     }
 
     bool RepositoriesNode::removeRepository(std::string const& repoName) {
@@ -283,34 +330,31 @@ namespace YAM
         try {
             Parser parser(_configFile->absolutePath());
             //detectCycles(context(), parser.repos());
-            updateRepos(parser.repos());
-            return true;
+            return updateRepos(parser.repos());
         } catch (std::runtime_error e) {
             LogRecord error(LogRecord::Aspect::Error, e.what());
             context()->addToLogBook(error);
             return false;
         }
     }
-    void RepositoriesNode::updateRepos(
+    bool RepositoriesNode::updateRepos(
         std::map<std::string, RepositoriesNode::Repo> const& repos
     ) {
         // add new and update existing repos
+        bool ok = true;
         for (auto const& pair : repos) {
             std::shared_ptr<FileRepository> frepo;
             Repo const& repo = pair.second;
             auto it = _repositories.find(repo.name);
             if (it == _repositories.end()) {
-                frepo = std::make_shared<FileRepository>(
-                    repo.name, repo.dir, context(), true);
-                _repositories.insert({ repo.name, frepo });
+                frepo = std::make_shared<FileRepository>(repo.name, repo.dir, context(), true);
+                ok = addRepository(frepo);
+                if (!ok) return false;
                 modified(true);
             } else {
                 frepo = it->second;
             }
-            if (frepo->directory() != repo.dir) {
-                frepo->directory(repo.dir);
-                modified(true);
-            }
+            if (!updateRepoDirectory(*frepo, repo.dir)) return false;
             //frepo->type(repo.type);
             frepo->inputRepoNames(repo.inputs);
         }
@@ -332,6 +376,27 @@ namespace YAM
             removeRepository(repo->name());
             modified(true);
         }
+        return true;
+    }
+
+    bool RepositoriesNode::updateRepoDirectory(FileRepository &frepo, std::filesystem::path const& newDir) {
+        if (frepo.directory() != newDir) {
+            for (auto const& pair : _repositories) {
+                auto other = pair.second;
+                if (other.get() == &frepo) continue;
+                if (other->lexicallyContains(newDir)) {
+                    logSubRepo(*(context()->logBook()), frepo, *other);
+                    return false;
+                }
+                if (frepo.lexicallyContains(other->directory())) {
+                    logParentRepo(*(context()->logBook()), frepo, *other);
+                    return false;
+                }
+            }
+            frepo.directory(newDir);
+            frepo.modified(true);
+        }
+        return true;
     }
 
     void RepositoriesNode::setStreamableType(uint32_t type) {
