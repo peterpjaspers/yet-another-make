@@ -23,7 +23,7 @@ namespace //parser
     TokenRegexSpec _inputsKey(R"(^inputs)", "inputs");
     TokenRegexSpec _eq(R"(^=)", "=");
     TokenRegexSpec _end(R"(^;)", ";");
-    TokenRegexSpec _identifier(R"(^\w+)", "identifier");
+    TokenRegexSpec _identifier(R"(^[\w0123456789_-]*)", "identifier");
     TokenPathSpec _path;
 
     std::string readFile(std::filesystem::path const& path) {
@@ -284,7 +284,6 @@ namespace YAM
             Parser parser(_configFile->absolutePath());
             //detectCycles(context(), parser.repos());
             updateRepos(parser.repos());
-            modified(true); 
             return true;
         } catch (std::runtime_error e) {
             LogRecord error(LogRecord::Aspect::Error, e.what());
@@ -304,10 +303,14 @@ namespace YAM
                 frepo = std::make_shared<FileRepository>(
                     repo.name, repo.dir, context(), true);
                 _repositories.insert({ repo.name, frepo });
+                modified(true);
             } else {
                 frepo = it->second;
             }
-            frepo->directory(repo.dir);
+            if (frepo->directory() != repo.dir) {
+                frepo->directory(repo.dir);
+                modified(true);
+            }
             //frepo->type(repo.type);
             frepo->inputRepoNames(repo.inputs);
         }
@@ -327,6 +330,7 @@ namespace YAM
         }
         for (auto const& repo : toRemove) {
             removeRepository(repo->name());
+            modified(true);
         }
     }
 

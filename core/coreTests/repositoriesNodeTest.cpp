@@ -40,7 +40,8 @@ namespace
             std::filesystem::path repositoriesPath(homeRepoDir / RepositoriesNode::configFilePath());
             std::stringstream ss;
             if (syntaxError) {
-                ss << "name=repo1 dir=" << repo1Dir << " types=Integrated ;" << std::endl;
+                // repo name not a valid identifier 
+                ss << "name=repo/1 dir=" << repo1Dir << " type=Integrated ;" << std::endl;
                 ss << "name=repo2 dir=" << repo2Dir << " type=Tracked ;" << std::endl;
 
             } else {

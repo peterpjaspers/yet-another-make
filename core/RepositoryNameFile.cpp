@@ -1,6 +1,7 @@
 #include "RepositoryNameFile.h"
 #include <iostream>
 #include <fstream>
+#include <regex>
 
 namespace
 {
@@ -39,19 +40,29 @@ namespace
 
     bool confirmRepoDir(std::filesystem::path const& repoDir) {
         std::cout << "Initializing yam on directory " << repoDir << std::endl;
+        std::cout << "Make sure that this is the root directory of your source code repository.";
+        std::cout << std::endl;
+        std::cout << "If this is not the case then restart yam on the proper directory.";
+        std::cout << std::endl;
         std::string input;
         do {
-            std::cout << "Is this the root of the source code tree that you want to build [y|n]:";
+            std::cout << "Please confirm using this directory [y|n]:";
             std::cin >> input;
         } while (!yes(input) && !no(input));
         return yes(input);
     }
 
     bool confirmRepoName(std::string const& repoName) {
+        static std::regex re("^[\w0123456789_-]*$");
+        if (!std::regex_match(repoName, re)) {
+            std::cout << "Invalid repository name: valid chars are a-z, A-Z, 0-9, _, -";
+            std::cout << std::endl;
+            return false;
+        }
         std::cout << "Yam will use the following repository name: " << repoName << std::endl;
         std::string input;
         do {
-            std::cout << "Please confirm [y|n]: ";
+            std::cout << "Please confirm using this name [y|n]: ";
             std::cin >> input;
         } while (!yes(input) && !no(input));
         return yes(input);
