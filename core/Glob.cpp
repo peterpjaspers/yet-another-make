@@ -108,7 +108,7 @@ namespace {
 namespace YAM {
 
     Glob::Glob(std::string const& globPattern, bool globstar)
-        : _re(globPatternAsRegex(fwdSlashPath(globPattern), globstar))
+        : _re(globPatternAsRegex(globPattern, globstar))
     {}
 
     Glob::Glob(std::filesystem::path const& globPattern)

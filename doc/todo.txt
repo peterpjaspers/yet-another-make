@@ -1,6 +1,7 @@
 Todo for R 0.1.0
 - use allowedInputs in BuildFileCompiler in checking input
 - test output ignore files
+- BuildScopeFinder unittest
 - implement wildcard for output files
 - deal with Node::State::Deleted
 - integrate Phil's file access monitor

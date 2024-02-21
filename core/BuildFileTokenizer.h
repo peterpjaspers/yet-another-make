@@ -33,15 +33,15 @@ namespace YAM {
 
         std::size_t tokenStartOffset() const { return _tokenStartOffset; }
         std::size_t tokenEndOffset() const { return _tokenEndOffset; }
-        std::size_t tokenStartLine() const { return _tokenStartLine; }
-        std::size_t tokenEndLine() const { return _tokenEndLine; }
-        std::size_t tokenStartColumn() const { return _tokenStartColumn; }
-        std::size_t tokenEndColumn() const{ return _tokenEndColumn; }
+        std::size_t tokenStartLine() const { return _tokenStartLine+1; }
+        std::size_t tokenEndLine() const { return _tokenEndLine+1; }
+        std::size_t tokenStartColumn() const { return _tokenStartColumn+1; }
+        std::size_t tokenEndColumn() const{ return _tokenEndColumn+1; }
 
         std::size_t cursor() const { return _cursor; }
         std::size_t lineBeginOffset() const { return _lineBeginOffset; }
-        std::size_t line() const { return _line; }
-        std::size_t column() const { return _column; }
+        std::size_t line() const { return _line+1; }
+        std::size_t column() const { return _column+1; }
 
 
 

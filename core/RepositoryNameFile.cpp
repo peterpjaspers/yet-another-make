@@ -53,7 +53,7 @@ namespace
     }
 
     bool confirmRepoName(std::string const& repoName) {
-        static std::regex re("^[\w0123456789_-]*$");
+        std::regex re(R"(^[\w0123456789_\-]*$)");
         if (!std::regex_match(repoName, re)) {
             std::cout << "Invalid repository name: valid chars are a-z, A-Z, 0-9, _, -";
             std::cout << std::endl;

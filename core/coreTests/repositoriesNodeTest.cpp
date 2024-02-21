@@ -86,7 +86,7 @@ namespace
         EXPECT_TRUE(completed);
         EXPECT_EQ(Node::State::Failed, setup.repositoriesNode->state());
         LogRecord const& r = setup.logBook->records()[0];
-        std::string msg("Unexpected token at line 0");
+        std::string msg("Unexpected token at line 1");
         EXPECT_EQ(0, r.message.find(msg));
     }
 
@@ -100,7 +100,7 @@ namespace
         EXPECT_TRUE(completed);
         EXPECT_EQ(Node::State::Failed, setup.repositoriesNode->state());
         LogRecord const& r = setup.logBook->records()[0];
-        std::string msg("Unexpected token at line 1");
+        std::string msg("Unexpected token at line 2");
         EXPECT_EQ(0, r.message.find(msg));
     }
 

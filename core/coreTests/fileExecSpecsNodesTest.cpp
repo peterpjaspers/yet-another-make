@@ -78,7 +78,7 @@ namespace
         EXPECT_TRUE(completed);
         EXPECT_EQ(Node::State::Failed, setup.fileExecSpecsNode->state());
         LogRecord const& r = setup.logBook->records()[0];
-        std::string msg("Unexpected token at line 1, column 5 in file ");        
+        std::string msg("Unexpected token at line 2, column 6 in file ");        
         msg.append(setup.fileExecSpecsNode->absoluteConfigFilePath().string());
         msg.append("\n");
         EXPECT_EQ(msg, r.message);
