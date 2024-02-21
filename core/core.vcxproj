@@ -103,11 +103,11 @@
     <ClInclude Include="BuildClient.h" />
     <ClInclude Include="Builder.h" />
     <ClInclude Include="BuildFileCompilerNode.h" />
-    <ClInclude Include="BuildFileCompiler_2.h" />
     <ClInclude Include="BuildFileDependenciesCompiler.h" />
+    <ClInclude Include="BuildOptions.h" />
+    <ClInclude Include="BuildScopeFinder.h" />
     <ClInclude Include="FileExecSpecsNode.h" />
     <ClInclude Include="BuildFileParserNode.h" />
-    <ClInclude Include="BuildFilePreCompiler.h" />
     <ClInclude Include="FileRepository.h" />
     <ClInclude Include="RepositoriesNode.h" />
     <ClInclude Include="Glob.h" />
@@ -189,6 +189,7 @@
     <ClInclude Include="Token.h" />
     <ClInclude Include="TokenPathSpec.h" />
     <ClInclude Include="TokenRegexSpec.h" />
+    <ClInclude Include="BuildOptionsParser.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BasicOStreamLogBook.cpp" />
@@ -199,6 +200,8 @@
     <ClCompile Include="BuildFile.cpp" />
     <ClCompile Include="BuildFileCompilerNode.cpp" />
     <ClCompile Include="BuildFileDependenciesCompiler.cpp" />
+    <ClCompile Include="BuildOptions.cpp" />
+    <ClCompile Include="BuildScopeFinder.cpp" />
     <ClCompile Include="FileExecSpecsNode.cpp" />
     <ClCompile Include="BuildFileParserNode.cpp" />
     <ClCompile Include="BuildFileTokenSpecs.cpp" />
@@ -285,6 +288,7 @@
     <ClCompile Include="BuildFileTokenizer.cpp" />
     <ClCompile Include="TokenPathSpec.cpp" />
     <ClCompile Include="TokenRegexSpec.cpp" />
+    <ClCompile Include="BuildOptionsParser.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="IStreamer.inl" />

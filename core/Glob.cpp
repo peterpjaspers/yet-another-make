@@ -94,16 +94,25 @@ namespace {
         ss << '$';
         return std::regex(ss.str());
     }
+
+    std::string fwdSlashPath(std::filesystem::path const& patternPath) {
+        bool toFwdSlash = (std::filesystem::path::preferred_separator == '\\');
+        std::string pattern = patternPath.string();
+        if (toFwdSlash) {
+            std::replace(pattern.begin(), pattern.end(), '\\', '/');
+        }
+        return pattern;
+    }
 }
 
 namespace YAM {
 
     Glob::Glob(std::string const& globPattern, bool globstar)
-        : _re(globPatternAsRegex(globPattern, globstar))
+        : _re(globPatternAsRegex(fwdSlashPath(globPattern), globstar))
     {}
 
     Glob::Glob(std::filesystem::path const& globPattern)
-        : _re(globPatternAsRegex(globPattern.string(), true))
+        : _re(globPatternAsRegex(fwdSlashPath(globPattern), true))
     {}
 
     bool Glob::isGlob(std::string const& pattern) {
@@ -117,7 +126,7 @@ namespace YAM {
     }
 
     bool Glob::matches(std::filesystem::path const& path) const {
-        return std::regex_match(path.string(), _re);
+        return std::regex_match(fwdSlashPath(path), _re);
     }
 }
 

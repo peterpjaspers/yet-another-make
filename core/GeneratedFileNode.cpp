@@ -25,11 +25,12 @@ namespace YAM
     bool GeneratedFileNode::deleteFile(bool setDirty) {
         std::error_code ok;
         std::error_code ec;
-        bool deleted = std::filesystem::remove(absolutePath(), ec);
+        auto absPath = absolutePath();
+        bool deleted = std::filesystem::remove(absPath, ec);
         if (deleted && setDirty) {
             setState(Node::State::Dirty);
         }
-        return ec != ok;
+        return !std::filesystem::exists(absPath);
     }
 
     void GeneratedFileNode::setStreamableType(uint32_t type) {

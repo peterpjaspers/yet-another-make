@@ -1,16 +1,34 @@
-Todo for R1.0.0
+Todo for R 0.1.0
+- use allowedInputs in BuildFileCompiler in checking input
+- deal with Node::State::Deleted
+- integrate Phil's file access monitor
 - RepositoriesNode
   Add type to filerepo, only support integrated, tracked and ignore
 - Version in PersistentBuildState
+  Encode version in name of buildstate file
 - improve buildfile cycle detection (see group cycle detection)
 - fileaspect configuration
 - variants (tup variants, MR build configurations)
 - command line arguments for scope and logging
-- yam init, make user confirm proper root dir of repo (think of git submod dirs with own .git dir)
+- Fast lookup of dirty nodes, modified nodes
+- use static iso dll libraries
+  This also enables implementation of streaming hash computation
 - build yam with yam
-- testing testing testing
-- documentation
+- how to deal with gtest, boost, xxhash?
+- license
+- how to deal with env variables
+- automated end-to-end testing
+- scalability measurements
+- documentation, bedenk betere naam
 - inform Mike Shal
+
+Todo for later release:
+- distributed build
+- build cache
+- btree/page caching
+
+
+
 
 
 Todo: core

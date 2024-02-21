@@ -532,18 +532,10 @@ namespace YAM {
             }
             // Match generated files
             if (!_allowedInputs.empty()) {
-                bool toFwdSlash = (std::filesystem::path::preferred_separator == '\\');
-                std::string pattern = (globNode->baseDirectory()->name() / globNode->pattern()).string();
-                if (toFwdSlash) {
-                    std::replace(pattern.begin(), pattern.end(), '\\', '/');
-                }
+                std::filesystem::path pattern = globNode->baseDirectory()->name() / globNode->pattern();
                 Glob glob(pattern);
                 for (auto const& pair : _allowedInputs) {
-                    std::string pathStr = pair.second->name().string();
-                    if (toFwdSlash) {
-                        std::replace(pathStr.begin(), pathStr.end(), '\\', '/');
-                    }
-                    if (glob.matches(pathStr)) {
+                    if (glob.matches(pair.second->name())) {
                         inputNodes.push_back(pair.second);
                     }
                 }

@@ -294,12 +294,6 @@
     <ClInclude Include="NodeMapStreamer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="BuildFileCompiler_2.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="BuildFilePreCompiler.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="GroupCycleFinder.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -322,6 +316,15 @@
       <Filter>Header Files\Node</Filter>
     </ClInclude>
     <ClInclude Include="RepositoryNameFile.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildOptions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildOptionsParser.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildScopeFinder.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -534,6 +537,15 @@
       <Filter>Source Files\Node</Filter>
     </ClCompile>
     <ClCompile Include="RepositoryNameFile.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildOptions.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildOptionsParser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildScopeFinder.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

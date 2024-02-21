@@ -7,6 +7,8 @@
 #include "../Dispatcher.h"
 #include "../BuildService.h"
 #include "../RepositoryNameFile.h"
+#include "../BuildOptions.h"
+#include "../BuildOptionsParser.h"
 
 #include <thread>
 #include <filesystem>
@@ -183,12 +185,18 @@ bool initializeYam(ILogBook &logBook, std::filesystem::path &repoDir, std::strin
     return !repoName.empty();
 }
 
-int main(int argc, char argv[]) {
+int main(int argc, char* argv[]) {
     ConsoleLogBook logBook;
     logBook.logElapsedTime(true);
+    BuildOptions options;
+    BuildOptionsParser parser(argc, argv, options);
+    if (parser.parseError()) return 1;
+
+    // TODO: remove before release.
     std::vector<LogRecord::Aspect> logAspects = logBook.aspects();
     logAspects.push_back(LogRecord::BuildStateUpdate);
     logBook.aspects(logAspects);
+    options._logAspects = logAspects;
 
     std::filesystem::path repoDir;
     std::string repoName;
@@ -208,7 +216,7 @@ int main(int argc, char argv[]) {
         auto request = std::make_shared<BuildRequest>();
         request->repoDirectory(repoDir);
         request->repoName(repoName);
-        request->logAspects(logAspects);
+        request->options(options);
 
         std::shared_ptr<BuildResult> result;
         Dispatcher dispatcher;

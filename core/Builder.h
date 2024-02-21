@@ -44,8 +44,8 @@ namespace YAM
     private:
         void logRepoNotInitialized();
         bool _init(std::shared_ptr<BuildRequest> const& request);
+        void _clean();
         void _start();
-        void _clean(std::shared_ptr<BuildRequest> request);
         void _handleConfigNodesCompletion(Node* n);
         void _handleDirectoriesCompletion(Node* n);
         void _handleBuildFileParsersCompletion(Node* n);

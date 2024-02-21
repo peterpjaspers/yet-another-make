@@ -110,11 +110,15 @@ When during retrieval node X streams (reads) G and key-of G is not in storage
 then an object in Deleted state is returned. This resembles earlier discussed
 'filtered streaming' scenario.
 Note that without further measures G is left as garbage in storage when a future 
-version of X no longer references G. Such garbage can be collected by retrieving 
-all objects from storage and, in addition to current implementation (first 
-retrieve all keys in storage and create placeholder objects, then for each key 
-the stream its value into the placeholder object) keeping track of all keys 
-passed to retrieve(key). garbage == all_keys - refd_keys.
+version of X no longer references G. Such garbage can be collected as follows:
+    - retrieve all keys from all btrees
+    - for each key
+        - create placeholder object of correct type
+        - initialize key.refcnt=1
+        - call retrieve(key,reader) to stream the key value into the
+          placeholder object.
+        - for each call to retrieve(key) key.refcnt++
+    - garbage == all_keys - all_keys.where(key is deleted and refcnt==1).
 
 In this design still the difference between context and stored state determines 
 which objects must be inserted/replaced/removed. Removal request from stoarge
@@ -129,15 +133,11 @@ When removal is ignored:
      - Garbage can be detected/collection during retrieveAll.
 Best solution seems to be to allow deleted nodes in storage.
 Take care: deleted nodes must not be added to context as side effect of their 
-retrieval. This requires separate btree that stores the keys of nodes in context. 
-Retrieving these keys causes retrieval of refd keys. Refd keys that are not in 
-context, i.e are not in separate btree, are added to set of keys of deleted nodes.
-When this set is empty we can remove the deleted nodes from the node btrees: 
-garbage = keys in node btrees - keys in context tree. 
-Note: this GC can only be done immediately after retrieving entire context.
-  
+retrieval. I.e. only the objects with keys in all_keys-garbage.
 
-The following sections contain insights obtained during above design study.
+
+
+The following sections contain insights obtained during above design analysis.
 
 Inconsistent behavior between rules with input paths and input globs
 when source files are deleted. Input path==path without glob chars.

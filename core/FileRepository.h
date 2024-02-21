@@ -35,7 +35,7 @@ namespace YAM
     //      See class FileRepositoriesNode.
     // 
     // The FileRepository type defines how yam will use a child repository:
-    //    - Integrated
+    //    - Local
     //      Yam will treat the repository as if it was a directory in the
     //      home repository: yam will mirror the files/directories, execute,
     //      parse and compile buildfiles, execute the resulting command nodes 
@@ -50,7 +50,7 @@ namespace YAM
     //            A build in a child repo may write generated files previously 
     //            build in the home repo. A subsequent build in the home repo 
     //            will consider these files to be out-dated and rebuild them.
-    //    - Coupled (optionally, discuss with Phil)
+    //    - Foreign (optionally, discuss with Phil)
     //      Before yam builds the home repository it submits build requests to
     //      the yamServers for Coupled child repositories. Yam will register 
     //      detected input file dependencies in the buildstate of the home repo
@@ -68,7 +68,7 @@ namespace YAM
     //            dependencies of generated files in child. For that one has to
     //            inspect the buildstate in the child repo buildstate.
     //          - Always the overhead of up-to-date analysis of the child repos.
-    //    - Tracked
+    //    - Track
     //      Yam will not build the child repo. Yam will register detected input 
     //      file dependencies in the buildstate of the home repo.
     //    - Ignore

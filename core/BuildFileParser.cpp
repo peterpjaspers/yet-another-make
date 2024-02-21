@@ -186,7 +186,7 @@ namespace YAM {
                 BuildFile::Input in;
                 eatInput(in);
                 inputs.inputs.push_back(in);
-                lookAhead({ glob, ignore });
+                lookAhead({ ignore, glob });
             }
         }
     }
@@ -253,7 +253,7 @@ namespace YAM {
                 BuildFile::Output out;
                 eatOutput(out);
                 outputs.outputs.push_back(out);
-                lookAhead({ glob, ignore });
+                lookAhead({ ignore, glob });
             }
         }
     }

@@ -12,9 +12,7 @@ namespace YAM
         stream(reader);
     }
 
-    BuildRequest::BuildRequest()
-        : _logAspects(LogRecord::allAspects())
-    {}
+    BuildRequest::BuildRequest() {}
 
     // Set/get the directory from which the build is started.
     void BuildRequest::repoDirectory(std::filesystem::path const& directory) {
@@ -33,20 +31,12 @@ namespace YAM
         return _repoName;
     }
 
-    void BuildRequest::addToScope(std::filesystem::path const& path) {
-        _pathsInScope.push_back(path);
+    void BuildRequest::options(BuildOptions const& newOptions) {
+        _options = newOptions;
     }
 
-    std::vector<std::filesystem::path> const& BuildRequest::pathsInScope() {
-        return _pathsInScope;
-    }
-
-    void BuildRequest::logAspects(std::vector<LogRecord::Aspect> const& aspects) {
-        _logAspects = aspects;
-    }
-
-    std::vector<LogRecord::Aspect>const& BuildRequest::logAspects() const {
-        return _logAspects;
+    BuildOptions const& BuildRequest::options() const {
+        return _options;
     }
 
     void BuildRequest::setStreamableType(uint32_t type) {
@@ -60,7 +50,6 @@ namespace YAM
     void BuildRequest::stream(IStreamer* streamer) {
         streamer->stream(_repoDirectory);
         streamer->stream(_repoName);
-        streamer->streamVector(_pathsInScope);
-        LogRecord::streamAspects(streamer, _logAspects);
+        _options.stream(streamer);
     }
 }

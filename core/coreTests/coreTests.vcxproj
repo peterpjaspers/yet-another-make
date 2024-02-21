@@ -50,6 +50,7 @@
     <ClCompile Include="buildFileDependenciesCompilerTest.cpp" />
     <ClCompile Include="buildFileParserTest.cpp" />
     <ClCompile Include="buildFileCompilerNodeTest.cpp" />
+    <ClCompile Include="buildOptionsParserTest.cpp" />
     <ClCompile Include="buildServicePortRegistryTest.cpp" />
     <ClCompile Include="buildServiceProtocolTest.cpp" />
     <ClCompile Include="collapsedFileChangesTest.cpp" />

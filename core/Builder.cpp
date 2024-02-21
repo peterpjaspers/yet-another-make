@@ -16,6 +16,9 @@
 #include "GroupCycleFinder.h"
 #include "PersistentBuildState.h"
 #include "RepositoryNameFile.h"
+#include "Globber.h"
+#include "Glob.h"
+#include "BuildScopeFinder.h"
 
 #include <iostream>
 #include <map>
@@ -29,18 +32,18 @@ namespace
     void resetNodeStates(NodeSet& nodes) {
         auto resetState = Delegate<void, std::shared_ptr<Node> const&>::CreateLambda(
             [](std::shared_ptr<Node> const& node) {
-                if (
-                    node->state() != Node::State::Ok
-                    && node->state() != Node::State::Deleted
-                 ) {
-                    node->setState(Node::State::Dirty);
-                }
-            });
+            if (
+                node->state() != Node::State::Ok
+                && node->state() != Node::State::Deleted
+             ) {
+                node->setState(Node::State::Dirty);
+            }
+        });
         nodes.foreach(resetState);
     }
 
     void appendDirtyDirectoryNodes(
-        std::shared_ptr<DirectoryNode> directory, 
+        std::shared_ptr<DirectoryNode> directory,
         std::map<std::filesystem::path, std::shared_ptr<DirectoryNode>>& dirtyDirs
     ) {
         if (directory->state() == Node::State::Dirty) {
@@ -51,7 +54,7 @@ namespace
             auto dir = dynamic_pointer_cast<DirectoryNode>(child);
             if (dir != nullptr) {
                 appendDirtyDirectoryNodes(dir, dirtyDirs);
-            } 
+            }
         }
     }
 
@@ -74,7 +77,7 @@ namespace
         std::shared_ptr<DirectoryNode> directory,
         std::vector<std::shared_ptr<Node>>& dirtyNodes
     ) {
-        auto parser= directory->buildFileParserNode();
+        auto parser = directory->buildFileParserNode();
         if (parser != nullptr && parser->state() == Node::State::Dirty) {
             dirtyNodes.push_back(parser);
         }
@@ -107,19 +110,32 @@ namespace
         return filePath.filename() == buildFileName;
     }
 
-    auto includeNode = Delegate<bool, std::shared_ptr<Node> const&>::CreateLambda(
-        [](std::shared_ptr<Node> const& node) {
+    void appendDirtyCommands(
+        NodeSet& nodes,
+        std::vector<std::filesystem::path> const& scope,
+        std::vector<std::shared_ptr<Node>>& dirtyCommands
+    ) {
+        for (auto const& node : nodes.nodes()) {
             auto cmd = dynamic_pointer_cast<CommandNode>(node);
-            return (cmd != nullptr && cmd->state() == Node::State::Dirty);
-        });
-
-    void appendDirtyCommands(NodeSet& nodes, std::vector<std::shared_ptr<Node>>& dirtyCommands) {
-        nodes.find(includeNode, dirtyCommands);
+            if (cmd != nullptr && cmd->state() == Node::State::Dirty) {
+                if (scope.empty()) {
+                    dirtyCommands.push_back(cmd);
+                } else {
+                    for (auto const& output : cmd->outputs()) {
+                        auto it = std::find(scope.begin(), scope.end(), output->name());
+                        if (it != scope.end()) {
+                            dirtyCommands.push_back(cmd);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     void logBuildFileCycle(
-        std::shared_ptr<ILogBook> const& logBook, 
-        std::shared_ptr<BuildFileParserNode> root, 
+        std::shared_ptr<ILogBook> const& logBook,
+        std::shared_ptr<BuildFileParserNode> root,
         std::list<const BuildFileParserNode*>const& trail
     ) {
         std::stringstream ss;
@@ -176,7 +192,11 @@ namespace YAM
         _result = std::make_shared<BuildResult>();
         bool ok = _init(request);
         if (ok) {
-            _start();
+            if (request->options()._clean) {
+                _clean();
+            } else {
+                _start();
+            }
         } else {
             _notifyCompletion(Node::State::Failed);
         }
@@ -226,17 +246,17 @@ namespace YAM
     }
 
     // Called in main thread
-    void Builder::_clean(std::shared_ptr<BuildRequest> request) {
+    void Builder::_clean() {
         uint32_t nFailures = 0;
-        auto cleanNode = Delegate<void, std::shared_ptr<Node> const&>::CreateLambda(
-            [&nFailures](std::shared_ptr<Node> const& node) {
-            auto generatedFileNode = dynamic_pointer_cast<GeneratedFileNode>(node);
-        if (generatedFileNode != nullptr) {
-            if (!generatedFileNode->deleteFile(true)) nFailures += 1;
+        std::vector<std::shared_ptr<Node>> cmds;
+        std::vector<std::shared_ptr<GeneratedFileNode>> genFiles;
+        BuildScopeFinder finder;
+        cmds = finder(&_context, _context.buildRequest()->options(), &genFiles);
+        for (auto const& file : genFiles) {
+            if (!file->deleteFile(true)) nFailures += 1;
         }
-        });
-        _context.nodes().foreach(cleanNode);
         _result->succeeded(nFailures == 0);
+        _notifyCompletion(nFailures == 0 ? Node::State::Ok : Node::State::Failed);
     }
 
     bool Builder::_containsBuildFileCycles(
@@ -438,9 +458,9 @@ namespace YAM
              }
              _postCompletion(Node::State::Failed);
         } else {
-            std::vector<std::shared_ptr<Node>> dirtyCommands;
-            appendDirtyCommands(_context.nodes(), dirtyCommands);
-            if (
+            BuildScopeFinder finder;
+            std::vector<std::shared_ptr<Node>> dirtyCommands = finder(&_context, _context.buildRequest()->options());
+             if (
                 !_dirtyBuildFileCompilers->content().empty()
                 || !dirtyCommands.empty()
             ) {

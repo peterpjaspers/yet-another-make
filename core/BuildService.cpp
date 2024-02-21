@@ -74,7 +74,7 @@ namespace YAM
         _builder.context()->logBook(_logBook);
         if (buildRequest != nullptr) {
             if (!_builder.running()) {
-                aspects(buildRequest->logAspects());
+                aspects(buildRequest->options()._logAspects);
                 _logBook->aspects(aspects());
                 _builder.completor().AddRaw(this, &BuildService::handleBuildCompletion);
                 _builder.start(buildRequest);
