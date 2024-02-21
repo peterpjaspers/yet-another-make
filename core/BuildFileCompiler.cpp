@@ -480,7 +480,7 @@ namespace YAM {
     }
 
     std::shared_ptr<FileNode> BuildFileCompiler::compileInputPath(
-        BuildFile::Input const&input
+        BuildFile::Input const& input
     ) {
         auto optimizedBaseDir = _baseDir;
         auto optimizedPattern = input.path;
@@ -505,6 +505,24 @@ namespace YAM {
             ss << "If the generated file is defined in a rule in another buildfile" << std::endl;
             ss << "then declare the dependency on that other buildfile in this buildfile." << std::endl;
             throw std::runtime_error(ss.str());
+        }
+        auto genFile = dynamic_pointer_cast<GeneratedFileNode>(fileNode);
+        if (genFile != nullptr) {
+            if (_allowedInputs.find(genFile->name()) == _allowedInputs.end()) {
+                auto cmd = genFile->producer();
+                auto cmdBuildFile = cmd->buildFile();
+                std::string cmdBuildFileName = (cmdBuildFile == nullptr) ? "unknown" : cmdBuildFile->name().string(); 
+                std::stringstream ss;
+                ss 
+                    << "The rule at line " << input.line << " in buildfile " << _buildFile.string()
+                    << " has an illegal reference to generated file " << genFile->name() << "." << std::endl;
+                ss 
+                    << "This file is defined as output of the rule at line " << cmd->ruleLineNr()
+                    <<" in buildfile " << cmdBuildFileName << "." << std::endl;
+                ss << "Fix: declare " << cmdBuildFileName << " as buildfile dependency in buildfile " << _buildFile.string();
+                ss << "." << std::endl;
+                throw std::runtime_error(ss.str());
+            }
         }
         return fileNode;
     }
