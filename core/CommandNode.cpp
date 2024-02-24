@@ -11,6 +11,8 @@
 #include "BuildFileCompiler.h"
 #include "NodeMapStreamer.h"
 #include "IStreamer.h"
+#include "Glob.h"
+#include "computeMapsDifference.h"
 
 #include <iostream>
 #include <fstream>
@@ -178,7 +180,7 @@ namespace
     ) {
         std::stringstream ss;
         ss
-            << "Unknown output file."
+            << "Not-declared output file." << std::endl
             << "Fix: declare the file as output of command." << std::endl
             << "Command    : " << cmd->name().string() << std::endl
             << "Output file: " << outputFile.string() << std::endl;
@@ -439,10 +441,12 @@ namespace YAM
         if (wdir != nullptr) hashes.push_back(XXH64_string(wdir->name().string()));
         hashes.push_back(XXH64_string(_script));
         for (auto const& node : _cmdInputs) {
+            hashes.push_back(XXH64_string(node->name().string()));
             auto grpNode = dynamic_pointer_cast<GroupNode>(node);
             if (grpNode != nullptr) hashes.push_back(grpNode->hash());
         }
         for (auto const& node : _orderOnlyInputs) {
+            hashes.push_back(XXH64_string(node->name().string()));
             auto grpNode = dynamic_pointer_cast<GroupNode>(node);
             if (grpNode != nullptr) hashes.push_back(grpNode->hash());
         }
@@ -450,7 +454,9 @@ namespace YAM
             hashes.push_back(XXH64_string(path.string()));
         }
         auto entireFile = FileAspect::entireFileAspect().name();
-        for (auto const& node : _outputs) hashes.push_back(node->hashOf(entireFile));
+        for (auto const& node : _outputs) {
+            hashes.push_back(node->hashOf(entireFile));
+        }
         FileAspectSet inputAspects = context()->findFileAspectSet(_inputAspectsName);
         for (auto const& pair : _detectedInputs) {
             auto const& node = pair.second;
@@ -521,6 +527,18 @@ namespace YAM
             } else {
                 valid = false;
                 logOutputFileNotDeclared(this, outputSymPath, logBook);
+                auto repo = context()->findRepositoryContaining(outputSymPath);
+                auto absPath = repo->absolutePathOf(outputSymPath);
+                std::error_code ec;
+                std::filesystem::remove(absPath, ec);
+                std::stringstream ss;
+                if (ec) {
+                    ss << "Failed to delete not-declared output file " << absPath << std::endl;
+                } else {
+                    ss << "Deleted not-declared output file " << absPath << std::endl;
+                }
+                LogRecord record(LogRecord::Error, ss.str());
+                logBook.add(record);
             }
         } else if (outputNode->producer().get() != this) {
             valid = false;
@@ -551,23 +569,18 @@ namespace YAM
         MemoryLogBook& logBook
     ) {
         bool valid = true;
-        std::vector<std::shared_ptr<GeneratedFileNode>> inBoth;
-        std::vector<std::shared_ptr<GeneratedFileNode>> inThisOnly;
-        std::vector<std::shared_ptr<GeneratedFileNode>> inNewOnly;
-        std::set_intersection(
-            _outputs.begin(), _outputs.end(),
-            newOutputs.begin(), newOutputs.end(),
-            std::inserter(inBoth, inBoth.begin()));
-        std::set_difference(
-            _outputs.begin(), _outputs.end(),
-            inBoth.begin(), inBoth.end(),
-            std::inserter(inThisOnly, inThisOnly.begin()));
-        std::set_difference(
-            newOutputs.begin(), newOutputs.end(),
-            inBoth.begin(), inBoth.end(),
-            std::inserter(inNewOnly, inNewOnly.begin()));
-        if (!inThisOnly.empty() || !inNewOnly.empty()) {
-            valid = false;
+        std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> newOutputsMap;
+        for (auto const& output : newOutputs) newOutputsMap.insert({ output->name(), output });
+        std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> oldOutputsMap;
+        for (auto const& output : _outputs) oldOutputsMap.insert({ output->name(), output });
+
+        std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> kept;
+        std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> added;
+        std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> removed;
+        computeMapsDifference(oldOutputsMap, newOutputsMap, kept, added, removed);
+
+        if (!added.empty() || !removed.empty()) {
+            valid = false; 
             logUnexpectedOutputs(this, _outputs, newOutputs, logBook);
         }
         return valid;
@@ -648,7 +661,8 @@ namespace YAM
     }
 
     std::set<std::filesystem::path> CommandNode::convertToSymbolicPaths(
-        std::set<std::filesystem::path> const& absPaths, MemoryLogBook& logBook
+        std::set<std::filesystem::path> const& absPaths,
+        MemoryLogBook& logBook
     ) {
         std::set<std::filesystem::path> symPaths;
         for (auto const& absPath : absPaths) {
@@ -658,9 +672,34 @@ namespace YAM
         return symPaths;
     }
 
+    std::set<std::filesystem::path> CommandNode::convertToSymbolicPaths(
+        std::set<std::filesystem::path> const& absPaths,
+        MemoryLogBook& logBook,
+        std::vector<std::filesystem::path> const &toIgnore,
+        std::vector<std::filesystem::path> &ignored
+    ) {
+        if (toIgnore.empty()) return convertToSymbolicPaths(absPaths, logBook);
+
+        std::set<std::filesystem::path> symPaths;
+        for (auto const& ipath : toIgnore) {
+            Glob ignore(ipath);
+            for (auto const& absPath : absPaths) {
+                auto symPath = convertToSymbolicPath(absPath, logBook);
+                if (symPath.empty()) {
+                } else if (ignore.matches(symPath)) {
+                    ignored.push_back(absPath);
+                } else {
+                    symPaths.insert(symPath);
+                }
+            }
+        }
+        return symPaths;
+    }
+
     // threadpool
     void CommandNode::executeScript() {
         auto result = std::make_shared<ExecutionResult>();
+        result->_log.aspects(context()->logBook()->aspects());
         result->_newState = Node::State::Ok;
         if (canceling()) {
             result->_newState = Node::State::Canceled;
@@ -669,7 +708,7 @@ namespace YAM
             if (scriptResult.exitCode != 0) {
                 result->_newState = canceling() ? Node::State::Canceled : Node::State::Failed;
             } else {
-                result->_newState = Node::State::Ok;
+                result->_newState = Node::State::Ok;                
                 std::set<std::filesystem::path> previousInputPaths;
                 for (auto const& pair : _detectedInputs) {
                     previousInputPaths.insert(pair.second->name());
@@ -680,7 +719,24 @@ namespace YAM
                     result->_keptInputPaths,
                     result->_removedInputPaths,
                     result->_addedInputPaths);
-                result->_outputPaths = convertToSymbolicPaths(scriptResult.writtenFiles, result->_log);
+                
+                std::vector<std::filesystem::path> ignored;
+                result->_outputPaths = convertToSymbolicPaths(scriptResult.writtenFiles, result->_log, _ignoredOutputs, ignored);
+                for (auto const& toDelete : ignored) {
+                    std::stringstream ss;
+                    std::error_code ec;
+                    std::filesystem::remove_all(toDelete, ec);
+                    if (ec) {
+                        std::stringstream ss;
+                        ss << "Failed to delete ignored output file " << toDelete << std::endl;
+                    } else {
+                        ss << "Deleted ignored output file " << toDelete << std::endl;
+                    }
+                    if (_buildFile != nullptr) {
+                        ss << "Ignore is defined in rule at line " << _ruleLineNr << " in file " << _buildFile->name() << std::endl;
+                    }
+                    result->_log.add(LogRecord(LogRecord::IgnoredOutputFiles, ss.str()));
+                }
                 if (_postProcessor != nullptr) {
                     _postProcessor->process(scriptResult);
                 }

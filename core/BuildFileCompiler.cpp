@@ -770,7 +770,11 @@ namespace YAM {
         std::vector<std::filesystem::path> ignoredOutputs;
         for (auto const& output : outputs.outputs) {
             if (output.ignore) {
-                ignoredOutputs.push_back(output.path);
+                auto base = _baseDir;
+                std::filesystem::path pattern = output.path;
+                Globber::optimize(base, pattern);
+                std::filesystem::path symOutputPath = base->name() / pattern;
+                ignoredOutputs.push_back(symOutputPath);
             }
         }
         return ignoredOutputs;

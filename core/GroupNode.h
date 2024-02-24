@@ -7,6 +7,8 @@
 
 namespace YAM
 {
+    class CommandNode;
+
     // A GroupNode facilitates the execution of an arbitrary collection of
     // nodes.
     class __declspec(dllexport) GroupNode : public Node
@@ -17,7 +19,7 @@ namespace YAM
 
         std::string className() const override { return "GroupNode"; }
 
-        void content(std::vector<std::shared_ptr<Node>> newContent);
+        void content(std::vector<std::shared_ptr<Node>> const &newContent);
         std::vector<std::shared_ptr<Node>> const& content() const { return _content; }
 
         // Override Node
@@ -36,6 +38,7 @@ namespace YAM
         bool restore(void* context, std::unordered_set<IPersistable const*>& restored) override;
 
     private:
+        void updateContentProducers(std::vector<std::shared_ptr<Node>> const& newContent);
         XXH64_hash_t computeHash() const;
         void handleGroupCompletion(Node::State groupState);
 

@@ -2,8 +2,9 @@
 #include "CommandNode.h"
 #include "GeneratedFileNode.h"
 #include "ExecutionContext.h"
-
 #include "IStreamer.h"
+
+#include <unordered_set>
 
 namespace
 {
@@ -11,21 +12,27 @@ namespace
 
     uint32_t streamableTypeId = 0;
 
-    void subscribe(Node* node, StateObserver* observer) {
+    Node* getProducer(Node* node) {
         auto genFileNode = dynamic_cast<GeneratedFileNode*>(node);
         if (genFileNode != nullptr) {
-            genFileNode->producer()->addObserver(observer);
-        } else {
-            node->addObserver(observer);
+            return genFileNode->producer().get();
+        }
+        return node;
+    }
+
+    void subscribe(std::vector<std::shared_ptr<Node>> const& nodes, StateObserver* observer) {
+        std::unordered_set<Node*> subscribed;
+        for (auto const& node : nodes) {
+            Node* producer = getProducer(node.get());
+            if (subscribed.insert(producer).second) producer->addObserver(observer);
         }
     }
 
-    void unsubscribe(Node* node, StateObserver* observer) {
-        auto genFileNode = dynamic_cast<GeneratedFileNode*>(node);
-        if (genFileNode != nullptr) {
-            genFileNode->producer()->removeObserver(observer);
-        } else {
-            node->removeObserver(observer);
+    void unsubscribe(std::vector<std::shared_ptr<Node>> const& nodes, StateObserver* observer) {
+        std::unordered_set<Node*> unsubscribed;
+        for (auto const& node : nodes) {
+            Node* producer = getProducer(node.get());
+            if (unsubscribed.insert(producer).second) producer->removeObserver(observer);
         }
     }
 }
@@ -37,13 +44,13 @@ namespace YAM
         : Node(context, name)
     {}
 
-    void GroupNode::content(std::vector<std::shared_ptr<Node>> newContent) {
+    void GroupNode::content(std::vector<std::shared_ptr<Node>> const &newContent) {
         Node::CompareName cmp;
-        std::sort(newContent.begin(), newContent.end(), cmp);
         if (_content != newContent) {
-            for (auto const& node : _content) unsubscribe(node.get(), this);
+            unsubscribe(_content, this);
             _content = newContent;
-            for (auto const& node : _content) subscribe(node.get(), this);
+            std::sort(_content.begin(), _content.end(), cmp);
+            subscribe(_content, this);
             modified(true);
             setState(Node::State::Dirty);
         }
@@ -114,15 +121,16 @@ namespace YAM
     }
 
     void GroupNode::prepareDeserialize() {
+        static std::vector<std::shared_ptr<Node>> empty;
         Node::prepareDeserialize();
-        for (auto const& node : _content) unsubscribe(node.get(), this);
+        unsubscribe(_content, this);
         _content.clear();
     }
 
     bool GroupNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
         if (!Node::restore(context, restored)) return false;
         for (auto const& node : _content) node->restore(context, restored);
-        for (auto const& node : _content) subscribe(node.get(), this);
+        subscribe(_content, this);
         return true;
     }
 }

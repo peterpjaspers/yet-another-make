@@ -15,6 +15,7 @@
 #include "BuildFileCompiler.h"
 #include "IStreamer.h"
 #include "NodeMapStreamer.h"
+#include "computeMapsDifference.h"
 
 #include <vector>
 #include <unordered_set>
@@ -91,23 +92,6 @@ namespace
         }
     }
 
-    template<class TNode>
-    void computeMapsDifference(
-        std::map<std::filesystem::path, std::shared_ptr<TNode>> const& in1,
-        std::map<std::filesystem::path, std::shared_ptr<TNode>> const& in2,
-        std::map<std::filesystem::path, std::shared_ptr<TNode>>& inBoth,
-        std::map<std::filesystem::path, std::shared_ptr<TNode>>& onlyIn1,
-        std::map<std::filesystem::path, std::shared_ptr<TNode>>& onlyIn2
-    ) {
-        for (auto i1 : in1) {
-            if (in2.find(i1.first) != in2.end()) inBoth.insert(i1);
-            else onlyIn1.insert(i1);
-        }
-        for (auto i2 : in2) {
-            if (in1.find(i2.first) == in1.end()) onlyIn2.insert(i2);
-        }
-    }
-
     template <class TNode>
     void updateMap(
         ExecutionContext* context,
@@ -118,21 +102,6 @@ namespace
         std::map<std::filesystem::path, std::shared_ptr<TNode>> kept;
         std::map<std::filesystem::path, std::shared_ptr<TNode>> added;
         std::map<std::filesystem::path, std::shared_ptr<TNode>> removed;
-        computeMapsDifference(newSet, toUpdate, kept, added, removed);
-        for (auto const& pair : added) addNode(pair.second, observer);
-        for (auto const& pair : removed) removeNode(pair.second, observer);
-        toUpdate = newSet;
-    }
-
-    void updateCommands(
-        ExecutionContext* context,
-        StateObserver* observer,
-        std::map<std::filesystem::path, std::shared_ptr<CommandNode>>& toUpdate,
-        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const& newSet
-    ) {
-        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> kept;
-        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> added;
-        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> removed;
         computeMapsDifference(newSet, toUpdate, kept, added, removed);
         for (auto const& pair : added) addNode(pair.second, observer);
         for (auto const& pair : removed) removeNode(pair.second, observer);

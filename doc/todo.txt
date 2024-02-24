@@ -1,6 +1,6 @@
 Todo for R 0.1.0
 - deal with Node::State::Deleted
-- test output ignore files
+- test ignored output files
 - BuildScopeFinder unittest
 - implement wildcard for output files (dynamic outputs)
 - integrate Phil's file access monitor

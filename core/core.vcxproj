@@ -191,6 +191,7 @@
     <ClInclude Include="TokenPathSpec.h" />
     <ClInclude Include="TokenRegexSpec.h" />
     <ClInclude Include="BuildOptionsParser.h" />
+    <ClInclude Include="computeMapsDifference.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BasicOStreamLogBook.cpp" />

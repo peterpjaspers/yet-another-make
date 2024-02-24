@@ -33,6 +33,7 @@ namespace YAM
             all.push_back(Aspect::Performance);
             all.push_back(Aspect::InputFiles);
             all.push_back(Aspect::IgnoredInputFiles);
+            all.push_back(Aspect::IgnoredOutputFiles);
             all.push_back(Aspect::FileChanges);
             all.push_back(Aspect::DirectoryChanges);
             all.push_back(Aspect::BuildTimePrediction);
@@ -53,6 +54,7 @@ namespace YAM
             case Performance: return "Performance";
             case InputFiles: return "InputFiles";
             case IgnoredInputFiles: return "Ignored inputFiles";
+            case IgnoredOutputFiles: return "Ignored outputFiles";
             case FileChanges: return "FileChanges";
             case DirectoryChanges: return "DirectoryChanges";
             case BuildTimePrediction: return "BuildTimePrediction";

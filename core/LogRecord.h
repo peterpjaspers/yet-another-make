@@ -18,7 +18,8 @@ namespace YAM
             Scope,                // build scope info
             Performance,          // time and memory usage
             InputFiles,           // input files of a command
-            IgnoredInputFiles,    // ignored input files of a commansd
+            IgnoredInputFiles,    // ignored input files of a command
+            IgnoredOutputFiles,   // ignored output files of a command
             FileChanges,          // files changed since previous build
             DirectoryChanges,     // directories changed since previous build
             BuildTimePrediction,  // estimated remaining build time

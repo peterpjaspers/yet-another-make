@@ -82,8 +82,8 @@ namespace YAM
         void outputs(std::vector<std::shared_ptr<GeneratedFileNode>> const& newOutputs);
         std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs() const { return _outputs; }
 
-        // newOutputs contains regular expression patterns. Output files that
-        // match these patterns are ignored.
+        // newOutputs contains paths and/or glob paths. Output files that
+        // match these paths/globs are ignored and deleted.
         void ignoreOutputs(std::vector<std::filesystem::path> const& newOutputs);
         std::vector<std::filesystem::path> const& ignoredOutputs() const { return _ignoredOutputs; }
 
@@ -130,7 +130,14 @@ namespace YAM
         };
 
         std::filesystem::path convertToSymbolicPath(std::filesystem::path const& absPath, MemoryLogBook& logBook);
-        std::set<std::filesystem::path> convertToSymbolicPaths(std::set<std::filesystem::path> const& absPaths, MemoryLogBook& logBook);
+        std::set<std::filesystem::path> convertToSymbolicPaths(
+            std::set<std::filesystem::path> const& absPaths,
+            MemoryLogBook& logBook);
+        std::set<std::filesystem::path> convertToSymbolicPaths(
+            std::set<std::filesystem::path> const& absPaths,
+            MemoryLogBook& logBook,
+            std::vector<std::filesystem::path> const &toIgnore,
+            std::vector<std::filesystem::path>& ignored);
         void handleRequisitesCompletion(Node::State state);
         void executeScript();
         void handleExecuteScriptCompletion(std::shared_ptr<ExecutionResult> result);
