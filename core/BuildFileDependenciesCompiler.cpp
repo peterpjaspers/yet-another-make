@@ -22,6 +22,7 @@ namespace YAM {
             std::filesystem::path const& globNameSpace)
         : _context(context)
         , _baseDir(baseDir)
+        , _buildFile(buildFile.buildFile)
         , _globNameSpace(globNameSpace)
     {
         if (compileMode == InputGlobs || compileMode == Both) {
@@ -72,19 +73,28 @@ namespace YAM {
         if (bfDirNode == nullptr) {
             buildFile = dynamic_pointer_cast<SourceFileNode>(node);
             if (buildFile == nullptr) {
-                throw std::runtime_error("No such buildfile: " + node->name().string());
+                std::stringstream ss;
+                ss << "Buildfile " << _buildFile << " references a non-existing buildfile: " << node->name();
+                ss << "." << std::endl;
+                throw std::runtime_error(ss.str());
             }
             std::filesystem::path dirPath = buildFile->name().parent_path();
             auto n = _context->nodes().find(dirPath);
             bfDirNode = dynamic_pointer_cast<DirectoryNode>(n);
             if (bfDirNode == nullptr) {
-                throw std::runtime_error("No such directory: " + dirPath.string());
+                std::stringstream ss;
+                ss << "Buildfile " << _buildFile << " references a non-existing buildfile directory: " << dirPath;
+                ss << "." << std::endl;
+                throw std::runtime_error(ss.str());
             }      
         } else if (bfDirNode->buildFileParserNode() != nullptr) {
             buildFile = bfDirNode->buildFileParserNode()->buildFile();
-        }
-        if (buildFile == nullptr) {
-            throw std::runtime_error("No such buildfile: " + node->name().string());
+            if (buildFile == nullptr) {
+                std::stringstream ss;
+                ss << "Buildfile " << _buildFile << " references a non-existing buildfile: " << node->name();
+                ss << "." << std::endl;
+                throw std::runtime_error(ss.str());
+            }
         }
         return buildFile;
     }
@@ -100,6 +110,12 @@ namespace YAM {
             std::filesystem::path nodePath(optimizedBaseDir->name());
             if (!optimizedPath.empty()) nodePath = nodePath / optimizedPath;
             std::shared_ptr<Node> const& node = _context->nodes().find(nodePath);
+            if (node == nullptr) {
+                std::stringstream ss;
+                ss << "Buildfile " << _buildFile << " references a non-existing buildfile: " << nodePath;
+                ss << "." << std::endl;
+                throw std::runtime_error(ss.str());
+            }
             std::shared_ptr<SourceFileNode> const& buildFileNode = findBuildFile(node);
             _buildFiles.insert({ buildFileNode->name(), buildFileNode });
         }

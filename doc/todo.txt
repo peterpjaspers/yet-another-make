@@ -1,15 +1,14 @@
 Todo for R 0.1.0
-- use allowedInputs in BuildFileCompiler in checking input
+- deal with Node::State::Deleted
 - test output ignore files
 - BuildScopeFinder unittest
-- implement wildcard for output files
-- deal with Node::State::Deleted
+- implement wildcard for output files (dynamic outputs)
 - integrate Phil's file access monitor
 - RepositoriesNode
   Add type to filerepo, only support integrated, tracked and ignore
 - Version in PersistentBuildState
   Encode version in name of buildstate file
-- improve buildfile cycle detection (see group cycle detection)
+- fileaspect last-write-time (e.g. for generated files in cmd executionhash)
 - fileaspect configuration
 - variants (tup variants, MR build configurations)
 - command line arguments for scope and logging

@@ -103,6 +103,7 @@
     <ClInclude Include="BuildClient.h" />
     <ClInclude Include="Builder.h" />
     <ClInclude Include="BuildFileCompilerNode.h" />
+    <ClInclude Include="BuildFileCycleFinder.h" />
     <ClInclude Include="BuildFileDependenciesCompiler.h" />
     <ClInclude Include="BuildOptions.h" />
     <ClInclude Include="BuildScopeFinder.h" />
@@ -199,6 +200,7 @@
     </ClCompile>
     <ClCompile Include="BuildFile.cpp" />
     <ClCompile Include="BuildFileCompilerNode.cpp" />
+    <ClCompile Include="BuildFileCycleFinder.cpp" />
     <ClCompile Include="BuildFileDependenciesCompiler.cpp" />
     <ClCompile Include="BuildOptions.cpp" />
     <ClCompile Include="BuildScopeFinder.cpp" />

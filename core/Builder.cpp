@@ -13,6 +13,7 @@
 #include "FileRepository.h"
 #include "DotYamDirectory.h"
 #include "AcyclicTrail.h"
+#include "BuildFileCycleFinder.h"
 #include "GroupCycleFinder.h"
 #include "PersistentBuildState.h"
 #include "RepositoryNameFile.h"
@@ -131,23 +132,6 @@ namespace
                 }
             }
         }
-    }
-
-    void logBuildFileCycle(
-        std::shared_ptr<ILogBook> const& logBook,
-        std::shared_ptr<BuildFileParserNode> root,
-        std::list<const BuildFileParserNode*>const& trail
-    ) {
-        std::stringstream ss;
-        ss << "Detected cycle in the buildfile dependency graph: " << std::endl;
-        for (auto bfpn : trail) {
-            ss << bfpn->absolutePath() << std::endl;
-        }
-        ss << root->absolutePath() << std::endl;
-        ss << "Cycles in the buildfile dependency graph are not allowed." << std::endl;
-        ss << "Refactor your buildfiles to remove the cycle." << std::endl;
-        LogRecord error(LogRecord::Error, ss.str());
-        logBook->add(error);
     }
 }
 
@@ -268,27 +252,17 @@ namespace YAM
         LogRecord checking(LogRecord::Progress, "Checking for cycles in buildfile dependency graph.");
         logBook.add(checking);
 
-        bool cycling = false;
-        std::unordered_set<const Node*> visited;
-        std::vector<BuildFileParserNode*> inCycle;
-        for (auto const& node : buildFileParserNodes) {
-            bool notVisited = visited.insert(node.get()).second;
-            if (notVisited) {
-                auto bfpNode = dynamic_pointer_cast<BuildFileParserNode>(node);
-                AcyclicTrail<const BuildFileParserNode*> trail;
-                bool notCycling = bfpNode->walkDependencies(trail);
-                if (!notCycling) {
-                    cycling = true;
-                    inCycle.push_back(bfpNode.get());
-                    logBuildFileCycle(bfpNode->context()->logBook(), bfpNode, trail.trail());
-                }
-            }
+        std::vector<std::shared_ptr<BuildFileParserNode>> parsers;
+        for (auto const& c : buildFileParserNodes) {
+            parsers.push_back(dynamic_pointer_cast<BuildFileParserNode>(c));
         }
-        for (auto n : inCycle) {
-            n->buildFile()->setState(Node::State::Dirty);
-            n->setState(Node::State::Failed);
+        BuildFileCycleFinder finder(parsers);
+        bool cycling = !finder.cycles().empty();
+        if (cycling) {
+            std::string cycleLog = finder.cyclesToString();
+            LogRecord error(LogRecord::Error, cycleLog);
+            parsers[0]->context()->addToLogBook(error);
         }
-
         return cycling;
     }
 
@@ -310,7 +284,7 @@ namespace YAM
         if (cycling) {
             std::string cycleLog = finder.cyclesToString();
             LogRecord error(LogRecord::Error, cycleLog);
-            compilers[0]->context()->logBook()->add(error);
+            compilers[0]->context()->addToLogBook(error);
         }
         return cycling;
     }

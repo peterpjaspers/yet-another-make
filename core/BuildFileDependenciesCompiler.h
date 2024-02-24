@@ -54,6 +54,7 @@ namespace YAM {
     private:
         ExecutionContext* _context;
         std::shared_ptr<DirectoryNode> _baseDir;
+        std::filesystem::path _buildFile;
         std::filesystem::path _globNameSpace;
 
         std::map<std::filesystem::path, std::shared_ptr<Node>> _buildFiles;
