@@ -303,6 +303,7 @@ namespace YAM
         // Inherited from IPersistable
         void modified(bool newValue) override;
         bool modified() const override;
+        bool deleted() const override;
         std::string describeName() const override { return _name; }
         std::string describeType() const override { return "FileRepository"; }
 
