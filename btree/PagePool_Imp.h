@@ -7,9 +7,9 @@
 namespace BTree {
 
     inline PageSize PagePool::pageCapacity() const { return capacity; };
-    inline uint32_t PagePool::size() const { return pages.size(); };
-    inline uint32_t PagePool::sizeFreed() const { return freePages.size(); };
-    inline uint32_t PagePool::sizeModified() const { return modifiedPages.size(); }
+    inline uint32_t PagePool::size() const { return static_cast<uint32_t>(pages.size()); };
+    inline uint32_t PagePool::sizeFreed() const { return static_cast<uint32_t>(freePages.size()); };
+    inline uint32_t PagePool::sizeModified() const { return static_cast<uint32_t>(modifiedPages.size()); }
     inline  uint32_t PagePool::sizeRecover() const { return 0; };
     inline const PageHeader& PagePool::access( const PageLink& link ) const { return *pages[ link.index ]; };
     inline void PagePool::free( const PageHeader& header ) { free( header.page ); }

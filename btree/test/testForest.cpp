@@ -61,28 +61,28 @@ void addEntry( Tree<uint32_t,uint16_t[]>* tree ) {
     uint32_t key = generateUint32();
     vector<uint16_t> value = generateUint16Array();
     while (tree->contains( key )) key = generateUint32();
-    tree->insert( key, value.data(), value.size() );
+    tree->insert( key, value.data(), static_cast<PageSize>(value.size()) );
 }
 void addEntry( Tree<uint16_t[],uint32_t>* tree ) {
     vector<uint16_t> key = generateUint16Array();
     uint32_t value = generateUint32();
-    while (tree->contains( key.data(), key.size() )) key = generateUint16Array();
-    tree->insert( key.data(), key.size(), value );
+    while (tree->contains( key.data(), static_cast<PageSize>(key.size()) )) key = generateUint16Array();
+    tree->insert( key.data(), static_cast<PageSize>(key.size()), value );
 }
 void addEntry(Tree<uint16_t[], uint16_t[]>* tree) {
     vector<uint16_t> key = generateUint16Array();
     vector<uint16_t> value = generateUint16Array();
-    while (tree->contains(key.data(), key.size())) key = generateUint16Array();
-    tree->insert(key.data(), key.size(), value.data(), value.size());
+    while (tree->contains(key.data(), static_cast<PageSize>(key.size()))) key = generateUint16Array();
+    tree->insert(key.data(), static_cast<PageSize>(key.size()), value.data(), static_cast<PageSize>(value.size()));
 }
 void addEntry(StreamingTree<uint32_t>* tree) {
     uint32_t key = generateUint32();
     vector<uint16_t> value = generateUint16Array();
     while (tree->contains(key)) key = generateUint32();
     ValueWriter<uint32_t>& writer = tree->insert(key);
-    uint32_t cnt = value.size();
+    uint32_t cnt = static_cast<uint32_t>(value.size());
     writer.stream(cnt);
-    for (int i = 0; i < cnt; i++) writer.stream(value[i]);
+    for (uint32_t i = 0; i < cnt; i++) writer.stream(value[i]);
     writer.close();
 }
 

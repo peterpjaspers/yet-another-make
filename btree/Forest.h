@@ -162,7 +162,7 @@ namespace BTree {
         using Tree< TreeIndex, PageLink >::replace;
         using Tree< TreeIndex, PageLink >::erase;
         // Generate a unique TreeIndex for a user
-        TreeIndex uniqueIndex() { return ((1 << 31) + trees.size()); }
+        TreeIndex uniqueIndex() { return static_cast<TreeIndex>((1 << 31) + trees.size()); }
     }; // class Forest
 
     inline std::ostream & operator<<( std::ostream & o, const Forest& tree ) { tree.stream( o ); return o; }

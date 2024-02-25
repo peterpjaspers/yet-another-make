@@ -515,7 +515,7 @@ private:
     vector<uint32_t>* generateUniqueKeys( uint32_t count ) const {
         auto keys = new vector<uint32_t>();
         set<uint32_t> keySet;
-        for ( int i = 0; i < count; ++i) {
+        for (uint32_t i = 0; i < count; ++i) {
             uint32_t key = generateUint32();
             while ((keySet.count( key ) == 1) || (content.count( key ) == 1)) key = generateUint32();
             keys->push_back( key );
@@ -669,7 +669,7 @@ if (TryUnexpectedKeys) log << "Trying un-expected keys...\n";
     uint32_t erase( int count, KeyOrder order ) {
         uint32_t errors = TreeTester<uint32_t,uint32_t>::erase( count, order );
         size_t range = keys.size();
-        if (range < count) count = range;
+        if (range < count) count = static_cast<int>(range);
         if (order == Forward) {
             sort( keys.begin(), keys.end() );
             for ( int i = 0; i < count; ++i) errors += removeKey( keys[ i ] );
@@ -751,7 +751,7 @@ private:
     vector<vector<uint16_t>*>* generateUniqueKeys( uint32_t count ) {
         auto keys = new vector<vector<uint16_t>*>();
         set<vector<uint16_t>*,Uint16ArrayCompare> keySet;
-        for ( int i = 0; i < count; ++i) {
+        for ( uint32_t i = 0; i < count; ++i) {
             auto key = new vector<uint16_t>;
             generateUint16Array( *key );
             while ((keySet.count( key ) == 1) || (content.count( key ) == 1)) generateUint16Array( *key );
@@ -765,13 +765,13 @@ private:
         uint32_t value = generateUint32();
         bool inserted = false;
         if (*usePair) {
-            pair<const uint16_t*, PageSize> keyPair = { key->data(), key->size() };
+            pair<const uint16_t*, PageSize> keyPair = { key->data(), static_cast<PageSize>(key->size()) };
             inserted = tree->insert( keyPair, value );
         } else {
-            inserted = tree->insert( key->data(), key->size(), value );
+            inserted = tree->insert( key->data(), static_cast<PageSize>(key->size()), value );
         }
         if (!inserted) {
-            log << "Insert on non-existing key "; logUint16Array( log, key->data(), key->size() ); log << " returned false!\n";
+            log << "Insert on non-existing key "; logUint16Array( log, key->data(), static_cast<PageSize>(key->size()) ); log << " returned false!\n";
             errors += 1;
         } else {
             keys.push_back( key );
@@ -783,13 +783,13 @@ private:
         uint32_t errors = 0;
         bool removed = false;
         if (*usePair) {
-            pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( key->size() ) };
+            pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( static_cast<PageSize>(key->size()) ) };
             removed = tree->erase( keyPair );
         } else {
-            removed = tree->erase( key->data(), PageSize( key->size() ));
+            removed = tree->erase( key->data(), PageSize( static_cast<PageSize>(key->size()) ));
         }
         if (!removed) {
-            log << "Remove with existing key "; logUint16Array( log, key->data(), key->size() ); log << " returned false!\n";
+            log << "Remove with existing key "; logUint16Array( log, key->data(), static_cast<PageSize>(key->size()) ); log << " returned false!\n";
             errors += 1;
         } else {
             content.erase( key );        
@@ -836,10 +836,10 @@ public:
                 try {
                     uint32_t retrieved;
                     if (usePair) {
-                        pair<const uint16_t*, PageSize> keyPair = { entry->first->data(), entry->first->size() };
+                        pair<const uint16_t*, PageSize> keyPair = { entry->first->data(), static_cast<PageSize>(entry->first->size()) };
                         retrieved = tree->retrieve( keyPair );
                     } else {
-                        retrieved = tree->retrieve( entry->first->data(), entry->first->size() );
+                        retrieved = tree->retrieve( entry->first->data(), static_cast<PageSize>(static_cast<PageSize>(entry->first->size())) );
                     }
                     if (retrieved != entry->second) {
                         log << "Key " << entry->first << " : Expected " << entry->second << ", retrieved " << retrieved << "!\n";
@@ -856,27 +856,27 @@ public:
                 }
                 bool found = false;
                 if (usePair) {
-                    pair<const uint16_t*, PageSize> keyPair = { entry->first->data(), entry->first->size() };
+                    pair<const uint16_t*, PageSize> keyPair = { entry->first->data(), static_cast<PageSize>(entry->first->size()) };
                     found = tree->contains( keyPair );
                 } else {
-                    found = tree->contains( entry->first->data(), entry->first->size() );
+                    found = tree->contains( entry->first->data(), static_cast<PageSize>(static_cast<PageSize>(entry->first->size())) );
                 }
                 if (!found) {
                     log << "Contains with existing key ";
-                    logUint16Array( log, entry->first->data(), entry->first->size() );
+                    logUint16Array( log, entry->first->data(), static_cast<PageSize>(entry->first->size()) );
                     log << " returned false!\n";
                     errors += 1;
                 }
                 PageSize count = 0;
                 if (usePair) {
-                    pair<const uint16_t*, PageSize> keyPair = { entry->first->data(), entry->first->size() };
+                    pair<const uint16_t*, PageSize> keyPair = { entry->first->data(), static_cast<PageSize>(entry->first->size()) };
                     count = tree->count( keyPair );
                 } else {
-                    count = tree->count( entry->first->data(), entry->first->size() );
+                    count = tree->count( entry->first->data(), static_cast<PageSize>(entry->first->size()) );
                 }
                 if (count != 1) {
                     log << "Count with existing key ";
-                    logUint16Array( log, entry->first->data(), entry->first->size() );
+                    logUint16Array( log, entry->first->data(), static_cast<PageSize>(entry->first->size()) );
                     log << " returned " << count << "!\n";
                     errors += 1;
                 }
@@ -890,13 +890,13 @@ public:
                     try {
                         uint32_t retrieved;
                         if (usePair) {
-                            pair<const uint16_t*, PageSize> keyPair = { key->data(), key->size() };
+                            pair<const uint16_t*, PageSize> keyPair = { key->data(), static_cast<PageSize>(key->size()) };
                             retrieved = tree->retrieve( keyPair );
                         } else {
-                            retrieved = tree->retrieve( key->data(), key->size() );
+                            retrieved = tree->retrieve( key->data(), static_cast<PageSize>(key->size()) );
                         }
                         log << "Retrieved " << retrieved << " with unexpected key ";
-                        logUint16Array( log, key->data(), key->size() );
+                        logUint16Array( log, key->data(), static_cast<PageSize>(key->size()) );
                         log << "!\n";
                         errors += 1;
                     }
@@ -906,27 +906,27 @@ public:
                 }
                 bool found = false;
                 if (usePair) {
-                    pair<const uint16_t*, PageSize> keyPair = { key->data(), key->size() };
+                    pair<const uint16_t*, PageSize> keyPair = { key->data(), static_cast<PageSize>(key->size()) };
                     found = tree->contains( keyPair );
                 } else {
-                    found = tree->contains( key->data(), key->size() );
+                    found = tree->contains( key->data(), static_cast<PageSize>(key->size()) );
                 }
                 if (found) {
                     log << "Contains with non-existing key ";
-                    logUint16Array( log, key->data(), key->size() );
+                    logUint16Array( log, key->data(), static_cast<PageSize>(key->size()) );
                     log << " returned true!\n";
                     errors += 1;
                 }
                 PageSize count = 0;
                 if (usePair) {
-                    pair<const uint16_t*, PageSize> keyPair = { key->data(), key->size() };
+                    pair<const uint16_t*, PageSize> keyPair = { key->data(), static_cast<PageSize>(key->size()) };
                     count = tree->count( keyPair );
                 } else {
-                    count = tree->count( key->data(), key->size() );
+                    count = tree->count( key->data(), static_cast<PageSize>(key->size()) );
                 }
                 if (count != 0) {
                     log << "Count with non-existing key ";
-                    logUint16Array( log, key->data(), key->size() );
+                    logUint16Array( log, key->data(), static_cast<PageSize>(key->size()) );
                     log << " returned " << count << "!\n";
                     errors += 1;
                 }
@@ -955,14 +955,14 @@ public:
         for( auto entry : content ) {
             bool inserted = false;
             if (usePair) {
-                pair<const uint16_t*, PageSize> keyPair = { entry.first->data(), PageSize( entry.first->size() ) };
+                pair<const uint16_t*, PageSize> keyPair = { entry.first->data(), PageSize( static_cast<PageSize>(entry.first->size()) ) };
                 inserted = tree->insert( keyPair, entry.second );
             } else {
-                inserted = tree->insert( entry.first->data(), PageSize( entry.first->size() ), entry.second );
+                inserted = tree->insert( entry.first->data(), PageSize( static_cast<PageSize>(entry.first->size()) ), entry.second );
             }
             if (inserted) {
                 log << "Insert with existing key ";
-                logUint16Array( log, entry.first->data(), entry.first->size() );
+                logUint16Array( log, entry.first->data(), static_cast<PageSize>(entry.first->size()) );
                 log << " returned true!\n";
                 errors += 1;
             }
@@ -974,21 +974,21 @@ public:
     uint32_t replace( int count ) {
         uint32_t errors = TreeTester<uint16_t[],uint32_t>::replace( count );
         size_t range = keys.size();
-        if (range < count) count = range;
+        if (range < count) count = static_cast<int>(range);
         bool usePair = false;
         for( int i = 0; i < count; ++i) {
             vector<uint16_t>* key = keys[ generateIndex( count ) ];
             uint32_t value = generateUint32();
             bool replaced = false;
             if (usePair) {
-                pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( key->size() ) };
+                pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( static_cast<PageSize>(key->size()) ) };
                 replaced = tree->replace( keyPair, value );
             } else {
-                replaced = tree->replace( key->data(), PageSize( key->size() ), value );
+                replaced = tree->replace( key->data(), PageSize( static_cast<PageSize>(key->size()) ), value );
             }
             if (!replaced) {
                 log << "Replace with existing key ";
-                logUint16Array( log, key->data(), key->size() );
+                logUint16Array( log, key->data(), static_cast<PageSize>(key->size()) );
                 log << " returned false!\n";
                 errors += 1;
             } else {
@@ -1000,14 +1000,14 @@ public:
             vector<uint16_t>* key = generateUniqueKey();
             bool replaced = false;
             if (usePair) {
-                pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( key->size() ) };
+                pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( static_cast<PageSize>(key->size()) ) };
                 replaced = tree->replace( keyPair, generateUint32() );
             } else {
-                replaced = tree->replace( key->data(), PageSize( key->size() ), generateUint32() );
+                replaced = tree->replace( key->data(), PageSize( static_cast<PageSize>(key->size()) ), generateUint32() );
             }
             if (replaced) {
                 log << "Replace with non-existing key ";
-                logUint16Array( log, key->data(), key->size() );
+                logUint16Array( log, key->data(), static_cast<PageSize>(key->size()) );
                 log << " returned true!\n";
                 errors += 1;
             }
@@ -1020,7 +1020,7 @@ public:
     uint32_t erase( int count, KeyOrder order ) {
         uint32_t errors = TreeTester<uint16_t[],uint32_t>::erase( count, order );
         size_t range = keys.size();
-        if (range < count) count = range;
+        if (range < count) count = static_cast<int>(range);
         bool usePair = false;
         if (order == Forward) {
             sort( keys.begin(), keys.end(), compare );
@@ -1039,14 +1039,14 @@ public:
             vector<uint16_t>* key = generateUniqueKey();
             bool removed = false;
             if (usePair) {
-                pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( key->size() ) };
+                pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( static_cast<PageSize>(key->size()) ) };
                 removed = tree->erase( keyPair );
             } else {
-                removed = tree->erase( key->data(), PageSize( key->size() ));
+                removed = tree->erase( key->data(), PageSize( static_cast<PageSize>(key->size()) ));
             }
             if (removed) {
                 log << "Remove with non-existing key ";
-                logUint16Array( log, key->data(), key->size() );
+                logUint16Array( log, key->data(), static_cast<PageSize>(key->size()) );
                 log << " returned true!\n";
                 errors += 1;
             }
@@ -1124,7 +1124,7 @@ private:
     vector<uint32_t>* generateUniqueKeys( uint32_t count ) const {
         auto keys = new vector<uint32_t>();
         set<uint32_t> keySet;
-        for ( int i = 0; i < count; ++i) {
+        for (uint32_t i = 0; i < count; ++i) {
             uint32_t key = generateUint32();
             while ((keySet.count( key ) == 1) || (content.count( key ) == 1)) key = generateUint32();
             keys->push_back( key );
@@ -1206,9 +1206,9 @@ public:
             for (auto entry = content.cbegin(); entry != content.cend(); ++entry) {
                 try {
                     auto retrieved = tree->retrieve( entry->first );
-                    if (Uint16ArrayCompare::compare( entry->second->data(), entry->second->size(), retrieved.first, retrieved.second )) {
+                    if (Uint16ArrayCompare::compare( entry->second->data(), static_cast<PageSize>(entry->second->size()), retrieved.first, retrieved.second )) {
                         log << "Key " << entry->first << " : Expected ";
-                        logUint16Array( log, entry->second->data(), entry->second->size() );
+                        logUint16Array( log, entry->second->data(), static_cast<PageSize>(entry->second->size()) );
                         log << ", retrieved ";
                         logUint16Array( log, retrieved.first, retrieved.second );
                         log << "!\n";
@@ -1299,7 +1299,7 @@ public:
     uint32_t replace( int count ) {
         uint32_t errors = TreeTester<uint32_t,uint16_t[]>::replace( count );
         size_t range = keys.size();
-        if (range < count) count = range;
+        if (range < count) count = static_cast<int>(range);
         bool usePair = false;
         for( int i = 0; i < count; ++i) {
             uint32_t key = keys[ generateIndex( range ) ];
@@ -1345,7 +1345,7 @@ public:
     uint32_t erase( int count, KeyOrder order ) {
         uint32_t errors = TreeTester<uint32_t,uint16_t[]>::erase( count, order );
         size_t range = keys.size();
-        if (range < count) count = range;
+        if (range < count) count = static_cast<int>(range);
         if (order == Forward) {
             sort( keys.begin(), keys.end() );
             for ( int i = 0; i < count; ++i) errors += removeKey( keys[ i ] );
@@ -1440,7 +1440,7 @@ private:
     vector<vector<uint16_t>*>* generateUniqueKeys( uint32_t count ) {
         auto keys = new vector<vector<uint16_t>*>();
         set<vector<uint16_t>*,Uint16ArrayCompare> keySet;
-        for ( int i = 0; i < count; ++i) {
+        for ( uint32_t i = 0; i < count; ++i) {
             auto key = new vector<uint16_t>;
             generateUint16Array( *key );
             while ((keySet.count( key ) == 1) || (content.count( key ) == 1)) generateUint16Array( *key );
@@ -1459,14 +1459,14 @@ private:
         auto value = generateValue();
         bool inserted = false;
         if (*usePair) {
-            pair<const uint16_t*, PageSize> keyPair = { key->data(), key->size() };
-            pair<const uint16_t*, PageSize> valuePair = { value->data(), value->size() };
+            pair<const uint16_t*, PageSize> keyPair = { key->data(), static_cast<PageSize>(key->size()) };
+            pair<const uint16_t*, PageSize> valuePair = { value->data(), static_cast<PageSize>(value->size()) };
             inserted = tree->insert( keyPair, valuePair );
         } else {
-            inserted = tree->insert( key->data(), key->size(), value->data(), value->size() );
+            inserted = tree->insert( key->data(), static_cast<PageSize>(key->size()), value->data(), static_cast<PageSize>(value->size()) );
         }
         if (!inserted) {
-            log << "Insert on non-existing key "; logUint16Array( log, key->data(), key->size() ); log << " returned false!\n";
+            log << "Insert on non-existing key "; logUint16Array( log, key->data(), static_cast<PageSize>(key->size()) ); log << " returned false!\n";
             errors += 1;
         } else {
             keys.push_back( key );
@@ -1478,13 +1478,13 @@ private:
         uint32_t errors = 0;
         bool removed = false;
         if (*usePair) {
-            pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( key->size() ) };
+            pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( static_cast<PageSize>(key->size()) ) };
             removed = tree->erase( keyPair );
         } else {
-            removed = tree->erase( key->data(), PageSize( key->size() ));
+            removed = tree->erase( key->data(), PageSize( static_cast<PageSize>(key->size()) ));
         }
         if (!removed) {
-            log << "Remove with existing key "; logUint16Array( log, key->data(), key->size() ); log << " returned false!\n";
+            log << "Remove with existing key "; logUint16Array( log, key->data(), static_cast<PageSize>(key->size()) ); log << " returned false!\n";
             errors += 1;
         } else {
             content.erase( key );
@@ -1533,16 +1533,16 @@ public:
                 try {
                     pair<const uint16_t*,PageSize> retrieved;
                     if (usePair) {
-                        pair<const uint16_t*, PageSize> keyPair = { entry->first->data(), entry->first->size() };
+                        pair<const uint16_t*, PageSize> keyPair = { entry->first->data(), static_cast<PageSize>(entry->first->size()) };
                         retrieved = tree->retrieve( keyPair );
                     } else {
-                        retrieved = tree->retrieve( entry->first->data(), entry->first->size() );
+                        retrieved = tree->retrieve( entry->first->data(), static_cast<PageSize>(entry->first->size()) );
                     }
-                    if (Uint16ArrayCompare::compare( entry->second->data(), entry->second->size(), retrieved.first, retrieved.second )) {
+                    if (Uint16ArrayCompare::compare( entry->second->data(), static_cast<PageSize>(entry->second->size()), retrieved.first, retrieved.second )) {
                         log << "Key ";
-                        logUint16Array( log, entry->first->data(), entry->first->size() );
+                        logUint16Array( log, entry->first->data(), static_cast<PageSize>(entry->first->size()) );
                         log << " : Expected ";
-                        logUint16Array( log, entry->second->data(), entry->second->size() );
+                        logUint16Array( log, entry->second->data(), static_cast<PageSize>(entry->second->size()) );
                         log << ", retrieved ";
                         logUint16Array( log, retrieved.first, retrieved.second );
                         log << ".\n";
@@ -1559,27 +1559,27 @@ public:
                 }
                 bool found = false;
                 if (usePair) {
-                    pair<const uint16_t*, PageSize> keyPair = { entry->first->data(), entry->first->size() };
+                    pair<const uint16_t*, PageSize> keyPair = { entry->first->data(), static_cast<PageSize>(entry->first->size()) };
                     found = tree->contains( keyPair );
                 } else {
-                    found = tree->contains( entry->first->data(), entry->first->size() );
+                    found = tree->contains( entry->first->data(), static_cast<PageSize>(entry->first->size()) );
                 }
                 if (!found) {
                     log << "Contains with existing key ";
-                    logUint16Array( log, entry->first->data(), entry->first->size() );
+                    logUint16Array( log, entry->first->data(), static_cast<PageSize>(entry->first->size()) );
                     log << " returned false!\n";
                     errors += 1;
                 }
                 PageSize count = 0;
                 if (usePair) {
-                    pair<const uint16_t*, PageSize> keyPair = { entry->first->data(), entry->first->size() };
+                    pair<const uint16_t*, PageSize> keyPair = { entry->first->data(), static_cast<PageSize>(entry->first->size()) };
                     count = tree->count( keyPair );
                 } else {
-                    count = tree->count( entry->first->data(), entry->first->size() );
+                    count = tree->count( entry->first->data(), static_cast<PageSize>(entry->first->size()) );
                 }
                 if (count != 1) {
                     log << "Count with existing key ";
-                    logUint16Array( log, entry->first->data(), entry->first->size() );
+                    logUint16Array( log, entry->first->data(), static_cast<PageSize>(entry->first->size()) );
                     log << " returned " << count << "!\n";
                     errors += 1;
                 }
@@ -1592,15 +1592,15 @@ public:
                     try {
                         pair<const uint16_t*,PageSize> retrieved;
                         if (usePair) {
-                            pair<const uint16_t*, PageSize> keyPair = { key->data(), key->size() };
+                            pair<const uint16_t*, PageSize> keyPair = { key->data(), static_cast<PageSize>(key->size()) };
                             retrieved = tree->retrieve( keyPair );
                         } else {
-                            retrieved = tree->retrieve( key->data(), key->size() );
+                            retrieved = tree->retrieve( key->data(), static_cast<PageSize>(key->size()) );
                         }
                         log << "Retrieved ";
                         logUint16Array( log, retrieved.first, retrieved.second );
                         log << " with non-existing key ";
-                        logUint16Array( log, key->data(), key->size() );
+                        logUint16Array( log, key->data(), static_cast<PageSize>(key->size()) );
                         log << "!\n";
                         errors += 1;
                     }
@@ -1610,27 +1610,27 @@ public:
                 }
                 bool found = false;
                 if (usePair) {
-                    pair<const uint16_t*, PageSize> keyPair = { key->data(), key->size() };
+                    pair<const uint16_t*, PageSize> keyPair = { key->data(), static_cast<PageSize>(key->size()) };
                     found = tree->contains( keyPair );
                 } else {
-                    found = tree->contains( key->data(), key->size() );
+                    found = tree->contains( key->data(), static_cast<PageSize>(key->size()) );
                 }
                 if (found) {
                     log << "Contains with non-existing key ";
-                    logUint16Array( log, key->data(), key->size() );
+                    logUint16Array( log, key->data(), static_cast<PageSize>(key->size()) );
                     log << " returned true!\n";
                     errors += 1;
                 }
                 PageSize count = 0;
                 if (usePair) {
-                    pair<const uint16_t*, PageSize> keyPair = { key->data(), key->size() };
+                    pair<const uint16_t*, PageSize> keyPair = { key->data(), static_cast<PageSize>(key->size()) };
                     count = tree->count( keyPair );
                 } else {
-                    count = tree->count( key->data(), key->size() );
+                    count = tree->count( key->data(), static_cast<PageSize>(key->size()) );
                 }
                 if (count != 0) {
                     log << "Count with non-existing key ";
-                    logUint16Array( log, key->data(), key->size() );
+                    logUint16Array( log, key->data(), static_cast<PageSize>(key->size()) );
                     log << " returned " << count << "!\n";
                     errors += 1;
                 }
@@ -1660,15 +1660,15 @@ public:
         for( auto entry : content ) {
             bool inserted = false;
             if (usePair) {
-                pair<const uint16_t*, PageSize> keyPair = { entry.first->data(), PageSize( entry.first->size() ) };
+                pair<const uint16_t*, PageSize> keyPair = { entry.first->data(), PageSize( static_cast<PageSize>(entry.first->size()) ) };
                 pair<const uint16_t*, PageSize> valuePair = { entry.second->data(), PageSize( entry.second->size() ) };
                 inserted = tree->insert( keyPair, valuePair );
             } else {
-                inserted = tree->insert( entry.first->data(), PageSize( entry.first->size() ), entry.second->data(), PageSize( entry.second->size() ) );
+                inserted = tree->insert( entry.first->data(), PageSize( static_cast<PageSize>(entry.first->size()) ), entry.second->data(), PageSize( entry.second->size() ) );
             }
             if (inserted) {
                 log << "Insert on existing key ";
-                logUint16Array( log, entry.first->data(), entry.first->size() );
+                logUint16Array( log, entry.first->data(), static_cast<PageSize>(entry.first->size()) );
                 log << " returned true!\n";
                 errors += 1;
             }
@@ -1680,22 +1680,22 @@ public:
     uint32_t replace( int count ) {
         uint32_t errors = TreeTester<uint16_t[],uint16_t[]>::replace( count );
         size_t range = keys.size();
-        if (range < count) count = range;
+        if (range < count) count = static_cast<int>(range);
         bool usePair = false;
         for( int i = 0; i < count; ++i) {
             vector<uint16_t>* key = keys[ generateIndex( range ) ];
             vector<uint16_t>* value = generateValue();
             bool replaced = false;
             if (usePair) {
-                pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( key->size() ) };
+                pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( static_cast<PageSize>(key->size()) ) };
                 pair<const uint16_t*, PageSize> valuePair = { value->data(), PageSize( value->size() ) };
                 replaced = tree->replace( keyPair, valuePair );
             } else {
-                replaced = tree->replace( key->data(), PageSize( key->size() ), value->data(), PageSize( value->size() ) );
+                replaced = tree->replace( key->data(), PageSize( static_cast<PageSize>(key->size()) ), value->data(), PageSize( value->size() ) );
             }
             if (!replaced) {
                 log << "Replace with existing key ";
-                logUint16Array( log, key->data(), key->size() );
+                logUint16Array( log, key->data(), static_cast<PageSize>(key->size()) );
                 log << " returned false!\n";
                 errors += 1;
             } else {
@@ -1710,15 +1710,15 @@ public:
             vector<uint16_t>* value = generateValue();
             bool replaced = false;
             if (usePair) {
-                pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( key->size() ) };
+                pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( static_cast<PageSize>(key->size()) ) };
                 pair<const uint16_t*, PageSize> valuePair = { value->data(), PageSize( value->size() ) };
                 replaced = tree->replace( keyPair, valuePair );
             } else {
-                replaced = tree->replace( key->data(), PageSize( key->size() ), value->data(), PageSize( value->size() ));
+                replaced = tree->replace( key->data(), PageSize( static_cast<PageSize>(key->size()) ), value->data(), PageSize( value->size() ));
             }
             if (replaced) {
                 log << "Replace with non-existing key ";
-                logUint16Array( log, key->data(), key->size() );
+                logUint16Array( log, key->data(), static_cast<PageSize>(key->size()) );
                 log << " returned true!\n";
                 errors += 1;
             }
@@ -1733,7 +1733,7 @@ public:
     uint32_t erase( int count, KeyOrder order ) {
         uint32_t errors = TreeTester<uint16_t[],uint16_t[]>::erase( count, order );
         size_t range = keys.size();
-        if (range < count) count = range;
+        if (range < count) count = static_cast<int>(range);
         bool usePair = false;
         if (order == Forward) {
             sort( keys.begin(), keys.end(), compare );
@@ -1752,14 +1752,14 @@ public:
             vector<uint16_t>* key = generateUniqueKey();
             bool removed = false;
             if (usePair) {
-                pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( key->size() ) };
+                pair<const uint16_t*, PageSize> keyPair = { key->data(), PageSize( static_cast<PageSize>(key->size()) ) };
                 removed = tree->erase( keyPair );
             } else {
-                removed = tree->erase( key->data(), PageSize( key->size() ));
+                removed = tree->erase( key->data(), PageSize( static_cast<PageSize>(key->size()) ));
             }
             if (removed) {
                 log << "Remove with non-existing key ";
-                logUint16Array( log, key->data(), key->size() );
+                logUint16Array( log, key->data(), static_cast<PageSize>(key->size()) );
                 log << " returned true!\n";
                 errors += 1;
             }
@@ -1861,23 +1861,23 @@ pair<uint32_t,bool> doTest( TreeTester<K,V>& tester, size_t count1, size_t count
         errors += tester.validate();
         errors += tester.commit();
         errors += tester.validate();
-        errors += tester.insert( count1, TreeTester<K,V>::Forward );
+        errors += tester.insert(static_cast<int>(count1), TreeTester<K,V>::Forward );
         errors += tester.validate();
-        errors += tester.erase( count2, TreeTester<K,V>::Forward );
-        errors += tester.validate();
-        tester.logTree();
-        tester.destroyTree();
-        tester.createTree();
-        errors += tester.insert( count1, TreeTester<K,V>::Forward );
-        errors += tester.validate();
-        errors += tester.erase( count2, TreeTester<K,V>::Reverse );
+        errors += tester.erase(static_cast<int>(count2), TreeTester<K,V>::Forward );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
-        errors += tester.insert( count1, TreeTester<K,V>::Forward );
+        errors += tester.insert(static_cast<int>(count1), TreeTester<K,V>::Forward );
         errors += tester.validate();
-        errors += tester.erase( count2, TreeTester<K,V>::Random );
+        errors += tester.erase(static_cast<int>(count2), TreeTester<K,V>::Reverse );
+        errors += tester.validate();
+        tester.logTree();
+        tester.destroyTree();
+        tester.createTree();
+        errors += tester.insert(static_cast<int>(count1), TreeTester<K,V>::Forward );
+        errors += tester.validate();
+        errors += tester.erase(static_cast<int>(count2), TreeTester<K,V>::Random );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
@@ -1886,23 +1886,23 @@ pair<uint32_t,bool> doTest( TreeTester<K,V>& tester, size_t count1, size_t count
         errors += tester.validate();
         errors += tester.commit();
         errors += tester.validate();
-        errors += tester.insert( count1, TreeTester<K,V>::Reverse );
+        errors += tester.insert(static_cast<int>(count1), TreeTester<K,V>::Reverse );
         errors += tester.validate();
-        errors += tester.erase( count2, TreeTester<K,V>::Forward );
-        errors += tester.validate();
-        tester.logTree();
-        tester.destroyTree();
-        tester.createTree();
-        errors += tester.insert( count1, TreeTester<K,V>::Reverse );
-        errors += tester.validate();
-        errors += tester.erase( count2, TreeTester<K,V>::Reverse );
+        errors += tester.erase(static_cast<int>(count2), TreeTester<K,V>::Forward );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
-        errors += tester.insert( count1, TreeTester<K,V>::Reverse );
+        errors += tester.insert(static_cast<int>(count1), TreeTester<K,V>::Reverse );
         errors += tester.validate();
-        errors += tester.erase( count2, TreeTester<K,V>::Random );
+        errors += tester.erase(static_cast<int>(count2), TreeTester<K,V>::Reverse );
+        errors += tester.validate();
+        tester.logTree();
+        tester.destroyTree();
+        tester.createTree();
+        errors += tester.insert(static_cast<int>(count1), TreeTester<K,V>::Reverse );
+        errors += tester.validate();
+        errors += tester.erase(static_cast<int>(count2), TreeTester<K,V>::Random );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
@@ -1911,48 +1911,48 @@ pair<uint32_t,bool> doTest( TreeTester<K,V>& tester, size_t count1, size_t count
         errors += tester.validate();
         errors += tester.commit();
         errors += tester.validate();
-        errors += tester.insert( count1, TreeTester<K,V>::Random );
+        errors += tester.insert(static_cast<int>(count1), TreeTester<K,V>::Random );
         errors += tester.validate();
-        errors += tester.erase( count2, TreeTester<K,V>::Forward );
-        errors += tester.validate();
-        tester.logTree();
-        tester.destroyTree();
-        tester.createTree();
-        errors += tester.insert( count1, TreeTester<K,V>::Random );
-        errors += tester.validate();
-        errors += tester.erase( count2, TreeTester<K,V>::Reverse );
+        errors += tester.erase(static_cast<int>(count2), TreeTester<K,V>::Forward );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
-        errors += tester.insert( count1, TreeTester<K,V>::Random );
+        errors += tester.insert(static_cast<int>(count1), TreeTester<K,V>::Random );
         errors += tester.validate();
-        errors += tester.erase( count2, TreeTester<K,V>::Random );
+        errors += tester.erase(static_cast<int>(count2), TreeTester<K,V>::Reverse );
+        errors += tester.validate();
+        tester.logTree();
+        tester.destroyTree();
+        tester.createTree();
+        errors += tester.insert( static_cast<int>(count1), TreeTester<K,V>::Random );
+        errors += tester.validate();
+        errors += tester.erase(static_cast<int>(count2), TreeTester<K,V>::Random );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         // Commit and recover test
         tester.createTree();
         errors += tester.validate();
-        errors += tester.insert( count1 / 10, TreeTester<K,V>::Random );
+        errors += tester.insert(static_cast<int>(count1) / 10, TreeTester<K,V>::Random );
         errors += tester.validate();
         errors += tester.commit();
         errors += tester.validate();
-        errors += tester.insert( count1 - (count1 / 10), TreeTester<K,V>::Random );
+        errors += tester.insert(static_cast<int>(count1 - (count1 / 10)), TreeTester<K,V>::Random );
         errors += tester.validate();
         errors += tester.commit();
         errors += tester.validate();
-        errors += tester.replace( count1 / 2 );
+        errors += tester.replace(static_cast<int>(count1 / 2) );
         errors += tester.validate();
-        errors += tester.erase( count1 - (count1 / 4), TreeTester<K,V>::Random );
+        errors += tester.erase(static_cast<int>(count1 - (count1 / 4)), TreeTester<K,V>::Random );
         errors += tester.validate();
         errors += tester.recover();
         errors += tester.validate();
-        errors += tester.erase( count1 / 2, TreeTester<K,V>::Random );
+        errors += tester.erase(static_cast<int>(count1 / 2), TreeTester<K,V>::Random );
         errors += tester.validate();
-        errors += tester.replace( count1 / 2 );
+        errors += tester.replace(static_cast<int>(count1 / 2) );
         errors += tester.validate();
-        errors += tester.insert( count1 / 2, TreeTester<K,V>::Random );
+        errors += tester.insert(static_cast<int>(count1 / 2), TreeTester<K,V>::Random );
         errors += tester.validate();
         errors += tester.assign();
         errors += tester.validate();
@@ -1964,7 +1964,7 @@ pair<uint32_t,bool> doTest( TreeTester<K,V>& tester, size_t count1, size_t count
         tester.createPool();
         tester.createTree();
         errors += tester.validate();
-        errors += tester.erase( count1 / 4, TreeTester<K,V>::Random );
+        errors += tester.erase(static_cast<int>(count1 / 4), TreeTester<K,V>::Random );
         errors += tester.validate();
         errors += tester.recover();
         errors += tester.validate();

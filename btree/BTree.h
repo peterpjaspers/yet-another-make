@@ -24,8 +24,8 @@ namespace BTree {
 
     template< class K, class V, class T > class TreeIterator;
 
-    static const float LowPageThreshold = 0.4;
-    static const float HighPageThreshold = 0.9;
+    static const float LowPageThreshold = 0.4f;
+    static const float HighPageThreshold = 0.9f;
 
     // B-Tree with template arguments for key (K) and value (V).
     //
@@ -1162,7 +1162,7 @@ namespace BTree {
                     if (0 < rightSplitKeySize) rightFill += (rightSplitKeySize + rightPage->splitValueSize());
                     rightFill += page->filling();
                 }
-                PageSize threshold = (HighPageThreshold * page->header.capacity);
+                PageSize threshold = static_cast<PageSize>(HighPageThreshold * page->header.capacity);
                 if ((leftFill < rightFill) && (leftFill < threshold)) {
                     mergePage<KT,VT>( leftTrail, pageTrail ); // Shift content of this page to left page
                 } else if (rightFill < threshold) {
