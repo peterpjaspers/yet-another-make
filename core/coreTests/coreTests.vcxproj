@@ -67,6 +67,7 @@
     <ClCompile Include="DirectoryTree.cpp" />
     <ClCompile Include="dispatcherTest.cpp" />
     <ClCompile Include="dotYamDirectoryTest.cpp" />
+    <ClCompile Include="enduranceTest.cpp" />
     <ClCompile Include="executeNode.cpp" />
     <ClCompile Include="executionContextTest.cpp" />
     <ClCompile Include="fileAspectSetTest.cpp" />
