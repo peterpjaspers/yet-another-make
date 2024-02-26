@@ -1,5 +1,5 @@
 #include "DirectoryNode.h"
-#include "FileRepository.h"
+#include "FileRepositoryNode.h"
 #include "SourceFileNode.h"
 #include "GeneratedFileNode.h"
 #include "ExecutionContext.h"
@@ -181,7 +181,7 @@ namespace YAM
 
     std::shared_ptr<Node> DirectoryNode::getNode(
         std::filesystem::directory_entry const& dirEntry,
-        std::shared_ptr<FileRepository> const& repo,
+        std::shared_ptr<FileRepositoryNode> const& repo,
         std::unordered_set<std::shared_ptr<Node>>& added,
         std::unordered_set<std::shared_ptr<Node>>& kept
     ) {

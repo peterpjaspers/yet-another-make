@@ -1,7 +1,7 @@
 #include "FileNode.h"
 #include "FileAspect.h"
 #include "ExecutionContext.h"
-#include "FileRepository.h"
+#include "FileRepositoryNode.h"
 #include "ExecutionContext.h"
 #include "IStreamer.h"
 #include "ILogBook.h"

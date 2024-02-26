@@ -1,5 +1,5 @@
 #include "FileRepositoryWatcher.h"
-#include "FileRepository.h"
+#include "FileRepositoryNode.h"
 #include "DirectoryNode.h"
 #include "FileNode.h"
 #include "DirectoryWatcher.h"
@@ -25,7 +25,7 @@ namespace
         return pair.second == base.end();
     }
 
-    bool isNodeInRepo(Node* node, std::filesystem::path const& repoDir, FileRepository* repo) {
+    bool isNodeInRepo(Node* node, std::filesystem::path const& repoDir, FileRepositoryNode* repo) {
         if (repo == nullptr) {
             return
                 (isFileNode(node) || isDirNode(node))
@@ -57,7 +57,7 @@ namespace YAM
     }
 
     FileRepositoryWatcher::FileRepositoryWatcher(
-        FileRepository* repo,
+        FileRepositoryNode* repo,
         ExecutionContext* context)
         : FileRepositoryWatcher(repo->directory(), context)
     {

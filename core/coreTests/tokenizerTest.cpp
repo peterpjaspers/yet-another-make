@@ -112,13 +112,13 @@ namespace {
         EXPECT_EQ(":", token.value);
         EXPECT_EQ(3, tokenizer.tokenStartOffset());
         EXPECT_EQ(4, tokenizer.tokenEndOffset());
-        EXPECT_EQ(1, tokenizer.tokenStartLine());
-        EXPECT_EQ(1, tokenizer.tokenEndLine());
-        EXPECT_EQ(2, tokenizer.tokenStartColumn());
-        EXPECT_EQ(3, tokenizer.tokenEndColumn());
+        EXPECT_EQ(2, tokenizer.tokenStartLine());
+        EXPECT_EQ(2, tokenizer.tokenEndLine());
+        EXPECT_EQ(3, tokenizer.tokenStartColumn());
+        EXPECT_EQ(4, tokenizer.tokenEndColumn());
         EXPECT_EQ(4, tokenizer.cursor());
         EXPECT_EQ(1, tokenizer.lineBeginOffset());
-        EXPECT_EQ(3, tokenizer.column());
+        EXPECT_EQ(4, tokenizer.column());
         tokenizer.skip({ whiteSpace });
         token = tokenizer.readNextToken({whiteSpace});
         EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
@@ -136,51 +136,51 @@ namespace {
         EXPECT_EQ(":", token.value);
         EXPECT_EQ(2, tokenizer.tokenStartOffset());
         EXPECT_EQ(3, tokenizer.tokenEndOffset());
-        EXPECT_EQ(0, tokenizer.tokenStartLine());
-        EXPECT_EQ(0, tokenizer.tokenEndLine());
-        EXPECT_EQ(2, tokenizer.tokenStartColumn());
-        EXPECT_EQ(3, tokenizer.tokenEndColumn());
+        EXPECT_EQ(1, tokenizer.tokenStartLine());
+        EXPECT_EQ(1, tokenizer.tokenEndLine());
+        EXPECT_EQ(3, tokenizer.tokenStartColumn());
+        EXPECT_EQ(4, tokenizer.tokenEndColumn());
         EXPECT_EQ(3, tokenizer.cursor());
         EXPECT_EQ(0, tokenizer.lineBeginOffset());
-        EXPECT_EQ(3, tokenizer.column());
+        EXPECT_EQ(4, tokenizer.column());
     
         token = tokenizer.readNextToken({ whiteSpace });
         token = tokenizer.readNextToken({ comment1 });
         EXPECT_EQ(comment1, token.spec);
         EXPECT_EQ(4, tokenizer.tokenStartOffset());
         EXPECT_EQ(19, tokenizer.tokenEndOffset());
-        EXPECT_EQ(0, tokenizer.tokenStartLine());
-        EXPECT_EQ(0, tokenizer.tokenEndLine());
-        EXPECT_EQ(4, tokenizer.tokenStartColumn());
-        EXPECT_EQ(19, tokenizer.tokenEndColumn());
+        EXPECT_EQ(1, tokenizer.tokenStartLine());
+        EXPECT_EQ(1, tokenizer.tokenEndLine());
+        EXPECT_EQ(5, tokenizer.tokenStartColumn());
+        EXPECT_EQ(20, tokenizer.tokenEndColumn());
         EXPECT_EQ(19, tokenizer.cursor());
         EXPECT_EQ(0, tokenizer.lineBeginOffset());
-        EXPECT_EQ(19, tokenizer.column());
+        EXPECT_EQ(20, tokenizer.column());
 
         token = tokenizer.readNextToken({ whiteSpace });
         EXPECT_EQ(whiteSpace, token.spec);
         EXPECT_EQ(19, tokenizer.tokenStartOffset());
         EXPECT_EQ(22, tokenizer.tokenEndOffset());
-        EXPECT_EQ(0, tokenizer.tokenStartLine());
-        EXPECT_EQ(1, tokenizer.tokenEndLine());
-        EXPECT_EQ(19, tokenizer.tokenStartColumn());
-        EXPECT_EQ(2, tokenizer.tokenEndColumn());
+        EXPECT_EQ(1, tokenizer.tokenStartLine());
+        EXPECT_EQ(2, tokenizer.tokenEndLine());
+        EXPECT_EQ(20, tokenizer.tokenStartColumn());
+        EXPECT_EQ(3, tokenizer.tokenEndColumn());
         EXPECT_EQ(22, tokenizer.cursor());
         EXPECT_EQ(20, tokenizer.lineBeginOffset());
-        EXPECT_EQ(2, tokenizer.column());
+        EXPECT_EQ(3, tokenizer.column());
 
         token = tokenizer.readNextToken({ rule });
         EXPECT_EQ(rule, token.spec);
         EXPECT_EQ(":", token.value);
         EXPECT_EQ(22, tokenizer.tokenStartOffset());
         EXPECT_EQ(23, tokenizer.tokenEndOffset());
-        EXPECT_EQ(1, tokenizer.tokenStartLine());
-        EXPECT_EQ(1, tokenizer.tokenEndLine());
-        EXPECT_EQ(2, tokenizer.tokenStartColumn());
-        EXPECT_EQ(3, tokenizer.tokenEndColumn());
+        EXPECT_EQ(2, tokenizer.tokenStartLine());
+        EXPECT_EQ(2, tokenizer.tokenEndLine());
+        EXPECT_EQ(3, tokenizer.tokenStartColumn());
+        EXPECT_EQ(4, tokenizer.tokenEndColumn());
         EXPECT_EQ(23, tokenizer.cursor());
         EXPECT_EQ(20, tokenizer.lineBeginOffset());
-        EXPECT_EQ(3, tokenizer.column());
+        EXPECT_EQ(4, tokenizer.column());
 
         token = tokenizer.readNextToken({ whiteSpace, });
         EXPECT_EQ(nullptr, token.spec);
@@ -190,13 +190,13 @@ namespace {
         EXPECT_EQ(whiteSpace, token.spec);
         EXPECT_EQ(34, tokenizer.tokenStartOffset());
         EXPECT_EQ(36, tokenizer.tokenEndOffset());
-        EXPECT_EQ(1, tokenizer.tokenStartLine());
-        EXPECT_EQ(2, tokenizer.tokenEndLine());
-        EXPECT_EQ(14, tokenizer.tokenStartColumn());
-        EXPECT_EQ(1, tokenizer.tokenEndColumn());
+        EXPECT_EQ(2, tokenizer.tokenStartLine());
+        EXPECT_EQ(3, tokenizer.tokenEndLine());
+        EXPECT_EQ(15, tokenizer.tokenStartColumn());
+        EXPECT_EQ(2, tokenizer.tokenEndColumn());
         EXPECT_EQ(36, tokenizer.cursor());
         EXPECT_EQ(35, tokenizer.lineBeginOffset());
-        EXPECT_EQ(1, tokenizer.column());
+        EXPECT_EQ(2, tokenizer.column());
 
         token = tokenizer.readNextToken({ whiteSpace, comment1, });
         EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
@@ -217,13 +217,13 @@ namespace {
         EXPECT_EQ(":", token.value);
         EXPECT_EQ(67, tokenizer.tokenStartOffset());
         EXPECT_EQ(68, tokenizer.tokenEndOffset());
-        EXPECT_EQ(5, tokenizer.tokenStartLine());
-        EXPECT_EQ(5, tokenizer.tokenEndLine());
-        EXPECT_EQ(6, tokenizer.tokenStartColumn());
-        EXPECT_EQ(7, tokenizer.tokenEndColumn());
+        EXPECT_EQ(6, tokenizer.tokenStartLine());
+        EXPECT_EQ(6, tokenizer.tokenEndLine());
+        EXPECT_EQ(7, tokenizer.tokenStartColumn());
+        EXPECT_EQ(8, tokenizer.tokenEndColumn());
         EXPECT_EQ(68, tokenizer.cursor());
         EXPECT_EQ(61, tokenizer.lineBeginOffset());
-        EXPECT_EQ(7, tokenizer.column());
+        EXPECT_EQ(8, tokenizer.column());
         token = tokenizer.readNextToken({ });
         EXPECT_EQ(tokenizer.eosTokenSpec(), token.spec);
     }
@@ -488,5 +488,20 @@ namespace {
         EXPECT_EQ("cmdEnd", token.type);
         EXPECT_EQ("|>", token.value);
 
+    }
+
+    TEST(BuildFileTokenizer, depBuildfile) {
+        const std::string depBuildfileStr = R"(buildfile buildfiles )";
+
+        BuildFileTokenizer tokenizer("testFile", depBuildfileStr);
+        Token token;
+
+        token = tokenizer.readNextToken({ depBuildFile });
+        EXPECT_EQ(depBuildFile, token.spec);
+        EXPECT_EQ("buildfile", token.value);
+
+        tokenizer.skip({ whiteSpace });
+        token = tokenizer.readNextToken({ depBuildFile });
+        EXPECT_EQ(nullptr, token.spec);
     }
 }

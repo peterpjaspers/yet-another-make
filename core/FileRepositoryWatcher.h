@@ -12,7 +12,7 @@ namespace YAM
     class Node;
     class ExecutionContext;
     class IDirectoryWatcher;
-    class FileRepository;
+    class FileRepositoryNode;
 
     // A FileRepositoryWatcher continuously watches a file repository for
     // directory and file changes. 
@@ -53,7 +53,7 @@ namespace YAM
         // changes. Find directory and file nodes associated with changes in 
         // given 'context->nodes()'.
         FileRepositoryWatcher(
-            FileRepository* repo,
+            FileRepositoryNode* repo,
             ExecutionContext* context);
 
         ~FileRepositoryWatcher();
@@ -87,7 +87,7 @@ namespace YAM
         void _invalidateNodeRecursively(std::shared_ptr<Node> const& node);
 
         ExecutionContext* _context;
-        FileRepository* _repository;
+        FileRepositoryNode* _repository;
         CollapsedFileChanges _changes;
         std::shared_ptr<IDirectoryWatcher> _watcher;
     };

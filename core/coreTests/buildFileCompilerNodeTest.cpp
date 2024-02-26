@@ -3,7 +3,7 @@
 #include "DirectoryTree.h"
 #include "../BuildFileParserNode.h"
 #include "../BuildFileCompilerNode.h"
-#include "../FileRepository.h"
+#include "../FileRepositoryNode.h"
 #include "../DirectoryNode.h"
 #include "../SourceFileNode.h"
 #include "../CommandNode.h"
@@ -22,15 +22,15 @@ namespace
     using namespace YAM;
     using namespace YAMTest;
 
-    void writeFile(std::filesystem::path const& p, std::string const& content) {
-        std::ofstream stream(p.string().c_str());
+    void writeFile(std::filesystem::path const& path, std::string const& content) {
+        std::ofstream stream(path);
         stream << content;
         stream.close();
     }
 
     std::string readFile(std::filesystem::path const& path) {
         std::string content;
-        std::ifstream file(path.string().c_str());
+        std::ifstream file(path);
         std::getline(file, content);
         return content;
     }
@@ -39,7 +39,7 @@ namespace
     public:
         DirectoryTree repoTree;
         ExecutionContext context;
-        std::shared_ptr<FileRepository> fileRepo;
+        std::shared_ptr<FileRepositoryNode> fileRepo;
         std::filesystem::path absBuildFilePath;
         std::filesystem::path absSub1BuildFilePath;
         std::filesystem::path cmdOutputFile;
@@ -54,7 +54,7 @@ namespace
 
         TestSetup()
             : repoTree(FileSystem::createUniqueDirectory("_buildFileCompilingTest"), 1, RegexSet())
-            , fileRepo(std::make_shared<FileRepository>("repo", repoTree.path(), &context, true))
+            , fileRepo(std::make_shared<FileRepositoryNode>(&context, "repo", repoTree.path(), true))
             , absBuildFilePath(repoTree.path() / R"(buildfile_yam.bat)")
             , absSub1BuildFilePath(repoTree.path() / R"(SubDir1\buildfile_yam.bat)")
             , cmdOutputFile(fileRepo->directoryNode()->name() / "main.obj")

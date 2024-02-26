@@ -1,7 +1,7 @@
 
 #include "executeNode.h"
 #include "DirectoryTree.h"
-#include "../FileRepository.h"
+#include "../FileRepositoryNode.h"
 #include "../DirectoryNode.h"
 #include "../SourceFileNode.h"
 #include "../CommandNode.h"
@@ -29,16 +29,15 @@ namespace
     // Nodes: per directory 4 nodes (dir node, dotignore .yamignore and
     // .gitignore). Per file 1 node.
     // cmdNode: 1 command node.
-    // RepositoriesNode + config file node: 2
-    // FileRepostory (not a node) has 2: FileExecConfigNode + SourceFileNode: 3
-    // Total nodes: 42*4 + 120 + 1 + 2 + 2=293
-    const std::size_t nNodes = 42 * 4 + 120 + 1 + 2 + 2; // in context->nodes()
+    // RepositoriesNode + home repo node + repositories.txt file node: 3
+    // FileRepostoryNode has: FileExecConfigNode + SourceFileNode: 2
+    const std::size_t nNodes = 42 * 4 + 120 + 1 + 3 + 2; // in context->nodes()
 
     // Wait for file change event to be received for given paths.
     // When event is received then consume the changes.
     // Return whether event was consumed.
     bool consumeFileChangeEvents(
-        FileRepository* sourceFileRepo,
+        FileRepositoryNode* sourceFileRepo,
         Dispatcher& mainThreadQueue,
         std::initializer_list<std::filesystem::path> paths)
     {
@@ -84,13 +83,13 @@ namespace
             : repoDir(repoDirectory)
             , yamDir(DotYamDirectory::create(repoDir))
             , testTree(repoDir, 3, RegexSet({ ".yam" }))
-            , persistentState(repoDir / "buildState", &context, true)
+            , persistentState(repoDir / "buildState", &context)
         {
             //context.threadPool().size(1);
-            auto homeRepo = std::make_shared<FileRepository>(
+            auto homeRepo = std::make_shared<FileRepositoryNode>(
+                &context,
                 "repo",
                 repoDir,
-                &context,
                 true);
             auto repos = std::make_shared<RepositoriesNode>(&context, homeRepo);
             context.repositoriesNode(repos);
@@ -114,7 +113,7 @@ namespace
             persistentState.store();
         }
 
-        std::shared_ptr<FileRepository> sourceFileRepo() {
+        std::shared_ptr<FileRepositoryNode> sourceFileRepo() {
             return context.findRepository(std::string("repo"));
         }
 
@@ -168,9 +167,8 @@ namespace
         void executeAll() {
             auto setDirty = Delegate<void, std::shared_ptr<Node> const&>::CreateLambda(
                 [](std::shared_ptr<Node> const& n) {
-                    if (n->state() == Node::State::Deleted) n->undelete();
-                    else n->setState(Node::State::Dirty);
-            });
+                    n->setState(Node::State::Dirty);
+                });
             context.nodes().foreach(setDirty);
             std::vector<std::shared_ptr<Node>> dirtyNodes;
             context.getDirtyNodes(dirtyNodes);
@@ -342,7 +340,7 @@ namespace
     TEST(PersistentBuildState, rollbackRemovedRepo) {
         SetupHelper setup(FileSystem::createUniqueDirectory());
 
-        std::string repoName = setup.sourceFileRepo()->name();
+        std::string repoName = setup.sourceFileRepo()->repoName();
         EXPECT_TRUE(setup.context.repositoriesNode()->removeRepository(repoName));
         EXPECT_EQ(3, setup.context.nodes().size()); // repositoriesn, repositoriesconfigfile and cmd node
 

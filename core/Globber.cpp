@@ -3,7 +3,7 @@
 #include "FileNode.h"
 #include "DirectoryNode.h"
 #include "ExecutionContext.h"
-#include "FileRepository.h"
+#include "FileRepositoryNode.h"
 #include "Glob.h"
 
 namespace
@@ -12,6 +12,7 @@ namespace
     namespace fs = std::filesystem;
 
     void resolveSymbolicOrAbsolutePath(
+        ExecutionContext* context,
         std::shared_ptr<DirectoryNode>& baseDir,
         std::filesystem::path& pattern)
     {
@@ -24,9 +25,9 @@ namespace
                 baseDir = nullptr;
             }
         } else {
-            std::string repoName = FileRepository::repoNameFromPath(pattern);
+            std::string repoName = FileRepositoryNode::repoNameFromPath(pattern);
             if (!repoName.empty()) {
-                auto repo = baseDir->context()->findRepository(repoName);
+                auto repo = context->findRepository(repoName);
                 if (repo != nullptr) {
                     baseDir = repo->directoryNode();
                     pattern = repo->relativePathOf(repo->absolutePathOf(pattern));
@@ -53,7 +54,7 @@ namespace YAM
         , _dirsOnly(dirsOnly)
         , _executed(false)
     {
-        optimize(_baseDir, _pattern);
+        optimize(_baseDir->context(), _baseDir, _pattern);
     }
 
 
@@ -102,10 +103,11 @@ namespace YAM
     }
 
     void Globber::optimize(
+        ExecutionContext* context,
         std::shared_ptr<DirectoryNode>& baseDir, 
         std::filesystem::path& pattern
     ) {
-        resolveSymbolicOrAbsolutePath(baseDir, pattern);
+        resolveSymbolicOrAbsolutePath(context, baseDir, pattern);
 
         std::filesystem::path patternDirPath;
         auto it = pattern.begin();

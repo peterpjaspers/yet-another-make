@@ -20,7 +20,7 @@ namespace YAM
         // 
         // Pattern can be relative to baseDir or can be a symbolic or 
         // absolute path. An exception is thrown when there is no known
-        // FileRepository that lexically contains the symbolic or absolute
+        // FileRepositoryNode that lexically contains the symbolic or absolute
         // path.
         // 
         // baseDir and pattern are optimized, see Globber::optimize. 
@@ -58,6 +58,7 @@ namespace YAM
         // Post: baseDir = baseDir/NP, pattern = GP
         // baseDir/NP is canonical, i.e. does not contain .. and . components.
         static void optimize(
+            ExecutionContext* context,
             std::shared_ptr<DirectoryNode>& baseDir,
             std::filesystem::path& pattern);
 

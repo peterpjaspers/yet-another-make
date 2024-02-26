@@ -2,7 +2,7 @@
 #include "executeNode.h"
 #include "DirectoryTree.h"
 #include "../BuildFileParserNode.h"
-#include "../FileRepository.h"
+#include "../FileRepositoryNode.h"
 #include "../DirectoryNode.h"
 #include "../SourceFileNode.h"
 #include "../GeneratedFileNode.h"
@@ -33,7 +33,7 @@ namespace
     public:
         DirectoryTree repoTree;
         ExecutionContext context;
-        std::shared_ptr<FileRepository> fileRepo;
+        std::shared_ptr<FileRepositoryNode> fileRepo;
         std::filesystem::path absBuildFilePath;
         std::filesystem::path absBuildFilePathSD1;
         std::filesystem::path absBuildFilePathSD2;
@@ -47,7 +47,7 @@ namespace
 
         TestSetup(bool syntaxError = false)
             : repoTree(FileSystem::createUniqueDirectory("_buildFileProcessingTest"), 1, RegexSet())
-            , fileRepo(std::make_shared<FileRepository>("repo", repoTree.path(), &context, true))
+            , fileRepo(std::make_shared<FileRepositoryNode>(&context, "repo", repoTree.path(), true))
             , absBuildFilePath(repoTree.path() / R"(buildfile_yam.bat)")
             , absBuildFilePathSD1(repoTree.path() / R"(SubDir1\buildfile_yam.txt)")
             , absBuildFilePathSD2(repoTree.path() / R"(SubDir2\buildfile_yam.txt)")

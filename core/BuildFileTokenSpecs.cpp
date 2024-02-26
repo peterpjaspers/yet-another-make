@@ -4,11 +4,41 @@
 namespace {
     using namespace YAM;
 
+    class TokenIdentifierSpec : public ITokenSpec
+    {
+    public:
+        TokenIdentifierSpec(
+            std::string const& identifier,
+            std::string const& tokenType)
+            : _identifier(identifier)
+            , _type(tokenType)
+            , _re("\\w+")
+        { }
+
+        bool match(const char* str, Token& token) const override {
+            std::cmatch cm;
+            bool matched = std::regex_search(str, cm, _re);
+            if (matched) matched = _identifier == cm[0].str();
+            if (matched) {
+                token.spec = this;
+                token.type = _type;
+                token.consumed = cm[0].length();
+                token.value = _identifier;
+            }
+            return matched;
+        }
+
+    private:
+        std::string _identifier;
+        std::string _type;
+        std::regex _re;
+    };
+
     TokenRegexSpec _whiteSpace(R"(^\s+)", "'skip'whitespace", 0);
     TokenRegexSpec _comment1(R"(^\/\/.*)", "comment1", 0); // single-line comment
     TokenRegexSpec _commentN(R"(^\/\*[\s\S]*?\*\/)", "commentN", 0); // multi-line comment
-    TokenRegexSpec _depBuildFile(R"(^buildfile)", "depBuildFile");
-    TokenRegexSpec _depGlob(R"(^glob)", "depGlob");
+    TokenIdentifierSpec _depBuildFile("buildfile", "depBuildFile");
+    TokenIdentifierSpec _depGlob("glob", "depGlob");
     TokenRegexSpec _rule(R"(^:)", "rule");
     TokenRegexSpec _foreach(R"(^foreach)", "foreach");
     TokenRegexSpec _ignore(R"(^\^)", "not");

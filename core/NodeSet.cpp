@@ -15,10 +15,12 @@ namespace YAM
     void NodeSet::remove(std::shared_ptr<Node> const& node) {
         auto nRemoved = _nodes.erase(node->name());
         if (nRemoved != 1) throw std::runtime_error("failed to remove node");
+        node->setState(Node::State::Deleted);
     }
 
     void NodeSet::removeIfPresent(std::shared_ptr<Node> const& node) {
-        auto notUsed = _nodes.erase(node->name());
+        auto nRemoved = _nodes.erase(node->name());
+        if (nRemoved == 1) node->setState(Node::State::Deleted);
     }
 
     void NodeSet::clear() {

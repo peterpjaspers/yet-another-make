@@ -13,7 +13,7 @@ namespace YAM
 {
     class GeneratedFileNode;
     class DirectoryNode;
-    class FileRepository;
+    class FileRepositoryNode;
     class SourceFileNode;
     class GroupNode;
 

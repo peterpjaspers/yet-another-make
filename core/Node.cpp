@@ -2,7 +2,7 @@
 #include "NodeSet.h"
 #include "Delegates.h"
 #include "ExecutionContext.h"
-#include "FileRepository.h"
+#include "FileRepositoryNode.h"
 #include "IStreamer.h"
 
 #include <iostream>
@@ -48,8 +48,8 @@ namespace YAM
 
     Node::~Node() {}
 
-    std::shared_ptr<FileRepository> const& Node::repository() const {
-        auto repoName = FileRepository::repoNameFromPath(name());
+    std::shared_ptr<FileRepositoryNode> const& Node::repository() const {
+        auto repoName = FileRepositoryNode::repoNameFromPath(name());
         return context()->findRepository(repoName);
     }
 
@@ -60,7 +60,7 @@ namespace YAM
     void Node::setState(State newState) {
         if (_state != newState) {
             if (_state == Node::State::Deleted) {
-                throw std::runtime_error("Not allowed to update state of Deleted object, use undelete");
+                throw std::runtime_error("Not allowed to update state of Deleted object");
             }
             bool wasExecuting = _state == Node::State::Executing;
             _state = newState;
@@ -89,13 +89,6 @@ namespace YAM
             }
             _addedAndRemovedObservers.clear();
         }
-    }
-
-    void Node::undelete() {
-        if (_state != Node::State::Deleted) {
-            throw std::runtime_error("Not allowed to undelete an object that is not in deleted state");
-        }
-        _state = Node::State::Dirty;
     }
 
     void Node::addObserver(StateObserver* observer) {
@@ -285,7 +278,11 @@ namespace YAM
     }
 
     bool Node::modified() const {
-        return _modified;
+        return _state == Node::State::Deleted || _modified;
+    }
+
+    bool Node::deleted() const {
+        return _state == Node::State::Deleted;
     }
 
     void Node::stream(IStreamer* streamer) {

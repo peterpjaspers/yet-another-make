@@ -1,4 +1,4 @@
-#include "../FileRepository.h"
+#include "../FileRepositoryNode.h"
 #include "../DirectoryNode.h"
 #include "../SourceFileNode.h"
 #include "../ExecutionContext.h"
@@ -32,10 +32,10 @@ namespace
             , testTree(repoDir, 3, RegexSet({ }))
         {
             //context.threadPool().size(1);
-            auto homeRepo = std::make_shared<FileRepository>(
+            auto homeRepo = std::make_shared<FileRepositoryNode>(
+                &context,
                 "repo",
                 repoDir,
-                &context,
                 true); 
             auto repos = std::make_shared<RepositoriesNode>(&context, homeRepo);
             context.repositoriesNode(repos);
@@ -44,7 +44,7 @@ namespace
             EXPECT_TRUE(completed);
         }
 
-        std::shared_ptr<FileRepository> repo() {
+        std::shared_ptr<FileRepositoryNode> repo() {
             return context.findRepository(repoName);
         }
 

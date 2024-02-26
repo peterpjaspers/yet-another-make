@@ -91,8 +91,13 @@ namespace YAM {
         file->buildFile = _buildFilePath;
         file->line = _tokenizer.tokenStartLine();
         file->column = _tokenizer.tokenStartColumn();
-        parseDeps(file->deps);
-        lookAhead({ rule });
+
+        lookAhead({ depBuildFile, depGlob, rule });
+        while (_lookAhead.spec == depBuildFile || _lookAhead.spec == depGlob) {
+            eatDep(file->deps);
+            lookAhead({ depBuildFile, depGlob, rule });
+        }
+        if (_lookAhead.spec == nullptr) syntaxError();
         while (_lookAhead.spec == rule) {
              file->variablesAndRules.push_back(eatRule());
              lookAhead({ rule });
@@ -100,19 +105,13 @@ namespace YAM {
          return file;
     }
 
-    void BuildFileParser::parseDeps(BuildFile::Deps& deps) {
-        lookAhead({ depBuildFile, depGlob });
-        if (_lookAhead.spec == depBuildFile || _lookAhead.spec == depGlob) {
-            deps.line = _tokenizer.tokenStartLine();
-            deps.column = _tokenizer.tokenStartColumn();
-            while (_lookAhead.spec == depBuildFile || _lookAhead.spec == depGlob) {
-                if (_lookAhead.spec == depBuildFile) {
-                    eatDepBuildFile(deps);
-                } else if (_lookAhead.spec == depGlob) {
-                    eatDepGlob(deps);
-                }
-                lookAhead({ depBuildFile, depGlob });
-            }
+    void BuildFileParser::eatDep(BuildFile::Deps& deps) {
+        deps.line = _tokenizer.tokenStartLine();
+        deps.column = _tokenizer.tokenStartColumn();
+        if (_lookAhead.spec == depBuildFile) {
+            eatDepBuildFile(deps);
+        } else if (_lookAhead.spec == depGlob) {
+            eatDepGlob(deps);
         }
     }
 

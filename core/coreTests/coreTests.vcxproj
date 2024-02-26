@@ -59,7 +59,11 @@
       </DisableSpecificWarnings>
     </ClCompile>
     <ClCompile Include="delegatesTest.cpp" />
-    <ClCompile Include="directoryNodeTest.cpp" />
+    <ClCompile Include="directoryNodeTest.cpp">
+      <BufferSecurityCheck Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BufferSecurityCheck>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">X64;_DEBUG;_CONSOLE;_WIN32_WINNT=0x0601;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</SDLCheck>
+    </ClCompile>
     <ClCompile Include="DirectoryTree.cpp" />
     <ClCompile Include="dispatcherTest.cpp" />
     <ClCompile Include="dotYamDirectoryTest.cpp" />

@@ -1,24 +1,29 @@
 Todo for R 0.1.0
-- deal with Node::State::Deleted
-- test ignored output files
-- BuildScopeFinder unittest
-- implement wildcard for output files (dynamic outputs)
+- fix persistent storage of deleted nodes (Node::State::Deleted)
+- implement wildcard/glob for output files (dynamic outputs)
 - integrate Phil's file access monitor
-- RepositoriesNode
-  Add type to filerepo, only support integrated, tracked and ignore
-- Version in PersistentBuildState
-  Encode version in name of buildstate file
+- Add support for FileRepository types yam, tracked and ignored
+- Versioning in PersistentBuildState, encode version in name of buildstate file
 - fileaspect last-write-time (e.g. for generated files in cmd executionhash)
 - fileaspect configuration
+- how to deal with input dependencies on non-existing source files
+  Note: these source file nodes are NOT in state Deleted. How to GC these
+  nodes when no longer refd => GC sweep over context to remove node with
+  use_count 1.
 - variants (tup variants, MR build configurations)
-- command line arguments for scope and logging
+  Not in scope: requires syntax for variables
+- environment variables
+  requires syntax for export of variables to environment of rule
 - Fast lookup of dirty nodes, modified nodes
+- BuildScopeFinder unittest
 - use static iso dll libraries
-  This also enables implementation of streaming hash computation
+  And enabled implementation of streaming hash computation
 - build yam with yam
-- how to deal with gtest, boost, xxhash?
+- deal with dependencies on gtest, boost, xxhash
 - license
-- how to deal with env variables
+- C++20 modules support
+  Allow commands to generated buildfiles.
+  while (dirty buildfiles found) build();
 - automated end-to-end testing
 - scalability measurements
 - documentation, bedenk betere naam

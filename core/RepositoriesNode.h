@@ -15,15 +15,14 @@ namespace YAM
     class DirectoryNode;
     class SourceFileNode;
     class ExecutionContext;
-    class FileRepositoryWatcher;
-    class FileExecSpecsNode;
+    class FileRepositoryNode;
 
     // A RepositoriesNode parses file yamConfig/repositories.txt in the root 
     // directory of the home repository. The home repository (the repo with
     // name ".") is the repo from which the build is started.
     // This file lists the input repositories of the home repository, i.e.
     // the repositories from which files are read when building the home repo.
-    // The parse result is a graph of FileRepository instances, accessible via
+    // The parse result is a graph of FileRepositoryNode instances, accessible via
     // ExecutionContext::homeRepository().
     //
     // Syntax of file yamConfig/repositories.txt:
@@ -34,7 +33,7 @@ namespace YAM
     //     Type :== "type" "=" Integrated" | "Coupled" | "Tracked" | "Ignored"
     //     InputRepos :== inputs "=" { RepoName }*
     //
-    // See clas FileRepository for an explanation of Type.
+    // See clas FileRepositoryNode for an explanation of Type.
     // 
     // Cycles in the repository graph are not allowed.
     // InputRepos declarations are mandatory for dependencies on Coupled repos
@@ -69,7 +68,7 @@ namespace YAM
         // name is the name of the home repository
         RepositoriesNode(
             ExecutionContext* context, 
-            std::shared_ptr<FileRepository> const& homeRepo);
+            std::shared_ptr<FileRepositoryNode> const& homeRepo);
 
         // Return the path of the repositories configuration file relative 
         // to the repository root directory.
@@ -83,11 +82,11 @@ namespace YAM
         // Return the absolute path of the child repositories configuration file.
         std::filesystem::path absoluteConfigFilePath() const;
 
-        std::shared_ptr<FileRepository> homeRepository() const;
-        std::map<std::string, std::shared_ptr<FileRepository>> const& repositories() const;
+        std::shared_ptr<FileRepositoryNode> const& homeRepository() const;
+        std::map<std::string, std::shared_ptr<FileRepositoryNode>> const& repositories() const;
 
-        std::shared_ptr<FileRepository> const& findRepository(std::string const& repoName) const;
-        bool addRepository(std::shared_ptr<FileRepository> const& repo);
+        std::shared_ptr<FileRepositoryNode> const& findRepository(std::string const& repoName) const;
+        bool addRepository(std::shared_ptr<FileRepositoryNode> const& repo);
         bool removeRepository(std::string const& repoName);
 
         // For synchronous update.
@@ -109,11 +108,12 @@ namespace YAM
 
         void handleRequisitesCompletion(Node::State newState);
         bool updateRepos(std::map<std::string, RepositoriesNode::Repo> const& repos);
-        bool updateRepoDirectory(FileRepository& frepo, std::filesystem::path const& newDir);
+        bool updateRepoDirectory(FileRepositoryNode& frepo, std::filesystem::path const& newDir);
 
         bool _ignoreConfigFile;
         std::shared_ptr<SourceFileNode> _configFile;
-        std::map<std::string, std::shared_ptr<FileRepository>> _repositories;
+        std::shared_ptr<FileRepositoryNode> _homeRepo;
+        std::map<std::string, std::shared_ptr<FileRepositoryNode>> _repositories;
         XXH64_hash_t _configFileHash;
         bool _modified;
     };

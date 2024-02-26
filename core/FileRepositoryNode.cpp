@@ -1,4 +1,4 @@
-#include "FileRepository.h"
+#include "FileRepositoryNode.h"
 #include "DirectoryNode.h"
 #include "SourceFileNode.h"
 #include "FileRepositoryWatcher.h"
@@ -26,65 +26,61 @@ namespace
 
 namespace YAM
 {
-    FileRepository::FileRepository()
-        : _context(nullptr)
-        , _modified(false)
-    {}
+    FileRepositoryNode::FileRepositoryNode() {}
 
-    FileRepository::FileRepository(
+    FileRepositoryNode::FileRepositoryNode(
+        ExecutionContext* context,
         std::string const& repoName,
         std::filesystem::path const& directory,
-        ExecutionContext* context,
         bool tracked)
-        : _name(repoName)
+        : Node(context, repoName)
+        , _repoName(repoName)
         , _directory(directory)
-        , _context(context)
         , _tracked(tracked)
         , _directoryNode(std::make_shared<DirectoryNode>(context, symbolicDirectory(), nullptr))
         , _fileExecSpecsNode(std::make_shared<FileExecSpecsNode>(context, symbolicDirectory()))
-        , _modified(true)
     {
-        _context->nodes().add(_directoryNode);
-        _context->nodes().add(_fileExecSpecsNode);
+        context->nodes().add(_directoryNode);
+        context->nodes().add(_fileExecSpecsNode);
         _directoryNode->addPrerequisitesToContext();
     }
 
-    FileRepository::~FileRepository() {
+    FileRepositoryNode::~FileRepositoryNode() {
         stopWatching();
     }
 
-    void FileRepository::startWatching() {
+    void FileRepositoryNode::startWatching() {
         if (_tracked) {
             if (_watcher == nullptr) {
-                _watcher = std::make_shared<FileRepositoryWatcher>(this, _context);
+                _watcher = std::make_shared<FileRepositoryWatcher>(this, context());
             }
         }
     }
 
-    void FileRepository::stopWatching() {
+    void FileRepositoryNode::stopWatching() {
         if (_watcher != nullptr) {
             _watcher->stop();
             _watcher = nullptr;
         }
     }
 
-    bool FileRepository::watching() const {
+    bool FileRepositoryNode::watching() const {
         return _watcher != nullptr;
     }
 
-    void FileRepository::consumeChanges() {
+    void FileRepositoryNode::consumeChanges() {
         if (_watcher != nullptr) _watcher->consumeChanges();
     }
 
-    bool FileRepository::hasChanged(std::filesystem::path const& path) {
+    bool FileRepositoryNode::hasChanged(std::filesystem::path const& path) {
         return (_watcher == nullptr) ? true : _watcher->hasChanged(path);
     }
 
-    std::string const& FileRepository::name() const {
-        return _name;
+    std::string const& FileRepositoryNode::repoName() const {
+        return _repoName;
     }
 
-    void FileRepository::directory(std::filesystem::path const& dir) {
+    void FileRepositoryNode::directory(std::filesystem::path const& dir) {
         if (_directory != dir) {
             std::stringstream ss;
             ss 
@@ -92,7 +88,7 @@ namespace YAM
                 << _directory << " to " 
                 << dir << std::endl;
             LogRecord progress(LogRecord::Aspect::Progress, ss.str());
-            _context->addToLogBook(progress);
+            context()->addToLogBook(progress);
 
             _directory = dir;
             if (watching()) {
@@ -103,15 +99,15 @@ namespace YAM
         }
     }
 
-    std::filesystem::path const& FileRepository::directory() const {
+    std::filesystem::path const& FileRepositoryNode::directory() const {
         return _directory;
     }
 
-    bool FileRepository::isSymbolicPath(std::filesystem::path const& path) {
+    bool FileRepositoryNode::isSymbolicPath(std::filesystem::path const& path) {
         return !repoNameFromPath(path).empty();
     }
 
-    std::string FileRepository::repoNameFromPath(std::filesystem::path const& path) {
+    std::string FileRepositoryNode::repoNameFromPath(std::filesystem::path const& path) {
         static std::string empty;
         auto it = path.begin();
         if (it == path.end()) return empty;
@@ -123,12 +119,12 @@ namespace YAM
         return repoComponent.substr(2);
     }
 
-    std::filesystem::path FileRepository::repoNameToSymbolicPath(std::string const& repoName) {
+    std::filesystem::path FileRepositoryNode::repoNameToSymbolicPath(std::string const& repoName) {
         std::filesystem::path p("@@" + repoName);
         return p;
     }
 
-    bool FileRepository::lexicallyContains(std::filesystem::path const& path) const {
+    bool FileRepositoryNode::lexicallyContains(std::filesystem::path const& path) const {
         bool contains;
         if (path.is_absolute()) {
             auto pit = path.begin();
@@ -145,7 +141,7 @@ namespace YAM
         return contains;
     }
 
-    std::filesystem::path FileRepository::relativePathOf(std::filesystem::path const& absPath) const {
+    std::filesystem::path FileRepositoryNode::relativePathOf(std::filesystem::path const& absPath) const {
         if (!absPath.is_absolute()) throw std::runtime_error("not an absolute path");
         std::filesystem::path relPath;
         auto pit = absPath.begin();
@@ -165,7 +161,7 @@ namespace YAM
         return relPath;
     }
 
-    std::filesystem::path FileRepository::symbolicPathOf(std::filesystem::path const& absPath) const {
+    std::filesystem::path FileRepositoryNode::symbolicPathOf(std::filesystem::path const& absPath) const {
         if (!absPath.is_absolute()) {
             throw std::runtime_error("not an absolute path");
         }
@@ -180,7 +176,7 @@ namespace YAM
         }
         std::filesystem::path symPath;
         if (contains) {
-            symPath /= repoNameToSymbolicPath(name());
+            symPath /= repoNameToSymbolicPath(_repoName);
             for (; pit != absPath.end(); pit++) {
                 symPath /= *pit;
             }
@@ -188,7 +184,7 @@ namespace YAM
         return symPath;
     }
 
-    std::filesystem::path FileRepository::absolutePathOf(std::filesystem::path const& symbolicPath) const {
+    std::filesystem::path FileRepositoryNode::absolutePathOf(std::filesystem::path const& symbolicPath) const {
         std::filesystem::path absPath;
         if (*symbolicPath.begin() != _directoryNode->name()) return absPath;
         absPath = _directory;
@@ -200,63 +196,61 @@ namespace YAM
         return absPath;
     }
 
-    void FileRepository::modified(bool newValue) {
-        _modified = newValue;
-    }
-
-    bool FileRepository::modified() const {
-        return _modified;
-    }
-
-    std::shared_ptr<DirectoryNode> FileRepository::directoryNode() const {
+    std::shared_ptr<DirectoryNode> FileRepositoryNode::directoryNode() const {
         return _directoryNode; 
     }
 
-    std::shared_ptr<FileExecSpecsNode> FileRepository::fileExecSpecsNode() const {
+    std::shared_ptr<FileExecSpecsNode> FileRepositoryNode::fileExecSpecsNode() const {
         return _fileExecSpecsNode;
     }
 
-    void FileRepository::inputRepoNames(std::vector<std::string> const& names) {
+    void FileRepositoryNode::inputRepoNames(std::vector<std::string> const& names) {
         if (_inputRepoNames != names) {
             _inputRepoNames = names;
             modified(true);
         }
     }
 
-    std::vector<std::string> const& FileRepository::inputRepoNames() const {
+    std::vector<std::string> const& FileRepositoryNode::inputRepoNames() const {
         return _inputRepoNames;
     }
 
-    void FileRepository::clear() {
-        _context->nodes().removeIfPresent(_fileExecSpecsNode);
-        _context->nodes().removeIfPresent(_fileExecSpecsNode->configFileNode());
-        _context->nodes().removeIfPresent(_directoryNode);
+    void FileRepositoryNode::clear() {
+        context()->nodes().removeIfPresent(_fileExecSpecsNode);
+        context()->nodes().removeIfPresent(_fileExecSpecsNode->configFileNode());
+        context()->nodes().removeIfPresent(_directoryNode);
         _directoryNode->clear();
         modified(true);
     }
 
-    void FileRepository::setStreamableType(uint32_t type) {
+    void FileRepositoryNode::start() {
+        Node::start();
+        postCompletion(Node::State::Ok);
+    }
+
+    void FileRepositoryNode::setStreamableType(uint32_t type) {
         streamableTypeId = type;
     }
 
-    uint32_t FileRepository::typeId() const {
+    uint32_t FileRepositoryNode::typeId() const {
         return streamableTypeId;
     }
 
-    void FileRepository::stream(IStreamer* streamer) {
-        streamer->stream(_name);
+    void FileRepositoryNode::stream(IStreamer* streamer) {
+        Node::stream(streamer);
         streamer->stream(_directory);
         streamer->stream(_tracked);
         streamer->stream(_directoryNode);
         streamer->stream(_fileExecSpecsNode);
     }
 
-    void FileRepository::prepareDeserialize() {
+    void FileRepositoryNode::prepareDeserialize() {
+        Node::prepareDeserialize();
     }
 
-    bool FileRepository::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
-        if (!restored.insert(this).second) return false;
-        _context = reinterpret_cast<ExecutionContext*>(context);
+    bool FileRepositoryNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
+        if (!Node::restore(context, restored)) return false;
+        _repoName = name().string();
         if (_tracked) {
             if (_watcher != nullptr && _watcher->directory() != _directory) {
                 stopWatching();

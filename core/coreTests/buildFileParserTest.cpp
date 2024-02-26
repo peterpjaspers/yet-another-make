@@ -6,6 +6,15 @@
 namespace {
     using namespace YAM;
 
+    TEST(BuildFileParser, empty) {
+        const std::string empty;
+
+        BuildFileParser parser(empty);
+        auto const buildFile = parser.file();
+        EXPECT_EQ(0, buildFile->deps.depBuildFiles.size());
+        EXPECT_EQ(0, buildFile->deps.depGlobs.size());
+        EXPECT_EQ(0, buildFile->variablesAndRules.size());
+    }
     TEST(BuildFileParser, depsAndRule) {
         const std::string rules = R"(
         buildfile ..\comp1\buildfile_yam.rb
@@ -52,6 +61,23 @@ namespace {
         EXPECT_EQ("%B.obj", output.path);
     }
 
+    TEST(BuildFileParser, depBuildFile) {
+        const std::string depOk = R"(buildfile ..\comp1\buildfile_yam.rb glob *.cpp)";
+
+        BuildFileParser parser(depOk);
+        auto const buildFile = parser.file();
+        ASSERT_NE(nullptr, buildFile);
+        EXPECT_EQ(1, buildFile->deps.depBuildFiles.size());
+        EXPECT_EQ(R"(..\comp1\buildfile_yam.rb)", buildFile->deps.depBuildFiles[0]);
+        EXPECT_EQ(1, buildFile->deps.depGlobs.size());
+        EXPECT_EQ(R"(*.cpp)", buildFile->deps.depGlobs[0]);
+
+        const std::string depWrong1 = R"(buildfiles ..\comp1\buildfile_yam.rb)";
+        EXPECT_ANY_THROW(BuildFileParser parser(depWrong1););
+
+        const std::string depWrong2 = R"(globs *.cpp)";
+        EXPECT_ANY_THROW(BuildFileParser parser(depWrong2););
+    }
     TEST(BuildFileParser, depsAndForeachRule) {
         const std::string rules = R"(
             buildfile ..\comp1\buildfile_yam.rb
@@ -168,7 +194,7 @@ namespace {
             BuildFileParser parser(file);
         } catch (std::runtime_error e)
         {
-            std::string expected("Illegal use of absolute path 'C:\\hello.c' at line 0, from column 2 to 12 in file test\n");
+            std::string expected("Illegal use of absolute path 'C:\\hello.c' at line 1, from column 3 to 13 in file test\n");
             std::string actual = e.what();
             EXPECT_EQ(expected, actual);
         }
@@ -181,7 +207,7 @@ namespace {
             BuildFileParser parser(file);
         } catch (std::runtime_error e)
         {
-            std::string expected("Missing endquote on input path at line 0, from column 2 to 47 in file test\n");
+            std::string expected("Missing endquote on input path at line 1, from column 3 to 48 in file test\n");
             std::string actual = e.what();
             EXPECT_EQ(expected, actual);
         }
@@ -194,7 +220,7 @@ namespace {
             BuildFileParser parser(file);
         } catch (std::runtime_error e)
         {
-            std::string expected("Missing endquote on output path at line 0, from column 37 to 43 in file test\n");
+            std::string expected("Missing endquote on output path at line 1, from column 38 to 44 in file test\n");
             std::string actual = e.what();
             EXPECT_EQ(expected, actual);
         }
@@ -206,7 +232,7 @@ namespace {
             BuildFileParser parser(file);
         } catch (std::runtime_error e)
         {
-            std::string expected("Illegal use of glob characters in path 'hello*' at line 0, from column 37 to 43 in file test\n");
+            std::string expected("Illegal use of glob characters in path 'hello*' at line 1, from column 38 to 44 in file test\n");
             std::string actual = e.what();
             EXPECT_EQ(expected, actual);
         }

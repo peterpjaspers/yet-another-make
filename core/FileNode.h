@@ -8,8 +8,6 @@
 
 namespace YAM
 {
-    class FileRepository;
-
     // A file node computes hashes of aspects of its associated file. The lis
     // of aspects applicable to the file is retrieved from the node's execution
     // context.
@@ -41,7 +39,7 @@ namespace YAM
     // 1) Source file F is detected as input of C
     // C will act as follows:
     //     if source file node associated with F does not exist
-    //         error //see FileRepository
+    //         error
     //     else
     //         add F to C's input files and prerequisites
     //         use F.hashOf(aspect) to compute C's executionHash where

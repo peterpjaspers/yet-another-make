@@ -10,7 +10,7 @@
 #include "BuildFileCompilerNode.h"
 #include "RepositoriesNode.h"
 #include "FileExecSpecsNode.h"
-#include "FileRepository.h"
+#include "FileRepositoryNode.h"
 #include "DotYamDirectory.h"
 #include "AcyclicTrail.h"
 #include "BuildFileCycleFinder.h"
@@ -204,14 +204,14 @@ namespace YAM
         
         if (_buildState == nullptr) {
             std::filesystem::path yamDir = repoDir / DotYamDirectory::yamName();
-            _buildState = std::make_shared<PersistentBuildState>(yamDir, &_context, true);
+            _buildState = std::make_shared<PersistentBuildState>(yamDir, &_context);
             _buildState->retrieve();
             auto repositoriesNode = _context.repositoriesNode();
             if (repositoriesNode == nullptr) {
-                auto homeRepo = std::make_shared<FileRepository>(
+                auto homeRepo = std::make_shared<FileRepositoryNode>(
+                    &_context,
                     repoName,
                     repoDir,
-                    &_context,
                     true);
                 repositoriesNode = std::make_shared<RepositoriesNode>(&_context, homeRepo);
                 repositoriesNode->ignoreConfigFile(false);
@@ -305,6 +305,7 @@ namespace YAM
         resetNodeStates(_context.nodes());
         std::vector<std::shared_ptr<Node>> dirtyNodes;
         auto repositoriesNode = _context.repositoriesNode();
+        repositoriesNode->homeRepository()->consumeChanges();
         if (repositoriesNode->state() == Node::State::Dirty) {
             if (repositoriesNode->parseAndUpdate()) {
                 for (auto& pair : _context.repositories()) pair.second->startWatching();
@@ -313,12 +314,6 @@ namespace YAM
                 return;
             }
             dirtyNodes.push_back(repositoriesNode);
-        }
-        if (_context.repositoriesNode()->parseAndUpdate()) {
-            for (auto& pair : _context.repositories()) pair.second->startWatching();
-        } else {
-            _postCompletion(Node::State::Failed);
-            return;
         }
         for (auto const& pair : _context.repositories()) {
             auto &repo = pair.second;

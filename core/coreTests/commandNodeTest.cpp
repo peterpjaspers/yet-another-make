@@ -9,7 +9,7 @@
 #include "../MultiwayLogBook.h"
 #include "../MemoryLogBook.h"
 #include "../BasicOStreamLogBook.h"
-#include "../FileRepository.h"
+#include "../FileRepositoryNode.h"
 
 #include "gtest/gtest.h"
 #include <boost/process.hpp>
@@ -69,19 +69,19 @@ namespace
             context.logBook(logBook);
 
             auto homeRepo =
-                std::make_shared<FileRepository>(
+                std::make_shared<FileRepositoryNode>(
+                    &context,
                     ".",
                     repoDir,
-                    &context,
                     true);
             auto repos = std::make_shared<RepositoriesNode>(&context, homeRepo);
             context.repositoriesNode(repos);
 
             auto winRepo =
-                std::make_shared<FileRepository>(
+                std::make_shared<FileRepositoryNode>(
+                    &context,
                     "windows",
                     std::filesystem::path("c:\\windows"),
-                    &context,
                     false);
             //repos->addRepository(winRepo);
 

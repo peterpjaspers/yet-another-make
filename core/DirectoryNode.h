@@ -13,7 +13,7 @@ namespace YAM
     class ExecutionContext;
     class FileNode;
     class DotIgnoreNode;
-    class FileRepository;
+    class FileRepositoryNode;
     class BuildFileParserNode;
     class BuildFileCompilerNode;
 
@@ -147,7 +147,7 @@ namespace YAM
         std::chrono::time_point<std::chrono::utc_clock> retrieveLastWriteTime() const;
         std::shared_ptr<Node> getNode(
             std::filesystem::directory_entry const& dirEntry,
-            std::shared_ptr<FileRepository> const& repo,
+            std::shared_ptr<FileRepositoryNode> const& repo,
             std::unordered_set<std::shared_ptr<Node>>& added,
             std::unordered_set<std::shared_ptr<Node>>& kept);
         void retrieveContent(

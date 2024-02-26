@@ -191,7 +191,7 @@ namespace YAM
         void syntaxError();
 
         std::shared_ptr<BuildFile::File> parseBuildFile();
-        void parseDeps(BuildFile::Deps& deps);
+        void eatDep(BuildFile::Deps& deps);
         void eatDepBuildFile(BuildFile::Deps& deps);
         void eatDepGlob(BuildFile::Deps& deps);
         std::shared_ptr<BuildFile::Rule> eatRule();

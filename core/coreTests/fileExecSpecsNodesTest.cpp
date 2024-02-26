@@ -1,7 +1,7 @@
 #include "executeNode.h"
 #include "../FileExecSpecsNode.h"
 #include "../FileSystem.h"
-#include "../FileRepository.h"
+#include "../FileRepositoryNode.h"
 #include "../ExecutionContext.h"
 #include "../MemoryLogBook.h"
 #include "../RepositoriesNode.h"
@@ -26,7 +26,7 @@ namespace
         TestSetup(bool syntaxError)
             : repoDir(FileSystem::createUniqueDirectory("_fileExecSpecsTest"))
             , logBook(std::make_shared<MemoryLogBook>())
-            , fileRepo(std::make_shared<FileRepository>("repo", repoDir, &context, false))
+            , fileRepo(std::make_shared<FileRepositoryNode>(&context, "repo", repoDir, false))
             , fileExecSpecsNode(fileRepo->fileExecSpecsNode())
         {
             context.logBook(logBook);
@@ -49,14 +49,14 @@ namespace
         }
 
         ~TestSetup() {
-            context.repositoriesNode()->removeRepository(fileRepo->name());
+            context.repositoriesNode()->removeRepository(fileRepo->repoName());
             std::filesystem::remove_all(repoDir);
         }
 
         std::filesystem::path repoDir;
         ExecutionContext context;
         std::shared_ptr<MemoryLogBook> logBook;
-        std::shared_ptr<FileRepository> fileRepo;
+        std::shared_ptr<FileRepositoryNode> fileRepo;
         std::shared_ptr<FileExecSpecsNode> fileExecSpecsNode;
     };
 

@@ -1,6 +1,6 @@
 #include "executeNode.h"
 #include "DirectoryTree.h"
-#include "../FileRepository.h"
+#include "../FileRepositoryNode.h"
 #include "../DirectoryNode.h"
 #include "../SourceFileNode.h"
 #include "../ExecutionContext.h"
@@ -51,17 +51,17 @@ namespace
         std::filesystem::path dir;
     };
 
-    TEST(FileRepository, construct) {
+    TEST(FileRepositoryNode, construct) {
         RepoProps repoProps;
         ExecutionContext context;
-        FileRepository repo(repoProps.name, repoProps.dir, &context, false);
+        FileRepositoryNode repo(&context, repoProps.name, repoProps.dir, false);
         EXPECT_EQ(repoProps.name, repo.name());
         EXPECT_EQ(repoProps.dir, repo.directory());
     }
-    TEST(FileRepository, lexicallyContains) {
+    TEST(FileRepositoryNode, lexicallyContains) {
         RepoProps repoProps;
         ExecutionContext context;
-        FileRepository repo(repoProps.name, repoProps.dir, &context, false);
+        FileRepositoryNode repo(&context, repoProps.name, repoProps.dir, false);
         EXPECT_TRUE(repo.lexicallyContains(R"(C:\aap\noot\mies)"));
         EXPECT_TRUE(repo.lexicallyContains(R"(C:\aap\noot\mies\)"));
         EXPECT_TRUE(repo.lexicallyContains(R"(C:\aap\noot\mies\file.cpp)"));
@@ -80,10 +80,10 @@ namespace
         EXPECT_FALSE(repo.lexicallyContains(R"(aap\noot\mies\file.cpp)"));
         EXPECT_FALSE(repo.lexicallyContains(R"(\aap\noot\mies\file.cpp)"));
     }
-    TEST(FileRepository, relativePathOf) {
+    TEST(FileRepositoryNode, relativePathOf) {
         RepoProps repoProps;
         ExecutionContext context;
-        FileRepository repo(repoProps.name, repoProps.dir, &context, false);
+        FileRepositoryNode repo(&context, repoProps.name, repoProps.dir, false);
         EXPECT_EQ("file.cpp", repo.relativePathOf(R"(C:\aap\noot\mies\file.cpp)"));
         EXPECT_ANY_THROW(repo.relativePathOf(R"(@@testRepo/file.cpp)"));
         EXPECT_ANY_THROW(repo.relativePathOf(R"(file.cpp)"));
@@ -94,10 +94,10 @@ namespace
         EXPECT_ANY_THROW(repo.relativePathOf(R"(\aap\noot\file.cpp)"));
         EXPECT_ANY_THROW(repo.relativePathOf(R"(aap\noot\mies\file.cpp)"));
     }
-    TEST(FileRepository, symbolicPath) {
+    TEST(FileRepositoryNode, symbolicPath) {
         RepoProps repoProps;
         ExecutionContext context;
-        FileRepository repo(repoProps.name, repoProps.dir, &context, false);
+        FileRepositoryNode repo(&context, repoProps.name, repoProps.dir, false);
         EXPECT_EQ(R"(@@testRepo\file.cpp)", repo.symbolicPathOf(R"(C:\aap\noot\mies\file.cpp)"));
         EXPECT_EQ(R"(@@testRepo)", repo.symbolicPathOf(R"(C:\aap\noot\mies)"));
         EXPECT_EQ(R"(@@testRepo\)", repo.symbolicPathOf(R"(C:\aap\noot\mies\)"));
@@ -106,10 +106,10 @@ namespace
         EXPECT_ANY_THROW(repo.symbolicPathOf(R"(aap\noot\mies\file.cpp)"));
     }
 
-    TEST(FileRepository, absolutePath) {
+    TEST(FileRepositoryNode, absolutePath) {
         RepoProps repoProps;
         ExecutionContext context;
-        FileRepository repo(repoProps.name, repoProps.dir, &context, false);
+        FileRepositoryNode repo(&context, repoProps.name, repoProps.dir, false);
         EXPECT_EQ(R"(C:\aap\noot\mies\file.cpp)", repo.absolutePathOf(R"(@@testRepo\file.cpp)"));
         EXPECT_EQ(R"(C:\aap\noot\mies)", repo.absolutePathOf(R"(@@testRepo)"));
         EXPECT_EQ(R"(C:\aap\noot\mies\)", repo.absolutePathOf(R"(@@testRepo\)"));
@@ -149,7 +149,7 @@ namespace
         return dirtyNodes;
     }
 
-    TEST(FileRepository, update_threeDeepDirectoryTree) {
+    TEST(FileRepositoryNode, update_threeDeepDirectoryTree) {
         std::filesystem::path tmpDir = FileSystem::createUniqueDirectory();
         std::filesystem::path rootDir(tmpDir.string() + "_dirNodeTest");
         RegexSet excludes;
@@ -157,10 +157,10 @@ namespace
 
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
-        auto repo = std::make_shared<FileRepository>(
+        auto repo = std::make_shared<FileRepositoryNode>(
+            &context,
             std::string("testRepo"), 
             rootDir,
-            &context,
             true);
         auto repos = std::make_shared<RepositoriesNode>(&context, repo);
         context.repositoriesNode(repos);

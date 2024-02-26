@@ -1,7 +1,9 @@
+#define _CRT_SECURE_NO_WARNINGS
+
 #include "gtest/gtest.h"
 #include "executeNode.h"
 #include "DirectoryTree.h"
-#include "../FileRepository.h"
+#include "../FileRepositoryNode.h"
 #include "../DirectoryNode.h"
 #include "../SourceFileNode.h"
 #include "../ExecutionContext.h"
@@ -25,7 +27,7 @@ namespace
 
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
-        auto repo = std::make_shared<FileRepository>("repo", rootDir, &context, true);
+        auto repo = std::make_shared<FileRepositoryNode>(&context, "repo", rootDir, true);
         auto repos = std::make_shared<RepositoriesNode>(&context, repo);
         context.repositoriesNode(repos);
         auto dirNode = repo->directoryNode();
@@ -43,7 +45,7 @@ namespace
 
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
-        auto repo = std::make_shared<FileRepository>("repo", rootDir, &context, true);
+        auto repo = std::make_shared<FileRepositoryNode>(&context, "repo", rootDir, true);
         auto repos = std::make_shared<RepositoriesNode>(&context, repo);
         context.repositoriesNode(repos);
         auto dirNode = repo->directoryNode();
@@ -107,7 +109,7 @@ namespace
 
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
-        auto repo = std::make_shared<FileRepository>("repo", rootDir, &context, true);
+        auto repo = std::make_shared<FileRepositoryNode>(&context, "repo", rootDir, true);
         auto repos = std::make_shared<RepositoriesNode>(&context, repo);
         context.repositoriesNode(repos);
         auto dirNode = repo->directoryNode();
@@ -177,7 +179,7 @@ namespace
 
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
-        auto repo = std::make_shared<FileRepository>("repo", rootDir, &context, true);
+        auto repo = std::make_shared<FileRepositoryNode>(&context, "repo", rootDir, true);
         auto repos = std::make_shared<RepositoriesNode>(&context, repo);
         context.repositoriesNode(repos);
         auto dirNode = repo->directoryNode();

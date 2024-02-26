@@ -3,7 +3,7 @@
 #include "../SourceFileNode.h"
 #include "../GeneratedFileNode.h"
 #include "../DirectoryNode.h"
-#include "../FileRepository.h"
+#include "../FileRepositoryNode.h"
 #include "../ThreadPool.h"
 #include "../ExecutionContext.h"
 #include "../FileSystem.h"
@@ -189,7 +189,7 @@ namespace
             }
         }
 
-        std::shared_ptr<FileRepository> sourceRepo() {
+        std::shared_ptr<FileRepositoryNode> sourceRepo() {
             return context->findRepository(repoName);
         }
 

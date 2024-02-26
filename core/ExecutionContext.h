@@ -12,7 +12,7 @@
 
 namespace YAM
 {
-    class FileRepository;
+    class FileRepositoryNode;
     class BuildRequest;
     class IPersistable;
     class RepositoriesNode;
@@ -40,14 +40,14 @@ namespace YAM
         std::shared_ptr<RepositoriesNode> const& repositoriesNode() const;
 
         // Find repository by name, return found repo, nullptr when not found.
-        std::shared_ptr<FileRepository> const& findRepository(std::string const& repoName) const;
+        std::shared_ptr<FileRepositoryNode> const& findRepository(std::string const& repoName) const;
 
         // Find repository that contains path, return found repo, nullptr when
         // not found.
-        std::shared_ptr<FileRepository> const& findRepositoryContaining(std::filesystem::path const& path) const;
+        std::shared_ptr<FileRepositoryNode> const& findRepositoryContaining(std::filesystem::path const& path) const;
 
-        // Return repositories.
-        std::map<std::string, std::shared_ptr<FileRepository>> const& repositories() const;
+        // Return repositories, repoName->repo
+        std::map<std::string, std::shared_ptr<FileRepositoryNode>> const& repositories() const;
 
         // Return the file aspects applicable to the file with the given path
         // name. A FileNode associated with the path will compute the hashes of
@@ -91,7 +91,6 @@ namespace YAM
         ExecutionStatistics _statistics;
 
         std::shared_ptr<RepositoriesNode> _repositoriesNode;
-        std::map<std::string, std::shared_ptr<FileRepository>> _repositories;
 
         //TODO: add interfaces to add/remove aspects and aspectSets
         std::map<std::string, FileAspect> _fileAspects;

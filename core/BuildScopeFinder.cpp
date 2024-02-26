@@ -5,7 +5,7 @@
 #include "DirectoryNode.h"
 #include "GeneratedFileNode.h"
 #include "CommandNode.h"
-#include "FileRepository.h"
+#include "FileRepositoryNode.h"
 
 namespace
 {
@@ -25,7 +25,7 @@ namespace
         for (auto const& path : options._scope) {
             auto baseDir = wdNode;
             auto pattern = path;
-            Globber::optimize(baseDir, pattern);
+            Globber::optimize(wdNode->context(), baseDir, pattern);
             auto optPattern = baseDir->name() / pattern;
             if (Glob::isGlob(optPattern.string())) {
                 Glob glob(optPattern);

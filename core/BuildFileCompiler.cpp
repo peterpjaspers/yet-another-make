@@ -6,7 +6,7 @@
 #include "GeneratedFileNode.h"
 #include "DirectoryNode.h"
 #include "CommandNode.h"
-#include "FileRepository.h"
+#include "FileRepositoryNode.h"
 #include "Globber.h"
 #include "Glob.h"
 #include "GlobNode.h"
@@ -418,7 +418,7 @@ namespace YAM {
     ) {
         auto optimizedBaseDir = _baseDir;
         auto optimizedPattern = groupName;
-        Globber::optimize(optimizedBaseDir, optimizedPattern);
+        Globber::optimize(_context, optimizedBaseDir, optimizedPattern);
         std::filesystem::path groupPath(optimizedBaseDir->name() / optimizedPattern);
 
         std::shared_ptr<GroupNode> groupNode;
@@ -484,7 +484,7 @@ namespace YAM {
     ) {
         auto optimizedBaseDir = _baseDir;
         auto optimizedPattern = input.path;
-        Globber::optimize(optimizedBaseDir, optimizedPattern);
+        Globber::optimize(_context, optimizedBaseDir, optimizedPattern);
         std::filesystem::path inputPath(optimizedBaseDir->name() / optimizedPattern);
         auto fileNode = dynamic_pointer_cast<FileNode>(_context->nodes().find(inputPath));
         if (fileNode == nullptr) {
@@ -571,7 +571,7 @@ namespace YAM {
     ) {
         auto optimizedBaseDir = _baseDir;
         auto optimizedPattern = pattern;
-        Globber::optimize(optimizedBaseDir, optimizedPattern);
+        Globber::optimize(_context, optimizedBaseDir, optimizedPattern);
         std::filesystem::path globName(_globNameSpace / optimizedBaseDir->name() / optimizedPattern);
         auto globNode = dynamic_pointer_cast<GlobNode>(_context->nodes().find(globName));
         if (globNode == nullptr) {
@@ -734,7 +734,7 @@ namespace YAM {
         }
         auto base = _baseDir;
         std::filesystem::path pattern = outputPath;
-        Globber::optimize(base, pattern);
+        Globber::optimize(_context, base, pattern);
         std::filesystem::path symOutputPath = base->name() / pattern;
         return symOutputPath;
     }
@@ -772,7 +772,7 @@ namespace YAM {
             if (output.ignore) {
                 auto base = _baseDir;
                 std::filesystem::path pattern = output.path;
-                Globber::optimize(base, pattern);
+                Globber::optimize(_context, base, pattern);
                 std::filesystem::path symOutputPath = base->name() / pattern;
                 ignoredOutputs.push_back(symOutputPath);
             }
@@ -871,7 +871,7 @@ namespace YAM {
     ) {
         auto optimizedBaseDir = _baseDir;
         auto optimizedPattern = groupName;
-        Globber::optimize(optimizedBaseDir, optimizedPattern);
+        Globber::optimize(_context, optimizedBaseDir, optimizedPattern);
         std::filesystem::path groupPath(optimizedBaseDir->name() / optimizedPattern);
 
         auto it = _outputGroupsContent.find(groupPath);

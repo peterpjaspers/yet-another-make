@@ -1,6 +1,6 @@
 #include "../BuildFile.h"
 #include "../SourceFileNode.h"
-#include "../FileRepository.h"
+#include "../FileRepositoryNode.h"
 #include "../DirectoryNode.h"
 #include "../BuildFileDependenciesCompiler.h"
 #include "../GlobNode.h"
@@ -24,13 +24,13 @@ namespace
     public:
         DirectoryTree repoTree;
         ExecutionContext context;
-        std::shared_ptr<FileRepository> fileRepo;
+        std::shared_ptr<FileRepositoryNode> fileRepo;
         std::shared_ptr<SourceFileNode> bfn1;
         std::shared_ptr<SourceFileNode> bfn2;
 
         TestSetup()
             : repoTree(FileSystem::createUniqueDirectory("_buildFileDepenciesCompilerTest"), 1, RegexSet())
-            , fileRepo(std::make_shared<FileRepository>("repo", repoTree.path(), &context, false))
+            , fileRepo(std::make_shared<FileRepositoryNode>(&context, "repo", repoTree.path(), false))
         {
             std::filesystem::create_directory(repoTree.path() / "src1");
             std::filesystem::create_directory(repoTree.path() / "src2");

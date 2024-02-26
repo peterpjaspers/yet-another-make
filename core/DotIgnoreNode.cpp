@@ -4,7 +4,7 @@
 #include "DirectoryNode.h"
 #include "FileSystem.h"
 #include "FileAspect.h"
-#include "FileRepository.h"
+#include "FileRepositoryNode.h"
 #include "IStreamer.h"
 
 namespace

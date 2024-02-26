@@ -44,7 +44,7 @@ namespace YAM {
     std::shared_ptr<GlobNode> BuildFileDependenciesCompiler::findOrCreateGlob(std::filesystem::path const& pattern) {
         auto optimizedBaseDir = _baseDir;
         auto optimizedPattern = pattern;
-        Globber::optimize(optimizedBaseDir, optimizedPattern);
+        Globber::optimize(_context, optimizedBaseDir, optimizedPattern);
         std::filesystem::path globName(_globNameSpace / optimizedBaseDir->name() / optimizedPattern);
         auto globNode = dynamic_pointer_cast<GlobNode>(_context->nodes().find(globName));
         if (globNode == nullptr) {
@@ -106,7 +106,7 @@ namespace YAM {
         } else {
             auto optimizedBaseDir = _baseDir;
             auto optimizedPath = path;
-            Globber::optimize(optimizedBaseDir, optimizedPath);
+            Globber::optimize(_context, optimizedBaseDir, optimizedPath);
             std::filesystem::path nodePath(optimizedBaseDir->name());
             if (!optimizedPath.empty()) nodePath = nodePath / optimizedPath;
             std::shared_ptr<Node> const& node = _context->nodes().find(nodePath);

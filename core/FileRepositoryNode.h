@@ -1,7 +1,7 @@
 #pragma once
 
 #include "RegexSet.h"
-#include "IPersistable.h"
+#include "Node.h"
 
 #include <memory>
 #include <filesystem>
@@ -10,7 +10,6 @@
 namespace YAM
 {
     class DirectoryNode;
-    class Node;
     class ExecutionContext;
     class FileRepositoryWatcher;
     class FileExecSpecsNode;
@@ -207,17 +206,17 @@ namespace YAM
     //      - solves the problem of identifying repository versions
     //      - solves the problem of cloning/checking-out repository version
     //
-    class __declspec(dllexport) FileRepository : public IPersistable
+    class __declspec(dllexport) FileRepositoryNode : public Node
     {
     public:
-        FileRepository(); // needed for deserialization
-        FileRepository(
+        FileRepositoryNode(); // needed for deserialization
+        FileRepositoryNode(
+            ExecutionContext* context,
             std::string const& repoName,
             std::filesystem::path const& directory,
-            ExecutionContext* context,
             bool tracked);
 
-        virtual ~FileRepository();
+        virtual ~FileRepositoryNode();
 
         bool tracked() const { return _tracked; }
 
@@ -251,7 +250,7 @@ namespace YAM
         // Return @@repoName, e.g. when repoName="main" return @@main
         static std::filesystem::path repoNameToSymbolicPath(std::string const& repoName);
 
-        std::string const& name() const;
+        std::string const& repoName() const;
 
         void directory(std::filesystem::path const& dir);
         std::filesystem::path const& directory() const;
@@ -264,7 +263,7 @@ namespace YAM
 
 
         std::filesystem::path symbolicDirectory() const {
-            return repoNameToSymbolicPath(_name);
+            return repoNameToSymbolicPath(repoName());
         }
 
         // Return whether 'path' is an absolute path or symbolic path in
@@ -300,12 +299,9 @@ namespace YAM
         // known repositories.
         void clear();
 
-        // Inherited from IPersistable
-        void modified(bool newValue) override;
-        bool modified() const override;
-        bool deleted() const override;
-        std::string describeName() const override { return _name; }
-        std::string describeType() const override { return "FileRepository"; }
+        // Inherited from Node
+        void start() override;
+        std::string className() const override { return "FileRepositoryNode"; }
 
         static void setStreamableType(uint32_t type);
         // Inherited from IStreamer (via IPersistable)
@@ -316,14 +312,12 @@ namespace YAM
         bool restore(void* context, std::unordered_set<IPersistable const*>& restored) override;
 
     private:
-        std::string _name;
+        std::string _repoName;
         std::filesystem::path _directory;
-        ExecutionContext* _context;
         bool _tracked;
         std::shared_ptr<DirectoryNode> _directoryNode;
         std::shared_ptr<FileExecSpecsNode> _fileExecSpecsNode;
         std::shared_ptr<FileRepositoryWatcher> _watcher;
         std::vector<std::string> _inputRepoNames;
-        bool _modified;
     };
 }

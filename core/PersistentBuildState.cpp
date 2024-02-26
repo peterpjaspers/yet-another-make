@@ -11,7 +11,7 @@
 #include "GroupNode.h"
 #include "SourceFileNode.h"
 #include "RepositoriesNode.h"
-#include "FileRepository.h"
+#include "FileRepositoryNode.h"
 #include "BinaryValueStreamer.h"
 #include "ISharedObjectStreamer.h"
 #include "Streamer.h"
@@ -121,7 +121,7 @@ namespace YAM
             GroupNode = 9,
             RepositoriesNode = 10,
             SourceFileNode = 11,
-            FileRepository = 12,
+            FileRepositoryNode = 12,
             Max = 13
         };
         std::vector<TypeId> ids;
@@ -138,7 +138,7 @@ namespace YAM
             YAM::GroupNode::setStreamableType(static_cast<uint32_t>(GroupNode));
             YAM::RepositoriesNode::setStreamableType(static_cast<uint32_t>(RepositoriesNode));
             YAM::SourceFileNode::setStreamableType(static_cast<uint32_t>(SourceFileNode));
-            YAM::FileRepository::setStreamableType(static_cast<uint32_t>(FileRepository));
+            YAM::FileRepositoryNode::setStreamableType(static_cast<uint32_t>(FileRepositoryNode));
 
             ids.push_back(BuildFileCompilerNode);
             ids.push_back(BuildFileParserNode);
@@ -151,7 +151,7 @@ namespace YAM
             ids.push_back(GroupNode);
             ids.push_back(RepositoriesNode);
             ids.push_back(SourceFileNode);
-            ids.push_back(FileRepository);
+            ids.push_back(FileRepositoryNode);
         }
 
         uint32_t getTypeId(IPersistable* object) {
@@ -174,7 +174,7 @@ namespace YAM
             case TypeId::GroupNode: return std::make_shared<YAM::GroupNode>();
             case TypeId::RepositoriesNode: return std::make_shared<YAM::RepositoriesNode>();
             case TypeId::SourceFileNode: return std::make_shared<YAM::SourceFileNode>();
-            case TypeId::FileRepository: return std::make_shared<YAM::FileRepository>();
+            case TypeId::FileRepositoryNode: return std::make_shared<YAM::FileRepositoryNode>();
             default: throw std::exception("unknown node type");
             }
         }
@@ -230,7 +230,7 @@ namespace YAM
                 writer->stream(nullPtrKey);                
             } else {
                 auto persistable = dynamic_pointer_cast<IPersistable>(object);
-                PersistentBuildState::Key key = _buildState.store(persistable);
+                PersistentBuildState::Key key = _buildState.getKey(persistable);
                 writer->stream(key);
             }
         }
@@ -252,7 +252,7 @@ namespace YAM
             if (key == nullPtrKey) {
                 object.reset();
             } else {
-                object = _buildState.retrieve(key);
+                object = _buildState.getObject(key);
             }
         }
 
@@ -337,11 +337,12 @@ namespace YAM
         bool rollback
     ) {
         for (auto const& p : buildState) {
-            if (storedState.contains(p)) {
-                if (p->modified()) toReplace.insert(p);
-            } else {
-                p->modified(true);
-                toInsert.insert(p);
+            if (p->modified()) {
+                if (storedState.contains(p)) {
+                    toReplace.insert(p);
+                } else {
+                    toInsert.insert(p);
+                }
             }
         }
         for (auto const& p : storedState) {
@@ -370,12 +371,10 @@ namespace YAM
 {
     PersistentBuildState::PersistentBuildState(
         std::filesystem::path const& directory,
-        ExecutionContext* context,
-            bool startRepoWatching
+        ExecutionContext* context
     )
         : _directory(directory)
         , _context(context)
-        , _startRepoWatching(startRepoWatching)
         , _pool(createPagePool(directory/"buildstate.bt"))
         , _nextId(1)
     {
@@ -399,11 +398,7 @@ namespace YAM
         }
         std::unordered_set<IPersistable const*> restored;
         for (auto const& pair : _keyToObject) pair.second->restore(_context, restored);
-        //if (_startRepoWatching) {
-        //    for (auto const& pair : _context->repositories()) {
-        //        pair.second->startWatching();
-        //    }
-        //}
+
     }
 
     void PersistentBuildState::reset() {
@@ -431,7 +426,7 @@ namespace YAM
                 reader.close();
                 if (code._id >= _nextId) _nextId = code._id + 1;
                 std::shared_ptr<IPersistable> object(buildStateTypes.instantiate(code._type));
-                auto pair = _keyToObject.insert({ key, object });
+                _keyToObject.insert({ key, object });
                 _objectToKey.insert({ object.get(), key });
             }
         }        
@@ -464,7 +459,7 @@ namespace YAM
         btreeVReader.close();
     }
 
-    std::shared_ptr<IPersistable> PersistentBuildState::retrieve(Key key) {
+    std::shared_ptr<IPersistable> PersistentBuildState::getObject(Key key) {
         auto it = _keyToObject.find(key);
         if (it == _keyToObject.end()) {
             throw std::runtime_error("Attempt to retrieve unknown key");
@@ -491,12 +486,12 @@ namespace YAM
         for (auto const& p : _toInsert) bindToKey(p);
         // ...then store the new objects
         for (auto const& p : _toInsert) {
-            store(p, false);
+            store(p);
             p->modified(false);
         }
 
         for (auto const& p : _toReplace) {
-            store(p, true);
+            store(p);
             p->modified(false);
         }
 
@@ -529,7 +524,7 @@ namespace YAM
         return code._key;
     }
 
-    void PersistentBuildState::store(std::shared_ptr<IPersistable> const& object, bool replace) {
+    void PersistentBuildState::store(std::shared_ptr<IPersistable> const& object) {
         Key key = _objectToKey[object.get()];
         KeyCode code(key);
         auto tree = _typeToTree[code._type];
@@ -541,7 +536,7 @@ namespace YAM
         btreeVWriter.close();
     }
 
-    PersistentBuildState::Key PersistentBuildState::store(std::shared_ptr<IPersistable> const& object) {
+    PersistentBuildState::Key PersistentBuildState::getKey(std::shared_ptr<IPersistable> const& object) {
         if (
             object->modified() 
             && !_toInsert.contains(object)
@@ -569,10 +564,6 @@ namespace YAM
                 _objectToKey.insert({ object.get(), key });
             }
             addToBuildState(object);
-            auto repo = dynamic_pointer_cast<FileRepository>(object);
-            if (repo != nullptr && _startRepoWatching) {
-                repo->startWatching();
-            }
         }
         for (auto const& object : _toInsert) {
             if (recoverForest) {
@@ -624,10 +615,7 @@ namespace YAM
         } else {
             auto node = dynamic_pointer_cast<Node>(object);
             if (node == nullptr) {
-                auto repo = dynamic_pointer_cast<FileRepository>(object);
-                if (repo == nullptr) {
-                    throw std::exception("unknown object class");
-                }
+                throw std::exception("unknown object class");
             } else {
                 _context->nodes().add(node);
                 auto repos = dynamic_pointer_cast<RepositoriesNode>(node);
@@ -645,10 +633,7 @@ namespace YAM
                 _context->repositoriesNode(nullptr);
             }
         } else {
-            auto repo = dynamic_pointer_cast<FileRepository>(object);
-            if (repo == nullptr) {
-                throw std::exception("unknown object class");
-            }
+            throw std::exception("unknown object class");
         }
     }
 }

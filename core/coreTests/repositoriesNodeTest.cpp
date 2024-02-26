@@ -2,7 +2,7 @@
 #include "../RepositoriesNode.h"
 #include "../DirectoryNode.h"
 #include "../FileSystem.h"
-#include "../FileRepository.h"
+#include "../FileRepositoryNode.h"
 #include "../ExecutionContext.h"
 #include "../MemoryLogBook.h"
 
@@ -25,11 +25,9 @@ namespace
     public:
         TestSetup()
             : homeRepoDir(FileSystem::createUniqueDirectory("_repositoriesNodeTest"))
-            , repo1Dir(FileSystem::createUniqueDirectory("_repositoriesNodeTest"))
-            , repo2Dir(FileSystem::createUniqueDirectory("_repositoriesNodeTest"))
             , repositoriesPath(homeRepoDir / RepositoriesNode::configFilePath())
             , logBook(std::make_shared<MemoryLogBook>())
-            , fileRepo(std::make_shared<FileRepository>(".", homeRepoDir, &context, false))
+            , fileRepo(std::make_shared<FileRepositoryNode>(&context, ".", homeRepoDir, false))
         {
             context.logBook(logBook);
             auto repos = std::make_shared<RepositoriesNode>(&context, fileRepo);
@@ -44,25 +42,24 @@ namespace
         ~TestSetup() {
             context.clearBuildState();
             std::filesystem::remove_all(homeRepoDir);
-            std::filesystem::remove_all(repo1Dir);
-            std::filesystem::remove_all(repo2Dir);
         }
 
         std::filesystem::path homeRepoDir;
-        std::filesystem::path repo1Dir;
-        std::filesystem::path repo2Dir;
         std::filesystem::path repositoriesPath;
         ExecutionContext context;
         std::shared_ptr<MemoryLogBook> logBook;
-        std::shared_ptr<FileRepository> fileRepo;
+        std::shared_ptr<FileRepositoryNode> fileRepo;
         std::shared_ptr<RepositoriesNode> repositoriesNode;
     };
 
     TEST(RepositoriesNode, parse) {
         TestSetup setup;
+
+        std::filesystem::create_directory(setup.homeRepoDir.parent_path() / "r1");
+        std::filesystem::create_directory(setup.homeRepoDir.parent_path() / "r2");
         std::stringstream ss;
-        ss << "name=repo1 dir=" << setup.repo1Dir << " type=Integrated ;" << std::endl;
-        ss << "name=repo2 dir=" << setup.repo2Dir << " type=Tracked ;" << std::endl;
+        ss << "name=repo1 dir=" << "..\\r1" << " type=Integrated ;" << std::endl;
+        ss << "name=repo2 dir=" << "..\\r2" << " type=Tracked ;" << std::endl;
         writeFile(setup.repositoriesPath, ss.str());
 
         bool completed = YAMTest::executeNode(setup.repositoriesNode.get());
@@ -71,97 +68,97 @@ namespace
         EXPECT_NE(nullptr, setup.context.findRepository("."));
         auto frepo1 = setup.context.findRepository("repo1");
         EXPECT_NE(nullptr, frepo1);
-        EXPECT_EQ(setup.repo1Dir, frepo1->directoryNode()->absolutePath());
+        EXPECT_EQ(setup.homeRepoDir.parent_path() / "r1", frepo1->directoryNode()->absolutePath());
         auto frepo2 = setup.context.findRepository("repo2");
         EXPECT_NE(nullptr, frepo2);
-        EXPECT_EQ(setup.repo2Dir, frepo2->directoryNode()->absolutePath());
+        EXPECT_EQ(setup.homeRepoDir.parent_path() / "r2", frepo2->directoryNode()->absolutePath());
+
+        std::filesystem::remove(setup.homeRepoDir.parent_path() / "r1");
+        std::filesystem::remove(setup.homeRepoDir.parent_path() / "r2");
     }
 
     TEST(RepositoriesNode, invalidRepoName) {
         TestSetup setup;
         std::stringstream ss;
-        ss << "name=repo/1 dir=" << setup.repo1Dir << " type=Integrated ;" << std::endl;
+        ss << "name=repo/1 dir=" << "../sub" << " type=Integrated ;" << std::endl;
         writeFile(setup.repositoriesPath, ss.str());
         bool completed = YAMTest::executeNode(setup.repositoriesNode.get());
         EXPECT_TRUE(completed);
         EXPECT_EQ(Node::State::Failed, setup.repositoriesNode->state());
         LogRecord const& r = setup.logBook->records()[0];
         std::string msg("Unexpected token at line 1");
-        EXPECT_EQ(0, r.message.find(msg));
+        EXPECT_NE(std::string::npos, r.message.find(msg));
     }
 
-    TEST(RepositoriesNode, invalidRepoType) {
+    TEST(RepositoriesNode, invalidRepoDir) {
         TestSetup setup;
         std::stringstream ss;
-        ss << "name=repo2 dir=" << setup.repo1Dir << " type=Integrated ;" << std::endl;
-        ss << "name=repo/2 dir=" << setup.repo2Dir << " type=blabla ;" << std::endl;
+        ss << "name=repo dir=" << "D:/aap" << " type=Integrated ;" << std::endl;
         writeFile(setup.repositoriesPath, ss.str());
         bool completed = YAMTest::executeNode(setup.repositoriesNode.get());
         EXPECT_TRUE(completed);
         EXPECT_EQ(Node::State::Failed, setup.repositoriesNode->state());
         LogRecord const& r = setup.logBook->records()[0];
-        std::string msg("Unexpected token at line 2");
-        EXPECT_EQ(0, r.message.find(msg));
+        std::string msg("must be a path relative to the home repository");
+        EXPECT_NE(std::string::npos, r.message.find(msg));
+    }
+
+    TEST(RepositoriesNode, invalidRepoType) {
+        TestSetup setup;
+        std::filesystem::create_directory(setup.homeRepoDir.parent_path() / "sub1");
+        std::stringstream ss;
+        ss << "name=repo2 dir=" << "..\\sub1" << " type=blabla ;" << std::endl;
+        writeFile(setup.repositoriesPath, ss.str());
+        bool completed = YAMTest::executeNode(setup.repositoriesNode.get());
+        EXPECT_TRUE(completed);
+        EXPECT_EQ(Node::State::Failed, setup.repositoriesNode->state());
+        LogRecord const& r = setup.logBook->records()[0];
+        std::string msg("Must be one of Integrated, Coupled, Tracked or Ignored");
+        EXPECT_NE(std::string::npos, r.message.find(msg));
+        std::filesystem::remove(setup.homeRepoDir / "sub1");
     }
 
     TEST(RepositoriesNode, invalidRepoDirParent) {
         TestSetup setup;
         std::stringstream ss;
-        ss << "name=repo1 dir=" << setup.repo1Dir << " type=Integrated ;" << std::endl;
-        ss << "name=repo2 dir=" << setup.repo2Dir.parent_path() << " type=Integrated ;" << std::endl;
+        ss << "name=repo1 dir=" << ".." << " type=Integrated ;" << std::endl;
         writeFile(setup.repositoriesPath, ss.str());
         bool completed = YAMTest::executeNode(setup.repositoriesNode.get());
         EXPECT_TRUE(completed);
         EXPECT_EQ(Node::State::Failed, setup.repositoriesNode->state());
         LogRecord const& r = setup.logBook->records()[0];
-        std::string msg("repository directory is parent directory of repository . ");
+        std::string msg("repository directory is parent directory of repository \".\" ");
         EXPECT_NE(std::string::npos, r.message.find(msg));
     }
 
     TEST(RepositoriesNode, invalidRepoDirSub) {
         TestSetup setup;
-        std::filesystem::path subDir(setup.repo1Dir / "sub");
-        std::filesystem::create_directories(subDir);
         std::stringstream ss;
-        ss << "name=repo1 dir=" << setup.repo1Dir << " type=Integrated ;" << std::endl;
-        ss << "name=repo2 dir=" << subDir << " type=Integrated ;" << std::endl;
+        std::filesystem::create_directory(setup.homeRepoDir / "sub");
+        ss << "name=repo1 dir=" << ".\\sub" << " type = Integrated; " << std::endl;
         writeFile(setup.repositoriesPath, ss.str());
         bool completed = YAMTest::executeNode(setup.repositoriesNode.get());
         EXPECT_TRUE(completed);
         EXPECT_EQ(Node::State::Failed, setup.repositoriesNode->state());
         LogRecord const& r = setup.logBook->records()[0];
-        std::string msg("repository directory is sub-directory of repository repo1");
+        std::string msg("repository directory is sub-directory of repository \".\"");
         EXPECT_NE(std::string::npos, r.message.find(msg));
+        std::filesystem::remove(setup.homeRepoDir / "sub");
     }
 
     TEST(RepositoriesNode, invalidRepoDirEqual) {
         TestSetup setup;
         std::stringstream ss;
-        ss << "name=repo1 dir=" << setup.repo1Dir << " type=Integrated ;" << std::endl;
-        ss << "name=repo2 dir=" << setup.repo1Dir << " type=Integrated ;" << std::endl;
+        std::filesystem::create_directories(setup.homeRepoDir.parent_path() / "r1");
+        ss << "name=repo1 dir=" << "../r1" << " type=Integrated ;" << std::endl;
+        ss << "name=repo2 dir=" << "../r1" << " type=Integrated ;" << std::endl;
         writeFile(setup.repositoriesPath, ss.str());
         bool completed = YAMTest::executeNode(setup.repositoriesNode.get());
         EXPECT_TRUE(completed);
         EXPECT_EQ(Node::State::Failed, setup.repositoriesNode->state());
         LogRecord const& r = setup.logBook->records()[0];
-        std::string msg("repository directory is equal to directory of repository repo1");
+        std::string msg("repository directory is equal to directory of repository \"repo1\"");
         EXPECT_NE(std::string::npos, r.message.find(msg));
-    }
-
-    TEST(RepositoriesNode, relativeRepoDir) {
-        TestSetup setup;
-        std::filesystem::path repoDir1(setup.homeRepoDir.parent_path() / "r1");
-        std::filesystem::create_directories(repoDir1);
-        std::stringstream ss;
-        ss << "name=repo1 dir=" << repoDir1 << " type=Integrated ;" << std::endl;
-        writeFile(setup.repositoriesPath, ss.str());
-        bool completed = YAMTest::executeNode(setup.repositoriesNode.get());
-        EXPECT_TRUE(completed);
-        EXPECT_EQ(Node::State::Ok, setup.repositoriesNode->state());
-
-        auto frepo1 = setup.context.findRepository("repo1");
-        EXPECT_EQ(repoDir1, frepo1->directory());
-
-        std::filesystem::remove_all(repoDir1);
+        std::filesystem::remove(setup.homeRepoDir.parent_path() / "r1");
     }
 }

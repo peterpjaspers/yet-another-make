@@ -1,7 +1,7 @@
 #include "RepositoriesNode.h"
 #include "SourceFileNode.h"
 #include "ExecutionContext.h"
-#include "FileRepository.h"
+#include "FileRepositoryNode.h"
 #include "BuildFileTokenizer.h"
 #include "TokenRegexSpec.h"
 #include "TokenPathSpec.h"
@@ -51,6 +51,13 @@ namespace //parser
                 skipWhiteSpace();
             }
         }
+        bool validType(std::string const& type) {
+            if (type == "Integrated") return true;
+            if (type == "Coupled") return true;
+            if (type == "Tracked") return true;
+            if (type == "Ignored") return true;
+            return false;
+        }
 
         void parseRepo() {
             RepositoriesNode::Repo repo;
@@ -60,15 +67,18 @@ namespace //parser
             if (_repos.contains(repo.name)) {
                 duplicateNameError(repo.name);
             }
-            if (repo.name == ".") {
-                reservedNameError(repo.name);
-            }
             consume(&_dirKey);
             consume(&_eq);
             repo.dir = consume(&_path).value;
+            if (repo.dir.is_absolute()) {
+                absDirError();
+            }
             consume(&_typeKey);
             consume(&_eq);
             Token type = consume(&_identifier);
+            if (!validType(type.value)) {
+                typeError();
+            }
             if (lookAhead({ &_inputsKey }) == &_inputsKey) {
                 eat(&_inputsKey);
                 consume(&_eq);
@@ -115,6 +125,27 @@ namespace //parser
             throw std::runtime_error(ss.str());
         }
 
+        void typeError() {
+            std::stringstream ss;
+            ss
+                << "Repository type at " << _tokenizer.line()
+                << ", column " << _tokenizer.column()
+                << " in file " << _tokenizer.filePath().string() << std::endl
+                << " is invalid." << std::endl;
+            ss << "Must be one of Integrated, Coupled, Tracked or Ignored." << std::endl;
+            throw std::runtime_error(ss.str());
+        }
+
+        void absDirError() {
+            std::stringstream ss;
+            ss
+                << "Repository directory at " << _tokenizer.line()
+                << ", column " << _tokenizer.column()
+                << " in file " << _tokenizer.filePath().string() << std::endl
+                << " must be a path relative to the home repository." << std::endl;
+            throw std::runtime_error(ss.str());
+        }
+
         void reservedNameError(std::string const& duplicateName) {
             std::stringstream ss;
             ss
@@ -150,16 +181,16 @@ namespace
 {
     using namespace YAM;
 
-    void logDuplicateRepo(ILogBook &logBook, FileRepository const &repo) {
+    void logDuplicateRepo(ILogBook &logBook, FileRepositoryNode const &repo) {
         std::stringstream ss;
         ss 
-            << "Cannot add repository " << repo.name() << " with directory " << repo.directory()
+            << "Cannot add repository " << repo.repoName() << " with directory " << repo.directory()
             << " : repository name is already in use" << std::endl;
         LogRecord e(LogRecord::Error, ss.str());
         logBook.add(e);
     }
 
-    void logSubRepo(ILogBook &logBook, FileRepository const& repo, FileRepository const& parent) {
+    void logSubRepo(ILogBook &logBook, FileRepositoryNode const& repo, FileRepositoryNode const& parent) {
         bool equalDirs = repo.directory() == parent.directory();
         std::stringstream ss;
         if (equalDirs) {
@@ -178,7 +209,7 @@ namespace
         logBook.add(e);
     }
 
-    void logParentRepo(ILogBook &logBook, FileRepository const& repo, FileRepository const& sub) {
+    void logParentRepo(ILogBook &logBook, FileRepositoryNode const& repo, FileRepositoryNode const& sub) {
         std::stringstream ss;
         ss
             << "Cannot add repository " << repo.name() << " with directory " << repo.directory()
@@ -193,13 +224,7 @@ namespace
 namespace
 {
     uint32_t streamableTypeId = 0;
-    static std::shared_ptr<FileRepository> nullRepo;
-
-    std::filesystem::path configFileSymPath(std::string const& homeRepoName) {
-        std::filesystem::path symPath("@@" + homeRepoName);
-        symPath /= RepositoriesNode::configFilePath();
-        return symPath;
-    }
+    static std::shared_ptr<FileRepositoryNode> nullRepo;
 }
 
 namespace YAM
@@ -211,15 +236,17 @@ namespace YAM
 
     RepositoriesNode::RepositoriesNode(
         ExecutionContext* context,
-        std::shared_ptr<FileRepository> const& homeRepo
+        std::shared_ptr<FileRepositoryNode> const& homeRepo
     )
-        : Node(context, homeRepo->name())
+        : Node(context, "repositories")
         , _ignoreConfigFile(true)
-        , _configFile(std::make_shared<SourceFileNode>(context, configFileSymPath(homeRepo->name())))
+        , _configFile(std::make_shared<SourceFileNode>(context, homeRepo->symbolicDirectory()/ RepositoriesNode::configFilePath()))
+        , _homeRepo(homeRepo)
         , _configFileHash(rand())
         , _modified(true)
     {
-        _repositories.insert({ homeRepo->name(), homeRepo });
+        context->nodes().add(homeRepo);
+        _repositories.insert({ homeRepo->repoName(), homeRepo });
         context->nodes().add(_configFile);
         _configFile->addObserver(this);
     }
@@ -236,17 +263,15 @@ namespace YAM
         return _configFile->absolutePath();
     }
 
-    std::shared_ptr<FileRepository> RepositoriesNode::homeRepository() const {
-        auto it = _repositories.find(name().string());
-        if (it != _repositories.end()) return it->second;
-        return nullRepo;
+    std::shared_ptr<FileRepositoryNode> const& RepositoriesNode::homeRepository() const {
+        return _homeRepo;
     }
 
-    std::map<std::string, std::shared_ptr<FileRepository>> const& RepositoriesNode::repositories() const {
+    std::map<std::string, std::shared_ptr<FileRepositoryNode>> const& RepositoriesNode::repositories() const {
         return _repositories;
     }
 
-    std::shared_ptr<FileRepository> const& RepositoriesNode::findRepository(std::string const& repoName) const {
+    std::shared_ptr<FileRepositoryNode> const& RepositoriesNode::findRepository(std::string const& repoName) const {
         auto it = _repositories.find(repoName);
         if (it == _repositories.end()) {
             return nullRepo;
@@ -254,8 +279,8 @@ namespace YAM
         return it->second;
     }
 
-    bool RepositoriesNode::addRepository(std::shared_ptr<FileRepository> const& repo) {
-        auto it = _repositories.find(repo->name());
+    bool RepositoriesNode::addRepository(std::shared_ptr<FileRepositoryNode> const& repo) {
+        auto it = _repositories.find(repo->repoName());
         if (it != _repositories.end()) {
             logDuplicateRepo(*(context()->logBook()), *repo);
             return false;
@@ -274,7 +299,8 @@ namespace YAM
         }
         if (ok) {
             modified(true);
-            _repositories.insert({ repo->name(), repo });
+            context()->nodes().add(repo);
+            _repositories.insert({ repo->repoName(), repo });
         }
         return ok;
     }
@@ -282,8 +308,10 @@ namespace YAM
     bool RepositoriesNode::removeRepository(std::string const& repoName) {
         auto it = _repositories.find(repoName);
         if (it == _repositories.end()) return false;
+        std::shared_ptr<FileRepositoryNode>& repo = it->second;
         modified(true);
-        it->second->clear();
+        repo->clear();
+        context()->nodes().remove(it->second);
         _repositories.erase(it);
         return true;
     }
@@ -343,13 +371,17 @@ namespace YAM
         // add new and update existing repos
         bool ok = true;
         for (auto const& pair : repos) {
-            std::shared_ptr<FileRepository> frepo;
+            std::shared_ptr<FileRepositoryNode> frepo;
             Repo const& repo = pair.second;
-            std::filesystem::path absRepoDir(homeRepository()->directory() / repo.dir);
+            std::filesystem::path absRepoDir = repo.dir;
+            if (absRepoDir.is_relative()) absRepoDir = (_homeRepo->directory() / repo.dir);
+            if (!std::filesystem::is_directory(absRepoDir)) {
+                throw std::runtime_error("No such directory: " + absRepoDir.string());
+            }
             absRepoDir = std::filesystem::canonical(absRepoDir);
             auto it = _repositories.find(repo.name);
             if (it == _repositories.end()) {
-                frepo = std::make_shared<FileRepository>(repo.name, absRepoDir, context(), true);
+                frepo = std::make_shared<FileRepositoryNode>(context(), repo.name, absRepoDir, true);
                 ok = addRepository(frepo);
                 if (!ok) return false;
                 modified(true);
@@ -362,11 +394,11 @@ namespace YAM
         }
         
         // Find removed repos
-        std::string homeRepoName = name().string();
-        std::vector<std::shared_ptr<FileRepository>> toRemove;
+        std::vector<std::shared_ptr<FileRepositoryNode>> toRemove;
         for (auto const& pair : _repositories) {
             std::string frepoName = pair.first;
-            if (frepoName != homeRepoName) {
+            auto frepo = pair.second;
+            if (frepo != _homeRepo) {
                 auto it = repos.find(frepoName);
                 if (it == repos.end()) {
                     auto fit = _repositories.find(frepoName);
@@ -375,13 +407,13 @@ namespace YAM
             }
         }
         for (auto const& repo : toRemove) {
-            removeRepository(repo->name());
+            removeRepository(repo->repoName());
             modified(true);
         }
         return true;
     }
 
-    bool RepositoriesNode::updateRepoDirectory(FileRepository &frepo, std::filesystem::path const& newDir) {
+    bool RepositoriesNode::updateRepoDirectory(FileRepositoryNode &frepo, std::filesystem::path const& newDir) {
         if (frepo.directory() != newDir) {
             for (auto const& pair : _repositories) {
                 auto other = pair.second;
@@ -413,6 +445,7 @@ namespace YAM
         Node::stream(streamer);
         streamer->stream(_ignoreConfigFile);
         streamer->stream(_configFile);
+        streamer->stream(_homeRepo);
         streamer->streamMap(_repositories);
         streamer->stream(_configFileHash);
     }

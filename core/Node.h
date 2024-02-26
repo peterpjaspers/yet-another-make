@@ -24,7 +24,7 @@ namespace YAM
 {
     class ExecutionContext;
     class Node;
-    class FileRepository;
+    class FileRepositoryNode;
 
     class StateObserver {
     public:
@@ -77,7 +77,7 @@ namespace YAM
         virtual std::string className() const { return typeid(*this).name(); }
 
         // Return the repository that contains this node.
-        std::shared_ptr<FileRepository> const& repository() const;
+        std::shared_ptr<FileRepositoryNode> const& repository() const;
 
         // Return the absolute path name of the node, i.e. return name() in which
         // <repoName> is replace by the repository absolute root directory path.
@@ -85,13 +85,8 @@ namespace YAM
 
         State state() const { return _state; }
 
-        // Pre: state() != Node::State::Deleted, see undelete()
+        // Pre: state() != Node::State::Deleted
         virtual void setState(State newState);
-
-        // Pre: state() == Node::State::Deleted.
-        // Post: state() == Node::State::Dirty.
-        // State changed will not be notified to subscribers.
-        void undelete();
 
         // Start asynchronous execution.
         // Sub-classes must override this function as follows:
@@ -143,6 +138,7 @@ namespace YAM
         // Inherited from IPersistable
         void modified(bool newValue) override;
         bool modified() const override;
+        bool deleted() const override;
         std::string describeName() const override { return _name.string(); }
         std::string describeType() const override { return className(); }
 

@@ -1,7 +1,7 @@
 #include "ExecutionContext.h"
 #include "Node.h"
 #include "RepositoriesNode.h"
-#include "FileRepository.h"
+#include "FileRepositoryNode.h"
 #include "BuildRequest.h"
 #include "ConsoleLogBook.h"
 
@@ -22,7 +22,7 @@ namespace
             });
 
 
-    static std::shared_ptr<FileRepository> nullRepo;
+    static std::shared_ptr<FileRepositoryNode> nullRepo;
 }
 
 namespace YAM
@@ -38,9 +38,7 @@ namespace YAM
     }
 
     ExecutionContext::~ExecutionContext() {
-        // destroy repositories to stop directory watching before stopping 
-        // main thread
-        _repositories.clear();
+        for (auto const& pair : repositories()) pair.second->stopWatching();
         _mainThreadQueue.stop(); // this will cause _mainThread to finish
     }
 
@@ -81,14 +79,14 @@ namespace YAM
         return _repositoriesNode;
     }
 
-    std::shared_ptr<FileRepository> const& ExecutionContext::findRepository(std::string const& repoName) const {
+    std::shared_ptr<FileRepositoryNode> const& ExecutionContext::findRepository(std::string const& repoName) const {
         return 
             _repositoriesNode == nullptr 
             ? nullRepo 
             : _repositoriesNode->findRepository(repoName);
     }
 
-    std::shared_ptr<FileRepository> const& ExecutionContext::findRepositoryContaining(std::filesystem::path const& path) const {
+    std::shared_ptr<FileRepositoryNode> const& ExecutionContext::findRepositoryContaining(std::filesystem::path const& path) const {
         auto const& repos = repositories();
         for (auto const& pair : repos) {
             auto const& repo = pair.second;
@@ -97,8 +95,8 @@ namespace YAM
         return nullRepo;
     }
 
-    std::map<std::string, std::shared_ptr<FileRepository>> const& ExecutionContext::repositories() const {
-        static std::map<std::string, std::shared_ptr<FileRepository>> empty;
+    std::map<std::string, std::shared_ptr<FileRepositoryNode>> const& ExecutionContext::repositories() const {
+        static std::map<std::string, std::shared_ptr<FileRepositoryNode>> empty;
         return _repositoriesNode == nullptr ? empty : _repositoriesNode->repositories();
     }
 

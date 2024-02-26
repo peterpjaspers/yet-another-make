@@ -44,11 +44,9 @@ namespace YAM
         typedef uint64_t Key;
 
         // Construct for storage of build state in given directory.
-        // If startRepoWatching: start watching repositories after retrieval.
         PersistentBuildState(
             std::filesystem::path const& directory,
-            ExecutionContext* context,
-            bool startRepoWatching);
+            ExecutionContext* context);
 
         ~PersistentBuildState();
 
@@ -75,9 +73,9 @@ namespace YAM
 
     private:
         // retrieve for use by SharedPersistableReader
-        std::shared_ptr<IPersistable> retrieve(Key key);
+        std::shared_ptr<IPersistable> getObject(Key key);
         // store for use by SharedPersistableWriter
-        Key store(std::shared_ptr<IPersistable> const& object);
+        Key getKey(std::shared_ptr<IPersistable> const& object);
 
         void reset();
         void retrieveAll();
@@ -86,7 +84,7 @@ namespace YAM
 
         Key bindToKey(std::shared_ptr<IPersistable> const& object);
         Key allocateKey(IPersistable* object);
-        void store(std::shared_ptr<IPersistable> const& object, bool replace);
+        void store(std::shared_ptr<IPersistable> const& object);
 
         void remove(Key key, std::shared_ptr<IPersistable> const& object);
 
@@ -100,8 +98,8 @@ namespace YAM
         void removeFromBuildState(std::shared_ptr<IPersistable> const& object);
 
         std::filesystem::path _directory;
-        ExecutionContext* _context;
-        bool _startRepoWatching;
+        ExecutionContext* _context
+            ;
         std::shared_ptr<BTree::PersistentPagePool> _pool;
         std::shared_ptr<BTree::Forest> _forest;
         std::map<BTree::TreeIndex, BTree::StreamingTree<Key>*> _typeToTree;

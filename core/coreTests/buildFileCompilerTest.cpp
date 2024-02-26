@@ -1,5 +1,5 @@
 #include "../BuildFileCompiler.h"
-#include "../FileRepository.h"
+#include "../FileRepositoryNode.h"
 #include "../DirectoryNode.h"
 #include "../SourceFileNode.h"
 #include "../GeneratedFileNode.h"
@@ -34,7 +34,7 @@ namespace
         std::filesystem::path repoDir;
         DirectoryTree testTree;
         ExecutionContext context;
-        std::shared_ptr<FileRepository> repo;
+        std::shared_ptr<FileRepositoryNode> repo;
         std::shared_ptr<SourceFileNode> mainFile;
         std::shared_ptr<SourceFileNode> lib1File;
         std::shared_ptr<SourceFileNode> lib2File;
@@ -61,10 +61,10 @@ namespace
             s2 << "void lib2() {}" << std::endl;
             s3.close();
 
-            repo = std::make_shared<FileRepository>(
+            repo = std::make_shared<FileRepositoryNode>(
+                &context,
                 "repo",
                 repoDir,
-                &context,
                 false);
             auto repos = std::make_shared<RepositoriesNode>(&context, repo);
             context.repositoriesNode(repos);
@@ -91,6 +91,7 @@ namespace
         auto command0 = (commands.begin())->second;
         auto command1 = (++commands.begin())->second;
 
+        std::filesystem::path repoRoot("@@repo");
         ASSERT_EQ(1, command0->cmdInputs().size());
         auto input00 = command0->cmdInputs()[0];
         EXPECT_EQ(setup.lib1File, input00);
@@ -99,7 +100,7 @@ namespace
         auto output00 = command0->outputs()[0];
         EXPECT_EQ("@@repo\\output\\lib1.obj", output00->name().string());
         ASSERT_EQ(1, command0->ignoredOutputs().size());
-        EXPECT_EQ(ignoredOutput.path, command0->ignoredOutputs()[0]);
+        EXPECT_EQ(repoRoot / ignoredOutput.path, command0->ignoredOutputs()[0]);
         EXPECT_EQ(3, command0->orderOnlyInputs().size());
 
         ASSERT_EQ(1, command1->cmdInputs().size());
@@ -110,7 +111,7 @@ namespace
         auto output10 = command1->outputs()[0];
         EXPECT_EQ("@@repo\\output\\lib2.obj", output10->name().string());
         ASSERT_EQ(1, command1->ignoredOutputs().size());
-        EXPECT_EQ(ignoredOutput.path, command1->ignoredOutputs()[0]);
+        EXPECT_EQ(repoRoot / ignoredOutput.path, command1->ignoredOutputs()[0]);
 
         auto const& globs = compiler.globs();
         ASSERT_EQ(2, globs.size());

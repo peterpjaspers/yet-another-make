@@ -1,7 +1,7 @@
 #pragma once
 #include "gtest/gtest.h"
 #include "DirectoryTree.h"
-#include "../FileRepository.h"
+#include "../FileRepositoryNode.h"
 #include "../DirectoryNode.h"
 #include "../SourceFileNode.h"
 #include "../FileNode.h"
@@ -46,9 +46,8 @@ namespace YAMTest
 
     // add a file at specified level in tree
     void DirectoryTree::addFile() {
-        char buf[32];
-        const std::string nextIndex(_itoa((int)(_files.size() + 1), buf, 10));
-        const std::string nextName("File" + nextIndex);
+        std::stringstream ss; ss << (_files.size() + 1);
+        const std::string nextName("File" + ss.str());
         const std::filesystem::path nextPath(_path / nextName);
         _files.push_back(nextPath);
         std::ofstream{ nextPath };
@@ -56,9 +55,8 @@ namespace YAMTest
 
     void DirectoryTree::addDirectory() {
         if (_nLevels == 0) _nLevels = 1;
-        char buf[32];
-        const std::string nextIndex(_itoa((int)(_subDirs.size() + 1), buf, 10));
-        const std::string nextName("SubDir" + nextIndex);
+        std::stringstream ss; ss << (_subDirs.size() + 1);
+        const std::string nextName("SubDir" + ss.str());
         const std::filesystem::path nextPath(_path / nextName);
         _subDirs.push_back(new DirectoryTree(nextPath, _nLevels - 1, _excludes));
         std::ofstream{ nextPath };
@@ -110,7 +108,7 @@ namespace YAMTest
         return dirs;
     }
 
-    XXH64_hash_t DirectoryTree::getHash(YAM::FileRepository* repo) const {
+    XXH64_hash_t DirectoryTree::getHash(YAM::FileRepositoryNode* repo) const {
         XXH64_hash_t hash;
         std::vector<XXH64_hash_t> hashes;
         hashes.push_back(0);

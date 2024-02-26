@@ -309,9 +309,6 @@
     <ClInclude Include="FileExecSpecsNode.h">
       <Filter>Header Files\Node</Filter>
     </ClInclude>
-    <ClInclude Include="FileRepository.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="RepositoriesNode.h">
       <Filter>Header Files\Node</Filter>
     </ClInclude>
@@ -332,6 +329,9 @@
     </ClInclude>
     <ClInclude Include="computeMapsDifference.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FileRepositoryNode.h">
+      <Filter>Header Files\Node</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -536,9 +536,6 @@
     <ClCompile Include="FileExecSpecsNode.cpp">
       <Filter>Source Files\Node</Filter>
     </ClCompile>
-    <ClCompile Include="FileRepository.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="RepositoriesNode.cpp">
       <Filter>Source Files\Node</Filter>
     </ClCompile>
@@ -556,6 +553,9 @@
     </ClCompile>
     <ClCompile Include="BuildFileCycleFinder.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="FileRepositoryNode.cpp">
+      <Filter>Source Files\Node</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

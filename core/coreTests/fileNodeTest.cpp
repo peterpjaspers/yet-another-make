@@ -1,29 +1,25 @@
 #include "gtest/gtest.h"
 #include "executeNode.h"
 #include "../FileNode.h"
-#include "../FileRepository.h"
 #include "../FileSystem.h"
 #include "../ExecutionContext.h"
-#include "../FileRepository.h"
+#include "../FileRepositoryNode.h"
 #include "../RepositoriesNode.h"
 #include "../../xxhash/xxhash.h"
 
 #include <chrono>
-#include <cstdio>
+#include <fstream>
 
 namespace
 {
     using namespace YAM;
 
     bool createTestFile(std::filesystem::path testPath, std::string const &content) {
-        FILE* fp = std::fopen(testPath.string().c_str(), "w");
-        if (!fp) return false;
-
-        auto nWritten = std::fwrite(content.c_str(), sizeof(char), content.length(), fp);
-        if (nWritten != content.length()) return false;
-
-        std::fclose(fp);
-        return true;
+        std::ofstream stream(testPath);
+        stream << content;
+        bool ok = stream.good();
+        stream.close();
+        return ok;
     }
 
     XXH64_hash_t hashString(std::string const& content) {
@@ -36,14 +32,14 @@ namespace
     public:
         std::filesystem::path repoDir;
         ExecutionContext context;
-        std::shared_ptr<FileRepository> repo;
+        std::shared_ptr<FileRepositoryNode> repo;
 
         Driver()
             : repoDir(FileSystem::createUniqueDirectory())
-            , repo(std::make_shared<FileRepository>(
+            , repo(std::make_shared<FileRepositoryNode>(
+                &context,
                 ".",
                 repoDir,
-                &context,
                 true))
         {
             auto repos = std::make_shared<RepositoriesNode>(&context, repo);
@@ -51,7 +47,7 @@ namespace
         }
 
         ~Driver() {
-            context.repositoriesNode()->removeRepository(repo->name());
+            context.repositoriesNode()->removeRepository(repo->repoName());
             repo = nullptr;
             std::filesystem::remove_all(repoDir);
         }

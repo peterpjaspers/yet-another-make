@@ -1,6 +1,6 @@
 #include "BuildFileParserNode.h"
 #include "BuildFileDependenciesCompiler.h"
-#include "FileRepository.h"
+#include "FileRepositoryNode.h"
 #include "FileExecSpecsNode.h"
 #include "DirectoryNode.h"
 #include "SourceFileNode.h"
@@ -500,15 +500,15 @@ namespace YAM
 
     bool BuildFileParserNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
         if (!Node::restore(context, restored)) return false;
+        if (_executor != nullptr) {
+            _executor->restore(context, restored);
+            _executor->addObserver(this);
+        }
         if (_buildFile != nullptr) {
             _buildFile->restore(context, restored);
             if (_buildFile == fileToParse()) {
                 _buildFile->addObserver(this);
             }
-        }
-        if (_executor != nullptr) {
-            _executor->restore(context, restored);
-            _executor->addObserver(this);
         }
         NodeMapStreamer::restore(_buildFileDeps);
         subscribeBuildFileGlobs(_buildFileDeps, true, this);
