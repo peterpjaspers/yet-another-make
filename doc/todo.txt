@@ -1,4 +1,6 @@
 Todo for R 0.1.0
+- hard to reproduce if (header->free == 1)  throw std::string(signature) + " - Accessing freed page.";
+  Somewhat reproducable by adding/removing input repos several times, restarting server
 - fix persistent storage of deleted nodes (Node::State::Deleted)
 - implement wildcard/glob for output files (dynamic outputs)
 - integrate Phil's file access monitor

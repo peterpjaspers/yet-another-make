@@ -196,7 +196,7 @@ namespace YAM
         std::filesystem::path repoDir = request->repoDirectory();
         RepositoryNameFile nameFile(repoDir);
         std::string repoName = nameFile.repoName();
-        _result->succeeded(!request->repoName().empty());
+        _result->succeeded(!repoName.empty() && repoName == request->repoName());
         if (!_result->succeeded()) {
             logRepoNotInitialized();
             return false;
@@ -225,6 +225,7 @@ namespace YAM
                     throw std::runtime_error("Unexpected Node::State::Delete");
                 }
             }
+            repositoriesNode->startWatching();
         }
         return _result->succeeded();
     }
@@ -308,7 +309,7 @@ namespace YAM
         repositoriesNode->homeRepository()->consumeChanges();
         if (repositoriesNode->state() == Node::State::Dirty) {
             if (repositoriesNode->parseAndUpdate()) {
-                for (auto& pair : _context.repositories()) pair.second->startWatching();
+                repositoriesNode->startWatching();
             } else {
                 _postCompletion(Node::State::Failed);
                 return;

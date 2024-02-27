@@ -4,6 +4,7 @@
 #include "DirectoryNode.h"
 #include "FileSystem.h"
 #include "FileAspect.h"
+#include "RepositoriesNode.h"
 #include "FileRepositoryNode.h"
 #include "IStreamer.h"
 
@@ -73,7 +74,13 @@ namespace YAM
         }
     }
 
-    bool DotIgnoreNode::ignore(std::filesystem::path const& path) const {
+    bool DotIgnoreNode::ignore(std::shared_ptr<FileRepositoryNode> const& repo, std::filesystem::path const& path) const {
+        if (repo == context()->repositoriesNode()->homeRepository()) {            
+            std::filesystem::path yamConfigDir = repo->directory() / "yamConfig";
+            if (path == yamConfigDir || path.parent_path() == yamConfigDir) {
+                return true;
+            }
+        }
         return false;
     }
 

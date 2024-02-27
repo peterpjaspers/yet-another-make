@@ -88,12 +88,10 @@ namespace YAM
     }
 
     std::shared_ptr<FileRepositoryNode> const& ExecutionContext::findRepositoryContaining(std::filesystem::path const& path) const {
-        auto const& repos = repositories();
-        for (auto const& pair : repos) {
-            auto const& repo = pair.second;
-            if (repo->lexicallyContains(path)) return repo;
-        }
-        return nullRepo;
+        return
+            _repositoriesNode == nullptr
+            ? nullRepo
+            : _repositoriesNode->findRepositoryContaining(path);
     }
 
     std::map<std::string, std::shared_ptr<FileRepositoryNode>> const& ExecutionContext::repositories() const {

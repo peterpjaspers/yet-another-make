@@ -537,6 +537,9 @@ namespace YAM
     }
 
     PersistentBuildState::Key PersistentBuildState::getKey(std::shared_ptr<IPersistable> const& object) {
+        if (object->deleted()) {
+            throw std::exception("object is deleted");
+        }
         if (
             object->modified() 
             && !_toInsert.contains(object)

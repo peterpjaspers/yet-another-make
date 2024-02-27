@@ -279,6 +279,16 @@ namespace YAM
         return it->second;
     }
 
+    std::shared_ptr<FileRepositoryNode> const& RepositoriesNode::findRepositoryContaining(
+        std::filesystem::path const& path
+    ) const {
+        for (auto const& pair : _repositories) {
+            auto const& repo = pair.second;
+            if (repo->lexicallyContains(path)) return repo;
+        }
+        return nullRepo;
+    }
+
     bool RepositoriesNode::addRepository(std::shared_ptr<FileRepositoryNode> const& repo) {
         auto it = _repositories.find(repo->repoName());
         if (it != _repositories.end()) {
@@ -314,6 +324,18 @@ namespace YAM
         context()->nodes().remove(it->second);
         _repositories.erase(it);
         return true;
+    }
+
+    void RepositoriesNode::startWatching() {
+        for (auto const& pair : _repositories) {
+            pair.second->startWatching();
+        }
+    }
+
+    void RepositoriesNode::stopWatching() {
+        for (auto const& pair : _repositories) {
+            pair.second->stopWatching();
+        }
     }
 
     void RepositoriesNode::start() {

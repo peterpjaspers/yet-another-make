@@ -187,7 +187,7 @@ namespace YAM
     ) {
         std::shared_ptr<Node> child = nullptr;
         auto const& absPath = dirEntry.path();
-        if (!_dotIgnoreNode->ignore(absPath)) {
+        if (!_dotIgnoreNode->ignore(repo, absPath)) {
             auto symPath = repo->symbolicPathOf(absPath);
             auto it = _content.find(symPath);
             if (it != _content.end()) {

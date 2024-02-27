@@ -83,11 +83,16 @@ namespace YAM
         std::filesystem::path absoluteConfigFilePath() const;
 
         std::shared_ptr<FileRepositoryNode> const& homeRepository() const;
-        std::map<std::string, std::shared_ptr<FileRepositoryNode>> const& repositories() const;
 
-        std::shared_ptr<FileRepositoryNode> const& findRepository(std::string const& repoName) const;
+        std::map<std::string, std::shared_ptr<FileRepositoryNode>> const& repositories() const;
         bool addRepository(std::shared_ptr<FileRepositoryNode> const& repo);
         bool removeRepository(std::string const& repoName);
+        std::shared_ptr<FileRepositoryNode> const& findRepository(std::string const& repoName) const;
+        std::shared_ptr<FileRepositoryNode> const& findRepositoryContaining(std::filesystem::path const& path) const;
+            
+        // Start/stop watching the directory trees of all watchable repositories.
+        void startWatching();
+        void stopWatching();
 
         // For synchronous update.
         bool parseAndUpdate();

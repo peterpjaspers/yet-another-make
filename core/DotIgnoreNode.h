@@ -8,16 +8,19 @@ namespace YAM
 {
     class DirectoryNode;
     class SourceFileNode;
+    class FileRepositoryNode;
 
+    // NOT YET IMPLEMENTED
     // A DotIgnoreNode parses a .gitignore and/or .yamignore file in a
     // given directory. Both files adhere to the gitignore specification,
-    // see https://git-scm.com/docs/gitignore. The isIgnored() member function 
+    // see https://git-scm.com/docs/gitignore. The ignore() member function 
     // applies the precedence rules as specified in same specification.
     // 
-    // YAM uses the patterns in these files to distinguish source files from
-    // generated files (mandatory) and to exclude source files (optionally) 
-    // that are not (allowed to be) used by the build from being mirrored by
-    // DirectoryNode.
+    // Special case: homeRepo/yamConfig/ is ignored.
+    // Rationale: permanent SourceFileNodes are created for the files in
+    // that directory by RepositoriesNode and FileExecSpecsNode (and possibly
+    // more as new configuration files get introduced). These filenodes must
+    // not be set to Node::State::Deleted when removed from the filesystem.  
     //
     class __declspec(dllexport) DotIgnoreNode : public Node
     {
@@ -42,7 +45,7 @@ namespace YAM
 
         // Return whether given path is not a source file or a source file that is
         // not allowed to be accessed by the build.
-        bool ignore(std::filesystem::path const& path) const;
+        bool ignore(std::shared_ptr<FileRepositoryNode> const& repo, std::filesystem::path const& path) const;
 
         // Remove the .gitignore and .yamignore nodes from context->nodes().
         void clear();
