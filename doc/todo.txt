@@ -1,10 +1,14 @@
 Todo for R 0.1.0
-- hard to reproduce if (header->free == 1)  throw std::string(signature) + " - Accessing freed page.";
-  Somewhat reproducable by adding/removing input repos several times, restarting server
+Bugs
+- fix (header->free == 1)  throw std::string(signature) + " - Accessing freed page.";
+  Reproduce with coreTests EnduranceTest
 - fix persistent storage of deleted nodes (Node::State::Deleted)
+- fix multi-line buildscripts
+
+Features
 - implement wildcard/glob for output files (dynamic outputs)
 - integrate Phil's file access monitor
-- Add support for FileRepository types yam, tracked and ignored
+- Add FileRepository types yam, tracked and ignored
 - Versioning in PersistentBuildState, encode version in name of buildstate file
 - fileaspect last-write-time (e.g. for generated files in cmd executionhash)
 - fileaspect configuration
@@ -12,29 +16,31 @@ Todo for R 0.1.0
   Note: these source file nodes are NOT in state Deleted. How to GC these
   nodes when no longer refd => GC sweep over context to remove node with
   use_count 1.
-- variants (tup variants, MR build configurations)
-  Not in scope: requires syntax for variables
 - environment variables
   requires syntax for export of variables to environment of rule
-- Fast lookup of dirty nodes, modified nodes
+- Fast lookup of dirty nodes, new/modified/deleted nodes
 - BuildScopeFinder unittest
 - use static iso dll libraries
-  And enabled implementation of streaming hash computation
+  And enable implementation of streaming hash computation
 - build yam with yam
 - deal with dependencies on gtest, boost, xxhash
 - license
 - C++20 modules support
   Allow commands to generated buildfiles.
   while (dirty buildfiles found) build();
-- automated end-to-end testing
+- end-to-end testing (automated gtest)
 - scalability measurements
-- documentation, bedenk betere naam
+- documentation
+- bedenk betere naam voor yam
 - inform Mike Shal
 
-Todo for later release:
+Out-of-scope:
 - distributed build
 - build cache
 - btree/page caching
+- tup-compatible syntax
+- variants (tup variants, MR build configurations)
+  Requires syntax for variables
 
 
 
