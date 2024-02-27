@@ -3,7 +3,7 @@
 #include "RegexSet.h"
 #include "Node.h"
 #include "AcyclicTrail.h"
-#include "../xxHash/xxhash.h"
+#include "xxhash.h"
 
 #include <memory>
 #include <filesystem>

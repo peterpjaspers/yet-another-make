@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Node.h"
-#include "../xxHash/xxhash.h"
+#include "xxhash.h"
 
 namespace YAM
 {

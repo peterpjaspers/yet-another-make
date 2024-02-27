@@ -40,67 +40,6 @@ namespace
         return content;
     }
 
-    RegexSet excludes({
-                RegexSet::matchDirectory("generated"),
-                RegexSet::matchDirectory(".yam"),
-        });
-
-    class TestRepository
-    {
-    public:
-        std::filesystem::path dir;
-        std::filesystem::path pietH;
-        std::filesystem::path janH;
-        std::filesystem::path pietCpp;
-        std::filesystem::path janCpp;
-        std::string pietHContent;
-        std::string pietCppContent;
-        std::string janHContent;
-        std::string janCppContent;
-
-        // Create unique directory dir and sub directories dir/src 
-        // and dir/generated.
-        // Fill repoDir/src with C++ source files.
-        TestRepository()
-            : dir(FileSystem::createUniqueDirectory())
-            , pietH(dir / "src" / "piet.h")
-            , janH(dir / "src" / "jan.h")
-            , pietCpp(dir / "src" / "piet.cpp")
-            , janCpp(dir / "src" / "jan.cpp")
-        {
-            std::filesystem::create_directories(dir / "src");
-            std::filesystem::create_directories(dir / "generated");
-
-            std::ofstream pietHFile(pietH.string());
-            pietHFile << "int piet(int x);";
-            pietHFile.close();
-            std::ofstream janHFile(janH.string());
-            janHFile << "int jan(int x);";
-            janHFile.close();
-
-            std::ofstream pietCppFile(pietCpp.string());
-            pietCppFile
-                << R"(#include "piet.h")" << std::endl
-                << R"(#include "jan.h")" << std::endl
-                << R"(int piet(int x) { return jan(x) + 3; })" << std::endl;
-            pietCppFile.close();
-            std::ofstream janCppFile(janCpp.string());
-            janCppFile
-                << R"(#include "jan.h")" << std::endl
-                << R"(int jan(int x) { return x + 5; })" << std::endl;
-            janCppFile.close();
-
-            pietHContent = readFile(pietH);
-            pietCppContent = readFile(pietCpp);
-            janCppContent = readFile(janCpp);
-            janHContent = readFile(janH);
-        }
-
-        ~TestRepository() {
-            std::filesystem::remove_all(dir);
-        }
-    };
-
     class TestDriver
     {
     public:

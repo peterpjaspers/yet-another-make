@@ -101,9 +101,6 @@
     <ProjectReference Include="..\..\btree\btree.vcxproj">
       <Project>{bce274f0-7a63-4d67-928b-f46c0eb23326}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\..\xxHash\xxHash.vcxproj">
-      <Project>{8bdd054e-da14-4e2b-8fc1-033afa27e26b}</Project>
-    </ProjectReference>
     <ProjectReference Include="..\core.vcxproj">
       <Project>{2156af8d-ff04-4b0b-8a73-52440e5f63d0}</Project>
     </ProjectReference>

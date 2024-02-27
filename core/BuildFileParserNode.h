@@ -2,7 +2,7 @@
 #include "CommandNode.h"
 #include "BuildFile.h"
 
-#include "../xxHash/xxhash.h"
+#include "xxhash.h"
 
 #include <memory>
 #include <vector>

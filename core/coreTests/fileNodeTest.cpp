@@ -5,7 +5,7 @@
 #include "../ExecutionContext.h"
 #include "../FileRepositoryNode.h"
 #include "../RepositoriesNode.h"
-#include "../../xxhash/xxhash.h"
+#include "../xxhash.h"
 
 #include <chrono>
 #include <fstream>

@@ -2,7 +2,7 @@
 
 #include "RegexSet.h"
 #include "Delegates.h"
-#include "..\xxhash\xxhash.h"
+#include "xxhash.h"
 
 #include <string>
 #include <vector>

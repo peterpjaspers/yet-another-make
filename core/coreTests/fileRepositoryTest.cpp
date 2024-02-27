@@ -9,7 +9,7 @@
 #include "../FileSystem.h"
 #include "../Dispatcher.h"
 #include "../DispatcherFrame.h"
-#include "../../xxhash/xxhash.h"
+#include "../xxhash.h"
 
 #include "gtest/gtest.h"
 #include <chrono>

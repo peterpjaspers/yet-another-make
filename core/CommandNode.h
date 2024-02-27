@@ -4,7 +4,7 @@
 #include "FileNode.h"
 #include "IMonitoredProcess.h"
 #include "MemoryLogBook.h"
-#include "../xxHash/xxhash.h"
+#include "xxhash.h"
 
 #include <atomic>
 #include <unordered_set>

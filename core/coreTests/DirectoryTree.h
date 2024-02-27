@@ -1,6 +1,6 @@
 #pragma once
 #include "../RegexSet.h"
-#include "../../xxhash/xxhash.h"
+#include "../xxhash.h"
 
 #include <filesystem>
 #include <vector>

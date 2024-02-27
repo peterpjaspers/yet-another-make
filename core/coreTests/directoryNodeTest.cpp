@@ -10,7 +10,7 @@
 #include "../BuildFileParserNode.h"
 #include "../BuildFileCompilerNode.h"
 #include "../RepositoriesNode.h"
-#include "../../xxhash/xxhash.h"
+#include "../xxhash.h"
 
 #include <chrono>
 

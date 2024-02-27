@@ -194,6 +194,7 @@
     <ClInclude Include="TokenRegexSpec.h" />
     <ClInclude Include="BuildOptionsParser.h" />
     <ClInclude Include="computeMapsDifference.h" />
+    <ClInclude Include="xxhash.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BasicOStreamLogBook.cpp" />
@@ -294,6 +295,7 @@
     <ClCompile Include="TokenPathSpec.cpp" />
     <ClCompile Include="TokenRegexSpec.cpp" />
     <ClCompile Include="BuildOptionsParser.cpp" />
+    <ClCompile Include="xxhash.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="IStreamer.inl" />

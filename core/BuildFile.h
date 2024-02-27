@@ -2,7 +2,7 @@
 
 #include "IStreamer.h"
 #include "IStreamable.h"
-#include "../xxHash/xxhash.h"
+#include "xxhash.h"
 
 #include <vector>
 #include <memory>

@@ -1,7 +1,7 @@
 #pragma once
 #include "Node.h"
 #include "MemoryLogBook.h"
-#include "../xxHash/xxhash.h"
+#include "xxhash.h"
 
 #include <chrono>
 #include <vector>

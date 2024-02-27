@@ -2,7 +2,7 @@
 
 #include "Node.h"
 #include "FileAspect.h"
-#include "../xxHash/xxhash.h"
+#include "xxhash.h"
 
 #include <map>
 
