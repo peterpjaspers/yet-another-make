@@ -177,6 +177,7 @@ namespace
     };
 
     TEST(Endurance, repeatAddRemoveRepositories) {
+    //void ignore() {
         std::filesystem::remove_all("D:\\test_yam");
         std::filesystem::remove_all("D:\\test_yam_1");
         std::filesystem::remove_all("D:\\test_yam_2");

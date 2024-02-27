@@ -3,6 +3,7 @@
 #include "../BuildServiceMessageTypes.h"
 #include "../MemoryLogBook.h"
 #include "../FileSystem.h"
+#include "../RepositoryNameFile.h"
 
 #include <atomic>
 #include <mutex>
@@ -25,13 +26,17 @@ namespace
         std::unique_ptr<BuildService> service;
         std::unique_ptr<BuildClient> client;
         std::filesystem::path repoDir;
+        std::string repoName;
 
         Session()
             : service(std::make_unique<BuildService>())
             , client(nullptr)
             , repoDir(FileSystem::createUniqueDirectory())
+            , repoName("testRepo")
             , _shutdown(false)
         {
+            RepositoryNameFile nameFile(repoDir);
+            nameFile.repoName(repoName);
             newClient();
         }
 
@@ -56,27 +61,24 @@ namespace
             return wait();
         }
 
-        std::shared_ptr<BuildResult> init() {
+        std::shared_ptr<BuildRequest> buildRequest() {
             auto request = std::make_shared<BuildRequest>();
-            if (!startBuild(request)) return std::make_shared<BuildResult>(false);
+            request->repoDirectory(repoDir);
+            request->repoName(repoName);
+            return request;
+        }
+
+        std::shared_ptr<BuildResult> init() {
+            if (!startBuild(buildRequest())) return std::make_shared<BuildResult>(false);
             return wait();
         }
 
         bool startBuild(std::shared_ptr<BuildRequest> request) {
-            request->repoDirectory(repoDir);
-            request->repoName("test");
-            return client->startBuild(request);
+            return client->startBuild(buildRequest());
         }
 
         std::shared_ptr<BuildResult> build() {
-            auto request = std::make_shared<BuildRequest>();
-            if (!startBuild(request)) return std::make_shared<BuildResult>(false);
-            return wait();
-        }
-
-        std::shared_ptr<BuildResult> clean() {
-            auto request = std::make_shared<BuildRequest>();
-            if (!startBuild(request)) return std::make_shared<BuildResult>(false);
+            if (!startBuild(buildRequest())) return std::make_shared<BuildResult>(false);
             return wait();
         }
 
@@ -131,12 +133,6 @@ namespace
         // The former when the build already completed when stop was received.
         // The latter when build in progress was canceled.
         EXPECT_NE(nullptr, result);
-    }
-
-    TEST(BuildService, clean) {
-        Session session;
-        auto result = session.clean();
-        EXPECT_TRUE(result->succeeded());
     }
 
     TEST(BuildService, shutdown) {
