@@ -33,7 +33,7 @@ namespace BTree {
             commitLink = root.page;
             for (size_t index = 0; index < pageCount; ++index) {
                 pages[ index ] = reinterpret_cast<PageHeader*>( malloc( pageSize ) );
-                PageLink link( static_cast<unsigned int>(index) );
+                PageLink link( static_cast<uint32_t>(index) );
                 PageHeader& page = const_cast<PageHeader&>( access( link ) );
                 file.read( reinterpret_cast<char*>( &page ), pageSize );
                 if (!file.good()) throw string( signature ) + " - File read error";

@@ -177,7 +177,7 @@ int main(int argc, char* argv[]) {
             keys.push_back( key );
             auto value = generateUint16Array();
             entries[ key ] = value;
-            if(!tree.insert( key, value.data(), value.size() )) {
+            if(!tree.insert( key, value.data(), static_cast<PageSize>(value.size()) )) {
                 stream << "Key " << key << " already present!\n";
                 errors += 1;
             }
@@ -186,7 +186,7 @@ int main(int argc, char* argv[]) {
         for ( auto key : keys ) {
             auto value = generateUint16Array();
             entries[ key ] = value;
-            if (!tree.replace( key, value.data(), value.size() )) {
+            if (!tree.replace( key, value.data(), static_cast<PageSize>(value.size()) )) {
                 stream << "Key " << key << " not present!\n";
                 errors += 1;
             }
@@ -195,7 +195,7 @@ int main(int argc, char* argv[]) {
         for ( auto key : keys ) {
             auto reference = entries[ key ];
             auto retrieved = tree.retrieve( key );
-            if (BTree::defaultCompareArray( reference.data(), reference.size(), retrieved.first, retrieved.second) != 0) {
+            if (BTree::defaultCompareArray( reference.data(), static_cast<PageSize>(reference.size()), retrieved.first, retrieved.second) != 0) {
                 stream << "Value mismatch for key " << key << " : expected ";
                 streamUint16Array( stream, reference );
                 stream << ", retrieved ";
@@ -274,7 +274,7 @@ int main(int argc, char* argv[]) {
             string value = generateString();
             while ( entries.count( key ) != 0 ) key = generateUint16Array();
             entries[ key ] = value;
-            if (!tree.insert( key.data(), key.size(), value )) {
+            if (!tree.insert( key.data(), static_cast<PageSize>(key.size()), value )) {
                 stream << "Key "; streamUint16Array( stream, key ); stream << " already present!\n";
                 errors += 1;
             }
@@ -282,7 +282,7 @@ int main(int argc, char* argv[]) {
         stream << "Modifying " << ValueCount << " strings with 16-bit unsigned int array keys...\n";
         for ( auto key : keys ) {
             string value = generateString();
-            if (!tree.replace( key.data(), key.size(), value )) {
+            if (!tree.replace( key.data(), static_cast<PageSize>(key.size()), value )) {
                 stream << "Key "; streamUint16Array( stream, key ); stream << " not present!\n";
                 errors += 1;
             }
@@ -290,7 +290,7 @@ int main(int argc, char* argv[]) {
         stream << "Reading " << ValueCount << " strings with 16-bit unsigned int array keys...\n";
         for ( auto key : keys ) {
             auto reference = entries[ key ];
-            string value = tree.retrieve( key.data(), key.size() );
+            string value = tree.retrieve( key.data(), static_cast<PageSize>(key.size()) );
             if ( value != reference ) {
                 stream << "Value mismatch : expected " << reference << ", retrieved " << value << ".\n";
                 errors += 1;

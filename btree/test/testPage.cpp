@@ -69,14 +69,14 @@ public:
     vector<vector<K>> keys;
     vector<vector<V>> values;
     PageContent() {}
-    PageSize size() const { return keys.size(); }
+    PageSize size() const { return static_cast<PageSize>(keys.size()); }
     void clear() {
         splitValue.clear();
         keys.clear();
         values.clear();
     }
     PageSize entryFilling( const vector<K>& key, const vector<V>& value ) const {
-        PageSize fill = (key.size() * sizeof( K )) + (value.size() * sizeof( V ));
+        PageSize fill = (static_cast<PageSize>(key.size()) * sizeof( K )) + (static_cast<PageSize>(value.size()) * sizeof( V ));
         if (1 < key.size()) fill += sizeof( PageIndex );
         if (1 < value.size()) fill += sizeof( PageIndex );
         return fill;
@@ -125,15 +125,15 @@ PageSize pageEntryFit( const Page<K,V,false,false>& page, const vector<K>& key, 
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(AK&&!AV),bool> = true >
 PageSize pageEntryFit( const Page<K,V,true,false>& page, const vector<K>& key, const vector<V>& value ) {
-    return page.entryFit( key.size() );
+    return page.entryFit(static_cast<PageSize>(key.size()) );
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(!AK&&AV),bool> = true >
 PageSize pageEntryFit( const Page<K,V,false,true>& page, const vector<K>& key, const vector<V>& value ) {
-    return page.entryFit( value.size() );
+    return page.entryFit(static_cast<PageSize>(value.size()) );
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(AK&&AV),bool> = true >
 PageSize pageEntryFit( const Page<K,V,true,true>& page, const vector<K>& key, const vector<V>& value ) {
-    return page.entryFit( key.size(), value.size() );
+    return page.entryFit(static_cast<PageSize>(key.size()), static_cast<PageSize>(value.size()) );
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(!AK&&!AV),bool> = true >
 PageSize pageEntryFilling( const Page<K,V,false,false>& page, const vector<K>& key, const vector<V>& value ) {
@@ -141,15 +141,15 @@ PageSize pageEntryFilling( const Page<K,V,false,false>& page, const vector<K>& k
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(AK&&!AV),bool> = true >
 PageSize pageEntryFilling( const Page<K,V,true,false>& page, const vector<K>& key, const vector<V>& value ) {
-    return page.entryFilling( key.size() );
+    return page.entryFilling(static_cast<PageSize>(key.size()) );
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(!AK&&AV),bool> = true >
 PageSize pageEntryFilling( const Page<K,V,false,true>& page, const vector<K>& key, const vector<V>& value ) {
-    return page.entryFilling( value.size() );
+    return page.entryFilling(static_cast<PageSize>(value.size()) );
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(AK&&AV),bool> = true >
 PageSize pageEntryFilling( const Page<K,V,true,true>& page, const vector<K>& key, const vector<V>& value ) {
-    return page.entryFilling( key.size(), value.size() );
+    return page.entryFilling(static_cast<PageSize>(key.size()), static_cast<PageSize>(value.size()) );
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(!AV),bool> = true >
 void pageSplit( Page<K,V,AK,false>& page, const vector<V>& value ) {
@@ -157,7 +157,7 @@ void pageSplit( Page<K,V,AK,false>& page, const vector<V>& value ) {
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(AV),bool> = true >
 void pageSplit( Page<K,V,AK,true>& page, const vector<V>& value ) {
-    page.split( value.data(), value.size() );
+    page.split( value.data(), static_cast<PageSize>(value.size()) );
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(!AV),bool> = true >
 vector<V> pageSplit( const Page<K,V,AK,false>& page ) {
@@ -201,15 +201,15 @@ void pageInsert( Page<K,V,false,false>& page, PageIndex index, const vector<K>& 
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(AK&&!AV),bool> = true >
 void pageInsert( Page<K,V,true,false>& page, PageIndex index, const vector<K>& key, const vector<V>& value ) {
-    page.insert( index, key.data(), key.size(), value[ 0 ] );
+    page.insert( index, key.data(), static_cast<PageSize>(key.size()), value[ 0 ] );
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(!AK&&AV),bool> = true >
 void pageInsert( Page<K,V,false,true>& page, PageIndex index, const vector<K>& key, const vector<V>& value ) {
-    page.insert( index, key[ 0 ], value.data(), value.size() );
+    page.insert( index, key[ 0 ], value.data(), static_cast<PageSize>(value.size()) );
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(AK&&AV),bool> = true >
 void pageInsert( Page<K,V,true,true>& page, PageIndex index, const vector<K>& key, const vector<V>& value ) {
-    page.insert( index, key.data(), key.size(), value.data(), value.size() );
+    page.insert( index, key.data(), static_cast<PageSize>(key.size()), value.data(), static_cast<PageSize>(value.size()) );
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(!AK&&!AV),bool> = true >
 void pageInsert( const Page<K,V,false,false>& page, PageIndex index, const vector<K>& key, const vector<V>& value, Page<K,V,false,false>& copy ) {
@@ -217,15 +217,15 @@ void pageInsert( const Page<K,V,false,false>& page, PageIndex index, const vecto
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(AK&&!AV),bool> = true >
 void pageInsert( const Page<K,V,true,false>& page, PageIndex index, const vector<K>& key, const vector<V>& value, Page<K,V,true,false>& copy ) {
-    page.insert( index, key.data(), key.size(), value[ 0 ], &copy );
+    page.insert( index, key.data(), static_cast<PageSize>(key.size()), value[ 0 ], &copy );
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(!AK&&AV),bool> = true >
 void pageInsert( const Page<K,V,false,true>& page, PageIndex index, const vector<K>& key, const vector<V>& value, Page<K,V,false,true>& copy ) {
-    page.insert( index, key[ 0 ], value.data(), value.size(), &copy );
+    page.insert( index, key[ 0 ], value.data(), static_cast<PageSize>(value.size()), &copy );
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(AK&&AV),bool> = true >
 void pageInsert( const Page<K,V,true,true>& page, PageIndex index, const vector<K>& key, const vector<V>& value, Page<K,V,true,true>& copy ) {
-    page.insert( index, key.data(), key.size(), value.data(), value.size(), &copy );
+    page.insert( index, key.data(), static_cast<PageSize>(key.size()), value.data(), static_cast<PageSize>(value.size()), &copy );
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(!AV),bool> = true >
 void pageReplace( Page<K,V,AK,false>& page, PageIndex index, const vector<V>& value ) {
@@ -233,7 +233,7 @@ void pageReplace( Page<K,V,AK,false>& page, PageIndex index, const vector<V>& va
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(AV),bool> = true >
 void pageReplace( Page<K,V,AK,true>& page, PageIndex index, const vector<V>& value ) {
-    page.replace( index, value.data(), value.size() );
+    page.replace( index, value.data(), static_cast<PageSize>(value.size()) );
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(!AV),bool> = true >
 void pageReplace( const Page<K,V,AK,false>& page, PageIndex index, const vector<V>& value, Page<K,V,AK,false>& copy ) {
@@ -241,7 +241,7 @@ void pageReplace( const Page<K,V,AK,false>& page, PageIndex index, const vector<
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(AV),bool> = true >
 void pageReplace( const Page<K,V,AK,true>& page, PageIndex index, const vector<V>& value, Page<K,V,AK,true>& copy ) {
-    page.replace( index, value.data(), value.size(), &copy );
+    page.replace( index, value.data(), static_cast<PageSize>(value.size()), &copy );
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(!AK&&!AV),bool> = true >
 void pageReplace( Page<K,V,false,false>& page, PageIndex index, const vector<K>& key, const vector<V>& value ) {
@@ -249,15 +249,15 @@ void pageReplace( Page<K,V,false,false>& page, PageIndex index, const vector<K>&
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(AK&&!AV),bool> = true >
 void pageReplace( Page<K,V,true,false>& page, PageIndex index, const vector<K>& key, const vector<V>& value ) {
-    page.replace( index, key.data(), key.size(), value[ 0 ] );
+    page.replace( index, key.data(), static_cast<PageSize>(key.size()), value[ 0 ] );
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(!AK&&AV),bool> = true >
 void pageReplace( Page<K,V,false,true>& page, PageIndex index, const vector<K>& key, const vector<V>& value ) {
-    page.replace( index, key[ 0 ], value.data(), value.size() );
+    page.replace( index, key[ 0 ], value.data(), static_cast<PageSize>(value.size()) );
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(AK&&AV),bool> = true >
 void pageReplace( Page<K,V,true,true>& page, PageIndex index, const vector<K>& key, const vector<V>& value ) {
-    page.replace( index, key.data(), key.size(), value.data(), value.size() );
+    page.replace( index, key.data(), static_cast<PageSize>(key.size()), value.data(), static_cast<PageSize>(value.size()) );
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(!AK&&!AV),bool> = true >
 void pageReplace( const Page<K,V,false,false>& page, PageIndex index, const vector<K>& key, const vector<V>& value, Page<K,V,false,false>& copy ) {
@@ -265,15 +265,15 @@ void pageReplace( const Page<K,V,false,false>& page, PageIndex index, const vect
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(AK&&!AV),bool> = true >
 void pageReplace( const Page<K,V,true,false>& page, PageIndex index, const vector<K>& key, const vector<V>& value, Page<K,V,true,false>& copy ) {
-    page.replace( index, key.data(), key.size(), value[ 0 ], &copy );
+    page.replace( index, key.data(), static_cast<PageSize>(key.size()), value[ 0 ], &copy );
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(!AK&&AV),bool> = true >
 void pageReplace( const Page<K,V,false,true>& page, PageIndex index, const vector<K>& key, const vector<V>& value, Page<K,V,false,true>& copy ) {
-    page.replace( index, key[ 0 ], value.data(), value.size(), &copy );
+    page.replace( index, key[ 0 ], value.data(), static_cast<PageSize>(value.size()), &copy );
 }
 template< class K, class V, bool AK, bool AV, std::enable_if_t<(AK&&AV),bool> = true >
 void pageReplace( const Page<K,V,true,true>& page, PageIndex index, const vector<K>& key, const vector<V>& value, Page<K,V,true,true>& copy ) {
-    page.replace( index, key.data(), key.size(), value.data(), value.size(), &copy );
+    page.replace( index, key.data(), static_cast<PageSize>(key.size()), value.data(), static_cast<PageSize>(value.size()), &copy );
 }
 
 template< class K, class V, bool AK, bool AV >
@@ -310,7 +310,7 @@ private:
             }
         }
         PageSize filling = sizeof( PageHeader );
-        filling += (content.split().size() * sizeof( V ));
+        filling += (static_cast<PageSize>(content.split().size()) * sizeof( V ));
         for (PageIndex index = 0; index < content.keys.size(); ++index) {
             filling += content.entryFilling( content.keys[ index ], content.values[ index ] );
         }

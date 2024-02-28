@@ -26,7 +26,7 @@ namespace BTree {
         uint32_t index; // Index of a page in the pool
         inline PageLink() {}
         inline PageLink( const PageLink& link ) { index = link.index; }
-        inline PageLink( unsigned int index ) { this->index = index; }
+        inline PageLink( uint32_t index ) { this->index = index; }
         inline PageLink& operator= ( const PageLink& link ) { index = link.index; return( *this ); }
         inline PageLink& nullify() { index = MaxPagePoolIndex; return( *this ); }
         inline bool null() const { return( index == MaxPagePoolIndex ); }

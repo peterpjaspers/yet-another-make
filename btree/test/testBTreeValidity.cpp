@@ -2,6 +2,7 @@
 #include "PersistentPagePool.h"
 #include <map>
 #include <set>
+#include <vector>
 #include <iostream>
 #include <fstream>
 #include <random>
@@ -212,10 +213,10 @@ public:
                     log << "File size " << fileSize << " does not match expected size for " << pageCount << " pages!\n";
                     errors += 1;
                 }
-                uint8_t* buffer = new uint8_t[ pageSize ];
+                std::vector<uint8_t> buffer;
                 for (size_t index = 0; index < pageCount; ++index) {
-                    file.read( reinterpret_cast<char*>( &buffer ), pageSize );
-                    PageHeader* page = reinterpret_cast<PageHeader*>( buffer );
+                    file.read( reinterpret_cast<char*>( buffer.data() ), pageSize );
+                    PageHeader* page = reinterpret_cast<PageHeader*>( buffer.data() );
                     if (!file.good()) {
                         log << "File read error on page " << index << " !\n";
                         errors += 1;
@@ -257,7 +258,6 @@ public:
                         }
                     }
                 }
-                delete[] buffer;
             } else {
                 log << "File read error on root header!\n";
                 errors += 1;

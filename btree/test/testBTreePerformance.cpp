@@ -95,7 +95,7 @@ template< class T >
 vector<vector<T>> generateUniqueKeys( uint32_t count, uint32_t min, uint32_t max ) {
     vector<vector<T>> keys;
     set<vector<T>,ArrayCompare<T>> keySet;
-    for ( int i = 0; i < count; ++i) {
+    for (uint32_t i = 0; i < count; ++i) {
         auto key = generate<T>( min, max );
         while (keySet.count( key ) == 1) key = generate<T>( min, max );
         keys.push_back( key );
@@ -107,7 +107,7 @@ vector<vector<T>> generateUniqueKeys( uint32_t count, uint32_t min, uint32_t max
 template< class T >
 vector<vector<T>> generateValues( uint32_t count, uint32_t min, uint32_t max ) {
     vector<vector<T>> values;
-    for ( int i = 0; i < count; ++i) values.push_back( generate<T>( min, max ) );
+    for (uint32_t i = 0; i < count; ++i) values.push_back( generate<T>( min, max ) );
     return values;
 }
 
@@ -133,15 +133,15 @@ void treeInsert( Tree<K,V>& tree, const vector<B<K>>& key, const vector<B<V>>& v
 }
 template< class K, class V, std::enable_if_t<(A<K>&&!A<V>),bool> = true >
 void treeInsert( Tree<K,V>& tree, const vector<B<K>>& key, const vector<B<V>>& value ) {
-    tree.insert( key.data(), key.size(), value[ 0 ] );
+    tree.insert( key.data(), static_cast<PageSize>(key.size()), value[ 0 ] );
 }
 template< class K, class V, std::enable_if_t<(!A<K>&&A<V>),bool> = true >
 void treeInsert( Tree<K,V>& tree, const vector<B<K>>& key, const vector<B<V>>& value ) {
-    tree.insert( key[ 0 ], value.data(), value.size() );
+    tree.insert( key[ 0 ], value.data(), static_cast<PageSize>(value.size()) );
 }
 template< class K, class V, std::enable_if_t<(A<K>&&A<V>),bool> = true >
 void treeInsert( Tree<K,V>& tree, const vector<B<K>>& key, const vector<B<V>>& value ) {
-    tree.insert( key.data(), key.size(), value.data(), value.size() );
+    tree.insert( key.data(), static_cast<PageSize>(key.size()), value.data(), static_cast<PageSize>(value.size()) );
 }
 template< class K, class V, std::enable_if_t<(!A<K>&&!A<V>),bool> = true >
 void treeReplace( Tree<K,V>& tree, const vector<B<K>>& key, const vector<B<V>>& value ) {
@@ -149,15 +149,15 @@ void treeReplace( Tree<K,V>& tree, const vector<B<K>>& key, const vector<B<V>>& 
 }
 template< class K, class V, std::enable_if_t<(A<K>&&!A<V>),bool> = true >
 void treeReplace( Tree<K,V>& tree, const vector<B<K>>& key, const vector<B<V>>& value ) {
-    tree.replace( key.data(), key.size(), value[ 0 ] );
+    tree.replace( key.data(), static_cast<PageSize>(key.size()), value[ 0 ] );
 }
 template< class K, class V, std::enable_if_t<(!A<K>&&A<V>),bool> = true >
 void treeReplace( Tree<K,V>& tree, const vector<B<K>>& key, const vector<B<V>>& value ) {
-    tree.replace( key[ 0 ], value.data(), value.size() );
+    tree.replace( key[ 0 ], value.data(), static_cast<PageSize>(value.size()) );
 }
 template< class K, class V, std::enable_if_t<(A<K>&&A<V>),bool> = true >
 void treeReplace( Tree<K,V>& tree, const vector<B<K>>& key, const vector<B<V>>& value ) {
-    tree.replace( key.data(), key.size(), value.data(), value.size() );
+    tree.replace( key.data(), static_cast<PageSize>(key.size()), value.data(), static_cast<PageSize>(value.size()) );
 }
 template< class K, class V, std::enable_if_t<(!A<K>),bool> = true >
 void treeRetrieve( const Tree<K,V>& tree, const vector<B<K>>& key ) {
@@ -165,7 +165,7 @@ void treeRetrieve( const Tree<K,V>& tree, const vector<B<K>>& key ) {
 }
 template< class K, class V, std::enable_if_t<(A<K>),bool> = true >
 void treeRetrieve( const Tree<K,V>& tree, const vector<B<K>>& key ) {
-    auto result = tree.retrieve( key.data(), key.size() );
+    auto result = tree.retrieve( key.data(), static_cast<PageSize>(key.size()) );
 }
 template< class K, class V, std::enable_if_t<(!A<K>),bool> = true >
 void treeRemove( Tree<K,V>& tree, const vector<B<K>>& key ) {
@@ -173,7 +173,7 @@ void treeRemove( Tree<K,V>& tree, const vector<B<K>>& key ) {
 }
 template< class K, class V, std::enable_if_t<(A<K>),bool> = true >
 void treeRemove( Tree<K,V>& tree, const vector<B<K>>& key ) {
-    tree.erase( key.data(), key.size() );
+    tree.erase( key.data(), static_cast<PageSize>(key.size()) );
 }
 
 template< class K, class V >
