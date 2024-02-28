@@ -89,8 +89,7 @@ namespace
             auto homeRepo = std::make_shared<FileRepositoryNode>(
                 &context,
                 "repo",
-                repoDir,
-                true);
+                repoDir);
             auto repos = std::make_shared<RepositoriesNode>(&context, homeRepo);
             context.repositoriesNode(repos);
             sourceFileRepo()->startWatching();

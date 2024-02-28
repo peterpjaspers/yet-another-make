@@ -27,7 +27,7 @@ namespace
 
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
-        auto repo = std::make_shared<FileRepositoryNode>(&context, "repo", rootDir, true);
+        auto repo = std::make_shared<FileRepositoryNode>(&context, "repo", rootDir);
         auto repos = std::make_shared<RepositoriesNode>(&context, repo);
         context.repositoriesNode(repos);
         auto dirNode = repo->directoryNode();
@@ -45,7 +45,7 @@ namespace
 
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
-        auto repo = std::make_shared<FileRepositoryNode>(&context, "repo", rootDir, true);
+        auto repo = std::make_shared<FileRepositoryNode>(&context, "repo", rootDir);
         auto repos = std::make_shared<RepositoriesNode>(&context, repo);
         context.repositoriesNode(repos);
         auto dirNode = repo->directoryNode();
@@ -109,7 +109,7 @@ namespace
 
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
-        auto repo = std::make_shared<FileRepositoryNode>(&context, "repo", rootDir, true);
+        auto repo = std::make_shared<FileRepositoryNode>(&context, "repo", rootDir);
         auto repos = std::make_shared<RepositoriesNode>(&context, repo);
         context.repositoriesNode(repos);
         auto dirNode = repo->directoryNode();
@@ -179,7 +179,7 @@ namespace
 
         // Create the directory node tree that reflects testTree
         ExecutionContext context;
-        auto repo = std::make_shared<FileRepositoryNode>(&context, "repo", rootDir, true);
+        auto repo = std::make_shared<FileRepositoryNode>(&context, "repo", rootDir);
         auto repos = std::make_shared<RepositoriesNode>(&context, repo);
         context.repositoriesNode(repos);
         auto dirNode = repo->directoryNode();

@@ -31,18 +31,13 @@ namespace YAM
     FileRepositoryNode::FileRepositoryNode(
         ExecutionContext* context,
         std::string const& repoName,
-        std::filesystem::path const& directory,
-        bool tracked)
+        std::filesystem::path const& directory)
         : Node(context, repoName)
         , _repoName(repoName)
+        , _type(FileRepositoryNode::RepoType::Ignore)
         , _directory(directory)
-        , _tracked(tracked)
-        , _directoryNode(std::make_shared<DirectoryNode>(context, symbolicDirectory(), nullptr))
-        , _fileExecSpecsNode(std::make_shared<FileExecSpecsNode>(context, symbolicDirectory()))
     {
-        context->nodes().add(_directoryNode);
-        context->nodes().add(_fileExecSpecsNode);
-        _directoryNode->addPrerequisitesToContext();
+        repoType(RepoType::Build);
     }
 
     FileRepositoryNode::~FileRepositoryNode() {
@@ -50,7 +45,7 @@ namespace YAM
     }
 
     void FileRepositoryNode::startWatching() {
-        if (_tracked) {
+        if (_type != FileRepositoryNode::RepoType::Ignore) {
             if (_watcher == nullptr) {
                 _watcher = std::make_shared<FileRepositoryWatcher>(this, context());
             }
@@ -78,6 +73,26 @@ namespace YAM
 
     std::string const& FileRepositoryNode::repoName() const {
         return _repoName;
+    }
+    FileRepositoryNode::RepoType FileRepositoryNode::repoType() const {
+        return _type;
+    }
+
+    void FileRepositoryNode::repoType(RepoType newType) {
+        if (_type != newType) {
+            _type = newType;
+            if (_type == RepoType::Ignore) {
+                stopWatching();
+                removeYourself();
+            } else if (_directoryNode == nullptr) {
+                _directoryNode = std::make_shared<DirectoryNode>(context(), symbolicDirectory(), nullptr);
+                _fileExecSpecsNode = std::make_shared<FileExecSpecsNode>(context(), symbolicDirectory());
+                context()->nodes().add(_directoryNode);
+                context()->nodes().add(_fileExecSpecsNode);
+                _directoryNode->addPrerequisitesToContext();
+            }
+            modified(true);
+        }
     }
 
     void FileRepositoryNode::directory(std::filesystem::path const& dir) {
@@ -186,7 +201,7 @@ namespace YAM
 
     std::filesystem::path FileRepositoryNode::absolutePathOf(std::filesystem::path const& symbolicPath) const {
         std::filesystem::path absPath;
-        if (*symbolicPath.begin() != _directoryNode->name()) return absPath;
+        if (*symbolicPath.begin() != symbolicDirectory()) return absPath;
         absPath = _directory;
         auto it = symbolicPath.begin();
         it++; // skip repo name component
@@ -216,10 +231,16 @@ namespace YAM
     }
 
     void FileRepositoryNode::clear() {
+        _directoryNode->clear();
+    }
+
+    void FileRepositoryNode::removeYourself() {
+        _directoryNode->clear();
         context()->nodes().removeIfPresent(_fileExecSpecsNode);
         context()->nodes().removeIfPresent(_fileExecSpecsNode->configFileNode());
         context()->nodes().removeIfPresent(_directoryNode);
-        _directoryNode->clear();
+        _fileExecSpecsNode = nullptr;
+        _directoryNode = nullptr;
         modified(true);
     }
 
@@ -239,7 +260,9 @@ namespace YAM
     void FileRepositoryNode::stream(IStreamer* streamer) {
         Node::stream(streamer);
         streamer->stream(_directory);
-        streamer->stream(_tracked);
+        uint32_t type = static_cast<uint32_t>(_type);
+        streamer->stream(type);
+        if (streamer->reading()) _type = static_cast<FileRepositoryNode::RepoType>(type);
         streamer->stream(_directoryNode);
         streamer->stream(_fileExecSpecsNode);
     }
@@ -251,13 +274,9 @@ namespace YAM
     bool FileRepositoryNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
         if (!Node::restore(context, restored)) return false;
         _repoName = name().string();
-        if (_tracked) {
-            if (_watcher != nullptr && _watcher->directory() != _directory) {
-                stopWatching();
-                startWatching();
-            }
-        } else {
+        if (_watcher != nullptr && _watcher->directory() != _directory) {
             stopWatching();
+            startWatching();
         }
         return true;
     }

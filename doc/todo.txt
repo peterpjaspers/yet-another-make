@@ -3,12 +3,15 @@ Bugs
 - fix (header->free == 1)  throw std::string(signature) + " - Accessing freed page.";
   Reproduce with coreTests EnduranceTest
 - fix persistent storage of deleted nodes (Node::State::Deleted)
+  E.g. add Track repo, add rule that copies file foo.cpp from Track repo
+  Changes in foo.cpp re-copies the file => Ok.
+  Change Track to Ignore => filenode foo.cpp gets Deleted and copy command
+  now contains ref to Deleted node => buildstate issue.
 - fix multi-line buildscripts
 
 Features
 - implement wildcard/glob for output files (dynamic outputs)
 - integrate Phil's file access monitor
-- Add FileRepository types yam, tracked and ignored
 - Versioning in PersistentBuildState, encode version in name of buildstate file
 - fileaspect last-write-time (e.g. for generated files in cmd executionhash)
 - fileaspect configuration
@@ -23,7 +26,7 @@ Features
 - Enable implementation of streaming hash computation
 - build yam with yam
 - deal with dependencies on gtest, boost, xxhash
-- what to do with xxhash license? Requires license to be part of binary redistribution.
+  xxhash requires license to be part of binary redistribution.
 - license
 - C++20 modules support
   Allow commands to generated buildfiles.

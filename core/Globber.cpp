@@ -22,22 +22,21 @@ namespace
                 baseDir = repo->directoryNode();
                 pattern = repo->relativePathOf(pattern);
             } else {
-                baseDir = nullptr;
+                throw std::runtime_error(pattern.string() + " is not a path in a known repository");
             }
         } else {
             std::string repoName = FileRepositoryNode::repoNameFromPath(pattern);
             if (!repoName.empty()) {
                 auto repo = context->findRepository(repoName);
-                if (repo != nullptr) {
+                if (repo == nullptr) {
+                    throw std::runtime_error(pattern.string() + " is not a path in a known repository");
+                } else if (repo->repoType() != FileRepositoryNode::RepoType::Ignore) {
                     baseDir = repo->directoryNode();
                     pattern = repo->relativePathOf(repo->absolutePathOf(pattern));
                 } else {
-                    baseDir = nullptr;
+                    throw std::runtime_error(pattern.string() + " is a path in an Ignored repository");
                 }
             }
-        }
-        if (baseDir == nullptr) {
-            throw std::runtime_error(pattern.string() + " is not a path in a known repository");
         }
     }
 }

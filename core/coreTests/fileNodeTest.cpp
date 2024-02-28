@@ -39,8 +39,7 @@ namespace
             , repo(std::make_shared<FileRepositoryNode>(
                 &context,
                 ".",
-                repoDir,
-                true))
+                repoDir))
         {
             auto repos = std::make_shared<RepositoriesNode>(&context, repo);
             context.repositoriesNode(repos);

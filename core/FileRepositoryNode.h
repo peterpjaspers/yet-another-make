@@ -27,19 +27,17 @@ namespace YAM
     // Terms:
     // Home repository
     //      The directory tree in which the user starts a build.
-    // Child repository
-    //      The home repository may depend on the content of other, 
-    //      so-called child, repositories, recursively. The repository 
-    //      dependency graph is a a-cyclic directed graph.
-    //      See class FileRepositoriesNode.
+    // Input repository
+    //      The home repository may depend on the content of other repositories,
+    //      so-called input repositories.
     // 
-    // The FileRepository type defines how yam will use a child repository:
-    //    - Local
-    //      Yam will treat the repository as if it was a directory in the
-    //      home repository: yam will mirror the files/directories, execute,
-    //      parse and compile buildfiles, execute the resulting command nodes 
-    //      and register detected input file dependencies in the buildstate 
-    //      of the home repo.
+    // The repository type defines how yam will use an input repository:
+    //    - Build
+    //      Yam will build the repository as if it was a sub-directory of the
+    //      home repository: mirror the repository, execute, parse and compile 
+    //      buildfiles, execute command nodes, register detected input file
+    //      dependencies in the buildstate of the home repository.
+    //      Yam will watch the repository for changes in directories/files.
     //      Advantages:
     //          - subject to buildscope
     //          - buildstate allows dependency analysis across repo boundary.
@@ -49,35 +47,23 @@ namespace YAM
     //            A build in a child repo may write generated files previously 
     //            build in the home repo. A subsequent build in the home repo 
     //            will consider these files to be out-dated and rebuild them.
-    //    - Foreign (optionally, discuss with Phil)
-    //      Before yam builds the home repository it submits build requests to
-    //      the yamServers for Coupled child repositories. Yam will register 
-    //      detected input file dependencies in the buildstate of the home repo
-    //      Optionally: only if yam detected changes in these repos (tracking).
-    //      Note: the repository graph defines the build order of Coupled repos.
-    //      Advantages:
-    //          - no interference between builds in home and Coupled repos.
-    //          - Possible to build child with other build tool.
-    //      Disadvantages:
-    //          - Coupled repo is build with all-scope.
-    //          - Limited dependency analysis across repo boundaries.
-    //            E.g. one can see that a executable in home repo depends on a
-    //            lib in child repo, that a cpp file in home depends on header
-    //            files in child. The home buildstate does not contain the
-    //            dependencies of generated files in child. For that one has to
-    //            inspect the buildstate in the child repo buildstate.
-    //          - Always the overhead of up-to-date analysis of the child repos.
-    //    - Track
-    //      Yam will not build the child repo. Yam will register detected input 
-    //      file dependencies in the buildstate of the home repo.
-    //    - Ignore
-    //      Yam will not build the child repo and (silently) ignores detected
-    //      input file dependencies. 
-    //      Usage example: ignore C:\windows\Program Files
+    //    - Track 
+    //      Yam will mirror the repository and register detected input file 
+    //      dependencies in the buildstate of the home repository.
+    //      Yam will watch the repository for changes in directories/files.
+    //      Yam will not build the repository.
     // 
-    // A FileRepository can be watched. A watched repository subscribes at the
-    // filesystem to be notified of changes in the repository directory tree. 
-    // The file/directory nodes associated with these changes are marked Dirty.
+    //    - Ignore
+    //      Yam will silently ignore detected input file dependencies.
+    //      Yam will not mirror, not build and not watch the child repository. 
+    //      Usage example: ignore C:\windows\Program Files
+    //      Note: globs/files from ignored repositories cannot be used as
+    //      command inputs in buildfiles. This is because these inputs are
+    //      evaluated against the repository mirror.
+    // 
+    // A watched repository subscribes at the filesystem to be notified of 
+    // changes in the repository directory tree. The file/directory nodes 
+    // associated with these changes are marked Dirty.
     // 
     // Watching impacts the time complexity of an increment build:
     //     - watching: O(N), N being the number of changed files/ directories.
@@ -88,8 +74,10 @@ namespace YAM
     //  
     // Watching a repository is done on demand. This allows applications that 
     // only read the buildstate to not unnecessarily watch the directory tree.
-    // The yam build application watches the home, Integrated and Coupled (??)
-    // child repositories.
+    // E.g. the yam application watches repositories of type Build and Track.
+    // E.g. an application that only analyzes (reads) the buildstate will not
+    // watch the repositories.
+    // Requests to watch a repository of type Ignore are silently ignored.
     // 
     // FileRepository supports the conversion of absolute paths to/from
     // so-called symbolic paths. The format of a symbolic path is
@@ -189,8 +177,8 @@ namespace YAM
     // --Recommendation for optimal use of multi-repo builds and build cache
     //     - Use unique repository names
     //     - Avoid renaming of repositories
-    //       Changing a repository name from A to B will delete the build cache
-    //       for A.
+    //       Changing a repository name from A to B will render the build cache
+    //       for A obsolete and requires a full build of B.
     // 
     // --Repository version
     // There is currently no support to specify the version of a repository.
@@ -198,8 +186,8 @@ namespace YAM
     // cannot be supported by yam as it must be version mgt agnostic.
     // 
     // --Concern
-    // Setting-up multi-repo development is complex. Using git submodules is an
-    // attractive alternative for multi-repo development:
+    // Using git submodules is an attractive alternative for multi-repo 
+    // development:
     //      - transparent for yam: the repositories are sub-directories 
     //        of the home repo.
     //      - solves the problem of unique repository names
@@ -209,16 +197,20 @@ namespace YAM
     class __declspec(dllexport) FileRepositoryNode : public Node
     {
     public:
+        enum RepoType {
+            Build = 1,
+            Track = 2,
+            Ignore = 3
+        };
+
         FileRepositoryNode(); // needed for deserialization
+        // Construct repository node of type Build
         FileRepositoryNode(
             ExecutionContext* context,
             std::string const& repoName,
-            std::filesystem::path const& directory,
-            bool tracked);
+            std::filesystem::path const& directory);
 
         virtual ~FileRepositoryNode();
-
-        bool tracked() const { return _tracked; }
 
         // Stop/start watching. Ignored when !tracked().
         // Also ignored when watching is not implemented.
@@ -251,6 +243,8 @@ namespace YAM
         static std::filesystem::path repoNameToSymbolicPath(std::string const& repoName);
 
         std::string const& repoName() const;
+        RepoType repoType() const;
+        void repoType(RepoType newType);
 
         void directory(std::filesystem::path const& dir);
         std::filesystem::path const& directory() const;
@@ -294,10 +288,13 @@ namespace YAM
         // Return empty path when !lexicallyContains(symbolicPath).
         std::filesystem::path absolutePathOf(std::filesystem::path const& symbolicPath) const;
 
-        // Recursively remove the directory node from context->nodes().
+        // Recursively clear directoryNode() and keep directoryNode().
+        void clear();
+
+        // clear() and remove directoryNode() from context.
         // Intended to be used when the repo is removed from the set of
         // known repositories.
-        void clear();
+        void removeYourself();
 
         // Inherited from Node
         void start() override;
@@ -314,7 +311,7 @@ namespace YAM
     private:
         std::string _repoName;
         std::filesystem::path _directory;
-        bool _tracked;
+        RepoType _type;
         std::shared_ptr<DirectoryNode> _directoryNode;
         std::shared_ptr<FileExecSpecsNode> _fileExecSpecsNode;
         std::shared_ptr<FileRepositoryWatcher> _watcher;

@@ -37,7 +37,7 @@ namespace //parser
     // Repo :== RepoName Dir Type [InputRepos] ";'
     // RepoName :== "name" "=" identifier
     // Dir :== "dir" "=" path (relative to home repo or absolute)
-    // Type :== "type" "=" Integrated" | "Coupled" | "Tracked" | "Ignored"
+    // Type :== "type" "=" Build" | "Track" | "Ignore"
     // InputRepos :== inputs "=" { RepoName }+
     class Parser
     {
@@ -52,10 +52,9 @@ namespace //parser
             }
         }
         bool validType(std::string const& type) {
-            if (type == "Integrated") return true;
-            if (type == "Coupled") return true;
-            if (type == "Tracked") return true;
-            if (type == "Ignored") return true;
+            if (type == "Build") return true;
+            if (type == "Track") return true;
+            if (type == "Ignore") return true;
             return false;
         }
 
@@ -70,13 +69,10 @@ namespace //parser
             consume(&_dirKey);
             consume(&_eq);
             repo.dir = consume(&_path).value;
-            if (repo.dir.is_absolute()) {
-                absDirError();
-            }
             consume(&_typeKey);
             consume(&_eq);
-            Token type = consume(&_identifier);
-            if (!validType(type.value)) {
+            repo.type = consume(&_identifier).value;
+            if (!validType(repo.type)) {
                 typeError();
             }
             if (lookAhead({ &_inputsKey }) == &_inputsKey) {
@@ -132,17 +128,7 @@ namespace //parser
                 << ", column " << _tokenizer.column()
                 << " in file " << _tokenizer.filePath().string() << std::endl
                 << " is invalid." << std::endl;
-            ss << "Must be one of Integrated, Coupled, Tracked or Ignored." << std::endl;
-            throw std::runtime_error(ss.str());
-        }
-
-        void absDirError() {
-            std::stringstream ss;
-            ss
-                << "Repository directory at " << _tokenizer.line()
-                << ", column " << _tokenizer.column()
-                << " in file " << _tokenizer.filePath().string() << std::endl
-                << " must be a path relative to the home repository." << std::endl;
+            ss << "Must be one of Build, Track or Ignore." << std::endl;
             throw std::runtime_error(ss.str());
         }
 
@@ -175,6 +161,13 @@ namespace //parser
         Token _lookAhead;
         std::map<std::string, RepositoriesNode::Repo> _repos;
     };
+
+    FileRepositoryNode::RepoType toType(std::string const& typeStr) {
+        if (typeStr == "Build") return FileRepositoryNode::RepoType::Build;
+        if (typeStr == "Track") return FileRepositoryNode::RepoType::Track;
+        if (typeStr == "Ignore") return FileRepositoryNode::RepoType::Ignore;
+        throw std::runtime_error("Unknown repository type");
+    }
 }
 
 namespace
@@ -320,7 +313,7 @@ namespace YAM
         if (it == _repositories.end()) return false;
         std::shared_ptr<FileRepositoryNode>& repo = it->second;
         modified(true);
-        repo->clear();
+        repo->removeYourself();
         context()->nodes().remove(it->second);
         _repositories.erase(it);
         return true;
@@ -398,20 +391,25 @@ namespace YAM
             std::filesystem::path absRepoDir = repo.dir;
             if (absRepoDir.is_relative()) absRepoDir = (_homeRepo->directory() / repo.dir);
             if (!std::filesystem::is_directory(absRepoDir)) {
-                throw std::runtime_error("No such directory: " + absRepoDir.string());
+                std::stringstream ss;
+                ss
+                    << "Repository directory " << absRepoDir.string() << " does not exist." << std::endl
+                    << "See the definition for the repository named " << repo.name << " in file "
+                    << _configFile->absolutePath().string() << std::endl;
+                throw std::runtime_error(ss.str());
             }
             absRepoDir = std::filesystem::canonical(absRepoDir);
             auto it = _repositories.find(repo.name);
             if (it == _repositories.end()) {
-                frepo = std::make_shared<FileRepositoryNode>(context(), repo.name, absRepoDir, true);
+                frepo = std::make_shared<FileRepositoryNode>(context(), repo.name, absRepoDir);
                 ok = addRepository(frepo);
                 if (!ok) return false;
                 modified(true);
             } else {
                 frepo = it->second;
             }
+            frepo->repoType(toType(repo.type));
             if (!updateRepoDirectory(*frepo, absRepoDir)) return false;
-            //frepo->type(repo.type);
             frepo->inputRepoNames(repo.inputs);
         }
         

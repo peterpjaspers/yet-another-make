@@ -48,8 +48,15 @@ namespace
         std::vector<std::shared_ptr<TNode>> const& nodes
     ) {
         std::vector<std::filesystem::path> relPaths;
-        for (auto const& node : nodes) {
-            relPaths.push_back(node->name().lexically_relative(baseDir->name()));
+        if (!nodes.empty()) {
+            std::shared_ptr<FileRepositoryNode> baseRepo = baseDir->repository();
+            for (auto const& node : nodes) {
+                if (baseRepo->lexicallyContains(node->name())) {
+                    relPaths.push_back(node->name().lexically_relative(baseDir->name()));
+                } else {
+                    relPaths.push_back(node->absolutePath());
+                }
+            }
         }
         return relPaths;
     }
@@ -116,7 +123,6 @@ namespace
     std::string compileFlag1(
         std::filesystem::path const& buildFile,
         BuildFile::Node const& node,
-        DirectoryNode const* baseDir,
         std::filesystem::path inputPath,
         char flag
     ) {
@@ -151,7 +157,6 @@ namespace
     void compileFlagN(
         std::filesystem::path const& buildFile,
         BuildFile::Node const& node,
-        DirectoryNode const* baseDir,
         std::size_t offset,
         std::vector<std::filesystem::path> const& filePaths,
         char flag,
@@ -160,13 +165,13 @@ namespace
         if (offset == -1) {
             std::size_t nFiles = filePaths.size();
             for (std::size_t i = 0; i < nFiles; ++i) {
-                auto path = compileFlag1(buildFile, node, baseDir, filePaths[i], flag);
+                auto path = compileFlag1(buildFile, node, filePaths[i], flag);
                 result.append(path);
                 if (i < nFiles-1) result.append(" ");
             }
         } else {
             std::filesystem::path filePath = filePaths[offset];
-            auto path = compileFlag1(buildFile, node, baseDir, filePath, flag);
+            auto path = compileFlag1(buildFile, node, filePath, flag);
             result.append(path);
         }
     }
@@ -266,14 +271,14 @@ namespace
                 assertValidFlag(buildFile, node, columnOffset, chars[i]);
                 if (allowOutputFlag && chars[i] == 'o') {
                     assertOffset(buildFile, node, oidx, offset, cmdOutputPaths.size());
-                    compileFlagN(buildFile, node, baseDir, offset, cmdOutputPaths, chars[i], result);
+                    compileFlagN(buildFile, node, offset, cmdOutputPaths, chars[i], result);
                 } else if (chars[i] == 'i') {
                     assertOffset(buildFile, node, oidx, offset, orderOnlyInputPaths.size());
-                    compileFlagN(buildFile, node, baseDir, offset, orderOnlyInputPaths, chars[i], result);
+                    compileFlagN(buildFile, node, offset, orderOnlyInputPaths, chars[i], result);
                 } else {
                     assertOffset(buildFile, node, oidx, offset, cmdInputPaths.size());
                     if (offset == -1) offset = defaultCmdInputOffset;
-                    compileFlagN(buildFile, node, baseDir, offset, cmdInputPaths, chars[i], result);
+                    compileFlagN(buildFile, node, offset, cmdInputPaths, chars[i], result);
                 } 
             } else {
                 result.insert(result.end(), chars[i]);

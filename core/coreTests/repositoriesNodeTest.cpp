@@ -27,7 +27,7 @@ namespace
             : homeRepoDir(FileSystem::createUniqueDirectory("_repositoriesNodeTest"))
             , repositoriesPath(homeRepoDir / RepositoriesNode::configFilePath())
             , logBook(std::make_shared<MemoryLogBook>())
-            , fileRepo(std::make_shared<FileRepositoryNode>(&context, ".", homeRepoDir, false))
+            , fileRepo(std::make_shared<FileRepositoryNode>(&context, ".", homeRepoDir))
         {
             context.logBook(logBook);
             auto repos = std::make_shared<RepositoriesNode>(&context, fileRepo);
@@ -58,8 +58,8 @@ namespace
         std::filesystem::create_directory(setup.homeRepoDir.parent_path() / "r1");
         std::filesystem::create_directory(setup.homeRepoDir.parent_path() / "r2");
         std::stringstream ss;
-        ss << "name=repo1 dir=" << "..\\r1" << " type=Integrated ;" << std::endl;
-        ss << "name=repo2 dir=" << "..\\r2" << " type=Tracked ;" << std::endl;
+        ss << "name=repo1 dir=" << "..\\r1" << " type=Build ;" << std::endl;
+        ss << "name=repo2 dir=" << "..\\r2" << " type=Track ;" << std::endl;
         writeFile(setup.repositoriesPath, ss.str());
 
         bool completed = YAMTest::executeNode(setup.repositoriesNode.get());
@@ -80,7 +80,7 @@ namespace
     TEST(RepositoriesNode, invalidRepoName) {
         TestSetup setup;
         std::stringstream ss;
-        ss << "name=repo/1 dir=" << "../sub" << " type=Integrated ;" << std::endl;
+        ss << "name=repo/1 dir=" << "../sub" << " type=Build ;" << std::endl;
         writeFile(setup.repositoriesPath, ss.str());
         bool completed = YAMTest::executeNode(setup.repositoriesNode.get());
         EXPECT_TRUE(completed);
@@ -93,13 +93,13 @@ namespace
     TEST(RepositoriesNode, invalidRepoDir) {
         TestSetup setup;
         std::stringstream ss;
-        ss << "name=repo dir=" << "D:/aap" << " type=Integrated ;" << std::endl;
+        ss << "name=repo dir=" << "D:/aap" << " type=Build ;" << std::endl;
         writeFile(setup.repositoriesPath, ss.str());
         bool completed = YAMTest::executeNode(setup.repositoriesNode.get());
         EXPECT_TRUE(completed);
         EXPECT_EQ(Node::State::Failed, setup.repositoriesNode->state());
         LogRecord const& r = setup.logBook->records()[0];
-        std::string msg("must be a path relative to the home repository");
+        std::string msg("Repository directory D:/aap does not exist");
         EXPECT_NE(std::string::npos, r.message.find(msg));
     }
 
@@ -113,7 +113,7 @@ namespace
         EXPECT_TRUE(completed);
         EXPECT_EQ(Node::State::Failed, setup.repositoriesNode->state());
         LogRecord const& r = setup.logBook->records()[0];
-        std::string msg("Must be one of Integrated, Coupled, Tracked or Ignored");
+        std::string msg("Must be one of Build, Track or Ignore");
         EXPECT_NE(std::string::npos, r.message.find(msg));
         std::filesystem::remove(setup.homeRepoDir / "sub1");
     }
@@ -121,7 +121,7 @@ namespace
     TEST(RepositoriesNode, invalidRepoDirParent) {
         TestSetup setup;
         std::stringstream ss;
-        ss << "name=repo1 dir=" << ".." << " type=Integrated ;" << std::endl;
+        ss << "name=repo1 dir=" << ".." << " type=Build ;" << std::endl;
         writeFile(setup.repositoriesPath, ss.str());
         bool completed = YAMTest::executeNode(setup.repositoriesNode.get());
         EXPECT_TRUE(completed);
@@ -135,7 +135,7 @@ namespace
         TestSetup setup;
         std::stringstream ss;
         std::filesystem::create_directory(setup.homeRepoDir / "sub");
-        ss << "name=repo1 dir=" << ".\\sub" << " type = Integrated; " << std::endl;
+        ss << "name=repo1 dir=" << ".\\sub" << " type = Build; " << std::endl;
         writeFile(setup.repositoriesPath, ss.str());
         bool completed = YAMTest::executeNode(setup.repositoriesNode.get());
         EXPECT_TRUE(completed);
@@ -150,8 +150,8 @@ namespace
         TestSetup setup;
         std::stringstream ss;
         std::filesystem::create_directories(setup.homeRepoDir.parent_path() / "r1");
-        ss << "name=repo1 dir=" << "../r1" << " type=Integrated ;" << std::endl;
-        ss << "name=repo2 dir=" << "../r1" << " type=Integrated ;" << std::endl;
+        ss << "name=repo1 dir=" << "../r1" << " type=Build ;" << std::endl;
+        ss << "name=repo2 dir=" << "../r1" << " type=Build ;" << std::endl;
         writeFile(setup.repositoriesPath, ss.str());
         bool completed = YAMTest::executeNode(setup.repositoriesNode.get());
         EXPECT_TRUE(completed);

@@ -10,9 +10,8 @@ namespace
     using namespace YAM;
 
     std::size_t getDefaultPoolSize() {
-        //static unsigned int n = std::thread::hardware_concurrency();
-        //return n;
-        return 1;
+        static unsigned int n = std::thread::hardware_concurrency();
+        return n;
     }
 
     Delegate<bool, std::shared_ptr<Node> const&> includeIfDirty = 

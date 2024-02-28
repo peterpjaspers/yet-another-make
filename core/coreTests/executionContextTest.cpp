@@ -49,13 +49,13 @@ namespace
             nodes.push_back(std::make_shared<FileNode>(&context, "n3"));           
             for (auto n : nodes) context.nodes().add(n);
 
-            auto homeRepo = std::make_shared<FileRepositoryNode>(&context, repo1.name, repo1.dir, false);
+            auto homeRepo = std::make_shared<FileRepositoryNode>(&context, repo1.name, repo1.dir);
             auto repositories = std::make_shared<RepositoriesNode>(&context, homeRepo);
             context.repositoriesNode(repositories);
 
             repos.push_back(homeRepo);
-            repos.push_back(std::make_shared<FileRepositoryNode>(&context, repo2.name, repo2.dir, false));
-            repos.push_back(std::make_shared<FileRepositoryNode>(&context, repo3.name, repo3.dir, false));
+            repos.push_back(std::make_shared<FileRepositoryNode>(&context, repo2.name, repo2.dir));
+            repos.push_back(std::make_shared<FileRepositoryNode>(&context, repo3.name, repo3.dir));
 
             for (auto n : repos) repositories->addRepository(n);
         }

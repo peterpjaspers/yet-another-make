@@ -53,6 +53,8 @@ namespace
             , repoDir("D:\\test_yam")
             , context(builder.context())
         {
+            // make test a bit more deterministic
+            context->threadPool().size(1);
         }
 
         ~TestDriver() {
@@ -103,8 +105,8 @@ namespace
         void addRepos() {
             std::filesystem::path reposFile(repoDir / "yamConfig/repositories.txt");
             std::string repos = R"(
-                name = test_1 dir = ..\test_yam_1 type = Integrated;
-                name = test_2 dir = ..\test_yam_2 type = Integrated; 
+                name = test_1 dir = ..\test_yam_1 type = Build;
+                name = test_2 dir = ..\test_yam_2 type = Build; 
             )";
             writeFile(reposFile, repos);
         }

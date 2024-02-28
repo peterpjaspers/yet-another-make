@@ -61,11 +61,7 @@ namespace
             s2 << "void lib2() {}" << std::endl;
             s3.close();
 
-            repo = std::make_shared<FileRepositoryNode>(
-                &context,
-                "repo",
-                repoDir,
-                false);
+            repo = std::make_shared<FileRepositoryNode>(&context, "repo", repoDir);
             auto repos = std::make_shared<RepositoriesNode>(&context, repo);
             context.repositoriesNode(repos);
             bool completed = YAMTest::executeNode(repo->directoryNode().get());

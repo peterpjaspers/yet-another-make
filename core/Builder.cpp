@@ -211,8 +211,7 @@ namespace YAM
                 auto homeRepo = std::make_shared<FileRepositoryNode>(
                     &_context,
                     repoName,
-                    repoDir,
-                    true);
+                    repoDir);
                 repositoriesNode = std::make_shared<RepositoriesNode>(&_context, homeRepo);
                 repositoriesNode->ignoreConfigFile(false);
                 _context.repositoriesNode(repositoriesNode);
@@ -316,12 +315,14 @@ namespace YAM
             }
             dirtyNodes.push_back(repositoriesNode);
         }
-        for (auto const& pair : _context.repositories()) {
+        for (auto const& pair : repositoriesNode->repositories()) {
             auto &repo = pair.second;
-            repo->consumeChanges();
-            auto fileExecSpecsNode = repo->fileExecSpecsNode(); 
-            if (fileExecSpecsNode->state() == Node::State::Dirty) {
-                dirtyNodes.push_back(fileExecSpecsNode);
+            if (repo->repoType() != FileRepositoryNode::RepoType::Ignore) {
+                repo->consumeChanges();
+                auto fileExecSpecsNode = repo->fileExecSpecsNode();
+                if (fileExecSpecsNode->state() == Node::State::Dirty) {
+                    dirtyNodes.push_back(fileExecSpecsNode);
+                }
             }
         }
         if (dirtyNodes.empty()) {
@@ -346,8 +347,10 @@ namespace YAM
             std::map<std::filesystem::path, std::shared_ptr<DirectoryNode>> dirtyDirs;
             for (auto const& pair : _context.repositories()) {
                 auto repo = pair.second;
-                auto dirNode = repo->directoryNode();
-                appendDirtyDirectoryNodes(dirNode, dirtyDirs);
+                if (repo->repoType() != FileRepositoryNode::RepoType::Ignore) {
+                    auto dirNode = repo->directoryNode();
+                    appendDirtyDirectoryNodes(dirNode, dirtyDirs);
+                }
             }
             std::vector<std::shared_ptr<Node>> prunedDirtyDirs = pruneDirtyDirectories(dirtyDirs);
             if (prunedDirtyDirs.empty()) {
@@ -372,8 +375,10 @@ namespace YAM
             std::vector<std::shared_ptr<Node>> dirtyBuildFiles;
             for (auto const& pair : _context.repositories()) {
                 auto repo = pair.second;
-                auto dirNode = repo->directoryNode();
-                appendDirtyBuildFileParserNodes(dirNode, dirtyBuildFiles);                
+                if (repo->repoType() == FileRepositoryNode::RepoType::Build) {
+                    auto dirNode = repo->directoryNode();
+                    appendDirtyBuildFileParserNodes(dirNode, dirtyBuildFiles);
+                }
             }
             if (dirtyBuildFiles.empty()) {
                 _handleBuildFileParsersCompletion(_dirtyBuildFileParsers.get());
@@ -402,8 +407,10 @@ namespace YAM
             std::vector<std::shared_ptr<Node>> dirtyBuildFileCompilers;
             for (auto const& pair : _context.repositories()) {
                 auto repo = pair.second;
-                auto dirNode = repo->directoryNode();
-                appendDirtyBuildFileCompilerNodes(dirNode, dirtyBuildFileCompilers);
+                if (repo->repoType() == FileRepositoryNode::RepoType::Build) {
+                    auto dirNode = repo->directoryNode();
+                    appendDirtyBuildFileCompilerNodes(dirNode, dirtyBuildFileCompilers);
+                }
             }
             if (dirtyBuildFileCompilers.empty()) {
                 _handleBuildFileCompilersCompletion(_dirtyBuildFileCompilers.get());

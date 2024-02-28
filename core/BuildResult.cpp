@@ -19,10 +19,7 @@ namespace YAM
         , _nDirectoryUpdates(0)
     {}
 
-    BuildResult::BuildResult(bool success)
-        : _succeeded(false)
-        , _startTime(std::chrono::system_clock::now())
-    {
+    BuildResult::BuildResult(bool success) {
         succeeded(success);
     }
 
