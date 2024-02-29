@@ -91,26 +91,29 @@ namespace YAM
                 context()->nodes().add(_fileExecSpecsNode);
                 _directoryNode->addPrerequisitesToContext();
             }
+            _hash = computeHash();
             modified(true);
+            setState(Node::State::Dirty);
         }
     }
 
     void FileRepositoryNode::directory(std::filesystem::path const& dir) {
         if (_directory != dir) {
-            std::stringstream ss;
-            ss 
-                << "Repository was moved from " 
-                << _directory << " to " 
-                << dir << std::endl;
-            LogRecord progress(LogRecord::Aspect::Progress, ss.str());
-            context()->addToLogBook(progress);
-
             _directory = dir;
             if (watching()) {
                 stopWatching();
                 startWatching();
             }
+            _hash = computeHash();
+            setState(Node::State::Dirty);
+
             modified(true);
+            std::stringstream ss;
+            ss
+                << "Repository " << repoName() << " moved from " << _directory
+                << " to " << dir << std::endl;
+            LogRecord progress(LogRecord::Aspect::Progress, ss.str());
+            context()->addToLogBook(progress);
         }
     }
 
@@ -219,21 +222,6 @@ namespace YAM
         return _fileExecSpecsNode;
     }
 
-    void FileRepositoryNode::inputRepoNames(std::vector<std::string> const& names) {
-        if (_inputRepoNames != names) {
-            _inputRepoNames = names;
-            modified(true);
-        }
-    }
-
-    std::vector<std::string> const& FileRepositoryNode::inputRepoNames() const {
-        return _inputRepoNames;
-    }
-
-    void FileRepositoryNode::clear() {
-        _directoryNode->clear();
-    }
-
     void FileRepositoryNode::removeYourself() {
         _directoryNode->clear();
         context()->nodes().removeIfPresent(_fileExecSpecsNode);
@@ -242,6 +230,17 @@ namespace YAM
         _fileExecSpecsNode = nullptr;
         _directoryNode = nullptr;
         modified(true);
+    }
+
+    XXH64_hash_t FileRepositoryNode::hash() const {
+        return _hash;
+    }
+
+    XXH64_hash_t FileRepositoryNode::computeHash() const {
+        std::vector<XXH64_hash_t> hashes;
+        hashes.push_back(XXH64_string(_directory.string()));
+        hashes.push_back(_type);
+        return XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
     }
 
     void FileRepositoryNode::start() {
@@ -274,6 +273,7 @@ namespace YAM
     bool FileRepositoryNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
         if (!Node::restore(context, restored)) return false;
         _repoName = name().string();
+        _hash = computeHash();
         if (_watcher != nullptr && _watcher->directory() != _directory) {
             stopWatching();
             startWatching();

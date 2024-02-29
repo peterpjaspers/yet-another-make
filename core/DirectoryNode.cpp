@@ -257,8 +257,6 @@ namespace YAM
         _content.clear();
         updateBuildFileParserNode();
         if (_buildFileParserNode != nullptr) {
-            _buildFileParserNode->setState(Node::State::Deleted);
-            _buildFileCompilerNode->setState(Node::State::Deleted);
             context()->nodes().remove(_buildFileParserNode);
             context()->nodes().remove(_buildFileCompilerNode);
             _buildFileParserNode = nullptr;
@@ -277,6 +275,7 @@ namespace YAM
             std::shared_ptr<Node> n = pair.second;
             hashes.push_back(XXH64_string(n->name().string()));
         }
+        hashes.push_back(repository()->hash());
         return XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
     }
 
@@ -346,6 +345,7 @@ namespace YAM
                 result._lastWriteTime == _lastWriteTime
                 && result._executionHash == _executionHash
             ) {
+                updateBuildFileParserNode();
                 startSubDirs();
             } else {
                 commitResult(result);
@@ -416,7 +416,10 @@ namespace YAM
     }
     
     void DirectoryNode::updateBuildFileParserNode() {
-        std::shared_ptr<SourceFileNode> buildFile = findBuildFile(_content);
+        std::shared_ptr<SourceFileNode> buildFile;
+        if (repository()->repoType() == FileRepositoryNode::RepoType::Build) {
+            buildFile = findBuildFile(_content);
+        }
         if (buildFile != nullptr) {
             if (_buildFileParserNode == nullptr) {
                 std::filesystem::path bfpName(name() / "__bfParser");
@@ -425,6 +428,7 @@ namespace YAM
                 std::filesystem::path bfcName(name() / "__bfCompiler");
                 _buildFileCompilerNode = std::make_shared<BuildFileCompilerNode>(context(), bfcName);
                 context()->nodes().add(_buildFileCompilerNode);
+                modified(true);
             }
             _buildFileParserNode->buildFile(buildFile);
             _buildFileCompilerNode->buildFileParser(_buildFileParserNode);

@@ -4,6 +4,7 @@
 #include "GeneratedFileNode.h"
 #include "DirectoryNode.h"
 #include "GeneratedFileNode.h"
+#include "FileRepositoryNode.h"
 #include "CommandNode.h"
 #include "GlobNode.h"
 #include "GroupNode.h"
@@ -220,6 +221,7 @@ namespace YAM
         hashes.push_back(_buildFileParser->executionHash());
         for (auto pair : _depCompilers) hashes.push_back(pair.second->_executionHash);
         for (auto pair : _depGlobs) hashes.push_back(pair.second->executionHash());
+        hashes.push_back(repository()->hash());
         XXH64_hash_t hash = XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
         return hash;
     }

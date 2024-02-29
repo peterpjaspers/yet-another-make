@@ -7,7 +7,9 @@ Bugs
   Changes in foo.cpp re-copies the file => Ok.
   Change Track to Ignore => filenode foo.cpp gets Deleted and copy command
   now contains ref to Deleted node => buildstate issue.
-- fix multi-line buildscripts
+- fix multi-line buildscripts, responsefiles ?
+- buildscopefinder must exclude finds in Track/Ignore repos.
+  Now yam -- @@test_1/submodules/sm1/*.obj in Track test_1 creates GlobNode.
 
 Features
 - implement wildcard/glob for output files (dynamic outputs)

@@ -1,5 +1,8 @@
 #include "RepositoriesNode.h"
 #include "SourceFileNode.h"
+#include "DirectoryNode.h"
+#include "BuildFileParserNode.h"
+#include "BuildFileCompilerNode.h"
 #include "ExecutionContext.h"
 #include "FileRepositoryNode.h"
 #include "BuildFileTokenizer.h"
@@ -11,7 +14,7 @@
 #include <fstream>
 #include <sstream>
 
-namespace //parser
+namespace
 {
     using namespace YAM;
 
@@ -39,10 +42,10 @@ namespace //parser
     // Dir :== "dir" "=" path (relative to home repo or absolute)
     // Type :== "type" "=" Build" | "Track" | "Ignore"
     // InputRepos :== inputs "=" { RepoName }+
-    class Parser
+    class _Parser
     {
     public:
-        Parser(std::filesystem::path const& path)
+        _Parser(std::filesystem::path const& path)
             : _tokenizer(path, readFile(path))
         {
             skipWhiteSpace();
@@ -75,17 +78,7 @@ namespace //parser
             if (!validType(repo.type)) {
                 typeError();
             }
-            if (lookAhead({ &_inputsKey }) == &_inputsKey) {
-                eat(&_inputsKey);
-                consume(&_eq);
-                while (lookAhead({ &_identifier, &_end }) == &_identifier) {
-                    std::string inputName = eat(&_identifier).value;
-                    repo.inputs.push_back(inputName);
-                }
-                eat(&_end);
-            } else {
-                consume(&_end);
-            }
+            consume(&_end);
             _repos.insert({ repo.name, repo });
         }
 
@@ -216,8 +209,23 @@ namespace
 
 namespace
 {
+    using namespace YAM;
+
     uint32_t streamableTypeId = 0;
     static std::shared_ptr<FileRepositoryNode> nullRepo;
+
+    void invalidateRecursively(std::shared_ptr<DirectoryNode> const& dir) {
+        if (dir == nullptr) return;
+        auto &parser = dir->buildFileParserNode();
+        if (parser != nullptr) parser->setState(Node::State::Dirty);
+        auto &compiler = dir->buildFileCompilerNode();
+        if (compiler != nullptr) compiler->setState(Node::State::Dirty);
+        std::vector<std::shared_ptr<DirectoryNode>> subDirs;
+        dir->getSubDirs(subDirs);
+        for (auto const& subDir : subDirs) {
+            invalidateRecursively(subDir);
+        }
+    }
 }
 
 namespace YAM
@@ -304,6 +312,7 @@ namespace YAM
             modified(true);
             context()->nodes().add(repo);
             _repositories.insert({ repo->repoName(), repo });
+            repo->addObserver(this);
         }
         return ok;
     }
@@ -313,8 +322,9 @@ namespace YAM
         if (it == _repositories.end()) return false;
         std::shared_ptr<FileRepositoryNode>& repo = it->second;
         modified(true);
+        repo->removeObserver(this);
         repo->removeYourself();
-        context()->nodes().remove(it->second);
+        context()->nodes().remove(repo);
         _repositories.erase(it);
         return true;
     }
@@ -371,8 +381,7 @@ namespace YAM
 
     bool RepositoriesNode::parseAndUpdate() {
         try {
-            Parser parser(_configFile->absolutePath());
-            //detectCycles(context(), parser.repos());
+            _Parser parser(_configFile->absolutePath());
             return updateRepos(parser.repos());
         } catch (std::runtime_error e) {
             LogRecord error(LogRecord::Aspect::Error, e.what());
@@ -380,11 +389,34 @@ namespace YAM
             return false;
         }
     }
+
     bool RepositoriesNode::updateRepos(
         std::map<std::string, RepositoriesNode::Repo> const& repos
     ) {
         // add new and update existing repos
+
         bool ok = true;
+
+        // Find removed repos...
+        std::vector<std::shared_ptr<FileRepositoryNode>> toRemove;
+        for (auto const& pair : _repositories) {
+            std::string frepoName = pair.first;
+            auto frepo = pair.second;
+            if (frepo != _homeRepo) {
+                auto it = repos.find(frepoName);
+                if (it == repos.end()) {
+                    auto fit = _repositories.find(frepoName);
+                    toRemove.push_back(fit->second);
+                }
+            }
+        }
+        // ... and remove them
+        for (auto const& repo : toRemove) {
+            removeRepository(repo->repoName());
+            modified(true);
+        }
+
+        // Add new repos, update existing ones.
         for (auto const& pair : repos) {
             std::shared_ptr<FileRepositoryNode> frepo;
             Repo const& repo = pair.second;
@@ -404,31 +436,22 @@ namespace YAM
                 frepo = std::make_shared<FileRepositoryNode>(context(), repo.name, absRepoDir);
                 ok = addRepository(frepo);
                 if (!ok) return false;
-                modified(true);
             } else {
                 frepo = it->second;
             }
             frepo->repoType(toType(repo.type));
             if (!updateRepoDirectory(*frepo, absRepoDir)) return false;
-            frepo->inputRepoNames(repo.inputs);
         }
-        
-        // Find removed repos
-        std::vector<std::shared_ptr<FileRepositoryNode>> toRemove;
-        for (auto const& pair : _repositories) {
-            std::string frepoName = pair.first;
-            auto frepo = pair.second;
-            if (frepo != _homeRepo) {
-                auto it = repos.find(frepoName);
-                if (it == repos.end()) {
-                    auto fit = _repositories.find(frepoName);
-                    toRemove.push_back(fit->second);
-                }
+
+        auto oldHash = _hash;
+        _hash = computeHash();
+        if (_hash != oldHash) {
+            // Invalidate all directory nodes to make sure that
+            // nodes that depend on repository properties will
+            // re-execute
+            for (auto const& pair : _repositories) {
+                invalidateRecursively(pair.second->directoryNode());
             }
-        }
-        for (auto const& repo : toRemove) {
-            removeRepository(repo->repoName());
-            modified(true);
         }
         return true;
     }
@@ -448,9 +471,16 @@ namespace YAM
                 }
             }
             frepo.directory(newDir);
-            frepo.modified(true);
         }
         return true;
+    }
+
+    XXH64_hash_t RepositoriesNode::computeHash() const {
+        std::vector<XXH64_hash_t> hashes;
+        for (auto const& pair : _repositories) {
+            hashes.push_back(pair.second->hash());
+        }
+        return XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
     }
 
     void RepositoriesNode::setStreamableType(uint32_t type) {
@@ -473,12 +503,15 @@ namespace YAM
     void RepositoriesNode::prepareDeserialize() {
         Node::prepareDeserialize();
         _configFile->removeObserver(this);
+        for (auto& pair : _repositories) pair.second->removeObserver(this);
     }
 
     bool RepositoriesNode::restore(void* context, std::unordered_set<IPersistable const*>& restored) {
         if (!Node::restore(context, restored)) return false;
         _configFile->addObserver(this);
         for (auto& pair : _repositories) pair.second->restore(context, restored);
+        for (auto& pair : _repositories) pair.second->addObserver(this);
+        _hash = computeHash();
         return true;
     }
 }

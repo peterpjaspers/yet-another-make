@@ -18,37 +18,32 @@ namespace YAM
     class FileRepositoryNode;
 
     // A RepositoriesNode parses file yamConfig/repositories.txt in the root 
-    // directory of the home repository. The home repository (the repo with
-    // name ".") is the repo from which the build is started.
-    // This file lists the input repositories of the home repository, i.e.
-    // the repositories from which files are read when building the home repo.
-    // The parse result is a graph of FileRepositoryNode instances, accessible via
-    // ExecutionContext::homeRepository().
+    // directory of the home repository. The home repository is the repo from
+    // which the build is started.
+    // This file lists the repositories on which the home repository depends.
     //
     // Syntax of file yamConfig/repositories.txt:
     //     File :== { Repo }*
-    //     Repo :== RepoName Dir Type [InputRepos] ";'
+    //     Repo :== RepoName Dir Type ";'
     //     RepoName :== "name" "=" identifier
     //     Dir :== "dir" "=" path (relative to home repo or absolute)
-    //     Type :== "type" "=" Integrated" | "Coupled" | "Tracked" | "Ignored"
-    //     InputRepos :== inputs "=" { RepoName }*
+    //     Type :== "type" "=" Build" | "Track" | "Ignore"
     //
-    // See clas FileRepositoryNode for an explanation of Type.
+    // See class FileRepositoryNode.
     // 
-    // Cycles in the repository graph are not allowed.
-    // InputRepos declarations are mandatory for dependencies on Coupled repos
-    // because they define the order in which Coupled repos are built.
+    // Deleting/renaming/moving a repository directory while yam is running 
+    // will not be detected by yam because yam is not monitoring the parent
+    // directory of the repository.
     // 
-    // Best practice when deleting/moving a child root directory is to
-    // first update the configuration file, then run yam, then do the
-    // deletion/move.
-    // First deleting the child root directory, then run yam: yam will
-    // raise a warning: root directory of child repo does not exist.
-    // First deleting the child root directory, then update config file, then
-    // run yam: no problem.
-    // First moving the child root directory, then run yam: yam will raise
-    // a warning: root directory of child repo does not exist.
-    // First moving the child root directory, then update config file, then
+    // Best practice when deleting a repository directory is to first remove
+    // the repository from the configuration file, then run yam, then delete 
+    // the repository directory.
+    //  
+    // Best practice when renaming/moving a repository directory is to first
+    // update the configuration file with the new directory name, then 
+    // rename/move the directory, then run yam.
+    // 
+    // First renaming/moving the repo directory, then update config file, then
     // run yam: yam will raise an error: stale output files in moved directory.
     // The user has to delete the stale output files and restart the build.
     // 
@@ -61,7 +56,6 @@ namespace YAM
             std::string name;
             std::filesystem::path dir;
             std::string type;
-            std::vector<std::string> inputs;
         };
 
         RepositoriesNode(); // needed for deserialization
@@ -97,6 +91,8 @@ namespace YAM
         // For synchronous update.
         bool parseAndUpdate();
 
+        XXH64_hash_t hash() const;
+
         // Inherited from Node
         void start() override;
         std::string className() const override { return "RepositoriesNode"; }
@@ -110,6 +106,7 @@ namespace YAM
         bool restore(void* context, std::unordered_set<IPersistable const*>& restored) override;
 
     private:
+        XXH64_hash_t computeHash() const;
 
         void handleRequisitesCompletion(Node::State newState);
         bool updateRepos(std::map<std::string, RepositoriesNode::Repo> const& repos);
@@ -120,6 +117,7 @@ namespace YAM
         std::shared_ptr<FileRepositoryNode> _homeRepo;
         std::map<std::string, std::shared_ptr<FileRepositoryNode>> _repositories;
         XXH64_hash_t _configFileHash;
+        XXH64_hash_t _hash; // hash of the repository hashes
         bool _modified;
     };
 }

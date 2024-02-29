@@ -163,6 +163,7 @@ namespace YAM
                     context()->nodes().remove(genNode);
                     _executor = nullptr;
                 }
+                _dependencies.clear();
             }
             _buildFile = newFile;
             if (_buildFile != nullptr) {
@@ -221,7 +222,7 @@ namespace YAM
     }
 
     std::shared_ptr<DirectoryNode> BuildFileParserNode::buildFileDirectory() const {
-        auto node = context()->nodes().find(_buildFile->name().parent_path());
+        auto node = context()->nodes().find(name().parent_path());
         return dynamic_pointer_cast<DirectoryNode>(node);
     }
 
@@ -366,6 +367,7 @@ namespace YAM
             auto const& glob = dynamic_pointer_cast<GlobNode>(pair.second);
             if (glob != nullptr) hashes.push_back(glob->executionHash());
         }
+        hashes.push_back(repository()->hash());
         XXH64_hash_t hash = XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
         return hash;
     }
@@ -385,9 +387,11 @@ namespace YAM
     }
 
     std::vector<BuildFileParserNode const*> const& BuildFileParserNode::dependencies() {
-        if (state() != Node::State::Ok) throw std::runtime_error("illegal state");
-        if (_dependencies.empty() && !_parseTree.deps.depBuildFiles.empty()) {
-            composeDependencies();
+        if (_buildFile != nullptr) {
+            if (state() != Node::State::Ok) throw std::runtime_error("illegal state");
+            if (_dependencies.empty() && !_parseTree.deps.depBuildFiles.empty()) {
+                composeDependencies();
+            }
         }
         return _dependencies;
     }
@@ -438,7 +442,7 @@ namespace YAM
             auto dirPath = fileNode->name().parent_path();
             dirNode = dynamic_pointer_cast<DirectoryNode>(context()->nodes().find(dirPath));
         }
-        if (dirNode != nullptr) {
+        if (dirNode != nullptr && dirNode->repository()->repoType() == FileRepositoryNode::RepoType::Build) {
             bfpn = dirNode->buildFileParserNode();
             if (bfpn == nullptr) {
                 if (fileNode == nullptr && requireBuildFile) {

@@ -2,6 +2,7 @@
 
 #include "RegexSet.h"
 #include "Node.h"
+#include "xxhash.h"
 
 #include <memory>
 #include <filesystem>
@@ -250,11 +251,7 @@ namespace YAM
         std::filesystem::path const& directory() const;
         std::shared_ptr<DirectoryNode> directoryNode() const;
 
-        void inputRepoNames(std::vector<std::string> const& names);
-        std::vector<std::string> const& inputRepoNames() const;
-
         std::shared_ptr<FileExecSpecsNode> fileExecSpecsNode() const;
-
 
         std::filesystem::path symbolicDirectory() const {
             return repoNameToSymbolicPath(repoName());
@@ -288,13 +285,14 @@ namespace YAM
         // Return empty path when !lexicallyContains(symbolicPath).
         std::filesystem::path absolutePathOf(std::filesystem::path const& symbolicPath) const;
 
-        // Recursively clear directoryNode() and keep directoryNode().
-        void clear();
-
-        // clear() and remove directoryNode() from context.
-        // Intended to be used when the repo is removed from the set of
-        // known repositories.
+        // Remove all that is in the repository from the context.
+        // Note: repo node itself must be removed by caller.
         void removeYourself();
+
+        // A hash of the repository properties.
+        // Nodes whose behavior depend on repo absolute directory path and/or
+        // repo type must include this hash in their execution hash.
+        XXH64_hash_t hash() const;
 
         // Inherited from Node
         void start() override;
@@ -309,12 +307,14 @@ namespace YAM
         bool restore(void* context, std::unordered_set<IPersistable const*>& restored) override;
 
     private:
+        XXH64_hash_t computeHash() const;
+
         std::string _repoName;
         std::filesystem::path _directory;
         RepoType _type;
+        XXH64_hash_t _hash;
         std::shared_ptr<DirectoryNode> _directoryNode;
         std::shared_ptr<FileExecSpecsNode> _fileExecSpecsNode;
         std::shared_ptr<FileRepositoryWatcher> _watcher;
-        std::vector<std::string> _inputRepoNames;
     };
 }

@@ -152,10 +152,10 @@ namespace YAM
     }
 
     void ExecutionContext::clearBuildState() {
-        for (auto const& pair : repositories()) {
-            pair.second->clear();
+        if (_repositoriesNode != nullptr) {
+            _repositoriesNode->stopWatching();
+            _repositoriesNode = nullptr;
         }
         _nodes.clear();
-        _repositoriesNode = nullptr;
     }
 }
