@@ -81,8 +81,8 @@ namespace
                     &context,
                     "windows",
                     std::filesystem::path("c:\\windows"));
-            winRepo->repoType(FileRepositoryNode::RepoType::Ignore);
             repos->addRepository(winRepo);
+            winRepo->repoType(FileRepositoryNode::RepoType::Ignore);
 
             stats.registerNodes = true;
             //context.threadPool().size(1); // to ease debugging

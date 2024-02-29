@@ -123,6 +123,7 @@ namespace YAMTest
                 hashes.push_back(XXH64_string(repo->symbolicPathOf(d->path()).string()));
             }
         }
+        hashes.push_back(repo->hash());
         hash = XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
         return hash;
     }

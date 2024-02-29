@@ -246,8 +246,7 @@ namespace YAM
         , _configFileHash(rand())
         , _modified(true)
     {
-        context->nodes().add(homeRepo);
-        _repositories.insert({ homeRepo->repoName(), homeRepo });
+        addRepository(homeRepo);;
         context->nodes().add(_configFile);
         _configFile->addObserver(this);
     }
