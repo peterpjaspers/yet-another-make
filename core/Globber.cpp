@@ -34,7 +34,10 @@ namespace
                     baseDir = repo->directoryNode();
                     pattern = repo->relativePathOf(repo->absolutePathOf(pattern));
                 } else {
-                    throw std::runtime_error(pattern.string() + " is a path in an Ignored repository");
+                    std::stringstream ss;
+                    ss << pattern.string() << " is a path in a repository of type Ignore." << std::endl;
+                    ss << "Input paths must be paths in repositories of type Build or Track." << std::endl;
+                    throw std::runtime_error(ss.str());
                 }
             }
         }

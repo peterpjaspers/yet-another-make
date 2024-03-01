@@ -8,7 +8,7 @@
 #include "FileAspectSet.h"
 #include "FileSystem.h"
 #include "FileRepositoryNode.h"
-#include "BuildFileCompiler.h"
+#include "PercentageFlagsCompiler.h"
 #include "NodeMapStreamer.h"
 #include "IStreamer.h"
 #include "Glob.h"
@@ -608,7 +608,7 @@ namespace YAM
                 ss 
                     << "Input group " << ip->name() << " at line " << _ruleLineNr
                     << " in file " << _buildFile->name() << " is empty." << std::endl;
-                ss << "Did you misspell the group name?" << std::endl;
+                ss << "Please make sure that output files are added to this group." << std::endl;
                 LogRecord w(LogRecord::Aspect::Warning, ss.str());
                 context()->addToLogBook(w);
             }
@@ -841,87 +841,32 @@ namespace YAM
         Node::notifyCompletion(sresult->_newState);
     }
 
-    bool CommandNode::verifyCmdFlag(
-        std::string const& script, 
-        std::vector<std::shared_ptr<Node>> const& cmdInputs,
-        ILogBook& logBook
-    ) {
-        bool containsFlag = BuildFileCompiler::containsCmdInputFlag(script); 
-        bool valid = !(containsFlag && cmdInputs.empty());
-        if (!valid) {
-            std::string buildFile = _buildFile != nullptr ? _buildFile->name().string() : "";
-            std::stringstream ss;
-            ss << "In command of rule at line " << _ruleLineNr << " in buildfile " << buildFile << ":" << std::endl;
-            ss << "No cmd input files while command contains percentage flag that operates on cmd input." << std::endl;
-            LogRecord error(LogRecord::Error, ss.str());
-            logBook.add(error);
-        }
-        return valid;
-    }
-    bool CommandNode::verifyOrderOnlyFlag(
-        std::string const& script,
-        std::vector<std::shared_ptr<Node>> const& orderOnlyInputs,
-        ILogBook& logBook
-    ) {
-        bool containsFlag = BuildFileCompiler::containsOrderOnlyInputFlag(script);
-        bool valid = !(containsFlag && orderOnlyInputs.empty());
-        if (!valid) {
-            std::string buildFile = _buildFile != nullptr ? _buildFile->name().string() : "";
-            std::stringstream ss;
-            ss << "In command of rule at line " << _ruleLineNr << " in buildfile " << buildFile << ":" << std::endl;
-            ss << "No order-only input files while command contains percentage flag that operates on order-only input." << std::endl;
-            LogRecord error(LogRecord::Error, ss.str());
-            logBook.add(error);
-        }
-        return valid;
-    }
-
-    bool CommandNode::verifyOutputFlag(
-        std::string const& script,
-        std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs,
-        ILogBook& logBook
-    ) {
-        bool valid = !outputs.empty();
-        if (!valid) {
-            valid = BuildFileCompiler::containsOutputFlag(script);
-            if (!valid) {
-                std::string buildFile = _buildFile != nullptr ? _buildFile->name().string() : "";
-                std::stringstream ss;
-                ss << "In command of rule at line " << _ruleLineNr << " in buildfile " << buildFile << ":" << std::endl;
-                ss << "No output files while command contains percentage flag that operates on cmd output." << std::endl;
-                LogRecord error(LogRecord::Error, ss.str());
-                logBook.add(error);
-            }
-        }
-        return valid;
-    }
-
     std::string CommandNode::compileScript(ILogBook& logBook) {
         std::filesystem::path wdir;
         auto workingDir = _workingDir.lock();
         if (workingDir == nullptr) return _script;
-        if (BuildFileCompiler::isLiteralScript(_script)) return _script;
+        if (!PercentageFlagsCompiler::containsFlags(_script)) return _script;
 
         BuildFile::Script bfScript;
         bfScript.script = _script;
+        bfScript.line = _ruleLineNr;
         std::filesystem::path buildFile = _buildFile == nullptr ? "" : _buildFile->name();
         std::vector<std::shared_ptr<Node>> cmdInputs = expandGroups(_cmdInputs);
         std::vector<std::shared_ptr<Node>> orderOnlyInputs = expandGroups(_cmdInputs);
-
-        bool cmdInOk = verifyCmdFlag(_script, cmdInputs, logBook);
-        bool orderOnlyInOk = verifyOrderOnlyFlag(_script, orderOnlyInputs, logBook);
-        bool outputOk = verifyOutputFlag(_script, _outputs, logBook);
-        if (cmdInOk && orderOnlyInOk && outputOk) {
-            std::string script = BuildFileCompiler::compileScript(
+        try {
+            PercentageFlagsCompiler compiler(
                 buildFile,
                 bfScript,
-                workingDir.get(),
+                workingDir,
                 cmdInputs,
                 orderOnlyInputs,
                 _outputs);
-            return script;
+            return compiler.result();
+        } catch (std::runtime_error e) {
+            LogRecord error(LogRecord::Error, e.what());
+            logBook.add(error);
+            return "";
         }
-        return "";
     }
 
     // threadpool
@@ -929,7 +874,7 @@ namespace YAM
         for (auto output : _outputs) output->deleteFile();
 
         std::string script = compileScript(logBook);
-        if (script.empty()) return MonitoredProcessResult{ 0 };
+        if (script.empty()) return MonitoredProcessResult{ 1 };
 
         std::filesystem::path tmpDir = FileSystem::createUniqueDirectory();
         auto scriptFilePath = std::filesystem::path(tmpDir / "cmdscript.cmd");

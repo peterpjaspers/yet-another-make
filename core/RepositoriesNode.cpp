@@ -216,6 +216,7 @@ namespace
 
     void invalidateRecursively(std::shared_ptr<DirectoryNode> const& dir) {
         if (dir == nullptr) return;
+        dir->setState(Node::State::Dirty);
         auto &parser = dir->buildFileParserNode();
         if (parser != nullptr) parser->setState(Node::State::Dirty);
         auto &compiler = dir->buildFileCompilerNode();

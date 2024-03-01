@@ -336,6 +336,9 @@
     <ClInclude Include="xxhash.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="PercentageFlagsCompiler.h">
+      <Filter>Header Files\BuildFileCompiler</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -562,6 +565,9 @@
     </ClCompile>
     <ClCompile Include="xxhash.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PercentageFlagsCompiler.cpp">
+      <Filter>Source Files\BuildFileCompiler</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

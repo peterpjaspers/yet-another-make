@@ -32,24 +32,6 @@ namespace YAM {
             // to limit their re-usability across buildfiles.
             std::filesystem::path const& globNameSpace = "");
 
-        static std::string compileScript(
-            std::filesystem::path const& buildFile,
-            BuildFile::Script const& script,
-            DirectoryNode const* baseDir,
-            std::vector<std::shared_ptr<Node>> cmdInputs,
-            std::vector<std::shared_ptr<Node>> orderOnlyInputs,
-            std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs);
-
-        // Return whether str contains flag that refers to cmd input,
-        // order-only input, output files respectively.
-        static bool containsCmdInputFlag(std::string const& str);
-        static bool containsOrderOnlyInputFlag(std::string const& str);
-        static bool containsOutputFlag(std::string const& str);
-
-        // Return whether the script is literal, i.e. contains no input
-        // or output flags.
-        static bool isLiteralScript(std::string const& script);
-
         std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const& commands() const {
             return _commands;
         }
@@ -167,10 +149,6 @@ namespace YAM {
             BuildFile::Rule const& rule,
             std::filesystem::path const& binPath,
             std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs);
-
-        void assertHasNoCmdInputFlag(std::size_t line, std::string const& str) const;
-        void assertHasNoOrderOnlyInputFlag(std::size_t line, std::string const& str) const;
-        void assertHasNoOutputFlag(std::size_t line, std::string const& str) const;
 
         void compileRule(BuildFile::Rule const& rule);
 

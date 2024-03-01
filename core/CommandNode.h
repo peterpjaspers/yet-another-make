@@ -145,18 +145,6 @@ namespace YAM
         void updateInputProducers();
         void notifyCommandCompletion(std::shared_ptr<ExecutionResult> result);
 
-        bool verifyCmdFlag(
-            std::string const& script, 
-            std::vector<std::shared_ptr<Node>> const& cmdInputs,
-            ILogBook& logBook);
-        bool verifyOrderOnlyFlag(
-            std::string const& script, 
-            std::vector<std::shared_ptr<Node>> const& orderOnlyInputs,
-            ILogBook& logBook);
-        bool verifyOutputFlag(
-            std::string const& script, 
-            std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs,
-            ILogBook& logBook);
         std::string compileScript(ILogBook& logBook);
         MonitoredProcessResult executeMonitoredScript(ILogBook& logBook);
         void getSourceInputs(std::vector<Node*>& sourceInputs) const;
