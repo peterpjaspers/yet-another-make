@@ -1,4 +1,5 @@
 #include "../BuildFileCompiler.h"
+#include "../PercentageFlagsCompiler.h"
 #include "../FileRepositoryNode.h"
 #include "../DirectoryNode.h"
 #include "../SourceFileNode.h"
@@ -266,7 +267,10 @@ namespace
         auto rule = std::make_shared<BuildFile::Rule>();
         rule->forEach = false;
         BuildFile::Script script;
-        script.script = "echo hello world";
+        script.script = R"(
+echo hello world
+echo %%EV%%
+)";
         rule->script = script;
         file.variablesAndRules.push_back(rule);
 
@@ -277,5 +281,35 @@ namespace
         EXPECT_EQ(1, compiler.commands().size());
         std::shared_ptr<CommandNode> cmd = compiler.commands().begin()->second;
         EXPECT_EQ(script.script, cmd->script());
+    }
+
+    TEST(BuildFileCompiler, multilineScript) {
+        BuildFile::File file;
+        ExecutionContext context;
+        std::shared_ptr<DirectoryNode> baseDir;
+
+        auto rule = std::make_shared<BuildFile::Rule>();
+        rule->forEach = false;
+        BuildFile::Script script;
+        script.script = R"(
+echo hello world
+echo %%EV%%
+)";
+        rule->script = script;
+        file.variablesAndRules.push_back(rule);
+        file.buildFile = "test";
+
+        PercentageFlagsCompiler compiler(
+            file.buildFile,
+            script,
+            baseDir,
+            std::vector<std::shared_ptr<Node>>(),
+            std::vector<std::shared_ptr<Node>>(),
+            std::vector<std::shared_ptr<GeneratedFileNode>>());
+        std::string expectedScript = R"(
+echo hello world
+echo %EV%
+)";
+        EXPECT_EQ(expectedScript, compiler.result());
     }
 }

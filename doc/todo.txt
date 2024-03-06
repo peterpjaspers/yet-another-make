@@ -2,7 +2,6 @@ Todo for R 0.1.0
 Bugs
 - fix (header->free == 1)  throw std::string(signature) + " - Accessing freed page.";
   Reproduce with coreTests EnduranceTest
-- fix multi-line buildscripts, responsefiles ?
 
 Features
 - implement wildcard/glob for output files (dynamic outputs)

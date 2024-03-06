@@ -225,28 +225,27 @@ namespace
                 }
                 if (chars[i] == '%') {
                     result.insert(result.end(), '%');
-                    break;
-                }
-
-                std::size_t oidx = i;
-                std::size_t offset = parseOffset(buildFile, node, stringWithFlags, i);
-                std::size_t columnOffset = i;
-                if (allowOutputFlag) {
-                    // stringWithFlags is the rule command. Correct column offset for start
-                    // token of command string "|>".
-                    columnOffset = i + 2;
-                }
-                assertValidFlag(buildFile, node, columnOffset, chars[i]);
-                if (allowOutputFlag && chars[i] == 'o') {
-                    assertOffset(buildFile, node, oidx, offset, cmdOutputPaths.size());
-                    compileFlagN(buildFile, node, offset, cmdOutputPaths, chars[i], result);
-                } else if (chars[i] == 'i') {
-                    assertOffset(buildFile, node, oidx, offset, orderOnlyInputPaths.size());
-                    compileFlagN(buildFile, node, offset, orderOnlyInputPaths, chars[i], result);
                 } else {
-                    assertOffset(buildFile, node, oidx, offset, cmdInputPaths.size());
-                    if (offset == -1) offset = defaultCmdInputOffset;
-                    compileFlagN(buildFile, node, offset, cmdInputPaths, chars[i], result);
+                    std::size_t oidx = i;
+                    std::size_t offset = parseOffset(buildFile, node, stringWithFlags, i);
+                    std::size_t columnOffset = i;
+                    if (allowOutputFlag) {
+                        // stringWithFlags is the rule command. Correct column offset for start
+                        // token of command string "|>".
+                        columnOffset = i + 2;
+                    }
+                    assertValidFlag(buildFile, node, columnOffset, chars[i]);
+                    if (allowOutputFlag && chars[i] == 'o') {
+                        assertOffset(buildFile, node, oidx, offset, cmdOutputPaths.size());
+                        compileFlagN(buildFile, node, offset, cmdOutputPaths, chars[i], result);
+                    } else if (chars[i] == 'i') {
+                        assertOffset(buildFile, node, oidx, offset, orderOnlyInputPaths.size());
+                        compileFlagN(buildFile, node, offset, orderOnlyInputPaths, chars[i], result);
+                    } else {
+                        assertOffset(buildFile, node, oidx, offset, cmdInputPaths.size());
+                        if (offset == -1) offset = defaultCmdInputOffset;
+                        compileFlagN(buildFile, node, offset, cmdInputPaths, chars[i], result);
+                    }
                 }
             } else {
                 result.insert(result.end(), chars[i]);
