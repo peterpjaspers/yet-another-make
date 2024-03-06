@@ -28,8 +28,6 @@ namespace {
     ITokenSpec const* ignore(BuildFileTokenSpecs::ignore());
     ITokenSpec const* curlyOpen(BuildFileTokenSpecs::curlyOpen());
     ITokenSpec const* curlyClose(BuildFileTokenSpecs::curlyClose());
-    ITokenSpec const* cmdStart(BuildFileTokenSpecs::cmdStart());
-    ITokenSpec const* cmdEnd(BuildFileTokenSpecs::cmdEnd());
     ITokenSpec const* script(BuildFileTokenSpecs::script());
     ITokenSpec const* vertical(BuildFileTokenSpecs::vertical());
     ITokenSpec const* glob(BuildFileTokenSpecs::glob());

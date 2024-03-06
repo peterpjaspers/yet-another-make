@@ -339,6 +339,9 @@
     <ClInclude Include="PercentageFlagsCompiler.h">
       <Filter>Header Files\BuildFileCompiler</Filter>
     </ClInclude>
+    <ClInclude Include="TokenScriptSpec.h">
+      <Filter>Header Files\BuildFileCompiler</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -567,6 +570,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="PercentageFlagsCompiler.cpp">
+      <Filter>Source Files\BuildFileCompiler</Filter>
+    </ClCompile>
+    <ClCompile Include="TokenScriptSpec.cpp">
       <Filter>Source Files\BuildFileCompiler</Filter>
     </ClCompile>
   </ItemGroup>

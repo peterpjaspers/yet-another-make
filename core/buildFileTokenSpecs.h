@@ -1,8 +1,5 @@
 #pragma once
-
-#include "TokenRegexSpec.h"
-#include "TokenPathSpec.h"
-#include <vector>
+#include "Token.h"
 
 namespace YAM
 {
@@ -19,8 +16,6 @@ namespace YAM
         static ITokenSpec const* ignore();
         static ITokenSpec const* curlyOpen();
         static ITokenSpec const* curlyClose();
-        static ITokenSpec const* cmdStart();
-        static ITokenSpec const* cmdEnd();
         static ITokenSpec const* script();
         static ITokenSpec const* vertical();
         static ITokenSpec const* glob();

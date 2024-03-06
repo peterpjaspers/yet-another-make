@@ -17,8 +17,6 @@ namespace {
     ITokenSpec const* ignore(BuildFileTokenSpecs::ignore());
     ITokenSpec const* curlyOpen(BuildFileTokenSpecs::curlyOpen());
     ITokenSpec const* curlyClose(BuildFileTokenSpecs::curlyClose());
-    ITokenSpec const* cmdStart(BuildFileTokenSpecs::cmdStart());
-    ITokenSpec const* cmdEnd(BuildFileTokenSpecs::cmdEnd());
     ITokenSpec const* script(BuildFileTokenSpecs::script());
     ITokenSpec const* vertical(BuildFileTokenSpecs::vertical());
     ITokenSpec const* glob(BuildFileTokenSpecs::glob());
@@ -478,16 +476,11 @@ namespace {
         EXPECT_EQ(rule, token.spec);
         EXPECT_EQ(":", token.value);
         tokenizer.skip({ whiteSpace });
-        token = tokenizer.readNextToken({ whiteSpace, cmdStart });
-        EXPECT_EQ(cmdStart, token.spec);
-        EXPECT_EQ("cmdStart", token.type);
-        EXPECT_EQ("|>", token.value);
+        token = tokenizer.readNextToken({ script });
+        EXPECT_EQ(script, token.spec);
+        EXPECT_EQ("script", token.type);
+        EXPECT_EQ(commandStr, token.value);
         tokenizer.skip({ whiteSpace });
-        token = tokenizer.readNextToken({ cmdEnd });
-        EXPECT_EQ(cmdEnd, token.spec);
-        EXPECT_EQ("cmdEnd", token.type);
-        EXPECT_EQ("|>", token.value);
-
     }
 
     TEST(BuildFileTokenizer, depBuildfile) {

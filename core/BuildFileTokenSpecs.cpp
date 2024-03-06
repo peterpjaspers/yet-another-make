@@ -1,4 +1,9 @@
 #include "BuildFileTokenSpecs.h"
+#include "TokenRegexSpec.h"
+#include "TokenPathSpec.h"
+#include "TokenScriptSpec.h"
+
+#include <vector>
 #include <regex>
 
 namespace {
@@ -44,9 +49,7 @@ namespace {
     TokenRegexSpec _ignore(R"(^\^)", "not");
     TokenRegexSpec _curlyOpen(R"(^\{)", "{");
     TokenRegexSpec _curlyClose(R"(^\})", "}");
-    TokenRegexSpec _cmdStart(R"(^\|>)", "cmdStart");
-    TokenRegexSpec _cmdEnd(R"(\|>)", "cmdEnd", 0, std::regex_constants::match_default);
-    TokenRegexSpec _script(R"(^\|>(((?!\|>)\S|\s)*)\|>)", "script", 1);
+    TokenScriptSpec _script;
     TokenRegexSpec _vertical(R"(^\|[^>])", "|");
     TokenPathSpec _glob;
 
@@ -79,8 +82,6 @@ namespace YAM
     ITokenSpec const* BuildFileTokenSpecs::ignore() { return &_ignore; }
     ITokenSpec const* BuildFileTokenSpecs::curlyOpen() { return &_curlyOpen; }
     ITokenSpec const* BuildFileTokenSpecs::curlyClose() { return &_curlyClose; }
-    ITokenSpec const* BuildFileTokenSpecs::cmdStart() { return &_cmdStart; }
-    ITokenSpec const* BuildFileTokenSpecs::cmdEnd() { return &_cmdEnd; }
     ITokenSpec const* BuildFileTokenSpecs::script() { return &_script; }
     ITokenSpec const* BuildFileTokenSpecs::vertical() { return &_vertical; }
     ITokenSpec const* BuildFileTokenSpecs::glob() { return &_glob; }
