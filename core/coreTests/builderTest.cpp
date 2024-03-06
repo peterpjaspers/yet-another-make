@@ -325,11 +325,11 @@ namespace
         // 3 generated file nodes pietOut, janOut, pietjanOut before script exec
         // 3 generated file nodes pietOut, janOut, pietjanOut after script exec
         // 3 commandNodes ccPiet, ccJan, linkPietjan
-        // 3 groupnodes (__dirtyConfigNodes/dirctory/command
-        EXPECT_EQ(16, driver.stats.nStarted); 
+        // 1 groupnodes (__dirtyCommands)
+        EXPECT_EQ(14, driver.stats.nStarted); 
         // pietOut, janOut, pietjanOut are started twice
-        EXPECT_EQ(13, driver.stats.started.size());
-        EXPECT_EQ(1, driver.stats.nDirectoryUpdates);
+        EXPECT_EQ(11, driver.stats.started.size());
+        EXPECT_EQ(0, driver.stats.nDirectoryUpdates);
         // 4 source + 3 generated (before cmd exec) + 3 generated (after cmd exec)
         EXPECT_EQ(10, driver.stats.nRehashedFiles); 
 
@@ -345,8 +345,8 @@ namespace
         EXPECT_TRUE(driver.stats.started.contains(driver.pietjanOut.get()));
 
         // Verify nodes self-executed 
-        EXPECT_EQ(14, driver.stats.nSelfExecuted);
-        EXPECT_EQ(11, driver.stats.selfExecuted.size());
+        EXPECT_EQ(13, driver.stats.nSelfExecuted);
+        EXPECT_EQ(10, driver.stats.selfExecuted.size());
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietCpp))));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietH))));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.janCpp))));

@@ -2,14 +2,7 @@ Todo for R 0.1.0
 Bugs
 - fix (header->free == 1)  throw std::string(signature) + " - Accessing freed page.";
   Reproduce with coreTests EnduranceTest
-- fix persistent storage of deleted nodes (Node::State::Deleted)
-  E.g. add Track repo, add rule that copies file foo.cpp from Track repo
-  Changes in foo.cpp re-copies the file => Ok.
-  Change Track to Ignore => filenode foo.cpp gets Deleted and copy command
-  now contains ref to Deleted node => buildstate issue.
 - fix multi-line buildscripts, responsefiles ?
-- buildscopefinder must exclude finds in Track/Ignore repos.
-  Now yam -- @@test_1/submodules/sm1/*.obj in Track test_1 creates GlobNode.
 
 Features
 - implement wildcard/glob for output files (dynamic outputs)
@@ -41,7 +34,7 @@ Features
 
 Out-of-scope:
 - distributed build
-- build cache
+- build cache (read MS buildXL section on caching!)
 - btree/page caching
 - tup-compatible syntax
 - variants (tup variants, MR build configurations)

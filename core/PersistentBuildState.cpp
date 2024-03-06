@@ -41,12 +41,12 @@ namespace
         }
     }
 
-    void logStorageNeed(
+    void logDifference(
         ILogBook& logBook,
         std::unordered_set<std::shared_ptr<IPersistable>>const& toInsert,
         std::unordered_set<std::shared_ptr<IPersistable>>const& toReplace,
         std::unordered_set<std::shared_ptr<IPersistable>>const& toRemove,
-        bool rollback
+        bool rollback = false
     ) {
         if (!logBook.mustLogAspect(LogRecord::BuildStateUpdate)) return;
 
@@ -294,9 +294,9 @@ namespace YAM
     };
 
     BTree::PersistentPagePool* createPagePool(std::filesystem::path const& path) {
-        std::filesystem::create_directory(path.parent_path());
+        std::filesystem::create_directories(path.parent_path());
         // Determine stored page size (if any)...
-        const BTree::PageSize pageSize = 32 * 1024;
+        const BTree::PageSize pageSize = 512; //32 * 1024;
         BTree::PageSize storedPageSize = BTree::PersistentPagePool::pageCapacity(path.string());
         return new BTree::PersistentPagePool(((0 < storedPageSize) ? storedPageSize : pageSize), path.string());
     }
@@ -321,48 +321,39 @@ namespace YAM
 
     // Determine the differences between buildState and storedState. 
     // Post:
-    //   toInsert: objects in buildState but not in storedState.
-    //   toReplace: objects in buildState and storedState.
-    //   toRemove: objects in storedState but not in buildState.
-    //   objects in toInsert and toReplace are modified().
-    //   if rollback: if object in toRemove and object is modified
-    //   the object is also in toReplace.
-    void computeStorageNeed(
-        ILogBook &logBook,
+    //   onlyInBuildState: objects in buildState but not in storedState.
+    //   inBoth: objects in buildState and storedState.
+    //   onlyInStoredState: objects in storedState but not in buildState.
+    //   objects in onlyInBuildState and inBoth are in modified() state.
+    void computeDifference(
+        ILogBook& logBook,
         std::unordered_set<std::shared_ptr<IPersistable>> const& buildState,
         std::unordered_set<std::shared_ptr<IPersistable>> const& storedState,
-        std::unordered_set<std::shared_ptr<IPersistable>>& toInsert,
-        std::unordered_set<std::shared_ptr<IPersistable>>& toReplace,
-        std::unordered_set<std::shared_ptr<IPersistable>>& toRemove,
-        bool rollback
+        std::unordered_set<std::shared_ptr<IPersistable>>& onlyInBuildState,
+        std::unordered_set<std::shared_ptr<IPersistable>>& inBoth,
+        std::unordered_set<std::shared_ptr<IPersistable>>& onlyInStoredState
     ) {
         for (auto const& p : buildState) {
             if (p->modified()) {
                 if (storedState.contains(p)) {
-                    toReplace.insert(p);
+                    inBoth.insert(p);
                 } else {
-                    toInsert.insert(p);
+                    onlyInBuildState.insert(p);
                 }
             }
         }
         for (auto const& p : storedState) {
             if (!buildState.contains(p)) {
-                toRemove.insert(p);
-                if (rollback && p->modified()) {
-                    // p was modified before it was removed from buildstate.
-                    // Only re-inserting p into buildstate is not sufficient: 
-                    // p must also be reset to its state in persistent storage.
-                    toReplace.insert(p);
-                }
+                onlyInStoredState.insert(p);
             }
         }
         std::shared_ptr<IPersistable> p;
-        if (!toInsert.empty()) p = *toInsert.begin();
-        else if (!toReplace.empty()) p = *toReplace.begin();
-        else if (!toRemove.empty()) p = *toRemove.begin();
+        if (!onlyInBuildState.empty()) p = *onlyInBuildState.begin();
+        else if (!inBoth.empty()) p = *inBoth.begin();
+        else if (!onlyInStoredState.empty()) p = *onlyInStoredState.begin();
         if (p != nullptr) {
             auto n = dynamic_cast<Node*>(p.get());
-            logStorageNeed(logBook, toInsert, toReplace, toRemove, rollback);
+            logDifference(logBook, onlyInBuildState, inBoth, onlyInStoredState);
         }
     }
 }
@@ -386,6 +377,14 @@ namespace YAM
         _pool.reset();
     }
 
+    bool PersistentBuildState::isPendingDelete(std::string const& name) const
+    {
+        for (auto const& pair : _deletedObjectToKey) {
+            if (pair.first->describeName() == name) return true;
+        }
+        return false;
+    }
+
     void PersistentBuildState::logState(ILogBook& logBook) {
         logPersistentState(logBook, _keyToObject);
     }
@@ -394,21 +393,46 @@ namespace YAM
         reset();
         retrieveAll();
         for (auto const& pair : _keyToObject) {
-            addToBuildState(pair.second);
+            auto key = pair.first;
+            auto const& object = pair.second;
+            if (object->deleted()) {
+                _keyToDeletedObject.insert({ key, object });
+                _deletedObjectToKey.insert({ object.get(), key });
+            } else {
+                addToBuildState(pair.second);
+            }
+        }
+        std::vector<Key> garbageKeys;
+        for (auto const& pair : _keyToDeletedObject) {
+            auto &key = pair.first;
+            auto &object = pair.second;
+            _keyToObject.erase(key);
+            _objectToKey.erase(object.get());
+            if (object.use_count() == 1) {
+                garbageKeys.push_back(key);
+            }
+        }
+        if (!garbageKeys.empty()) {
+            for (int i = 0; i < garbageKeys.size(); ++i) {
+                auto &key = garbageKeys[i];
+                auto &object = _keyToDeletedObject[key];
+                if (!removePendingDelete(key, object)) {
+                    throw std::runtime_error("Failed to remove object from storage");
+                }
+            }
+            _forest->commit();
         }
         std::unordered_set<IPersistable const*> restored;
         for (auto const& pair : _keyToObject) pair.second->restore(_context, restored);
-
+        for (auto const& pair : _keyToDeletedObject) pair.second->restore(_context, restored);
     }
 
     void PersistentBuildState::reset() {
         _keyToObject.clear();
         _objectToKey.clear();
+        _keyToDeletedObject.clear();
+        _deletedObjectToKey.clear();
         _nextId = 1;
-        _toInsert.clear();
-        _toReplace.clear();
-        _toRemove.clear();
-        _toRemoveKeys.clear();
         _context->clearBuildState();
     }
 
@@ -459,55 +483,99 @@ namespace YAM
         btreeVReader.close();
     }
 
+    // Called by SharedPersistableReader to get the object stored at key
     std::shared_ptr<IPersistable> PersistentBuildState::getObject(Key key) {
-        auto it = _keyToObject.find(key);
-        if (it == _keyToObject.end()) {
-            throw std::runtime_error("Attempt to retrieve unknown key");
+        std::shared_ptr<IPersistable> object; 
+        auto dit = _keyToDeletedObject.find(key);
+        if (dit != _keyToDeletedObject.end()) {
+            object = dit->second;
+        } else {
+            auto it = _keyToObject.find(key); 
+            if (it == _keyToObject.end()) {
+                throw std::runtime_error("Attempt to getObject with unknown key");
+            }
+            object = it->second;
         }
-        return it->second;
+        return object;
     }
 
     std::size_t PersistentBuildState::store() {
         std::unordered_set<std::shared_ptr<IPersistable>> buildState;
         std::unordered_set<std::shared_ptr<IPersistable>> storedState;
+        std::unordered_set<std::shared_ptr<IPersistable>> toInsert;
+        std::unordered_set<std::shared_ptr<IPersistable>> toReplace;
+        std::unordered_set<std::shared_ptr<IPersistable>> toReplaceDeleted;
+        std::unordered_set<std::shared_ptr<IPersistable>> toRemove;
+        std::map<IPersistable*, Key> _toRemoveKeys;
         _context->getBuildState(buildState);
         getStoredState(storedState);
-        computeStorageNeed(*(_context->logBook()), buildState, storedState, _toInsert, _toReplace, _toRemove, false);
-        
-        for (auto const& p : _toRemove) {
-           // Save keys of removed object to enable rollback
-            Key key = _objectToKey[p.get()];
-            _toRemoveKeys.insert({p.get(), key});
-            remove(key, p);
-            p->modified(false);
-        }
+        computeDifference(*(_context->logBook()), buildState, storedState, toInsert, toReplace, toRemove);
+        // Release strong refs to objects in these temporary sets.
+        buildState.clear();
+        storedState.clear();
 
-        // First bind keys to new objects to avoid re-entrant storage...
-        for (auto const& p : _toInsert) bindToKey(p);
-        // ...then store the new objects
-        for (auto const& p : _toInsert) {
-            store(p);
-            p->modified(false);
-        }
-
-        for (auto const& p : _toReplace) {
-            store(p);
-            p->modified(false);
-        }
-
-        std::size_t nStored = _toInsert.size() + _toReplace.size() + _toRemove.size();
-        if (0 < nStored) {
-            try { _forest->commit(); } 
-            catch (std::string msg) {
-                rollback(true);
-                nStored = -1;
+        for (auto const& p : toRemove) {
+            if (!p->deleted()) {
+                throw std::exception("Wrong state to delete");
+            }
+            auto pit = _deletedObjectToKey.find(p.get());
+            if (pit != _deletedObjectToKey.end()) {
+                throw std::exception("Attempt to deleted a pending delete object.");
+            }
+            auto it = _objectToKey.find(p.get());
+            if (it == _objectToKey.end()) {
+                throw std::exception("Attempt to deleted a not-stored object.");
+            }
+            Key key = it->second;
+            // 2 strong refs left to p: from _toRemove and from _keyToObject,
+            // i.e. p is not referenced by other objects and can be safely
+            // removed from storage.
+            if (p.use_count() == 2) {
+                if (!remove(key, p)) {
+                    throw std::runtime_error("Failed to delete object from storage");
+                }
+            } else {
+                // postpone deletion from forest until p is no longer referenced
+                _keyToObject.erase(key);
+                _objectToKey.erase(p.get());
+                _keyToDeletedObject.insert({ key, p });
+                _deletedObjectToKey.insert({ p.get(), key });
+                toReplaceDeleted.insert(p);
             }
         }
 
-        _toInsert.clear();
-        _toReplace.clear();
-        _toRemove.clear();
-        _toRemoveKeys.clear();
+        // First bind keys to new objects to avoid re-entrant storage...
+        for (auto const& p : toInsert) bindToKey(p);
+        // ...then store the new objects
+        for (auto const& p : toInsert) {
+            store(_objectToKey[p.get()], p);
+            p->modified(false);
+        }
+
+        for (auto const& p : toReplace) {
+            store(_objectToKey[p.get()], p);
+            p->modified(false);
+        }
+        for (auto const& p : toReplaceDeleted) {
+            store(_deletedObjectToKey[p.get()], p);
+            p->modified(false);
+        }
+
+        std::size_t nStored = 
+            toInsert.size()
+            + toReplace.size()
+            + toReplaceDeleted.size()
+            + toRemove.size();
+        if (0 < nStored) {
+            try { _forest->commit(); } 
+            catch (std::string msg) {
+                // This should be a very rare error. Therefore no attempt
+                // is made to optimize recovery.
+                _forest->recover();
+                retrieve();
+                nStored = -1;
+            }
+        }
         return nStored;
     }
 
@@ -524,8 +592,7 @@ namespace YAM
         return code._key;
     }
 
-    void PersistentBuildState::store(std::shared_ptr<IPersistable> const& object) {
-        Key key = _objectToKey[object.get()];
+    void PersistentBuildState::store(Key key, std::shared_ptr<IPersistable> const& object) {
         KeyCode code(key);
         auto tree = _typeToTree[code._type];
         auto& btreeVWriter = tree->insert(key);
@@ -536,77 +603,105 @@ namespace YAM
         btreeVWriter.close();
     }
 
+    // Called by SharedPersistableWriter to get the key of a stored object.
     PersistentBuildState::Key PersistentBuildState::getKey(std::shared_ptr<IPersistable> const& object) {
+        Key key;
+
         if (object->deleted()) {
-            throw std::exception("object is deleted");
+            auto dit = _deletedObjectToKey.find(object.get());
+            if (dit == _deletedObjectToKey.end()) {
+                throw std::exception("unknown object");
+            }
+            key = dit->second;
+        } else {
+            auto it = _objectToKey.find(object.get());
+            if (it == _objectToKey.end()) {
+                throw std::exception("unknown object");
+            }
+            key = it->second;
         }
-        if (
-            object->modified() 
-            && !_toInsert.contains(object)
-            && !_toReplace.contains(object)
-        ) {
-            throw std::exception("object not registered for storage");
-        }
-        return _objectToKey[object.get()];
+        return key;
     }
 
-    void PersistentBuildState::remove(Key key, std::shared_ptr<IPersistable> const& object) {
-        _keyToObject.erase(key);
+    bool PersistentBuildState::remove(Key key, std::shared_ptr<IPersistable> const& object) {
+        if (!object->deleted()) {
+            throw std::exception("cannot remove an object in state !deleted()");
+        }
+        auto it = _keyToObject.find(key);
+        if (it == _keyToObject.end()) {
+            throw std::exception("Unknown object");
+        }
+        _keyToObject.erase(it);
         _objectToKey.erase(object.get());
         KeyCode code(key);
         auto tree = _typeToTree[code._type];
-        tree->erase(key);
+        return tree->erase(key);
     }
 
-    void PersistentBuildState::rollback(bool recoverForest) {
-        if (recoverForest) _forest->recover();
-        for (auto const& object : _toRemove) {
-            if (recoverForest) {
-                Key key = _toRemoveKeys[object.get()];
-                _keyToObject.insert({ key, object });
-                _objectToKey.insert({ object.get(), key });
-            }
-            addToBuildState(object);
+    bool PersistentBuildState::removePendingDelete(Key key, std::shared_ptr<IPersistable> const& object) {
+        if (!object->deleted()) {
+            throw std::exception("cannot removePendingDelete an object in state !deleted()");
         }
-        for (auto const& object : _toInsert) {
-            if (recoverForest) {
-                auto it = _objectToKey.find(object.get());
-                if (it != _objectToKey.end()) {
-                    Key key = it->second;
-                    _keyToObject.erase(key);
-                    _objectToKey.erase(object.get());
-                }
-            }
-            removeFromBuildState(object);
+        auto it = _keyToDeletedObject.find(key);
+        if (it == _keyToDeletedObject.end()) {
+            throw std::exception("Unknown object");
         }
-        for (auto const& object : _toReplace) {
-            // Replaces object-in-place by re-streaming it from btree.
-            Key key = _objectToKey[object.get()];
-            object->prepareDeserialize();
-            retrieveKey(key);
-        };
-        std::unordered_set<IPersistable const*> restored;
-        for (auto const& pair : _objectToKey) {
-            restored.insert(pair.first);
-        }
-        for (auto const& object : _toReplace) {
-            restored.erase(object.get());
-        }
-        for (auto const& object : _toReplace) {
-            object->restore(_context, restored);
-        }
+        _keyToDeletedObject.erase(it);
+        _deletedObjectToKey.erase(object.get());
+        KeyCode code(key);
+        auto tree = _typeToTree[code._type];
+        return tree->erase(key);
     }
 
     void PersistentBuildState::rollback() {
         std::unordered_set<std::shared_ptr<IPersistable>> buildState;
         std::unordered_set<std::shared_ptr<IPersistable>> storedState;
+        std::unordered_set<std::shared_ptr<IPersistable>> toRemove;
+        std::unordered_set<std::shared_ptr<IPersistable>> toReplace;
+        std::unordered_set<std::shared_ptr<IPersistable>> toAdd;
         _context->getBuildState(buildState);
         getStoredState(storedState);
-        computeStorageNeed(*(_context->logBook()), buildState, storedState, _toInsert, _toReplace, _toRemove, true);
-        rollback(false);
-        _toInsert.clear();
-        _toReplace.clear();
-        _toRemove.clear();
+        computeDifference(*(_context->logBook()), buildState, storedState, toRemove, toReplace, toAdd);
+
+        for (auto const& object : toRemove) {
+            removeFromBuildState(object);
+        }
+        for (auto const& object : toReplace) {
+            // Replaces object-in-place by re-streaming it from btree.
+            Key key = _objectToKey[object.get()];
+            object->prepareDeserialize();
+            retrieveKey(key);
+        };
+        for (auto const& object : toAdd) {
+            // toAdd contains the objects that were removed from context
+            // since previous storage. On removal from context these objects
+            // are cleaned-up, see Node::cleanup(). These objects must therefore
+            // be retrieved from storage to restore their state to before
+            // cleanup.
+            Key key = _objectToKey[object.get()];
+            object->prepareDeserialize();
+            retrieveKey(key);
+            addToBuildState(object);
+        }
+
+        if (!toReplace.empty()) {
+            std::unordered_set<IPersistable const*> restored;
+            for (auto const& pair : _objectToKey) {
+                restored.insert(pair.first);
+            }
+            for (auto const& object : toReplace) {
+                restored.erase(object.get());
+            }
+            for (auto const& object : toAdd) {
+                restored.erase(object.get());
+            }
+            for (auto const& object : toReplace) {
+                object->restore(_context, restored);
+            }
+            for (auto const& object : toAdd) {
+                object->restore(_context, restored);
+            }
+        }
     }
 
     void PersistentBuildState::getStoredState(std::unordered_set<std::shared_ptr<IPersistable>>& storedState) {

@@ -29,6 +29,9 @@ namespace YAM
         uint32_t typeId() const override; 
         void stream(IStreamer* streamer) override;
 
+    protected:
+        void cleanup() override;
+
     private:
         std::shared_ptr<CommandNode> _producer;
     };

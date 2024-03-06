@@ -343,7 +343,7 @@ namespace YAM
         if (_dirtyConfigNodes->state() != Node::State::Ok) {
             _postCompletion(Node::State::Failed);
         } else {
-            //if (!_dirtyConfigNodes->content().empty()) _storeBuildState();
+            if (!_dirtyConfigNodes->content().empty()) _storeBuildState();
             std::map<std::filesystem::path, std::shared_ptr<DirectoryNode>> dirtyDirs;
             for (auto const& pair : _context.repositories()) {
                 auto repo = pair.second;
@@ -437,11 +437,11 @@ namespace YAM
         } else {
             BuildScopeFinder finder;
             std::vector<std::shared_ptr<Node>> dirtyCommands = finder(&_context, _context.buildRequest()->options());
-             if (
+            if (
                 !_dirtyBuildFileCompilers->content().empty()
                 || !dirtyCommands.empty()
             ) {
-                //_storeBuildState();
+                _storeBuildState();
             }
             if (dirtyCommands.empty()) {
                 _handleCommandsCompletion(_dirtyCommands.get());
@@ -460,9 +460,7 @@ namespace YAM
     void Builder::_handleCommandsCompletion(Node* n) {
         if (n != _dirtyCommands.get()) throw std::exception("unexpected node");
         Node::State newState = _dirtyCommands->state();
-        if (newState == Node::State::Ok) {
-            _storeBuildState();
-        }
+        _storeBuildState();
         // Delay clearing the inputProducers of the _dirty* nodes to avoid
         // removing an observer on a node that is notifying.
         _postCompletion(newState);

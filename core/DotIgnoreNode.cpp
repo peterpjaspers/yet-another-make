@@ -75,9 +75,13 @@ namespace YAM
     }
 
     bool DotIgnoreNode::ignore(std::shared_ptr<FileRepositoryNode> const& repo, std::filesystem::path const& path) const {
-        if (repo == context()->repositoriesNode()->homeRepository()) {            
+        if (repo == context()->repositoriesNode()->homeRepository()) {
             std::filesystem::path yamConfigDir = repo->directory() / "yamConfig";
             if (path == yamConfigDir || path.parent_path() == yamConfigDir) {
+                return true;
+            }
+            std::filesystem::path yamDir = repo->directory() / ".yam";
+            if (path == yamDir || path.parent_path() == yamDir) {
                 return true;
             }
         }

@@ -25,6 +25,8 @@ namespace YAM
         // objects. Deleting the object from persistent store is deleted until
         // it is no longer referenced.
         virtual bool deleted() const = 0;
+        // Post: !deleted()
+        virtual void undelete() = 0;
 
         virtual std::string describeName() const = 0;
         virtual std::string describeType() const = 0;

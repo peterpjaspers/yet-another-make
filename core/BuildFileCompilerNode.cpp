@@ -184,6 +184,7 @@ namespace YAM
         if (_buildFileParser != nullptr)  _buildFileParser->removeObserver(this);
         for (auto const& pair : _depCompilers) pair.second->removeObserver(this);
         for (auto const& pair : _depGlobs) pair.second->removeObserver(this);
+        _buildFileParser = nullptr;
     }
 
     void BuildFileCompilerNode::buildFileParser(std::shared_ptr<BuildFileParserNode> const& newParser) {

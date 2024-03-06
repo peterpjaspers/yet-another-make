@@ -118,6 +118,9 @@ namespace YAM
         void prepareDeserialize() override;
         bool restore(void* context, std::unordered_set<IPersistable const*>& restored) override;
 
+    protected:
+        void cleanup() override;
+
     private:
         struct ExecutionResult {
             MemoryLogBook _log;

@@ -20,7 +20,9 @@ namespace YAM
 
     void NodeSet::removeIfPresent(std::shared_ptr<Node> const& node) {
         auto nRemoved = _nodes.erase(node->name());
-        if (nRemoved == 1) node->setState(Node::State::Deleted);
+        if (nRemoved == 1) {
+            node->setState(Node::State::Deleted);
+        }
     }
 
     void NodeSet::clear() {

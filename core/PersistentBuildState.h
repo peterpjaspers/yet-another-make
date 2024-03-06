@@ -69,6 +69,12 @@ namespace YAM
         // Rollback the build state to its state at last successfull commit.
         void rollback();
 
+        // For testing purposes.
+        // An object is pending delete when it was requested to be deleted
+        // while other stored objects were stil referencing it.
+        // The object will be deleted when its reference count drops to 0.
+        bool isPendingDelete(std::string const &name) const;
+
         void logState(ILogBook &logBook);
 
     private:
@@ -84,13 +90,10 @@ namespace YAM
 
         Key bindToKey(std::shared_ptr<IPersistable> const& object);
         Key allocateKey(IPersistable* object);
-        void store(std::shared_ptr<IPersistable> const& object);
+        void store(Key key,std::shared_ptr<IPersistable> const& object);
 
-        void remove(Key key, std::shared_ptr<IPersistable> const& object);
-
-        // If recoverForest: recover forest to last commit.
-        // Restore build state to state at last commit.
-        void rollback(bool recoverForest); 
+        bool remove(Key key, std::shared_ptr<IPersistable> const& object);
+        bool removePendingDelete(Key key, std::shared_ptr<IPersistable> const& object);
         
         // Return in storedState the objects that have a key.
         void getStoredState(std::unordered_set<std::shared_ptr<IPersistable>>& storedState);
@@ -104,12 +107,13 @@ namespace YAM
         std::shared_ptr<BTree::Forest> _forest;
         std::map<BTree::TreeIndex, BTree::StreamingTree<Key>*> _typeToTree;
         uint64_t _nextId;
+
         std::map<Key, std::shared_ptr<IPersistable>> _keyToObject;
         std::map<IPersistable*, Key> _objectToKey;
-        std::unordered_set<std::shared_ptr<IPersistable>> _toInsert;
-        std::unordered_set<std::shared_ptr<IPersistable>> _toReplace;
-        std::unordered_set<std::shared_ptr<IPersistable>> _toRemove;
-        std::map<IPersistable*, Key> _toRemoveKeys;
+
+        std::map<Key, std::shared_ptr<IPersistable>> _keyToDeletedObject;
+        std::map<IPersistable*, Key> _deletedObjectToKey;
+
     };
 
 }

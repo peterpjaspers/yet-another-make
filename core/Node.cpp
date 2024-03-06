@@ -73,6 +73,8 @@ namespace YAM
                 for (auto observer : _observers) {
                     observer->handleDirtyOf(this);
                 }
+            } else if (_state == Node::State::Deleted) {
+                cleanup();
             }
             if (wasExecuting && nowCompleted) {
                 for (auto observer : _observers) {
@@ -278,11 +280,18 @@ namespace YAM
     }
 
     bool Node::modified() const {
-        return _state == Node::State::Deleted || _modified;
+        return _modified;
     }
 
     bool Node::deleted() const {
         return _state == Node::State::Deleted;
+    }
+
+    void Node::undelete() {
+        if (_state != Node::State::Deleted) {
+            throw std::runtime_error("Not allowed to undelete an object that is not in deleted state");
+        }
+        _state = Node::State::Dirty;
     }
 
     void Node::stream(IStreamer* streamer) {

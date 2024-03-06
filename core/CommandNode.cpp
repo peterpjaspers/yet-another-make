@@ -299,12 +299,21 @@ namespace YAM
     {}
 
     CommandNode::~CommandNode() {
-        for (auto output : _outputs) {
-            output->removeObserver(this);
-        }
+        cleanup();
+    }
+    
+    void CommandNode::cleanup() {
+        _cmdInputs.clear();
+        _orderOnlyInputs.clear();
         for (auto producer : _inputProducers) {
             producer->removeObserver(this);
         }
+        _script.clear();
+        _inputProducers.clear();
+        for (auto output : _outputs) {
+            output->removeObserver(this);
+        }
+        _outputs.clear();
         clearDetectedInputs();
     }
 
@@ -827,9 +836,7 @@ namespace YAM
                 context()->logBook()->add(change);
             }
         } else {
-            ExecutionResult r;
-            for (auto const& pair : _detectedInputs) r._removedInputPaths.insert(pair.first);
-            setDetectedInputs(r);
+            clearDetectedInputs();
             for (auto output : _outputs) output->deleteFile();
             _executionHash = rand();
         }

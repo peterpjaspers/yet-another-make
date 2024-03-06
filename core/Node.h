@@ -139,6 +139,10 @@ namespace YAM
         void modified(bool newValue) override;
         bool modified() const override;
         bool deleted() const override;
+        // Pre: state() == Node::State::Deleted.
+        // Post: state() == Node::State::Dirty.
+        // State changed will not be notified to subscribers.
+        void undelete() override;
         std::string describeName() const override { return _name.string(); }
         std::string describeType() const override { return className(); }
 
@@ -149,6 +153,11 @@ namespace YAM
         bool restore(void* context, std::unordered_set<IPersistable const*>& restored) override;
 
     protected:
+        // Called when node state is set to Node::State::Deleted
+        // Subclasses must release all references to other nodes,
+        // and remove themselves as observer of other nodes.
+        virtual void cleanup() {}
+
         // Implements StateObserver::handleCompletionOf
         // Overrides must be implemented like:
         //      sub-class specific logic

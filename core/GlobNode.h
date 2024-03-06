@@ -26,10 +26,12 @@ namespace YAM
 
         std::string className() const override { return "GlobNode"; }
 
-        // The path pattern is relative to the base directory.
         void baseDirectory(std::shared_ptr<DirectoryNode> const& newBaseDir);
         std::shared_ptr<DirectoryNode> const& baseDirectory() const { return _baseDir;  }
 
+        // newPattern is relative to the base directory or is a symbolic
+        // path (see FileRepositoryNode). newPattern can be a normal path
+        // or a path that contains glob special characters. 
         void pattern(std::filesystem::path const& newPattern);
         std::filesystem::path const& pattern() const { return _pattern; }
 
@@ -57,6 +59,7 @@ namespace YAM
         bool restore(void* context, std::unordered_set<IPersistable const*>& restored) override;
 
     private:
+        void cleanup() override;
         std::pair<std::shared_ptr<Globber>, std::string> execute();
         void handleInputDirsCompletion(Node::State state);
         void executeGlob();

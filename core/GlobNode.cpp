@@ -44,21 +44,33 @@ namespace YAM
         , _executionHash(rand())
     {}
 
-    // The path pattern is relative to the base directory.
+    GlobNode::~GlobNode() {
+        cleanup();
+    }
+
+    void GlobNode::cleanup() {
+        for (auto const& dir : _inputDirs) dir->removeObserver(this);
+        _inputDirs.clear();
+        _matches.clear();
+        _baseDir = nullptr;
+    }
+
     void GlobNode::baseDirectory(std::shared_ptr<DirectoryNode> const& newBaseDir) {
         if (_baseDir != newBaseDir) {
             _baseDir = newBaseDir;
+            for (auto const& dir : _inputDirs) dir->removeObserver(this);
+            _inputDirs.clear();
+            _matches.clear();
             setState(Node::State::Dirty);
         }
-    }
-
-    GlobNode::~GlobNode() {
-        for (auto const& dir : _inputDirs) dir->removeObserver(this);
     }
 
     void GlobNode::pattern(std::filesystem::path const& newPattern) {
         if (_pattern != newPattern) {
             _pattern = newPattern;
+            for (auto const& dir : _inputDirs) dir->removeObserver(this);
+            _inputDirs.clear();
+            _matches.clear();
             setState(Node::State::Dirty);
         }
     }
