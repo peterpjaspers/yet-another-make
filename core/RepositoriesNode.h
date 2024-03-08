@@ -47,9 +47,7 @@ namespace YAM
     // run yam: yam will raise an error: stale output files in moved directory.
     // The user has to delete the stale output files and restart the build.
     // 
-    class __declspec(dllexport) RepositoriesNode : 
-        public Node, 
-        std::enable_shared_from_this<RepositoriesNode>
+    class __declspec(dllexport) RepositoriesNode : public Node
     {
     public:
         struct Repo {

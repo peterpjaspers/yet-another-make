@@ -42,7 +42,8 @@ namespace YAM
         : Node(context, name)
         , _inputsHash(rand())
         , _executionHash(rand())
-    {}
+    {
+    }
 
     GlobNode::~GlobNode() {
         cleanup();

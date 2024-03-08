@@ -1,0 +1,750 @@
+Running main() from D:\Peter\github\yam\core\coreTests\main_gtest.cpp
+Note: Google Test filter = Endurance.*
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from Endurance
+[ RUN      ] Endurance.repeatAddRemoveRepositories_crashIn2_0
+
+Starting build 0.0
+10:59:41.777 Processing configuration changes
+10:59:41.781 Persistent buildstate updates:
+Insert new objects: 
+	@@test_0 : DirectoryNode
+	@@test_0\.dotignore : DotIgnoreNode
+	@@test_0\.gitignore : SourceFileNode
+	@@test_0\.yamignore : SourceFileNode
+	@@test_0\__invokeConfig : FileExecSpecsNode
+	@@test_0\yamConfig/fileExecSpecs.txt : SourceFileNode
+	@@test_0\yamConfig/repositories.txt : SourceFileNode
+	repositories : RepositoriesNode
+	test_0 : FileRepositoryNode
+
+10:59:41.782 Updated 9 nodes in buildstate.
+
+10:59:41.782 Scanning filesystem
+10:59:41.793 Parsing buildfiles
+10:59:41.828 Checking for cycles in buildfile dependency graph.
+10:59:41.828 Compiling parsed buildfiles
+10:59:41.866 Checking for cycles in group dependency graph.
+10:59:41.873 Persistent buildstate updates:
+Insert new objects: 
+	@@test_0\clean.bat : SourceFileNode
+	@@test_0\project : DirectoryNode
+	@@test_0\project\.dotignore : DotIgnoreNode
+	@@test_0\project\.gitignore : SourceFileNode
+	@@test_0\project\.yamignore : SourceFileNode
+	@@test_0\project\<cyclic4> : GroupNode
+	@@test_0\project\<cyclic5> : GroupNode
+	@@test_0\project\__bfCompiler : BuildFileCompilerNode
+	@@test_0\project\__bfParser : BuildFileParserNode
+	@@test_0\project\buildfile_yam.txt : SourceFileNode
+	@@test_0\project\cyclic0.txt : GeneratedFileNode
+	@@test_0\project\cyclic0.txt\__cmd : CommandNode
+	@@test_0\project\cyclic3.txt : GeneratedFileNode
+	@@test_0\project\cyclic3.txt\__cmd : CommandNode
+	@@test_0\project\cyclic4.txt : GeneratedFileNode
+	@@test_0\project\cyclic4.txt\__cmd : CommandNode
+	@@test_0\project\cyclic5.txt : GeneratedFileNode
+	@@test_0\project\cyclic5.txt\__cmd : CommandNode
+	@@test_0\project\cyclic6.txt : GeneratedFileNode
+	@@test_0\project\cyclic6.txt\__cmd : CommandNode
+	@@test_0\project\cyclic8.txt : GeneratedFileNode
+	@@test_0\project\cyclic8.txt\__cmd : CommandNode
+	@@test_0\project\fooobjects.txt : GeneratedFileNode
+	@@test_0\project\fooobjects.txt\__cmd : CommandNode
+	@@test_0\project\linkedobjects.txt : GeneratedFileNode
+	@@test_0\project\linkedobjects.txt\__cmd : CommandNode
+	@@test_0\submodules : DirectoryNode
+	@@test_0\submodules\.dotignore : DotIgnoreNode
+	@@test_0\submodules\.gitignore : SourceFileNode
+	@@test_0\submodules\.txt : SourceFileNode
+	@@test_0\submodules\.yamignore : SourceFileNode
+	@@test_0\submodules\<cyclic1> : GroupNode
+	@@test_0\submodules\<cyclic2> : GroupNode
+	@@test_0\submodules\<cyclic3> : GroupNode
+	@@test_0\submodules\<fooobjects> : GroupNode
+	@@test_0\submodules\<group1> : GroupNode
+	@@test_0\submodules\<group2> : GroupNode
+	@@test_0\submodules\<objects> : GroupNode
+	@@test_0\submodules\__bfCompiler : BuildFileCompilerNode
+	@@test_0\submodules\__bfParser : BuildFileParserNode
+	@@test_0\submodules\buildfile_yam.txt : SourceFileNode
+	@@test_0\submodules\foo_objects.txt : GeneratedFileNode
+	@@test_0\submodules\foo_objects.txt\__cmd : CommandNode
+	@@test_0\submodules\fooobjects.obj : GeneratedFileNode
+	@@test_0\submodules\fooobjects.obj\__cmd : CommandNode
+	@@test_0\submodules\group_1.txt : GeneratedFileNode
+	@@test_0\submodules\group_1.txt\__cmd : CommandNode
+	@@test_0\submodules\group_2.txt : GeneratedFileNode
+	@@test_0\submodules\group_2.txt\__cmd : CommandNode
+	@@test_0\submodules\moduleobjects_1.txt : GeneratedFileNode
+	@@test_0\submodules\moduleobjects_1.txt\__cmd : CommandNode
+	@@test_0\submodules\moduleobjects_2.txt : GeneratedFileNode
+	@@test_0\submodules\moduleobjects_2.txt\__cmd : CommandNode
+	@@test_0\submodules\moduleobjects_3.txt : GeneratedFileNode
+	@@test_0\submodules\moduleobjects_3.txt\__cmd : CommandNode
+	@@test_0\submodules\moduleobjects_4.txt : GeneratedFileNode
+	@@test_0\submodules\moduleobjects_4.txt\__cmd : CommandNode
+	@@test_0\submodules\moduleobjects_5.txt : GeneratedFileNode
+	@@test_0\submodules\moduleobjects_5.txt\__cmd : CommandNode
+	@@test_0\submodules\sm1 : DirectoryNode
+	@@test_0\submodules\sm12_objects.txt : GeneratedFileNode
+	@@test_0\submodules\sm12_objects.txt\__cmd : CommandNode
+	@@test_0\submodules\sm1\*.cpp : GlobNode
+	@@test_0\submodules\sm1\*.obj : GlobNode
+	@@test_0\submodules\sm1\.dotignore : DotIgnoreNode
+	@@test_0\submodules\sm1\.gitignore : SourceFileNode
+	@@test_0\submodules\sm1\.yamignore : SourceFileNode
+	@@test_0\submodules\sm1\__bfCompiler : BuildFileCompilerNode
+	@@test_0\submodules\sm1\__bfParser : BuildFileParserNode
+	@@test_0\submodules\sm1\buildfile_yam.txt : SourceFileNode
+	@@test_0\submodules\sm1\foo.cpp : SourceFileNode
+	@@test_0\submodules\sm1\foo.obj : GeneratedFileNode
+	@@test_0\submodules\sm1\foo.obj\__cmd : CommandNode
+	@@test_0\submodules\sm1\objects_1.txt : GeneratedFileNode
+	@@test_0\submodules\sm1\objects_1.txt\__cmd : CommandNode
+	@@test_0\submodules\sm1\rens.cpp : SourceFileNode
+	@@test_0\submodules\sm1\rens.obj : GeneratedFileNode
+	@@test_0\submodules\sm1\rens.obj\__cmd : CommandNode
+	@@test_0\submodules\sm2 : DirectoryNode
+	@@test_0\submodules\sm2\*.cpp : GlobNode
+	@@test_0\submodules\sm2\.dotignore : DotIgnoreNode
+	@@test_0\submodules\sm2\.gitignore : SourceFileNode
+	@@test_0\submodules\sm2\.yamignore : SourceFileNode
+	@@test_0\submodules\sm2\__bfCompiler : BuildFileCompilerNode
+	@@test_0\submodules\sm2\__bfParser : BuildFileParserNode
+	@@test_0\submodules\sm2\bar.cpp : SourceFileNode
+	@@test_0\submodules\sm2\bar.obj : GeneratedFileNode
+	@@test_0\submodules\sm2\bar.obj\__cmd : CommandNode
+	@@test_0\submodules\sm2\buildfile_yam.txt : SourceFileNode
+	@@test_0\submodules\sm3 : DirectoryNode
+	@@test_0\submodules\sm3\*.cpp : GlobNode
+	@@test_0\submodules\sm3\.dotignore : DotIgnoreNode
+	@@test_0\submodules\sm3\.gitignore : SourceFileNode
+	@@test_0\submodules\sm3\.yamignore : SourceFileNode
+	@@test_0\submodules\sm3\__bfCompiler : BuildFileCompilerNode
+	@@test_0\submodules\sm3\__bfParser : BuildFileParserNode
+	@@test_0\submodules\sm3\buildfile_yam.txt : SourceFileNode
+	@@test_0\submodules\sm3\poo.cpp : SourceFileNode
+	@@test_0\submodules\sm3\poo.obj : GeneratedFileNode
+	@@test_0\submodules\sm3\poo.obj\__cmd : CommandNode
+	@@test_0\submodules\sm[123]\buildfile_yam* : GlobNode
+	@@test_0\submodules\sm[12]\* : GlobNode
+Replace objects: 
+	@@test_0 : DirectoryNode
+	@@test_0\.gitignore : SourceFileNode
+	@@test_0\.yamignore : SourceFileNode
+
+10:59:41.880 Updated 105 nodes in buildstate.
+
+10:59:41.880 Executing commands
+10:59:43.237 Persistent buildstate updates:
+Replace objects: 
+	@@test_0\project\<cyclic4> : GroupNode
+	@@test_0\project\<cyclic5> : GroupNode
+	@@test_0\project\cyclic0.txt : GeneratedFileNode
+	@@test_0\project\cyclic0.txt\__cmd : CommandNode
+	@@test_0\project\cyclic3.txt : GeneratedFileNode
+	@@test_0\project\cyclic3.txt\__cmd : CommandNode
+	@@test_0\project\cyclic4.txt : GeneratedFileNode
+	@@test_0\project\cyclic4.txt\__cmd : CommandNode
+	@@test_0\project\cyclic5.txt : GeneratedFileNode
+	@@test_0\project\cyclic5.txt\__cmd : CommandNode
+	@@test_0\project\cyclic6.txt : GeneratedFileNode
+	@@test_0\project\cyclic6.txt\__cmd : CommandNode
+	@@test_0\project\cyclic8.txt : GeneratedFileNode
+	@@test_0\project\cyclic8.txt\__cmd : CommandNode
+	@@test_0\project\fooobjects.txt : GeneratedFileNode
+	@@test_0\project\fooobjects.txt\__cmd : CommandNode
+	@@test_0\project\linkedobjects.txt : GeneratedFileNode
+	@@test_0\project\linkedobjects.txt\__cmd : CommandNode
+	@@test_0\submodules\<cyclic1> : GroupNode
+	@@test_0\submodules\<cyclic3> : GroupNode
+	@@test_0\submodules\<fooobjects> : GroupNode
+	@@test_0\submodules\<group1> : GroupNode
+	@@test_0\submodules\<group2> : GroupNode
+	@@test_0\submodules\<objects> : GroupNode
+	@@test_0\submodules\foo_objects.txt : GeneratedFileNode
+	@@test_0\submodules\foo_objects.txt\__cmd : CommandNode
+	@@test_0\submodules\fooobjects.obj : GeneratedFileNode
+	@@test_0\submodules\fooobjects.obj\__cmd : CommandNode
+	@@test_0\submodules\group_1.txt : GeneratedFileNode
+	@@test_0\submodules\group_1.txt\__cmd : CommandNode
+	@@test_0\submodules\group_2.txt : GeneratedFileNode
+	@@test_0\submodules\group_2.txt\__cmd : CommandNode
+	@@test_0\submodules\moduleobjects_1.txt : GeneratedFileNode
+	@@test_0\submodules\moduleobjects_1.txt\__cmd : CommandNode
+	@@test_0\submodules\moduleobjects_2.txt : GeneratedFileNode
+	@@test_0\submodules\moduleobjects_2.txt\__cmd : CommandNode
+	@@test_0\submodules\moduleobjects_3.txt : GeneratedFileNode
+	@@test_0\submodules\moduleobjects_3.txt\__cmd : CommandNode
+	@@test_0\submodules\moduleobjects_4.txt : GeneratedFileNode
+	@@test_0\submodules\moduleobjects_4.txt\__cmd : CommandNode
+	@@test_0\submodules\moduleobjects_5.txt : GeneratedFileNode
+	@@test_0\submodules\moduleobjects_5.txt\__cmd : CommandNode
+	@@test_0\submodules\sm12_objects.txt : GeneratedFileNode
+	@@test_0\submodules\sm12_objects.txt\__cmd : CommandNode
+	@@test_0\submodules\sm1\foo.cpp : SourceFileNode
+	@@test_0\submodules\sm1\foo.obj : GeneratedFileNode
+	@@test_0\submodules\sm1\foo.obj\__cmd : CommandNode
+	@@test_0\submodules\sm1\objects_1.txt : GeneratedFileNode
+	@@test_0\submodules\sm1\objects_1.txt\__cmd : CommandNode
+	@@test_0\submodules\sm1\rens.cpp : SourceFileNode
+	@@test_0\submodules\sm1\rens.obj : GeneratedFileNode
+	@@test_0\submodules\sm1\rens.obj\__cmd : CommandNode
+	@@test_0\submodules\sm2\bar.cpp : SourceFileNode
+	@@test_0\submodules\sm2\bar.obj : GeneratedFileNode
+	@@test_0\submodules\sm2\bar.obj\__cmd : CommandNode
+	@@test_0\submodules\sm3\poo.cpp : SourceFileNode
+	@@test_0\submodules\sm3\poo.obj : GeneratedFileNode
+	@@test_0\submodules\sm3\poo.obj\__cmd : CommandNode
+
+10:59:43.242 Updated 58 nodes in buildstate.
+
+Completed build 0.0
+
+Starting build 0.1
+10:59:43.252 Processing configuration changes
+10:59:43.257 Persistent buildstate updates:
+Insert new objects: 
+	@@test_1 : DirectoryNode
+	@@test_1\.dotignore : DotIgnoreNode
+	@@test_1\.gitignore : SourceFileNode
+	@@test_1\.yamignore : SourceFileNode
+	@@test_1\__invokeConfig : FileExecSpecsNode
+	@@test_1\yamConfig/fileExecSpecs.txt : SourceFileNode
+	test_1 : FileRepositoryNode
+Replace objects: 
+	@@test_0\yamConfig/repositories.txt : SourceFileNode
+	repositories : RepositoriesNode
+
+10:59:43.257 Updated 9 nodes in buildstate.
+
+10:59:43.257 Scanning filesystem
+10:59:43.270 Parsing buildfiles
+10:59:43.297 Checking for cycles in buildfile dependency graph.
+10:59:43.297 Compiling parsed buildfiles
+10:59:43.323 Checking for cycles in group dependency graph.
+10:59:43.331 Persistent buildstate updates:
+Insert new objects: 
+	@@test_1\clean.bat : SourceFileNode
+	@@test_1\project : DirectoryNode
+	@@test_1\project\.dotignore : DotIgnoreNode
+	@@test_1\project\.gitignore : SourceFileNode
+	@@test_1\project\.yamignore : SourceFileNode
+	@@test_1\project\<cyclic4> : GroupNode
+	@@test_1\project\<cyclic5> : GroupNode
+	@@test_1\project\__bfCompiler : BuildFileCompilerNode
+	@@test_1\project\__bfParser : BuildFileParserNode
+	@@test_1\project\buildfile_yam.txt : SourceFileNode
+	@@test_1\project\cyclic0.txt : GeneratedFileNode
+	@@test_1\project\cyclic0.txt\__cmd : CommandNode
+	@@test_1\project\cyclic3.txt : GeneratedFileNode
+	@@test_1\project\cyclic3.txt\__cmd : CommandNode
+	@@test_1\project\cyclic4.txt : GeneratedFileNode
+	@@test_1\project\cyclic4.txt\__cmd : CommandNode
+	@@test_1\project\cyclic5.txt : GeneratedFileNode
+	@@test_1\project\cyclic5.txt\__cmd : CommandNode
+	@@test_1\project\cyclic6.txt : GeneratedFileNode
+	@@test_1\project\cyclic6.txt\__cmd : CommandNode
+	@@test_1\project\cyclic8.txt : GeneratedFileNode
+	@@test_1\project\cyclic8.txt\__cmd : CommandNode
+	@@test_1\project\fooobjects.txt : GeneratedFileNode
+	@@test_1\project\fooobjects.txt\__cmd : CommandNode
+	@@test_1\project\linkedobjects.txt : GeneratedFileNode
+	@@test_1\project\linkedobjects.txt\__cmd : CommandNode
+	@@test_1\submodules : DirectoryNode
+	@@test_1\submodules\.dotignore : DotIgnoreNode
+	@@test_1\submodules\.gitignore : SourceFileNode
+	@@test_1\submodules\.yamignore : SourceFileNode
+	@@test_1\submodules\<cyclic1> : GroupNode
+	@@test_1\submodules\<cyclic2> : GroupNode
+	@@test_1\submodules\<cyclic3> : GroupNode
+	@@test_1\submodules\<fooobjects> : GroupNode
+	@@test_1\submodules\<group1> : GroupNode
+	@@test_1\submodules\<group2> : GroupNode
+	@@test_1\submodules\<objects> : GroupNode
+	@@test_1\submodules\__bfCompiler : BuildFileCompilerNode
+	@@test_1\submodules\__bfParser : BuildFileParserNode
+	@@test_1\submodules\buildfile_yam.txt : SourceFileNode
+	@@test_1\submodules\foo_objects.txt : GeneratedFileNode
+	@@test_1\submodules\foo_objects.txt\__cmd : CommandNode
+	@@test_1\submodules\fooobjects.obj : GeneratedFileNode
+	@@test_1\submodules\fooobjects.obj\__cmd : CommandNode
+	@@test_1\submodules\group_1.txt : GeneratedFileNode
+	@@test_1\submodules\group_1.txt\__cmd : CommandNode
+	@@test_1\submodules\group_2.txt : GeneratedFileNode
+	@@test_1\submodules\group_2.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_1.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_1.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_2.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_2.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_3.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_3.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_4.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_4.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_5.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_5.txt\__cmd : CommandNode
+	@@test_1\submodules\sm1 : DirectoryNode
+	@@test_1\submodules\sm12_objects.txt : GeneratedFileNode
+	@@test_1\submodules\sm12_objects.txt\__cmd : CommandNode
+	@@test_1\submodules\sm1\*.cpp : GlobNode
+	@@test_1\submodules\sm1\*.obj : GlobNode
+	@@test_1\submodules\sm1\.dotignore : DotIgnoreNode
+	@@test_1\submodules\sm1\.gitignore : SourceFileNode
+	@@test_1\submodules\sm1\.yamignore : SourceFileNode
+	@@test_1\submodules\sm1\__bfCompiler : BuildFileCompilerNode
+	@@test_1\submodules\sm1\__bfParser : BuildFileParserNode
+	@@test_1\submodules\sm1\buildfile_yam.txt : SourceFileNode
+	@@test_1\submodules\sm1\foo.cpp : SourceFileNode
+	@@test_1\submodules\sm1\foo.obj : GeneratedFileNode
+	@@test_1\submodules\sm1\foo.obj\__cmd : CommandNode
+	@@test_1\submodules\sm1\objects_1.txt : GeneratedFileNode
+	@@test_1\submodules\sm1\objects_1.txt\__cmd : CommandNode
+	@@test_1\submodules\sm1\rens.cpp : SourceFileNode
+	@@test_1\submodules\sm1\rens.obj : GeneratedFileNode
+	@@test_1\submodules\sm1\rens.obj\__cmd : CommandNode
+	@@test_1\submodules\sm2 : DirectoryNode
+	@@test_1\submodules\sm2\*.cpp : GlobNode
+	@@test_1\submodules\sm2\.dotignore : DotIgnoreNode
+	@@test_1\submodules\sm2\.gitignore : SourceFileNode
+	@@test_1\submodules\sm2\.yamignore : SourceFileNode
+	@@test_1\submodules\sm2\__bfCompiler : BuildFileCompilerNode
+	@@test_1\submodules\sm2\__bfParser : BuildFileParserNode
+	@@test_1\submodules\sm2\bar.cpp : SourceFileNode
+	@@test_1\submodules\sm2\bar.obj : GeneratedFileNode
+	@@test_1\submodules\sm2\bar.obj\__cmd : CommandNode
+	@@test_1\submodules\sm2\buildfile_yam.txt : SourceFileNode
+	@@test_1\submodules\sm3 : DirectoryNode
+	@@test_1\submodules\sm3\*.cpp : GlobNode
+	@@test_1\submodules\sm3\.dotignore : DotIgnoreNode
+	@@test_1\submodules\sm3\.gitignore : SourceFileNode
+	@@test_1\submodules\sm3\.yamignore : SourceFileNode
+	@@test_1\submodules\sm3\__bfCompiler : BuildFileCompilerNode
+	@@test_1\submodules\sm3\__bfParser : BuildFileParserNode
+	@@test_1\submodules\sm3\buildfile_yam.txt : SourceFileNode
+	@@test_1\submodules\sm3\poo.cpp : SourceFileNode
+	@@test_1\submodules\sm3\poo.obj : GeneratedFileNode
+	@@test_1\submodules\sm3\poo.obj\__cmd : CommandNode
+	@@test_1\submodules\sm[123]\buildfile_yam* : GlobNode
+	@@test_1\submodules\sm[1]\*.obj : GlobNode
+	@@test_1\yamConfig : DirectoryNode
+	@@test_1\yamConfig\.dotignore : DotIgnoreNode
+	@@test_1\yamConfig\.gitignore : SourceFileNode
+	@@test_1\yamConfig\.yamignore : SourceFileNode
+Replace objects: 
+	@@test_0\project : DirectoryNode
+	@@test_0\submodules : DirectoryNode
+	@@test_0\submodules\sm1 : DirectoryNode
+	@@test_0\submodules\sm1\*.cpp : GlobNode
+	@@test_0\submodules\sm1\*.obj : GlobNode
+	@@test_0\submodules\sm2 : DirectoryNode
+	@@test_0\submodules\sm2\*.cpp : GlobNode
+	@@test_0\submodules\sm3 : DirectoryNode
+	@@test_0\submodules\sm3\*.cpp : GlobNode
+	@@test_0\submodules\sm[123]\buildfile_yam* : GlobNode
+	@@test_0\submodules\sm[12]\* : GlobNode
+	@@test_1 : DirectoryNode
+	@@test_1\.gitignore : SourceFileNode
+	@@test_1\.yamignore : SourceFileNode
+
+10:59:43.354 Updated 119 nodes in buildstate.
+
+10:59:43.354 Executing commands
+10:59:44.704 Persistent buildstate updates:
+Replace objects: 
+	@@test_1\project\<cyclic4> : GroupNode
+	@@test_1\project\<cyclic5> : GroupNode
+	@@test_1\project\cyclic0.txt : GeneratedFileNode
+	@@test_1\project\cyclic0.txt\__cmd : CommandNode
+	@@test_1\project\cyclic3.txt : GeneratedFileNode
+	@@test_1\project\cyclic3.txt\__cmd : CommandNode
+	@@test_1\project\cyclic4.txt : GeneratedFileNode
+	@@test_1\project\cyclic4.txt\__cmd : CommandNode
+	@@test_1\project\cyclic5.txt : GeneratedFileNode
+	@@test_1\project\cyclic5.txt\__cmd : CommandNode
+	@@test_1\project\cyclic6.txt : GeneratedFileNode
+	@@test_1\project\cyclic6.txt\__cmd : CommandNode
+	@@test_1\project\cyclic8.txt : GeneratedFileNode
+	@@test_1\project\cyclic8.txt\__cmd : CommandNode
+	@@test_1\project\fooobjects.txt : GeneratedFileNode
+	@@test_1\project\fooobjects.txt\__cmd : CommandNode
+	@@test_1\project\linkedobjects.txt : GeneratedFileNode
+	@@test_1\project\linkedobjects.txt\__cmd : CommandNode
+	@@test_1\submodules\<cyclic1> : GroupNode
+	@@test_1\submodules\<cyclic3> : GroupNode
+	@@test_1\submodules\<fooobjects> : GroupNode
+	@@test_1\submodules\<group1> : GroupNode
+	@@test_1\submodules\<group2> : GroupNode
+	@@test_1\submodules\<objects> : GroupNode
+	@@test_1\submodules\foo_objects.txt : GeneratedFileNode
+	@@test_1\submodules\foo_objects.txt\__cmd : CommandNode
+	@@test_1\submodules\fooobjects.obj : GeneratedFileNode
+	@@test_1\submodules\fooobjects.obj\__cmd : CommandNode
+	@@test_1\submodules\group_1.txt : GeneratedFileNode
+	@@test_1\submodules\group_1.txt\__cmd : CommandNode
+	@@test_1\submodules\group_2.txt : GeneratedFileNode
+	@@test_1\submodules\group_2.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_1.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_1.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_2.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_2.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_3.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_3.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_4.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_4.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_5.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_5.txt\__cmd : CommandNode
+	@@test_1\submodules\sm12_objects.txt : GeneratedFileNode
+	@@test_1\submodules\sm12_objects.txt\__cmd : CommandNode
+	@@test_1\submodules\sm1\foo.cpp : SourceFileNode
+	@@test_1\submodules\sm1\foo.obj : GeneratedFileNode
+	@@test_1\submodules\sm1\foo.obj\__cmd : CommandNode
+	@@test_1\submodules\sm1\objects_1.txt : GeneratedFileNode
+	@@test_1\submodules\sm1\objects_1.txt\__cmd : CommandNode
+	@@test_1\submodules\sm1\rens.cpp : SourceFileNode
+	@@test_1\submodules\sm1\rens.obj : GeneratedFileNode
+	@@test_1\submodules\sm1\rens.obj\__cmd : CommandNode
+	@@test_1\submodules\sm2\bar.cpp : SourceFileNode
+	@@test_1\submodules\sm2\bar.obj : GeneratedFileNode
+	@@test_1\submodules\sm2\bar.obj\__cmd : CommandNode
+	@@test_1\submodules\sm3\poo.cpp : SourceFileNode
+	@@test_1\submodules\sm3\poo.obj : GeneratedFileNode
+	@@test_1\submodules\sm3\poo.obj\__cmd : CommandNode
+
+10:59:44.707 Updated 58 nodes in buildstate.
+
+Completed build 0.1
+
+Starting build 1.0
+10:59:44.746 Processing configuration changes
+10:59:44.755 Persistent buildstate updates:
+Replace objects: 
+	@@test_0\yamConfig/repositories.txt : SourceFileNode
+	@@test_1\submodules\<objects> : GroupNode
+	repositories : RepositoriesNode
+Remove objects: 
+	@@test_1 : DirectoryNode
+	@@test_1\.dotignore : DotIgnoreNode
+	@@test_1\.gitignore : SourceFileNode
+	@@test_1\.yamignore : SourceFileNode
+	@@test_1\__invokeConfig : FileExecSpecsNode
+	@@test_1\clean.bat : SourceFileNode
+	@@test_1\project : DirectoryNode
+	@@test_1\project\.dotignore : DotIgnoreNode
+	@@test_1\project\.gitignore : SourceFileNode
+	@@test_1\project\.yamignore : SourceFileNode
+	@@test_1\project\<cyclic4> : GroupNode
+	@@test_1\project\<cyclic5> : GroupNode
+	@@test_1\project\__bfCompiler : BuildFileCompilerNode
+	@@test_1\project\__bfParser : BuildFileParserNode
+	@@test_1\project\buildfile_yam.txt : SourceFileNode
+	@@test_1\project\cyclic0.txt : GeneratedFileNode
+	@@test_1\project\cyclic0.txt\__cmd : CommandNode
+	@@test_1\project\cyclic3.txt : GeneratedFileNode
+	@@test_1\project\cyclic3.txt\__cmd : CommandNode
+	@@test_1\project\cyclic4.txt : GeneratedFileNode
+	@@test_1\project\cyclic4.txt\__cmd : CommandNode
+	@@test_1\project\cyclic5.txt : GeneratedFileNode
+	@@test_1\project\cyclic5.txt\__cmd : CommandNode
+	@@test_1\project\cyclic6.txt : GeneratedFileNode
+	@@test_1\project\cyclic6.txt\__cmd : CommandNode
+	@@test_1\project\cyclic8.txt : GeneratedFileNode
+	@@test_1\project\cyclic8.txt\__cmd : CommandNode
+	@@test_1\project\fooobjects.txt : GeneratedFileNode
+	@@test_1\project\fooobjects.txt\__cmd : CommandNode
+	@@test_1\project\linkedobjects.txt : GeneratedFileNode
+	@@test_1\project\linkedobjects.txt\__cmd : CommandNode
+	@@test_1\submodules : DirectoryNode
+	@@test_1\submodules\.dotignore : DotIgnoreNode
+	@@test_1\submodules\.gitignore : SourceFileNode
+	@@test_1\submodules\.yamignore : SourceFileNode
+	@@test_1\submodules\<cyclic1> : GroupNode
+	@@test_1\submodules\<cyclic2> : GroupNode
+	@@test_1\submodules\<cyclic3> : GroupNode
+	@@test_1\submodules\<fooobjects> : GroupNode
+	@@test_1\submodules\<group1> : GroupNode
+	@@test_1\submodules\<group2> : GroupNode
+	@@test_1\submodules\__bfCompiler : BuildFileCompilerNode
+	@@test_1\submodules\__bfParser : BuildFileParserNode
+	@@test_1\submodules\buildfile_yam.txt : SourceFileNode
+	@@test_1\submodules\foo_objects.txt : GeneratedFileNode
+	@@test_1\submodules\foo_objects.txt\__cmd : CommandNode
+	@@test_1\submodules\fooobjects.obj : GeneratedFileNode
+	@@test_1\submodules\fooobjects.obj\__cmd : CommandNode
+	@@test_1\submodules\group_1.txt : GeneratedFileNode
+	@@test_1\submodules\group_1.txt\__cmd : CommandNode
+	@@test_1\submodules\group_2.txt : GeneratedFileNode
+	@@test_1\submodules\group_2.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_1.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_1.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_2.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_2.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_3.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_3.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_4.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_4.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_5.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_5.txt\__cmd : CommandNode
+	@@test_1\submodules\sm1 : DirectoryNode
+	@@test_1\submodules\sm12_objects.txt : GeneratedFileNode
+	@@test_1\submodules\sm12_objects.txt\__cmd : CommandNode
+	@@test_1\submodules\sm1\*.cpp : GlobNode
+	@@test_1\submodules\sm1\*.obj : GlobNode
+	@@test_1\submodules\sm1\.dotignore : DotIgnoreNode
+	@@test_1\submodules\sm1\.gitignore : SourceFileNode
+	@@test_1\submodules\sm1\.yamignore : SourceFileNode
+	@@test_1\submodules\sm1\__bfCompiler : BuildFileCompilerNode
+	@@test_1\submodules\sm1\__bfParser : BuildFileParserNode
+	@@test_1\submodules\sm1\buildfile_yam.txt : SourceFileNode
+	@@test_1\submodules\sm1\foo.cpp : SourceFileNode
+	@@test_1\submodules\sm1\foo.obj : GeneratedFileNode
+	@@test_1\submodules\sm1\foo.obj\__cmd : CommandNode
+	@@test_1\submodules\sm1\objects_1.txt : GeneratedFileNode
+	@@test_1\submodules\sm1\objects_1.txt\__cmd : CommandNode
+	@@test_1\submodules\sm1\rens.cpp : SourceFileNode
+	@@test_1\submodules\sm1\rens.obj : GeneratedFileNode
+	@@test_1\submodules\sm1\rens.obj\__cmd : CommandNode
+	@@test_1\submodules\sm2 : DirectoryNode
+	@@test_1\submodules\sm2\*.cpp : GlobNode
+	@@test_1\submodules\sm2\.dotignore : DotIgnoreNode
+	@@test_1\submodules\sm2\.gitignore : SourceFileNode
+	@@test_1\submodules\sm2\.yamignore : SourceFileNode
+	@@test_1\submodules\sm2\__bfCompiler : BuildFileCompilerNode
+	@@test_1\submodules\sm2\__bfParser : BuildFileParserNode
+	@@test_1\submodules\sm2\bar.cpp : SourceFileNode
+	@@test_1\submodules\sm2\bar.obj : GeneratedFileNode
+	@@test_1\submodules\sm2\bar.obj\__cmd : CommandNode
+	@@test_1\submodules\sm2\buildfile_yam.txt : SourceFileNode
+	@@test_1\submodules\sm3 : DirectoryNode
+	@@test_1\submodules\sm3\*.cpp : GlobNode
+	@@test_1\submodules\sm3\.dotignore : DotIgnoreNode
+	@@test_1\submodules\sm3\.gitignore : SourceFileNode
+	@@test_1\submodules\sm3\.yamignore : SourceFileNode
+	@@test_1\submodules\sm3\__bfCompiler : BuildFileCompilerNode
+	@@test_1\submodules\sm3\__bfParser : BuildFileParserNode
+	@@test_1\submodules\sm3\buildfile_yam.txt : SourceFileNode
+	@@test_1\submodules\sm3\poo.cpp : SourceFileNode
+	@@test_1\submodules\sm3\poo.obj : GeneratedFileNode
+	@@test_1\submodules\sm3\poo.obj\__cmd : CommandNode
+	@@test_1\submodules\sm[123]\buildfile_yam* : GlobNode
+	@@test_1\submodules\sm[1]\*.obj : GlobNode
+	@@test_1\yamConfig : DirectoryNode
+	@@test_1\yamConfig/fileExecSpecs.txt : SourceFileNode
+	@@test_1\yamConfig\.dotignore : DotIgnoreNode
+	@@test_1\yamConfig\.gitignore : SourceFileNode
+	@@test_1\yamConfig\.yamignore : SourceFileNode
+	test_1 : FileRepositoryNode
+
+10:59:44.762 Updated 192 nodes in buildstate.
+
+10:59:44.762 Scanning filesystem
+10:59:44.769 Parsing buildfiles
+10:59:44.770 Checking for cycles in buildfile dependency graph.
+10:59:44.771 Compiling parsed buildfiles
+10:59:44.772 Checking for cycles in group dependency graph.
+10:59:44.773 Executing commands
+Completed build 1.0
+
+Starting build 1.1
+10:59:44.781 Processing configuration changes
+10:59:44.784 Persistent buildstate updates:
+Insert new objects: 
+	@@test_1 : DirectoryNode
+	@@test_1\.dotignore : DotIgnoreNode
+	@@test_1\.gitignore : SourceFileNode
+	@@test_1\.yamignore : SourceFileNode
+	@@test_1\__invokeConfig : FileExecSpecsNode
+	@@test_1\yamConfig/fileExecSpecs.txt : SourceFileNode
+	test_1 : FileRepositoryNode
+Replace objects: 
+	@@test_0\yamConfig/repositories.txt : SourceFileNode
+	repositories : RepositoriesNode
+
+10:59:44.785 Updated 9 nodes in buildstate.
+
+10:59:44.785 Scanning filesystem
+10:59:44.797 Parsing buildfiles
+10:59:44.818 Checking for cycles in buildfile dependency graph.
+10:59:44.818 Compiling parsed buildfiles
+10:59:44.843 Checking for cycles in group dependency graph.
+10:59:44.850 Persistent buildstate updates:
+Insert new objects: 
+	@@test_1\clean.bat : SourceFileNode
+	@@test_1\project : DirectoryNode
+	@@test_1\project\.dotignore : DotIgnoreNode
+	@@test_1\project\.gitignore : SourceFileNode
+	@@test_1\project\.yamignore : SourceFileNode
+	@@test_1\project\<cyclic4> : GroupNode
+	@@test_1\project\<cyclic5> : GroupNode
+	@@test_1\project\__bfCompiler : BuildFileCompilerNode
+	@@test_1\project\__bfParser : BuildFileParserNode
+	@@test_1\project\buildfile_yam.txt : SourceFileNode
+	@@test_1\project\cyclic0.txt : GeneratedFileNode
+	@@test_1\project\cyclic0.txt\__cmd : CommandNode
+	@@test_1\project\cyclic3.txt : GeneratedFileNode
+	@@test_1\project\cyclic3.txt\__cmd : CommandNode
+	@@test_1\project\cyclic4.txt : GeneratedFileNode
+	@@test_1\project\cyclic4.txt\__cmd : CommandNode
+	@@test_1\project\cyclic5.txt : GeneratedFileNode
+	@@test_1\project\cyclic5.txt\__cmd : CommandNode
+	@@test_1\project\cyclic6.txt : GeneratedFileNode
+	@@test_1\project\cyclic6.txt\__cmd : CommandNode
+	@@test_1\project\cyclic8.txt : GeneratedFileNode
+	@@test_1\project\cyclic8.txt\__cmd : CommandNode
+	@@test_1\project\fooobjects.txt : GeneratedFileNode
+	@@test_1\project\fooobjects.txt\__cmd : CommandNode
+	@@test_1\project\linkedobjects.txt : GeneratedFileNode
+	@@test_1\project\linkedobjects.txt\__cmd : CommandNode
+	@@test_1\submodules : DirectoryNode
+	@@test_1\submodules\.dotignore : DotIgnoreNode
+	@@test_1\submodules\.gitignore : SourceFileNode
+	@@test_1\submodules\.yamignore : SourceFileNode
+	@@test_1\submodules\<cyclic1> : GroupNode
+	@@test_1\submodules\<cyclic2> : GroupNode
+	@@test_1\submodules\<cyclic3> : GroupNode
+	@@test_1\submodules\<fooobjects> : GroupNode
+	@@test_1\submodules\<group1> : GroupNode
+	@@test_1\submodules\<group2> : GroupNode
+	@@test_1\submodules\__bfCompiler : BuildFileCompilerNode
+	@@test_1\submodules\__bfParser : BuildFileParserNode
+	@@test_1\submodules\buildfile_yam.txt : SourceFileNode
+	@@test_1\submodules\foo_objects.txt : GeneratedFileNode
+	@@test_1\submodules\foo_objects.txt\__cmd : CommandNode
+	@@test_1\submodules\fooobjects.obj : GeneratedFileNode
+	@@test_1\submodules\fooobjects.obj\__cmd : CommandNode
+	@@test_1\submodules\group_1.txt : GeneratedFileNode
+	@@test_1\submodules\group_1.txt\__cmd : CommandNode
+	@@test_1\submodules\group_2.txt : GeneratedFileNode
+	@@test_1\submodules\group_2.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_1.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_1.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_2.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_2.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_3.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_3.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_4.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_4.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_5.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_5.txt\__cmd : CommandNode
+	@@test_1\submodules\sm1 : DirectoryNode
+	@@test_1\submodules\sm12_objects.txt : GeneratedFileNode
+	@@test_1\submodules\sm12_objects.txt\__cmd : CommandNode
+	@@test_1\submodules\sm1\*.cpp : GlobNode
+	@@test_1\submodules\sm1\*.obj : GlobNode
+	@@test_1\submodules\sm1\.dotignore : DotIgnoreNode
+	@@test_1\submodules\sm1\.gitignore : SourceFileNode
+	@@test_1\submodules\sm1\.yamignore : SourceFileNode
+	@@test_1\submodules\sm1\__bfCompiler : BuildFileCompilerNode
+	@@test_1\submodules\sm1\__bfParser : BuildFileParserNode
+	@@test_1\submodules\sm1\buildfile_yam.txt : SourceFileNode
+	@@test_1\submodules\sm1\foo.cpp : SourceFileNode
+	@@test_1\submodules\sm1\foo.obj : GeneratedFileNode
+	@@test_1\submodules\sm1\foo.obj\__cmd : CommandNode
+	@@test_1\submodules\sm1\objects_1.txt : GeneratedFileNode
+	@@test_1\submodules\sm1\objects_1.txt\__cmd : CommandNode
+	@@test_1\submodules\sm1\rens.cpp : SourceFileNode
+	@@test_1\submodules\sm1\rens.obj : GeneratedFileNode
+	@@test_1\submodules\sm1\rens.obj\__cmd : CommandNode
+	@@test_1\submodules\sm2 : DirectoryNode
+	@@test_1\submodules\sm2\*.cpp : GlobNode
+	@@test_1\submodules\sm2\.dotignore : DotIgnoreNode
+	@@test_1\submodules\sm2\.gitignore : SourceFileNode
+	@@test_1\submodules\sm2\.yamignore : SourceFileNode
+	@@test_1\submodules\sm2\__bfCompiler : BuildFileCompilerNode
+	@@test_1\submodules\sm2\__bfParser : BuildFileParserNode
+	@@test_1\submodules\sm2\bar.cpp : SourceFileNode
+	@@test_1\submodules\sm2\bar.obj : GeneratedFileNode
+	@@test_1\submodules\sm2\bar.obj\__cmd : CommandNode
+	@@test_1\submodules\sm2\buildfile_yam.txt : SourceFileNode
+	@@test_1\submodules\sm3 : DirectoryNode
+	@@test_1\submodules\sm3\*.cpp : GlobNode
+	@@test_1\submodules\sm3\.dotignore : DotIgnoreNode
+	@@test_1\submodules\sm3\.gitignore : SourceFileNode
+	@@test_1\submodules\sm3\.yamignore : SourceFileNode
+	@@test_1\submodules\sm3\__bfCompiler : BuildFileCompilerNode
+	@@test_1\submodules\sm3\__bfParser : BuildFileParserNode
+	@@test_1\submodules\sm3\buildfile_yam.txt : SourceFileNode
+	@@test_1\submodules\sm3\poo.cpp : SourceFileNode
+	@@test_1\submodules\sm3\poo.obj : GeneratedFileNode
+	@@test_1\submodules\sm3\poo.obj\__cmd : CommandNode
+	@@test_1\submodules\sm[123]\buildfile_yam* : GlobNode
+	@@test_1\submodules\sm[1]\*.obj : GlobNode
+	@@test_1\yamConfig : DirectoryNode
+	@@test_1\yamConfig\.dotignore : DotIgnoreNode
+	@@test_1\yamConfig\.gitignore : SourceFileNode
+	@@test_1\yamConfig\.yamignore : SourceFileNode
+Replace objects: 
+	@@test_1 : DirectoryNode
+	@@test_1\.gitignore : SourceFileNode
+	@@test_1\.yamignore : SourceFileNode
+	@@test_1\submodules\<objects> : GroupNode
+
+10:59:44.856 Updated 108 nodes in buildstate.
+
+10:59:44.856 Executing commands
+10:59:46.311 Persistent buildstate updates:
+Replace objects: 
+	@@test_1\project\<cyclic4> : GroupNode
+	@@test_1\project\<cyclic5> : GroupNode
+	@@test_1\project\cyclic0.txt : GeneratedFileNode
+	@@test_1\project\cyclic0.txt\__cmd : CommandNode
+	@@test_1\project\cyclic3.txt : GeneratedFileNode
+	@@test_1\project\cyclic3.txt\__cmd : CommandNode
+	@@test_1\project\cyclic4.txt : GeneratedFileNode
+	@@test_1\project\cyclic4.txt\__cmd : CommandNode
+	@@test_1\project\cyclic5.txt : GeneratedFileNode
+	@@test_1\project\cyclic5.txt\__cmd : CommandNode
+	@@test_1\project\cyclic6.txt : GeneratedFileNode
+	@@test_1\project\cyclic6.txt\__cmd : CommandNode
+	@@test_1\project\cyclic8.txt : GeneratedFileNode
+	@@test_1\project\cyclic8.txt\__cmd : CommandNode
+	@@test_1\project\fooobjects.txt : GeneratedFileNode
+	@@test_1\project\fooobjects.txt\__cmd : CommandNode
+	@@test_1\project\linkedobjects.txt : GeneratedFileNode
+	@@test_1\project\linkedobjects.txt\__cmd : CommandNode
+	@@test_1\submodules\<cyclic1> : GroupNode
+	@@test_1\submodules\<cyclic3> : GroupNode
+	@@test_1\submodules\<fooobjects> : GroupNode
+	@@test_1\submodules\<group1> : GroupNode
+	@@test_1\submodules\<group2> : GroupNode
+	@@test_1\submodules\foo_objects.txt : GeneratedFileNode
+	@@test_1\submodules\foo_objects.txt\__cmd : CommandNode
+	@@test_1\submodules\fooobjects.obj : GeneratedFileNode
+	@@test_1\submodules\fooobjects.obj\__cmd : CommandNode
+	@@test_1\submodules\group_1.txt : GeneratedFileNode
+	@@test_1\submodules\group_1.txt\__cmd : CommandNode
+	@@test_1\submodules\group_2.txt : GeneratedFileNode
+	@@test_1\submodules\group_2.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_1.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_1.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_2.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_2.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_3.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_3.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_4.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_4.txt\__cmd : CommandNode
+	@@test_1\submodules\moduleobjects_5.txt : GeneratedFileNode
+	@@test_1\submodules\moduleobjects_5.txt\__cmd : CommandNode
+	@@test_1\submodules\sm12_objects.txt : GeneratedFileNode
+	@@test_1\submodules\sm12_objects.txt\__cmd : CommandNode
+	@@test_1\submodules\sm1\foo.cpp : SourceFileNode
+	@@test_1\submodules\sm1\foo.obj : GeneratedFileNode
+	@@test_1\submodules\sm1\foo.obj\__cmd : CommandNode
+	@@test_1\submodules\sm1\objects_1.txt : GeneratedFileNode
+	@@test_1\submodules\sm1\objects_1.txt\__cmd : CommandNode
+	@@test_1\submodules\sm1\rens.cpp : SourceFileNode
+	@@test_1\submodules\sm1\rens.obj : GeneratedFileNode
+	@@test_1\submodules\sm1\rens.obj\__cmd : CommandNode
+	@@test_1\submodules\sm2\bar.cpp : SourceFileNode
+	@@test_1\submodules\sm2\bar.obj : GeneratedFileNode
+	@@test_1\submodules\sm2\bar.obj\__cmd : CommandNode
+	@@test_1\submodules\sm3\poo.cpp : SourceFileNode
+	@@test_1\submodules\sm3\poo.obj : GeneratedFileNode
+	@@test_1\submodules\sm3\poo.obj\__cmd : CommandNode
+
+10:59:46.315 Updated 57 nodes in buildstate.
+
+Completed build 1.1
+
+Starting build 2.0

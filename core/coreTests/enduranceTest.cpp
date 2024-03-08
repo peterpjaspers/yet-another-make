@@ -53,6 +53,12 @@ namespace
             , repoDir("D:\\test_yam")
             , context(builder.context())
         {
+            std::vector<LogRecord::Aspect> logAspects;
+            logAspects.push_back(LogRecord::Error);
+            logAspects.push_back(LogRecord::Warning);
+            logAspects.push_back(LogRecord::Progress);
+            logAspects.push_back(LogRecord::BuildStateUpdate);
+            context->logBook()->aspects(logAspects);
             // make test a bit more deterministic
             context->threadPool().size(1);
         }
@@ -106,7 +112,6 @@ namespace
             std::filesystem::path reposFile(repoDir / "yamConfig/repositories.txt");
             std::string repos = R"(
                 name = test_1 dir = ..\test_yam_1 type = Build;
-                name = test_2 dir = ..\test_yam_2 type = Build; 
             )";
             writeFile(reposFile, repos);
         }
@@ -117,29 +122,55 @@ namespace
         }
     };
 
-    //TEST(Endurance, repeatAddRemoveRepositories) {
-    void ignore() {
+    // Reproduces crash in build 2.0
+    TEST(Endurance, repeatAddRemoveRepositories_crashIn2_0) {
+    //void ignore2_0() {
         std::filesystem::remove_all("D:\\test_yam");
         std::filesystem::remove_all("D:\\test_yam_1");
-        std::filesystem::remove_all("D:\\test_yam_2");
-        std::filesystem::copy("D:\\clean_repos\\test_yam",   "D:\\test_yam",   std::filesystem::copy_options::recursive);
+        std::filesystem::copy("D:\\clean_repos\\test_yam", "D:\\test_yam", std::filesystem::copy_options::recursive);
         std::filesystem::copy("D:\\clean_repos\\test_yam_1", "D:\\test_yam_1", std::filesystem::copy_options::recursive);
-        std::filesystem::copy("D:\\clean_repos\\test_yam_2", "D:\\test_yam_2", std::filesystem::copy_options::recursive);
-        for (int nRestarts = 0; nRestarts < 100; nRestarts++) {
+        for (int nRestarts = 0; nRestarts < 3; nRestarts++) {
             TestDriver driver;
-            auto &stats = driver.context->statistics();
+            auto& stats = driver.context->statistics();
             stats.registerNodes = true;
             driver.removeRepos();
             for (int nBuilds = 0; nBuilds < 2; nBuilds++) {
                 stats.reset();
+                std::cout << "\nStarting build " << nRestarts << "." << nBuilds << std::endl;
                 std::shared_ptr<BuildResult> result = driver.build();
                 ASSERT_EQ(TRUE, result->succeeded());
-                std::cout << "Restarts=" << nRestarts << ", builds=" << nBuilds << std::endl;
-                if (nBuilds%2 == 0) {
+                std::cout << "Completed build " << nRestarts << "." << nBuilds << std::endl;
+                if (nBuilds % 2 == 0) {
                     driver.addRepos();
                 } else {
                     driver.removeRepos();
                 }
+            }
+        }
+    }
+
+    // Reproduces crash in build 4.0
+    //TEST(Endurance, repeatAddRemoveRepositories_crashIn4_0) {
+    void ignore4_0() {
+        std::filesystem::remove_all("D:\\test_yam");
+        std::filesystem::remove_all("D:\\test_yam_1");
+        std::filesystem::copy("D:\\clean_repos\\test_yam", "D:\\test_yam", std::filesystem::copy_options::recursive);
+        std::filesystem::copy("D:\\clean_repos\\test_yam_1", "D:\\test_yam_1", std::filesystem::copy_options::recursive);
+        for (int nRestarts = 0; nRestarts < 10; nRestarts++) {
+            TestDriver driver;
+            auto& stats = driver.context->statistics();
+            stats.registerNodes = true;
+            if (nRestarts % 2 == 0) {
+                driver.removeRepos();
+            } else {
+                driver.addRepos();
+            }
+            for (int nBuilds = 0; nBuilds < 1; nBuilds++) {
+                stats.reset();
+                std::cout << "\nStarting build " << nRestarts << "." << nBuilds << std::endl;
+                std::shared_ptr<BuildResult> result = driver.build();
+                ASSERT_EQ(TRUE, result->succeeded());
+                std::cout << "Completed build " << nRestarts << "." << nBuilds << std::endl;
             }
         }
     }

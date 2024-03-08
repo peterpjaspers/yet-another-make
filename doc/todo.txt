@@ -4,20 +4,24 @@ Bugs
   Reproduce with coreTests EnduranceTest
 
 Features
+- Fast lookup of dirty node nodes
+     - BuildScopeFinder unittest
+- periodic storage during a build
 - implement wildcard/glob for output files (dynamic outputs)
 - integrate Phil's file access monitor
+    - how to deal with input dependencies on non-existing source files
+      Note: these source file nodes are NOT in state Deleted. How to GC these
+      nodes when no longer refd => GC sweep over context to remove node with
+      use_count 1.
+    - directory enumerat
 - Versioning in PersistentBuildState, encode version in name of buildstate file
-- fileaspect last-write-time (e.g. for generated files in cmd executionhash)
 - fileaspect configuration
-- how to deal with input dependencies on non-existing source files
-  Note: these source file nodes are NOT in state Deleted. How to GC these
-  nodes when no longer refd => GC sweep over context to remove node with
-  use_count 1.
+      - hash = last-write-time (e.g. for generated files in cmd executionhash)
+      - import lib exports hash (hash i/f of dll)
 - environment variables
   requires syntax for export of variables to environment of rule
-- Fast lookup of dirty nodes, new/modified/deleted nodes
-- BuildScopeFinder unittest
-- Enable implementation of streaming hash computation
+- response files
+- xxhash stream
 - build yam with yam
 - deal with dependencies on gtest, boost, xxhash
   xxhash requires license to be part of binary redistribution.
@@ -28,7 +32,7 @@ Features
 - end-to-end testing (automated gtest)
 - scalability measurements
 - documentation
-- bedenk betere naam voor yam
+- bedenk betere naam voor yam?
 - inform Mike Shal
 
 Out-of-scope:

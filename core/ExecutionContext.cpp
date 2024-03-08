@@ -157,5 +157,6 @@ namespace YAM
             _repositoriesNode = nullptr;
         }
         _nodes.clear();
+        _nodes.clearChangeSet();
     }
 }

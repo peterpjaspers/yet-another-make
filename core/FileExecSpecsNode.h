@@ -62,6 +62,7 @@ namespace YAM
         //Inherited from Node
         void start() override;
         std::string className() const override { return "FileExecSpecsNode"; }
+        void cleanup() override;
 
         static void setStreamableType(uint32_t type);
         // Inherited from IStreamable

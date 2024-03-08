@@ -224,8 +224,8 @@ namespace YAM
 
     void FileRepositoryNode::removeYourself() {
         _directoryNode->clear();
-        context()->nodes().removeIfPresent(_fileExecSpecsNode);
         context()->nodes().removeIfPresent(_fileExecSpecsNode->configFileNode());
+        context()->nodes().removeIfPresent(_fileExecSpecsNode);
         context()->nodes().removeIfPresent(_directoryNode);
         _fileExecSpecsNode = nullptr;
         _directoryNode = nullptr;

@@ -55,8 +55,24 @@ namespace YAM
         std::vector<std::shared_ptr<Node>> nodes() const;
         std::unordered_map<std::filesystem::path, std::shared_ptr<Node>> nodesMap() const;
 
+        // Register node as modified.
+        // Pre: node->modified()
+        void registerModified(std::shared_ptr<Node> const& node);
+
+        // Return changes in the nodeset since the last call to clearChangeSet().
+        std::vector<std::shared_ptr<Node>> const& addedNodes() const;
+        std::vector<std::shared_ptr<Node>> const& modifiedNodes() const;
+        std::vector<std::shared_ptr<Node>> const& removedNodes() const;
+
+        // Clear the modified and removed node sets.
+        void clearChangeSet();
+
     private:
         std::unordered_map<std::filesystem::path, std::shared_ptr<Node>> _nodes;
+        std::vector<std::shared_ptr<Node>> _addedNodes;
+        std::vector<std::shared_ptr<Node>> _modifiedNodes;
+        std::vector<std::shared_ptr<Node>> _removedNodes;
+
     };
 }
 

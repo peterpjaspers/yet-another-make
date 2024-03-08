@@ -4,24 +4,30 @@
 namespace YAM
 {
     void NodeSet::addIfAbsent(std::shared_ptr<Node> const& node) {
-        const auto notUsed = _nodes.insert({ node->name(), node });
+        const auto result = _nodes.insert({ node->name(), node });
+        if (result.second) {
+            _addedNodes.push_back(node);
+        }
     }
 
     void NodeSet::add(std::shared_ptr<Node> const& node) {
         const auto [it, success] = _nodes.insert({ node->name(), node });
         if (!success) throw std::runtime_error("failed to add node");
+        _addedNodes.push_back(node);
     }
 
     void NodeSet::remove(std::shared_ptr<Node> const& node) {
         auto nRemoved = _nodes.erase(node->name());
         if (nRemoved != 1) throw std::runtime_error("failed to remove node");
         node->setState(Node::State::Deleted);
+        _removedNodes.push_back(node);
     }
 
     void NodeSet::removeIfPresent(std::shared_ptr<Node> const& node) {
         auto nRemoved = _nodes.erase(node->name());
         if (nRemoved == 1) {
             node->setState(Node::State::Deleted);
+            _removedNodes.push_back(node);
         }
     }
 
@@ -74,5 +80,24 @@ namespace YAM
         std::vector<std::shared_ptr<Node>> nodes;
         for (auto const& pair : _nodes) nodes.push_back(pair.second);
         return nodes;
+    }
+
+
+    void NodeSet::registerModified(std::shared_ptr<Node> const& node) {
+        _modifiedNodes.push_back(node);
+    }
+    std::vector<std::shared_ptr<Node>> const& NodeSet::addedNodes() const {
+        return _addedNodes;
+    }
+    std::vector<std::shared_ptr<Node>> const& NodeSet::modifiedNodes() const {
+        return _modifiedNodes;
+    }
+    std::vector<std::shared_ptr<Node>> const& NodeSet::removedNodes() const {
+        return _removedNodes;
+    }
+    void NodeSet::clearChangeSet() {
+        _addedNodes.clear();
+        _modifiedNodes.clear();
+        _removedNodes.clear();
     }
 }

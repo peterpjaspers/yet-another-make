@@ -46,9 +46,7 @@ namespace YAM
     // It is up to the application to avoid such situations by only starting
     // a directory node when its parent directory is not dirty. 
     //
-    class __declspec(dllexport) DirectoryNode : 
-        public Node,
-        public std::enable_shared_from_this<DirectoryNode>
+    class __declspec(dllexport) DirectoryNode : public Node
     {
     public:
         DirectoryNode(); // needed for deserialization

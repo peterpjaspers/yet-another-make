@@ -131,6 +131,11 @@ namespace YAM
         _configFile->addObserver(this);
     }
 
+    void FileExecSpecsNode::cleanup() {
+        _configFile->removeObserver(this);
+        _configFile = nullptr;
+    }
+
     std::filesystem::path FileExecSpecsNode::absoluteConfigFilePath() const {
         return _configFile->absolutePath();
     }
@@ -202,20 +207,26 @@ namespace YAM
 
     void FileExecSpecsNode::stream(IStreamer* streamer) {
         Node::stream(streamer);
-        streamer->stream(_configFile);
-        streamer->streamMap(_commandFmts);
-        streamer->stream(_executionHash);
+        if (state() != Node::State::Deleted) {
+            streamer->stream(_configFile);
+            streamer->streamMap(_commandFmts);
+            streamer->stream(_executionHash);
+        }
     }
 
     void FileExecSpecsNode::prepareDeserialize() {
         Node::prepareDeserialize();
-        _commandFmts.clear();
-        _configFile->removeObserver(this);
+        if (state() != Node::State::Deleted) {
+            _commandFmts.clear();
+            _configFile->removeObserver(this);
+        }
     }
 
     bool FileExecSpecsNode::restore(void* context, std::unordered_set<IPersistable const*>& restored) {
         if (!Node::restore(context, restored)) return false;
-        _configFile->addObserver(this);
+        if (state() != Node::State::Deleted) {
+            _configFile->addObserver(this);
+        }
         return true;
     }
 }

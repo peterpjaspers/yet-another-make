@@ -82,7 +82,8 @@ namespace YAM
     }
 
     std::shared_ptr<DirectoryNode> DirectoryNode::parent() const { 
-        return _parent == nullptr ? nullptr : _parent->shared_from_this();
+        if (_parent == nullptr) return nullptr;
+        return dynamic_pointer_cast<DirectoryNode>(_parent->shared_from_this());
     }
 
     void DirectoryNode::parent(DirectoryNode* parent) {
@@ -165,7 +166,8 @@ namespace YAM
     }
 
     std::shared_ptr<Node> DirectoryNode::findChild(std::filesystem::path const& path) {
-        return findChild(shared_from_this(), path.begin(), path.end());
+        auto sharedThis = dynamic_pointer_cast<DirectoryNode>(shared_from_this());
+        return findChild(sharedThis, path.begin(), path.end());
     }
 
     std::chrono::time_point<std::chrono::utc_clock> const& DirectoryNode::lastWriteTime() {

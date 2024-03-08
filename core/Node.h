@@ -44,7 +44,10 @@ namespace YAM
     // be called from ExecutionContext::mainThread(). Applications must access
     // node state and ExecutionContext::nodes() from mainThread only.
     //  
-    class __declspec(dllexport) Node : public IPersistable, protected StateObserver
+    class __declspec(dllexport) Node : 
+        public IPersistable, 
+        protected StateObserver,
+        public std::enable_shared_from_this<Node>
     {
     public:
         enum class State {

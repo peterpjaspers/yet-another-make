@@ -368,10 +368,12 @@ namespace YAM
 
     // Called in main thread
     void Builder::_handleDirectoriesCompletion(Node* n) {
+        _storeBuildState();
         if (n != _dirtyDirectories.get()) throw std::exception("unexpected node");
         if (_dirtyDirectories->state() != Node::State::Ok) {
             _postCompletion(Node::State::Failed);
         } else {
+            _storeBuildState();
             std::vector<std::shared_ptr<Node>> dirtyBuildFiles;
             for (auto const& pair : _context.repositories()) {
                 auto repo = pair.second;
@@ -395,6 +397,7 @@ namespace YAM
 
     // Called in main thread
     void Builder::_handleBuildFileParsersCompletion(Node* n) {
+        _storeBuildState();
         if (n != _dirtyBuildFileParsers.get()) throw std::exception("unexpected node");
         if (_dirtyBuildFileParsers->state() != Node::State::Ok) {
             _postCompletion(Node::State::Failed);
@@ -426,6 +429,7 @@ namespace YAM
     }
 
     void Builder::_handleBuildFileCompilersCompletion(Node* n) {
+        _storeBuildState();
         if (n != _dirtyBuildFileCompilers.get()) throw std::exception("unexpected node");
         if (_dirtyBuildFileCompilers->state() != Node::State::Ok) {
             _postCompletion(Node::State::Failed);
@@ -437,12 +441,6 @@ namespace YAM
         } else {
             BuildScopeFinder finder;
             std::vector<std::shared_ptr<Node>> dirtyCommands = finder(&_context, _context.buildRequest()->options());
-            if (
-                !_dirtyBuildFileCompilers->content().empty()
-                || !dirtyCommands.empty()
-            ) {
-                _storeBuildState();
-            }
             if (dirtyCommands.empty()) {
                 _handleCommandsCompletion(_dirtyCommands.get());
             } else {
@@ -458,9 +456,9 @@ namespace YAM
 
     // Called in main thread
     void Builder::_handleCommandsCompletion(Node* n) {
+        _storeBuildState();
         if (n != _dirtyCommands.get()) throw std::exception("unexpected node");
         Node::State newState = _dirtyCommands->state();
-        _storeBuildState();
         // Delay clearing the inputProducers of the _dirty* nodes to avoid
         // removing an observer on a node that is notifying.
         _postCompletion(newState);

@@ -318,44 +318,6 @@ namespace YAM
         }
         return forest;
     }
-
-    // Determine the differences between buildState and storedState. 
-    // Post:
-    //   onlyInBuildState: objects in buildState but not in storedState.
-    //   inBoth: objects in buildState and storedState.
-    //   onlyInStoredState: objects in storedState but not in buildState.
-    //   objects in onlyInBuildState and inBoth are in modified() state.
-    void computeDifference(
-        ILogBook& logBook,
-        std::unordered_set<std::shared_ptr<IPersistable>> const& buildState,
-        std::unordered_set<std::shared_ptr<IPersistable>> const& storedState,
-        std::unordered_set<std::shared_ptr<IPersistable>>& onlyInBuildState,
-        std::unordered_set<std::shared_ptr<IPersistable>>& inBoth,
-        std::unordered_set<std::shared_ptr<IPersistable>>& onlyInStoredState
-    ) {
-        for (auto const& p : buildState) {
-            if (p->modified()) {
-                if (storedState.contains(p)) {
-                    inBoth.insert(p);
-                } else {
-                    onlyInBuildState.insert(p);
-                }
-            }
-        }
-        for (auto const& p : storedState) {
-            if (!buildState.contains(p)) {
-                onlyInStoredState.insert(p);
-            }
-        }
-        std::shared_ptr<IPersistable> p;
-        if (!onlyInBuildState.empty()) p = *onlyInBuildState.begin();
-        else if (!inBoth.empty()) p = *inBoth.begin();
-        else if (!onlyInStoredState.empty()) p = *onlyInStoredState.begin();
-        if (p != nullptr) {
-            auto n = dynamic_cast<Node*>(p.get());
-            logDifference(logBook, onlyInBuildState, inBoth, onlyInStoredState);
-        }
-    }
 }
 
 namespace YAM
@@ -425,6 +387,7 @@ namespace YAM
         std::unordered_set<IPersistable const*> restored;
         for (auto const& pair : _keyToObject) pair.second->restore(_context, restored);
         for (auto const& pair : _keyToDeletedObject) pair.second->restore(_context, restored);
+        _context->nodes().clearChangeSet();
     }
 
     void PersistentBuildState::reset() {
@@ -506,13 +469,18 @@ namespace YAM
         std::unordered_set<std::shared_ptr<IPersistable>> toReplace;
         std::unordered_set<std::shared_ptr<IPersistable>> toReplaceDeleted;
         std::unordered_set<std::shared_ptr<IPersistable>> toRemove;
-        std::map<IPersistable*, Key> _toRemoveKeys;
-        _context->getBuildState(buildState);
-        getStoredState(storedState);
-        computeDifference(*(_context->logBook()), buildState, storedState, toInsert, toReplace, toRemove);
-        // Release strong refs to objects in these temporary sets.
-        buildState.clear();
-        storedState.clear();
+
+        auto& nodes = _context->nodes();
+        auto const &added = nodes.addedNodes();
+        auto const &modified = nodes.modifiedNodes();
+        auto const &removed = nodes.removedNodes();
+        toInsert.insert(added.begin(), added.end());
+        toReplace.insert(modified.begin(), modified.end());
+        toRemove.insert(removed.begin(), removed.end());
+        for (auto const& p : toInsert) toReplace.erase(p);
+        for (auto const& p : toRemove) toReplace.erase(p);
+        nodes.clearChangeSet();
+        logDifference(*(_context->logBook()), toInsert, toReplace, toRemove);
 
         for (auto const& p : toRemove) {
             if (!p->deleted()) {
@@ -659,9 +627,17 @@ namespace YAM
         std::unordered_set<std::shared_ptr<IPersistable>> toRemove;
         std::unordered_set<std::shared_ptr<IPersistable>> toReplace;
         std::unordered_set<std::shared_ptr<IPersistable>> toAdd;
-        _context->getBuildState(buildState);
-        getStoredState(storedState);
-        computeDifference(*(_context->logBook()), buildState, storedState, toRemove, toReplace, toAdd);
+
+        auto& nodes = _context->nodes();
+        auto const& added = nodes.addedNodes();
+        auto const& modified = nodes.modifiedNodes();
+        auto const& removed = nodes.removedNodes();
+        toRemove.insert(added.begin(), added.end());
+        toReplace.insert(modified.begin(), modified.end());
+        toAdd.insert(removed.begin(), removed.end());
+        nodes.clearChangeSet();
+        for (auto const& p : toRemove) toReplace.erase(p);
+        for (auto const& p : toAdd) toReplace.erase(p);
 
         for (auto const& object : toRemove) {
             removeFromBuildState(object);
