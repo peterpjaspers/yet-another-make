@@ -5,12 +5,20 @@ namespace YAM
 {
     void NodeSet::addIfAbsent(std::shared_ptr<Node> const& node) {
         const auto result = _nodes.insert({ node->name(), node });
-        if (result.second) changeSetAdd(node);
+        if (result.second) {
+            if (node->state() == Node::State::Dirty) {
+                registerDirtyNode(node);
+            }
+            changeSetAdd(node);
+        }
     }
 
     void NodeSet::add(std::shared_ptr<Node> const& node) {
         const auto [it, success] = _nodes.insert({ node->name(), node });
         if (!success) throw std::runtime_error("failed to add node");
+        if (node->state() == Node::State::Dirty) {
+            registerDirtyNode(node);
+        }
         changeSetAdd(node);
     }
 
@@ -18,6 +26,7 @@ namespace YAM
         auto nRemoved = _nodes.erase(node->name());
         if (nRemoved != 1) throw std::runtime_error("failed to remove node");
         node->setState(Node::State::Deleted);
+        _dirtyNodes[node->className()].erase(node);
         changeSetRemove(node);
     }
 
@@ -25,12 +34,14 @@ namespace YAM
         auto nRemoved = _nodes.erase(node->name());
         if (nRemoved == 1) {
             node->setState(Node::State::Deleted);
+            _dirtyNodes[node->className()].erase(node);
             changeSetRemove(node);
         }
     }
 
     void NodeSet::clear() {
         for (auto const& pair : _nodes) changeSetRemove(pair.second);
+        _dirtyNodes.clear();
         _nodes.clear();
     }
 
@@ -79,6 +90,24 @@ namespace YAM
         std::vector<std::shared_ptr<Node>> nodes;
         for (auto const& pair : _nodes) nodes.push_back(pair.second);
         return nodes;
+    }
+
+    void NodeSet::NodeSet::registerDirtyNode(std::shared_ptr<Node> const& node) {
+        if (!_nodes.contains(node->name())) return;
+        auto result = _dirtyNodes[node->className()].insert(node);
+        if (!result.second) throw std::runtime_error("Attempt to add duplicate dirty node");
+    }
+
+    void NodeSet::unregisterDirtyNode(std::shared_ptr<Node> const& node) {
+        if (!_nodes.contains(node->name())) return;
+        std::size_t nRemoved = _dirtyNodes[node->className()].erase(node);
+        if (nRemoved != 1) throw std::runtime_error("Attempt to remove unknown dirty node");
+    }
+
+    // Return map from node class name to the set of instances of that class
+    // in state Node::State::Dirty
+    std::unordered_map<std::string, std::unordered_set<std::shared_ptr<Node>>> const& NodeSet::dirtyNodes() const {
+        return _dirtyNodes;
     }
 
     void NodeSet::changeSetModify(std::shared_ptr<Node> const& node) {

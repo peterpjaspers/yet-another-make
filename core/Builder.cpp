@@ -29,6 +29,10 @@ namespace
     using namespace YAM;
 
     std::vector<std::shared_ptr<Node>> emptyNodes;
+    static std::string dirClass("DirectoryNode");
+    static std::string parserClass("BuildFileParserNode");
+    static std::string compilerClass("BuildFileCompilerNode");
+    static std::string cmdClass("CommandNode");
 
     void resetNodeStates(NodeSet& nodes) {
         auto resetState = Delegate<void, std::shared_ptr<Node> const&>::CreateLambda(
@@ -43,20 +47,43 @@ namespace
         nodes.foreach(resetState);
     }
 
-    void appendDirtyDirectoryNodes(
-        std::shared_ptr<DirectoryNode> directory,
-        std::map<std::filesystem::path, std::shared_ptr<DirectoryNode>>& dirtyDirs
+    template<typename T>
+    void appendDirtyNodes(
+        ExecutionContext* context,
+        std::string const& nodeClass,
+        std::vector<std::shared_ptr<T>>& dirtyNodes
     ) {
-        if (directory->state() == Node::State::Dirty) {
-            dirtyDirs.insert({ directory->name(), directory });
-        }
-        for (auto const& pair : directory->getContent()) {
-            auto child = pair.second;
-            auto dir = dynamic_pointer_cast<DirectoryNode>(child);
-            if (dir != nullptr) {
-                appendDirtyDirectoryNodes(dir, dirtyDirs);
+        auto const& dirtyNodesMap = context->nodes().dirtyNodes();
+        auto it = dirtyNodesMap.find(nodeClass);
+        if (it != dirtyNodesMap.end()) {
+            for (auto const& node : it->second) {
+                auto repoType = node->repository()->repoType();
+                if (repoType == FileRepositoryNode::RepoType::Build) {
+                    auto tnode = dynamic_pointer_cast<T>(node);
+                    if (tnode == nullptr) throw std::runtime_error("not a node of type T");
+                    if (tnode->state() != Node::State::Dirty) throw std::runtime_error("not a dirty node");
+                    dirtyNodes.push_back(tnode);
+                }
             }
         }
+    }
+
+    template<typename T>
+    void appendDirtyNodesMap(
+        ExecutionContext *context,
+        std::string const& nodeClass,
+        std::map<std::filesystem::path, std::shared_ptr<T>>& dirtyNodes
+    ) {
+        std::vector<std::shared_ptr<T>> dirtyNodesVec;
+        appendDirtyNodes<T>(context, nodeClass, dirtyNodesVec);
+        for (auto const& node : dirtyNodesVec) {
+            dirtyNodes.insert({ node->name(), node });
+        }
+    }
+
+    bool isBuildFile(std::filesystem::path const& filePath) {
+        static std::filesystem::path buildFileName("buildfile.yam");
+        return filePath.filename() == buildFileName;
     }
 
     // See class DirectoryNode for explanation why pruning is needed.
@@ -72,66 +99,6 @@ namespace
             }
         }
         return pruned;
-    }
-
-    void appendDirtyBuildFileParserNodes(
-        std::shared_ptr<DirectoryNode> directory,
-        std::vector<std::shared_ptr<Node>>& dirtyNodes
-    ) {
-        auto parser = directory->buildFileParserNode();
-        if (parser != nullptr && parser->state() == Node::State::Dirty) {
-            dirtyNodes.push_back(parser);
-        }
-        for (auto const& pair : directory->getContent()) {
-            auto sourceDir = dynamic_pointer_cast<DirectoryNode>(pair.second);
-            if (sourceDir != nullptr) {
-                appendDirtyBuildFileParserNodes(sourceDir, dirtyNodes);
-            }
-        }
-    }
-
-    void appendDirtyBuildFileCompilerNodes(
-        std::shared_ptr<DirectoryNode> directory,
-        std::vector<std::shared_ptr<Node>>& dirtyNodes
-    ) {
-        auto compiler = directory->buildFileCompilerNode();
-        if (compiler != nullptr && compiler->state() == Node::State::Dirty) {
-            dirtyNodes.push_back(compiler);
-        }
-        for (auto const& pair : directory->getContent()) {
-            auto sourceDir = dynamic_pointer_cast<DirectoryNode>(pair.second);
-            if (sourceDir != nullptr) {
-                appendDirtyBuildFileCompilerNodes(sourceDir, dirtyNodes);
-            }
-        }
-    }
-
-    bool isBuildFile(std::filesystem::path const& filePath) {
-        static std::filesystem::path buildFileName("buildfile.yam");
-        return filePath.filename() == buildFileName;
-    }
-
-    void appendDirtyCommands(
-        NodeSet& nodes,
-        std::vector<std::filesystem::path> const& scope,
-        std::vector<std::shared_ptr<Node>>& dirtyCommands
-    ) {
-        for (auto const& node : nodes.nodes()) {
-            auto cmd = dynamic_pointer_cast<CommandNode>(node);
-            if (cmd != nullptr && cmd->state() == Node::State::Dirty) {
-                if (scope.empty()) {
-                    dirtyCommands.push_back(cmd);
-                } else {
-                    for (auto const& output : cmd->outputs()) {
-                        auto it = std::find(scope.begin(), scope.end(), output->name());
-                        if (it != scope.end()) {
-                            dirtyCommands.push_back(cmd);
-                            break;
-                        }
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -232,10 +199,9 @@ namespace YAM
     // Called in main thread
     void Builder::_clean() {
         uint32_t nFailures = 0;
-        std::vector<std::shared_ptr<Node>> cmds;
         std::vector<std::shared_ptr<GeneratedFileNode>> genFiles;
         BuildScopeFinder finder;
-        cmds = finder(&_context, _context.buildRequest()->options(), &genFiles);
+        genFiles = finder.findGeneratedFiles(&_context, _context.buildRequest()->options());
         for (auto const& file : genFiles) {
             if (!file->deleteFile(true)) nFailures += 1;
         }
@@ -339,19 +305,13 @@ namespace YAM
 
     // Called in main thread
     void Builder::_handleConfigNodesCompletion(Node* n) {
+        _storeBuildState();
         if (n != _dirtyConfigNodes.get()) throw std::exception("unexpected node");
         if (_dirtyConfigNodes->state() != Node::State::Ok) {
             _postCompletion(Node::State::Failed);
         } else {
-            if (!_dirtyConfigNodes->content().empty()) _storeBuildState();
             std::map<std::filesystem::path, std::shared_ptr<DirectoryNode>> dirtyDirs;
-            for (auto const& pair : _context.repositories()) {
-                auto repo = pair.second;
-                if (repo->repoType() != FileRepositoryNode::RepoType::Ignore) {
-                    auto dirNode = repo->directoryNode();
-                    appendDirtyDirectoryNodes(dirNode, dirtyDirs);
-                }
-            }
+            appendDirtyNodesMap<DirectoryNode>(&_context, dirClass, dirtyDirs);
             std::vector<std::shared_ptr<Node>> prunedDirtyDirs = pruneDirtyDirectories(dirtyDirs);
             if (prunedDirtyDirs.empty()) {
                 _handleDirectoriesCompletion(_dirtyDirectories.get());
@@ -373,15 +333,8 @@ namespace YAM
         if (_dirtyDirectories->state() != Node::State::Ok) {
             _postCompletion(Node::State::Failed);
         } else {
-            _storeBuildState();
             std::vector<std::shared_ptr<Node>> dirtyBuildFiles;
-            for (auto const& pair : _context.repositories()) {
-                auto repo = pair.second;
-                if (repo->repoType() == FileRepositoryNode::RepoType::Build) {
-                    auto dirNode = repo->directoryNode();
-                    appendDirtyBuildFileParserNodes(dirNode, dirtyBuildFiles);
-                }
-            }
+            appendDirtyNodes<Node>(&_context, parserClass, dirtyBuildFiles);
             if (dirtyBuildFiles.empty()) {
                 _handleBuildFileParsersCompletion(_dirtyBuildFileParsers.get());
             } else {
@@ -408,13 +361,7 @@ namespace YAM
             _postCompletion(Node::State::Failed);
         } else {
             std::vector<std::shared_ptr<Node>> dirtyBuildFileCompilers;
-            for (auto const& pair : _context.repositories()) {
-                auto repo = pair.second;
-                if (repo->repoType() == FileRepositoryNode::RepoType::Build) {
-                    auto dirNode = repo->directoryNode();
-                    appendDirtyBuildFileCompilerNodes(dirNode, dirtyBuildFileCompilers);
-                }
-            }
+            appendDirtyNodes<Node>(&_context, compilerClass, dirtyBuildFileCompilers);
             if (dirtyBuildFileCompilers.empty()) {
                 _handleBuildFileCompilersCompletion(_dirtyBuildFileCompilers.get());
             } else {
@@ -439,17 +386,31 @@ namespace YAM
              }
              _postCompletion(Node::State::Failed);
         } else {
+            std::vector<std::shared_ptr<CommandNode>> dirtyCommands;
+            bool finderError = false;
             BuildScopeFinder finder;
-            std::vector<std::shared_ptr<Node>> dirtyCommands = finder(&_context, _context.buildRequest()->options());
-            if (dirtyCommands.empty()) {
-                _handleCommandsCompletion(_dirtyCommands.get());
+            try {
+                dirtyCommands = finder.findDirtyCommands(&_context, _context.buildRequest()->options());
+            } catch (std::runtime_error e) {
+                LogRecord error(LogRecord::Aspect::Error, e.what());
+                _context.addToLogBook(error);
+                finderError = true;
+            }
+            if (finderError) {
+                _postCompletion(Node::State::Failed);
             } else {
-                ILogBook& logBook = *(_context.logBook());
-                LogRecord executing(LogRecord::Progress, "Executing commands");
-                logBook.add(executing);
+                if (dirtyCommands.empty()) {
+                    _handleCommandsCompletion(_dirtyCommands.get());
+                } else {
+                    ILogBook& logBook = *(_context.logBook());
+                    LogRecord executing(LogRecord::Progress, "Executing commands");
+                    logBook.add(executing);
 
-                _dirtyCommands->content(dirtyCommands);
-                _dirtyCommands->start();
+                    std::vector<std::shared_ptr<Node>> dirtyNodes;
+                    dirtyNodes.insert(dirtyNodes.end(), dirtyCommands.begin(), dirtyCommands.end());
+                    _dirtyCommands->content(dirtyNodes);
+                    _dirtyCommands->start();
+                }
             }
         }
     }

@@ -8,20 +8,25 @@
 namespace YAM
 {
     class ExecutionContext;
-    class Node;
+    class CommandNode;
     class GeneratedFileNode;
 
     class __declspec(dllexport) BuildScopeFinder
     {
     public:
-        // Return the command nodes that match option._scope.
-        // If genFiles != nullptr: file *genFiles with the generated files
-        // that match option._scope.
-        std::vector<std::shared_ptr<Node>> operator()(
+        // Return the dirty command nodes that have output files that match 
+        // option._scope.
+        std::vector<std::shared_ptr<CommandNode>> findDirtyCommands(
             ExecutionContext* context,
-            BuildOptions const& options,
-            std::vector<std::shared_ptr<GeneratedFileNode>> *genFiles = nullptr
-       ) const;
+            BuildOptions const& options
+        ) const;
+
+        // Return the generated file nodes (dirty and not-dirty) that match
+        // option._scope.
+        std::vector<std::shared_ptr<GeneratedFileNode>> findGeneratedFiles(
+            ExecutionContext* context,
+            BuildOptions const& options
+        ) const;
     };
 }
 

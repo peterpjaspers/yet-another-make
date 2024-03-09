@@ -65,16 +65,17 @@ namespace
         XXH64_hash_t expectedHash = hashString(content);
         EXPECT_TRUE(createTestFile(testPath, content));
 
-        FileNode fnode(&driver.context, driver.repo->symbolicPathOf(testPath));
-        EXPECT_EQ(testPath.string(), fnode.absolutePath().string());
-        EXPECT_EQ(Node::State::Dirty, fnode.state());
-        EXPECT_ANY_THROW(fnode.hashOf(entireFile));
+        auto fnode = std::make_shared<FileNode>(&driver.context, driver.repo->symbolicPathOf(testPath));
+        driver.context.nodes().add(fnode);
+        EXPECT_EQ(testPath.string(), fnode->absolutePath().string());
+        EXPECT_EQ(Node::State::Dirty, fnode->state());
+        EXPECT_ANY_THROW(fnode->hashOf(entireFile));
 
-        bool completed = YAMTest::executeNode(&fnode);
+        bool completed = YAMTest::executeNode(fnode.get());
 
         EXPECT_TRUE(completed);
-        EXPECT_EQ(Node::State::Ok, fnode.state());
-        EXPECT_EQ(expectedHash, fnode.hashOf(entireFile));
+        EXPECT_EQ(Node::State::Ok, fnode->state());
+        EXPECT_EQ(expectedHash, fnode->hashOf(entireFile));
     }
 
     TEST(FileNode, executeFileDeleted) {
@@ -84,15 +85,16 @@ namespace
         XXH64_hash_t expectedHash = hashString(content);
 
         auto testPath(driver.repoDir / "fileNode_del.txt");
-        FileNode fnode(&driver.context, driver.repo->symbolicPathOf(testPath));
-        EXPECT_EQ(testPath.string(), fnode.absolutePath().string());
-        EXPECT_EQ(Node::State::Dirty, fnode.state());
-        EXPECT_ANY_THROW(fnode.hashOf(entireFile));
+        auto fnode = std::make_shared<FileNode>(&driver.context, driver.repo->symbolicPathOf(testPath));
+        driver.context.nodes().add(fnode);
+        EXPECT_EQ(testPath.string(), fnode->absolutePath().string());
+        EXPECT_EQ(Node::State::Dirty, fnode->state());
+        EXPECT_ANY_THROW(fnode->hashOf(entireFile));
 
-        bool completed = YAMTest::executeNode(&fnode);
+        bool completed = YAMTest::executeNode(fnode.get());
 
         EXPECT_TRUE(completed);
-        EXPECT_EQ(Node::State::Ok, fnode.state());
-        EXPECT_NE(expectedHash, fnode.hashOf(entireFile));
+        EXPECT_EQ(Node::State::Ok, fnode->state());
+        EXPECT_NE(expectedHash, fnode->hashOf(entireFile));
     }
 }

@@ -4,8 +4,6 @@ Bugs
   Reproduce with coreTests EnduranceTest
 
 Features
-- Fast lookup of dirty node nodes
-     - BuildScopeFinder unittest
 - periodic storage during a build
 - implement wildcard/glob for output files (dynamic outputs)
 - integrate Phil's file access monitor

@@ -56,6 +56,14 @@ namespace YAM
         std::vector<std::shared_ptr<Node>> nodes() const;
         std::unordered_map<std::filesystem::path, std::shared_ptr<Node>> nodesMap() const;
 
+        // Pre: node->state() == Node::State::Dirty
+        void registerDirtyNode(std::shared_ptr<Node> const& node);
+        // Pre: node->state() != Node::State::Dirty
+        void unregisterDirtyNode(std::shared_ptr<Node> const& node);
+        // Return map from node class name to the set of instances of that class
+        // in state Node::State::Dirty
+        std::unordered_map<std::string, std::unordered_set<std::shared_ptr<Node>>> const& dirtyNodes() const;
+
         // Register node as modified in changeset.
         // Pre: node->modified()
         void changeSetModify(std::shared_ptr<Node> const& node);
@@ -74,6 +82,10 @@ namespace YAM
         void changeSetRemove(std::shared_ptr<Node> const& node);
 
         std::unordered_map<std::filesystem::path, std::shared_ptr<Node>> _nodes;
+
+        std::unordered_map<std::string, std::unordered_set<std::shared_ptr<Node>>> _dirtyNodes;
+
+        // Changeset
         std::unordered_set<std::shared_ptr<Node>> _addedNodes;
         std::unordered_set<std::shared_ptr<Node>> _modifiedNodes;
         std::unordered_set<std::shared_ptr<Node>> _removedNodes;

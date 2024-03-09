@@ -59,24 +59,29 @@ namespace YAM
 
     void Node::setState(State newState) {
         if (_state != newState) {
-            if (_state == Node::State::Deleted) {
+            if (_state == State::Deleted) {
                 throw std::runtime_error("Not allowed to update state of Deleted object");
             }
-            bool wasExecuting = _state == Node::State::Executing;
+            State oldState = _state;
             _state = newState;
+            if (_state == State::Dirty) {
+                _context->nodes().registerDirtyNode(shared_from_this());
+            } else if (oldState == State::Dirty && _state != State::Deleted) {
+                _context->nodes().unregisterDirtyNode(shared_from_this());
+            }
             bool nowCompleted =
-                _state == Node::State::Ok
-                || _state == Node::State::Failed
-                || _state == Node::State::Canceled;
+                _state == State::Ok
+                || _state == State::Failed
+                || _state == State::Canceled;
             _notifyingObservers = true;
-            if (_state == Node::State::Dirty) {
+            if (_state == State::Dirty) {
                 for (auto observer : _observers) {
                     observer->handleDirtyOf(this);
                 }
-            } else if (_state == Node::State::Deleted) {
+            } else if (_state == State::Deleted) {
                 cleanup();
             }
-            if (wasExecuting && nowCompleted) {
+            if (oldState == State::Executing && nowCompleted) {
                 for (auto observer : _observers) {
                     observer->handleCompletionOf(this);
                 }
