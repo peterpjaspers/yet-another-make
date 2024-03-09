@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <memory>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace YAM
 {
@@ -55,23 +56,27 @@ namespace YAM
         std::vector<std::shared_ptr<Node>> nodes() const;
         std::unordered_map<std::filesystem::path, std::shared_ptr<Node>> nodesMap() const;
 
-        // Register node as modified.
+        // Register node as modified in changeset.
         // Pre: node->modified()
-        void registerModified(std::shared_ptr<Node> const& node);
+        void changeSetModify(std::shared_ptr<Node> const& node);
 
-        // Return changes in the nodeset since the last call to clearChangeSet().
-        std::vector<std::shared_ptr<Node>> const& addedNodes() const;
-        std::vector<std::shared_ptr<Node>> const& modifiedNodes() const;
-        std::vector<std::shared_ptr<Node>> const& removedNodes() const;
+        // Return changes in the nodeset since last call to clearChangeSet().
+        // The sets do not intersect.
+        std::unordered_set<std::shared_ptr<Node>> const& addedNodes() const;
+        std::unordered_set<std::shared_ptr<Node>> const& modifiedNodes() const;
+        std::unordered_set<std::shared_ptr<Node>> const& removedNodes() const;
 
-        // Clear the modified and removed node sets.
+        std::size_t changeSetSize() const;
         void clearChangeSet();
 
     private:
+        void changeSetAdd(std::shared_ptr<Node> const& node);
+        void changeSetRemove(std::shared_ptr<Node> const& node);
+
         std::unordered_map<std::filesystem::path, std::shared_ptr<Node>> _nodes;
-        std::vector<std::shared_ptr<Node>> _addedNodes;
-        std::vector<std::shared_ptr<Node>> _modifiedNodes;
-        std::vector<std::shared_ptr<Node>> _removedNodes;
+        std::unordered_set<std::shared_ptr<Node>> _addedNodes;
+        std::unordered_set<std::shared_ptr<Node>> _modifiedNodes;
+        std::unordered_set<std::shared_ptr<Node>> _removedNodes;
 
     };
 }

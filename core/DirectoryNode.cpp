@@ -231,9 +231,6 @@ namespace YAM
     } 
 
     void DirectoryNode::_removeChildRecursively(std::shared_ptr<Node> const& child) {
-        // removeIfPresent because a parent directory may already have removed
-        // this directory recursively
-        context()->nodes().removeIfPresent(child);
         auto dirChild = dynamic_pointer_cast<DirectoryNode>(child);
         if (dirChild != nullptr) {
             if (dirChild->observers().contains(this)) {
@@ -241,6 +238,9 @@ namespace YAM
             }
             dirChild->clear();
         }
+        // removeIfPresent because a parent directory may already have removed
+        // this directory recursively
+        context()->nodes().removeIfPresent(child);
     }
 
     void DirectoryNode::clear() {

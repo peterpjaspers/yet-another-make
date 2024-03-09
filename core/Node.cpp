@@ -274,8 +274,7 @@ namespace YAM
         if (_modified != newValue) {
             _modified = newValue;
             if (_modified) {
-                auto st = shared_from_this();
-                _context->nodes().registerModified(st);
+                _context->nodes().changeSetModify(shared_from_this());
             }
         }
     }

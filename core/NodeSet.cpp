@@ -5,33 +5,32 @@ namespace YAM
 {
     void NodeSet::addIfAbsent(std::shared_ptr<Node> const& node) {
         const auto result = _nodes.insert({ node->name(), node });
-        if (result.second) {
-            _addedNodes.push_back(node);
-        }
+        if (result.second) changeSetAdd(node);
     }
 
     void NodeSet::add(std::shared_ptr<Node> const& node) {
         const auto [it, success] = _nodes.insert({ node->name(), node });
         if (!success) throw std::runtime_error("failed to add node");
-        _addedNodes.push_back(node);
+        changeSetAdd(node);
     }
 
     void NodeSet::remove(std::shared_ptr<Node> const& node) {
         auto nRemoved = _nodes.erase(node->name());
         if (nRemoved != 1) throw std::runtime_error("failed to remove node");
         node->setState(Node::State::Deleted);
-        _removedNodes.push_back(node);
+        changeSetRemove(node);
     }
 
     void NodeSet::removeIfPresent(std::shared_ptr<Node> const& node) {
         auto nRemoved = _nodes.erase(node->name());
         if (nRemoved == 1) {
             node->setState(Node::State::Deleted);
-            _removedNodes.push_back(node);
+            changeSetRemove(node);
         }
     }
 
     void NodeSet::clear() {
+        for (auto const& pair : _nodes) changeSetRemove(pair.second);
         _nodes.clear();
     }
 
@@ -82,18 +81,31 @@ namespace YAM
         return nodes;
     }
 
-
-    void NodeSet::registerModified(std::shared_ptr<Node> const& node) {
-        _modifiedNodes.push_back(node);
+    void NodeSet::changeSetModify(std::shared_ptr<Node> const& node) {
+        if (_removedNodes.contains(node)) throw std::runtime_error("illegal change");
+        if (!_addedNodes.contains(node)) _modifiedNodes.insert(node);
     }
-    std::vector<std::shared_ptr<Node>> const& NodeSet::addedNodes() const {
+    void NodeSet::changeSetAdd(std::shared_ptr<Node> const& node) {
+        _modifiedNodes.erase(node);
+        _addedNodes.insert(node);
+    }
+    void NodeSet::changeSetRemove(std::shared_ptr<Node> const& node) {
+        _modifiedNodes.erase(node);
+        _removedNodes.insert(node);
+    }
+
+    std::unordered_set<std::shared_ptr<Node>> const& NodeSet::addedNodes() const {
         return _addedNodes;
     }
-    std::vector<std::shared_ptr<Node>> const& NodeSet::modifiedNodes() const {
+    std::unordered_set<std::shared_ptr<Node>> const& NodeSet::modifiedNodes() const {
         return _modifiedNodes;
     }
-    std::vector<std::shared_ptr<Node>> const& NodeSet::removedNodes() const {
+    std::unordered_set<std::shared_ptr<Node>> const& NodeSet::removedNodes() const {
         return _removedNodes;
+    }
+
+    std::size_t NodeSet::changeSetSize() const {
+        return _addedNodes.size() + _modifiedNodes.size() + _removedNodes.size();
     }
     void NodeSet::clearChangeSet() {
         _addedNodes.clear();

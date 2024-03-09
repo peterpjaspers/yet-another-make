@@ -31,7 +31,7 @@ namespace
         }
     };
 
-    void strStream(std::stringstream& ss, std::unordered_set<std::shared_ptr<IPersistable>>const& persistables) {
+    void strStream(std::stringstream& ss, std::unordered_set<std::shared_ptr<Node>>const& persistables) {
         if (persistables.empty()) return;
         std::vector<std::shared_ptr<IPersistable>> sorted(persistables.begin(), persistables.end());
         ComparePName cmpName;
@@ -43,9 +43,9 @@ namespace
 
     void logDifference(
         ILogBook& logBook,
-        std::unordered_set<std::shared_ptr<IPersistable>>const& toInsert,
-        std::unordered_set<std::shared_ptr<IPersistable>>const& toReplace,
-        std::unordered_set<std::shared_ptr<IPersistable>>const& toRemove,
+        std::unordered_set<std::shared_ptr<Node>>const& toInsert,
+        std::unordered_set<std::shared_ptr<Node>>const& toReplace,
+        std::unordered_set<std::shared_ptr<Node>>const& toRemove,
         bool rollback = false
     ) {
         if (!logBook.mustLogAspect(LogRecord::BuildStateUpdate)) return;
@@ -463,23 +463,12 @@ namespace YAM
     }
 
     std::size_t PersistentBuildState::store() {
-        std::unordered_set<std::shared_ptr<IPersistable>> buildState;
-        std::unordered_set<std::shared_ptr<IPersistable>> storedState;
-        std::unordered_set<std::shared_ptr<IPersistable>> toInsert;
-        std::unordered_set<std::shared_ptr<IPersistable>> toReplace;
+        if (_context->nodes().changeSetSize() == 0) return 0;
         std::unordered_set<std::shared_ptr<IPersistable>> toReplaceDeleted;
-        std::unordered_set<std::shared_ptr<IPersistable>> toRemove;
-
         auto& nodes = _context->nodes();
-        auto const &added = nodes.addedNodes();
-        auto const &modified = nodes.modifiedNodes();
-        auto const &removed = nodes.removedNodes();
-        toInsert.insert(added.begin(), added.end());
-        toReplace.insert(modified.begin(), modified.end());
-        toRemove.insert(removed.begin(), removed.end());
-        for (auto const& p : toInsert) toReplace.erase(p);
-        for (auto const& p : toRemove) toReplace.erase(p);
-        nodes.clearChangeSet();
+        auto const &toInsert = nodes.addedNodes();
+        auto const &toReplace = nodes.modifiedNodes();
+        auto const &toRemove = nodes.removedNodes();
         logDifference(*(_context->logBook()), toInsert, toReplace, toRemove);
 
         for (auto const& p : toRemove) {
@@ -532,8 +521,9 @@ namespace YAM
         std::size_t nStored = 
             toInsert.size()
             + toReplace.size()
-            + toReplaceDeleted.size()
-            + toRemove.size();
+            + toRemove.size()
+            + toReplaceDeleted.size();
+        nodes.clearChangeSet();
         if (0 < nStored) {
             try { _forest->commit(); } 
             catch (std::string msg) {
@@ -622,22 +612,10 @@ namespace YAM
     }
 
     void PersistentBuildState::rollback() {
-        std::unordered_set<std::shared_ptr<IPersistable>> buildState;
-        std::unordered_set<std::shared_ptr<IPersistable>> storedState;
-        std::unordered_set<std::shared_ptr<IPersistable>> toRemove;
-        std::unordered_set<std::shared_ptr<IPersistable>> toReplace;
-        std::unordered_set<std::shared_ptr<IPersistable>> toAdd;
-
         auto& nodes = _context->nodes();
-        auto const& added = nodes.addedNodes();
-        auto const& modified = nodes.modifiedNodes();
-        auto const& removed = nodes.removedNodes();
-        toRemove.insert(added.begin(), added.end());
-        toReplace.insert(modified.begin(), modified.end());
-        toAdd.insert(removed.begin(), removed.end());
-        nodes.clearChangeSet();
-        for (auto const& p : toRemove) toReplace.erase(p);
-        for (auto const& p : toAdd) toReplace.erase(p);
+        std::unordered_set<std::shared_ptr<Node>> toRemove = nodes.addedNodes();
+        std::unordered_set<std::shared_ptr<Node>> toReplace = nodes.modifiedNodes();
+        std::unordered_set<std::shared_ptr<Node>> toAdd = nodes.removedNodes();
 
         for (auto const& object : toRemove) {
             removeFromBuildState(object);
@@ -678,6 +656,7 @@ namespace YAM
                 object->restore(_context, restored);
             }
         }
+        nodes.clearChangeSet();
     }
 
     void PersistentBuildState::getStoredState(std::unordered_set<std::shared_ptr<IPersistable>>& storedState) {
