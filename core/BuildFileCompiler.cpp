@@ -99,6 +99,24 @@ namespace
     ) {
         for (auto const& node : nodes) groupNode->add(node);
     }
+
+    void updateGroup(
+        std::shared_ptr<GroupNode> const& groupNode,
+        std::set<std::shared_ptr<Node>, Node::CompareName> const& oldContent,
+        std::set<std::shared_ptr<Node>, Node::CompareName> const& newContent
+    ) {
+        for (auto const& node : oldContent) {
+            if (!newContent.contains(node)) {
+                groupNode->remove(node);
+            }
+        }
+        for (auto const& node : newContent) {
+            if (!oldContent.contains(node)) {
+                groupNode->add(node);
+            }
+        }
+    }
+
 }
 
 namespace YAM {
@@ -142,10 +160,7 @@ namespace YAM {
                 addToGroup(groupNode, content);
             } else {
                 auto const &oldContent = oldIt->second;
-                if (oldContent != content) {
-                    removeFromGroup(groupNode, oldContent);
-                    addToGroup(groupNode, content);
-                }
+                updateGroup(groupNode, oldContent, content);
             }
         }
         for (auto const& pair : _oldOutputGroups) {
