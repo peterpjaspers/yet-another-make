@@ -12,48 +12,60 @@ namespace
 
     uint32_t streamableTypeId = 0;
 
-    Node* getProducer(Node* node) {
+    Node* getObservable(Node* node) {
         auto genFileNode = dynamic_cast<GeneratedFileNode*>(node);
         if (genFileNode != nullptr) {
             return genFileNode->producer().get();
         }
         return node;
     }
-
-    void subscribe(std::vector<std::shared_ptr<Node>> const& nodes, StateObserver* observer) {
-        std::unordered_set<Node*> subscribed;
-        for (auto const& node : nodes) {
-            Node* producer = getProducer(node.get());
-            if (subscribed.insert(producer).second) producer->addObserver(observer);
-        }
-    }
-
-    void unsubscribe(std::vector<std::shared_ptr<Node>> const& nodes, StateObserver* observer) {
-        std::unordered_set<Node*> unsubscribed;
-        for (auto const& node : nodes) {
-            Node* producer = getProducer(node.get());
-            if (unsubscribed.insert(producer).second) producer->removeObserver(observer);
-        }
-    }
 }
 
 namespace YAM
 {
-    GroupNode::GroupNode() {}
+    GroupNode::GroupNode() : Node(), _hash(rand()) {}
     GroupNode::GroupNode(ExecutionContext* context, std::filesystem::path const& name)
         : Node(context, name)
+        , _hash(rand())
     {}
 
-    void GroupNode::content(std::vector<std::shared_ptr<Node>> const &newContent) {
-        Node::CompareName cmp;
-        if (_content != newContent) {
-            unsubscribe(_content, this);
-            _content = newContent;
-            std::sort(_content.begin(), _content.end(), cmp);
-            subscribe(_content, this);
+    void GroupNode::content(std::vector<std::shared_ptr<Node>> newContent) {
+        for (auto const& node : _content) unsubscribe(node);
+        _content.clear();
+        _content.insert(newContent.begin(), newContent.end());
+        for (auto const& node : _content) subscribe(node);
+        modified(true);
+        setState(Node::State::Dirty);
+    }
+
+    bool GroupNode::contains(std::shared_ptr<Node> const& node) const {
+        return _content.contains(node);
+    }
+
+    void GroupNode::add(std::shared_ptr<Node> const& node) {
+        auto result = _content.insert(node);
+        if (!result.second) throw std::runtime_error("Attempt to add duplicate");
+        subscribe(node);
+        modified(true);
+        setState(Node::State::Dirty);
+    }
+
+    void GroupNode::remove(std::shared_ptr<Node> const& node) {
+        std::size_t nErased = _content.erase(node);
+        if (nErased == 0) throw std::runtime_error("Attempt to remove unknown");
+        unsubscribe(node);
+        modified(true);
+        setState(Node::State::Dirty);
+    }
+
+    bool GroupNode::removeIfPresent(std::shared_ptr<Node> const& node) {
+        std::size_t nErased = _content.erase(node);
+        if (nErased == 1) {
+            unsubscribe(node);
             modified(true);
             setState(Node::State::Dirty);
         }
+        return nErased == 1;
     }
 
     void GroupNode::start() {
@@ -106,6 +118,34 @@ namespace YAM
         }
     }
 
+    void GroupNode::subscribe(std::shared_ptr<Node> const& node) {
+        Node* observable = getObservable(node.get());
+        auto it = _observed.find(observable);
+        if (it == _observed.end()) {
+            _observed[observable] = 1;
+            observable->addObserver(this);
+        } else {
+            uint32_t cnt = it->second;
+            if (cnt == 0) throw std::runtime_error("corrupt _observed");
+            _observed[observable] = cnt + 1;
+        }
+    }
+
+    void GroupNode::unsubscribe(std::shared_ptr<Node> const& node) {
+        Node* observable = getObservable(node.get());
+        auto it = _observed.find(observable);
+        if (it == _observed.end()) throw std::runtime_error("illegal unsubscribe request");
+        uint32_t cnt = it->second;
+        if (cnt == 0) throw std::runtime_error("corrupt _observed");
+        cnt -= 1;
+        if (cnt == 0) {
+            _observed.erase(it);
+            observable->removeObserver(this);
+        } else {
+            _observed[observable] = cnt;
+        }
+    }
+
     void GroupNode::setStreamableType(uint32_t type) {
         streamableTypeId = type;
     }
@@ -116,21 +156,27 @@ namespace YAM
 
     void GroupNode::stream(IStreamer* streamer) {
         Node::stream(streamer);
-        streamer->streamVector(_content);
+        if (streamer->writing()) {
+            _contentVec.clear();
+            _contentVec.insert(_contentVec.end(), _content.begin(), _content.end());
+        }
+        streamer->streamVector(_contentVec);
         streamer->stream(_hash);
     }
 
     void GroupNode::prepareDeserialize() {
         static std::vector<std::shared_ptr<Node>> empty;
         Node::prepareDeserialize();
-        unsubscribe(_content, this);
+        for (auto const& node: _content) unsubscribe(node);
         _content.clear();
     }
 
     bool GroupNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
         if (!Node::restore(context, restored)) return false;
-        for (auto const& node : _content) node->restore(context, restored);
-        subscribe(_content, this);
+        for (auto const& node : _contentVec) node->restore(context, restored);
+        _content.insert(_contentVec.begin(), _contentVec.end());
+        _contentVec.clear();
+        for (auto const& node : _content) subscribe(node);
         return true;
     }
 }

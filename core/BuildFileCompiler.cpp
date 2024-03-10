@@ -53,64 +53,51 @@ namespace
     }
 
 
-    std::vector<std::shared_ptr<Node>> contributionToGroup(
+    std::set<std::shared_ptr<Node>, Node::CompareName> contributionToGroup(
         std::shared_ptr<GroupNode> const& group,
-        std::vector<std::shared_ptr<Node>> const& nodes
+        std::set<std::shared_ptr<Node>, Node::CompareName> const& nodes
     ) {
-        static Node::CompareName cmp;
-        std::vector<std::shared_ptr<Node>> contrib;
-        std::vector<std::shared_ptr<Node>> const& content = group->content();
+        std::set<std::shared_ptr<Node>, Node::CompareName> contrib;
+        std::set<std::shared_ptr<Node>, Node::CompareName> const& content = group->content();
         for (auto const& node : nodes) {
-            auto it = std::find(content.begin(), content.end(), node);
-            if (it != content.end()) contrib.push_back(node);
+            if (content.contains(node)) contrib.insert(node);
         }
         return contrib;
     }
 
-    std::map<std::filesystem::path, std::vector<std::shared_ptr<Node>>> contributionToGroups(
+    std::map<std::filesystem::path, std::set<std::shared_ptr<Node>, Node::CompareName>> contributionToGroups(
         std::map<std::filesystem::path, std::shared_ptr<GroupNode>> const& groups,
-        std::vector<std::shared_ptr<Node>> const& nodes
+        std::set<std::shared_ptr<Node>, Node::CompareName> const& nodes
     ) {
-        std::map<std::filesystem::path, std::vector<std::shared_ptr<Node>>> contribs;
+        std::map<std::filesystem::path, std::set<std::shared_ptr<Node>, Node::CompareName>> contribs;
         for (auto const& pair : groups) {
             contribs.insert({ pair.first, contributionToGroup(pair.second, nodes)});
         }
         return contribs;
     }
 
-    std::vector<std::shared_ptr<Node>> nodesIn(
+    std::set<std::shared_ptr<Node>, Node::CompareName> nodesIn(
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const& outputs
     ) {
-        std::vector<std::shared_ptr<Node>> nodes;
+        std::set<std::shared_ptr<Node>, Node::CompareName> nodes;
         for (auto const& pair : outputs) {
-            nodes.push_back(pair.second);
+            nodes.insert(pair.second);
         }
         return nodes;
     }
 
     void removeFromGroup(
         std::shared_ptr<GroupNode> const& groupNode,
-        std::vector<std::shared_ptr<Node>> const& nodes
+        std::set<std::shared_ptr<Node>, Node::CompareName> const& nodes
      ) {
-        bool updated = false;
-        std::vector<std::shared_ptr<Node>> content = groupNode->content();
-        for (auto const& node : nodes) {
-            auto it = std::find(content.begin(), content.end(), node);
-            if (it != content.end()) {
-                content.erase(it);
-                updated = true;
-            }
-        }
-        if (updated) groupNode->content(content);
+        for (auto const& node : nodes) groupNode->remove(node);
     }
 
     void addToGroup(
         std::shared_ptr<GroupNode> const& groupNode,
-        std::vector<std::shared_ptr<Node>> const& nodes
+        std::set<std::shared_ptr<Node>, Node::CompareName> const& nodes
     ) {
-        std::vector<std::shared_ptr<Node>> content = groupNode->content();
-        for (auto const& node : nodes) content.push_back(node);
-        groupNode->content(content);
+        for (auto const& node : nodes) groupNode->add(node);
     }
 }
 
@@ -147,16 +134,14 @@ namespace YAM {
     void BuildFileCompiler::updateOutputGroups() {
         static Node::CompareName cmp;
         for (auto const& pair : _outputGroupsContent) {
-            auto const& groupPath = pair.first;
-            auto content = pair.second;
+            auto const &groupPath = pair.first;
+            auto const &content = pair.second;
             auto groupNode = compileOutputGroup(groupPath);
             auto oldIt = _oldOutputGroupsContent.find(groupPath);
             if (oldIt == _oldOutputGroupsContent.end()) {
                 addToGroup(groupNode, content);
             } else {
-                auto oldContent = oldIt->second;
-                std::sort(oldContent.begin(), oldContent.end(), cmp);
-                std::sort(content.begin(), content.end(), cmp);
+                auto const &oldContent = oldIt->second;
                 if (oldContent != content) {
                     removeFromGroup(groupNode, oldContent);
                     addToGroup(groupNode, content);
@@ -612,10 +597,10 @@ namespace YAM {
 
         auto it = _outputGroupsContent.find(groupPath);
         if (it == _outputGroupsContent.end()) {
-            _outputGroupsContent.insert({ groupPath, std::vector<std::shared_ptr<Node>>() });
+            _outputGroupsContent.insert({ groupPath, std::set<std::shared_ptr<Node>, Node::CompareName>() });
         }
         auto& content = _outputGroupsContent[groupPath];
-        content.insert(content.end(), outputs.begin(), outputs.end());
+        content.insert(outputs.begin(), outputs.end());
     }
 
     void BuildFileCompiler::compileRule(BuildFile::Rule const& rule) {

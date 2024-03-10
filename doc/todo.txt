@@ -10,8 +10,8 @@ Features
     - how to deal with input dependencies on non-existing source files
       Note: these source file nodes are NOT in state Deleted. How to GC these
       nodes when no longer refd => GC sweep over context to remove node with
-      use_count 1.
-    - directory enumerat
+      use_count 1. delete when not observed
+    - directory enumeration
 - Versioning in PersistentBuildState, encode version in name of buildstate file
 - fileaspect configuration
       - hash = last-write-time (e.g. for generated files in cmd executionhash)
@@ -30,7 +30,6 @@ Features
 - end-to-end testing (automated gtest)
 - scalability measurements
 - documentation
-- bedenk betere naam voor yam?
 - inform Mike Shal
 
 Out-of-scope:

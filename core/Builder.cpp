@@ -58,7 +58,7 @@ namespace
         if (it != dirtyNodesMap.end()) {
             for (auto const& node : it->second) {
                 auto repoType = node->repository()->repoType();
-                if (repoType == FileRepositoryNode::RepoType::Build) {
+                if (repoType != FileRepositoryNode::RepoType::Ignore) {
                     auto tnode = dynamic_pointer_cast<T>(node);
                     if (tnode == nullptr) throw std::runtime_error("not a node of type T");
                     if (tnode->state() != Node::State::Dirty) throw std::runtime_error("not a dirty node");
@@ -210,7 +210,7 @@ namespace YAM
     }
 
     bool Builder::_containsBuildFileCycles(
-        std::vector<std::shared_ptr<Node>> const& buildFileParserNodes
+        std::set<std::shared_ptr<Node>, Node::CompareName> const& buildFileParserNodes
     ) const {
         if (buildFileParserNodes.empty()) return false;
 
@@ -233,7 +233,7 @@ namespace YAM
     }
 
     bool Builder::_containsGroupCycles(
-        std::vector<std::shared_ptr<Node>> const& buildFileCompilerNodes
+        std::set<std::shared_ptr<Node>, Node::CompareName> const& buildFileCompilerNodes
     ) const {
         if (buildFileCompilerNodes.empty()) return false;
 

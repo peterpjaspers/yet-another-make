@@ -123,7 +123,8 @@ namespace
             ASSERT_NE(nullptr, groupNode);
             EXPECT_EQ(Node::State::Dirty, groupNode->state());
             ASSERT_EQ(1, groupNode->content().size());
-            EXPECT_EQ(setup.repoTree.path() / "main.obj", groupNode->content()[0]->absolutePath());
+            std::shared_ptr<Node> node0 = *(groupNode->content().begin());
+            EXPECT_EQ(setup.repoTree.path() / "main.obj", node0->absolutePath());
         }
         {
             EXPECT_EQ(Node::State::Dirty, setup.cCommand->state());

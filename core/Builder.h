@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <filesystem>
+#include <set>
 
 namespace YAM
 {
@@ -50,8 +51,8 @@ namespace YAM
         void _handleDirectoriesCompletion(Node* n);
         void _handleBuildFileParsersCompletion(Node* n);
         void _handleBuildFileCompilersCompletion(Node* n);
-        bool _containsBuildFileCycles(std::vector<std::shared_ptr<Node>> const& buildFileParserNodes) const;
-        bool _containsGroupCycles(std::vector<std::shared_ptr<Node>> const& buildFileCompilerNodes) const;
+        bool _containsBuildFileCycles(std::set<std::shared_ptr<Node>, Node::CompareName> const& buildFileParserNodes) const;
+        bool _containsGroupCycles(std::set<std::shared_ptr<Node>, Node::CompareName> const& buildFileCompilerNodes) const;
         void _handleCommandsCompletion(Node* n);
         void _postCompletion(Node::State resultState);
         void _notifyCompletion(Node::State resultState);

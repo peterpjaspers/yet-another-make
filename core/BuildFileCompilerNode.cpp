@@ -276,16 +276,9 @@ namespace YAM
     }
 
     void BuildFileCompilerNode::cleanOutputGroup(GroupNode* group) {
-        bool updated = false;
-        std::vector<std::shared_ptr<Node>> content = group->content();
         for (auto const& pair : _outputs) {
-            auto it = std::find(content.begin(), content.end(), pair.second);
-            if (it != content.end()) {
-                content.erase(it);
-                updated = true;
-            }
+            group->removeIfPresent(pair.second);
         }
-        if (updated) group->content(content);
     }
 
     void BuildFileCompilerNode::compileBuildFile() {

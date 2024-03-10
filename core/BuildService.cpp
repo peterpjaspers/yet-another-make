@@ -47,8 +47,8 @@ namespace YAM
                 if (shutdown) {
                     send(std::make_shared<BuildResult>(true));
                 }
-            } catch (std::exception& e) {
-            } catch (EndOfStreamException e) {
+            } catch (std::exception) {
+            } catch (EndOfStreamException) {
             }
             closeClient();
         }

@@ -1,15 +1,16 @@
 #pragma once
 
 #include "BuildFile.h"
+#include "Node.h"
 
 #include <vector>
+#include <set>
 #include <map>
 #include <memory>
 #include <filesystem>
 
 namespace YAM {
     class ExecutionContext;
-    class Node;
     class GeneratedFileNode;
     class DirectoryNode;
     class FileNode;
@@ -162,7 +163,7 @@ namespace YAM {
         std::map<std::filesystem::path, std::shared_ptr<CommandNode>> _oldCommands;
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _oldOutputs;
         std::map<std::filesystem::path, std::shared_ptr<GroupNode>> _oldOutputGroups;
-        std::map<std::filesystem::path, std::vector<std::shared_ptr<Node>>> _oldOutputGroupsContent;
+        std::map<std::filesystem::path, std::set<std::shared_ptr<Node>, Node::CompareName>> _oldOutputGroupsContent;
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _allowedInputs;
         
         // Results of this compilation. The globs are the globs found in cmd and
@@ -177,7 +178,7 @@ namespace YAM {
         // Used to collect the new contributions to output groups. Once all 
         // commands have been created _outputGroups is updated with this info.
         // Rationale: only update groups when needed.
-        std::map<std::filesystem::path, std::vector<std::shared_ptr<Node>>> _outputGroupsContent;
+        std::map<std::filesystem::path, std::set<std::shared_ptr<Node>, Node::CompareName>> _outputGroupsContent;
 
         // The line nrs of the rules from which the commands were compiled.
         // Ordering is as in _commands.
