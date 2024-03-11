@@ -21,6 +21,7 @@
 #include "Globber.h"
 #include "Glob.h"
 #include "BuildScopeFinder.h"
+#include "PeriodicTimer.h"
 
 #include <iostream>
 #include <map>
@@ -113,6 +114,11 @@ namespace YAM
         , _dirtyBuildFileCompilers(std::make_shared<GroupNode>(&_context, "__dirtyBuildFileCompilers__"))
         , _dirtyCommands(std::make_shared<GroupNode>(&_context, "__dirtyCommands__"))
         , _result(nullptr)
+        , _periodicStorage(
+            std::make_shared<PeriodicTimer>(
+                std::chrono::seconds(10),
+                _context.mainThreadQueue(),
+                Delegate<void>::CreateLambda([this]() { _storeBuildState(); })))
     {
         _dirtyConfigNodes->completor().AddRaw(this, &Builder::_handleConfigNodesCompletion);
         _dirtyDirectories->completor().AddRaw(this, &Builder::_handleDirectoriesCompletion);
@@ -280,6 +286,7 @@ namespace YAM
 
     // Called in main thread
     void Builder::_start() {
+        _periodicStorage->resume();
         resetNodeStates(_context.nodes());
         std::vector<std::shared_ptr<Node>> dirtyNodes;
         auto repositoriesNode = _context.repositoriesNode();
@@ -317,7 +324,6 @@ namespace YAM
 
     // Called in main thread
     void Builder::_handleConfigNodesCompletion(Node* n) {
-        _storeBuildState();
         if (n != _dirtyConfigNodes.get()) throw std::exception("unexpected node");
         if (_dirtyConfigNodes->state() != Node::State::Ok) {
             _postCompletion(Node::State::Failed);
@@ -340,7 +346,6 @@ namespace YAM
 
     // Called in main thread
     void Builder::_handleDirectoriesCompletion(Node* n) {
-        _storeBuildState();
         if (n != _dirtyDirectories.get()) throw std::exception("unexpected node");
         if (_dirtyDirectories->state() != Node::State::Ok) {
             _postCompletion(Node::State::Failed);
@@ -362,7 +367,6 @@ namespace YAM
 
     // Called in main thread
     void Builder::_handleBuildFileParsersCompletion(Node* n) {
-        _storeBuildState();
         if (n != _dirtyBuildFileParsers.get()) throw std::exception("unexpected node");
         if (_dirtyBuildFileParsers->state() != Node::State::Ok) {
             _postCompletion(Node::State::Failed);
@@ -388,7 +392,6 @@ namespace YAM
     }
 
     void Builder::_handleBuildFileCompilersCompletion(Node* n) {
-        _storeBuildState();
         if (n != _dirtyBuildFileCompilers.get()) throw std::exception("unexpected node");
         if (_dirtyBuildFileCompilers->state() != Node::State::Ok) {
             _postCompletion(Node::State::Failed);
@@ -429,7 +432,6 @@ namespace YAM
 
     // Called in main thread
     void Builder::_handleCommandsCompletion(Node* n) {
-        _storeBuildState();
         if (n != _dirtyCommands.get()) throw std::exception("unexpected node");
         Node::State newState = _dirtyCommands->state();
         // Delay clearing the inputProducers of the _dirty* nodes to avoid
@@ -445,7 +447,9 @@ namespace YAM
     }
 
     // Called in main thread
-    void Builder::_notifyCompletion(Node::State resultState) {
+    void Builder::_notifyCompletion(Node::State resultState) {\
+        _periodicStorage->suspend();
+        _storeBuildState();
         _result->succeeded(resultState == Node::State::Ok);
         if (resultState == Node::State::Ok) {
             _result->nDirectoryUpdates(_context.statistics().nDirectoryUpdates);
@@ -453,7 +457,6 @@ namespace YAM
             _result->nNodesStarted(_context.statistics().nStarted);
             _result->nRehashedFiles(_context.statistics().nRehashedFiles);
         }
-
         _dirtyConfigNodes->content(emptyNodes);
         _dirtyDirectories->content(emptyNodes);
         _dirtyBuildFileParsers->content(emptyNodes);

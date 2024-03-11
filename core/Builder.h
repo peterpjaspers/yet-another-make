@@ -14,6 +14,7 @@ namespace YAM
     class BuildResult;
     class GroupNode;
     class PersistentBuildState;
+    class PeriodicTimer;
 
     class __declspec(dllexport) Builder
     {
@@ -68,6 +69,7 @@ namespace YAM
         std::shared_ptr<GroupNode> _dirtyBuildFileCompilers;
         std::shared_ptr<GroupNode> _dirtyCommands;
         std::shared_ptr<BuildResult> _result;
+        std::shared_ptr<PeriodicTimer> _periodicStorage;
     };
 }
 

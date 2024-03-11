@@ -4,7 +4,6 @@ Bugs
   Reproduce with coreTests EnduranceTest
 
 Features
-- periodic storage during a build
 - implement wildcard/glob for output files (dynamic outputs)
 - integrate Phil's file access monitor
     - how to deal with input dependencies on non-existing source files
