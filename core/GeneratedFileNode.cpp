@@ -26,15 +26,26 @@ namespace YAM
         return _producer;
     }
 
-    bool GeneratedFileNode::deleteFile(bool setDirty) {
-        std::error_code ok;
+    bool GeneratedFileNode::deleteFile(bool setDirty, bool logDeletion) {
         std::error_code ec;
         auto absPath = absolutePath();
-        bool deleted = std::filesystem::remove(absPath, ec);
-        if (deleted && setDirty) {
-            setState(Node::State::Dirty);
+        bool deleted = !std::filesystem::exists(absPath);
+        if (!deleted) {
+            deleted = std::filesystem::remove(absPath, ec);
+            if (deleted && setDirty) {
+                setState(Node::State::Dirty);
+            }
+            if (logDeletion) {
+                if (deleted) {
+                    LogRecord progress(LogRecord::Aspect::Progress, "Deleted " + absPath.string());
+                    context()->logBook()->add(progress);
+                } else {
+                    LogRecord error(LogRecord::Aspect::Error, "Failed to delete " + absPath.string());
+                    context()->logBook()->add(error);
+                }
+            }
         }
-        return !std::filesystem::exists(absPath);
+        return deleted;
     }
 
     void GeneratedFileNode::setStreamableType(uint32_t type) {

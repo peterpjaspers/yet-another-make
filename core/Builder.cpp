@@ -15,6 +15,7 @@
 #include "AcyclicTrail.h"
 #include "BuildFileCycleFinder.h"
 #include "GroupCycleFinder.h"
+#include "BuildStateVersion.h"
 #include "PersistentBuildState.h"
 #include "RepositoryNameFile.h"
 #include "Globber.h"
@@ -171,27 +172,34 @@ namespace YAM
         
         if (_buildState == nullptr) {
             std::filesystem::path yamDir = repoDir / DotYamDirectory::yamName();
-            _buildState = std::make_shared<PersistentBuildState>(yamDir, &_context);
-            _buildState->retrieve();
-            auto repositoriesNode = _context.repositoriesNode();
-            if (repositoriesNode == nullptr) {
-                auto homeRepo = std::make_shared<FileRepositoryNode>(
-                    &_context,
-                    repoName,
-                    repoDir);
-                repositoriesNode = std::make_shared<RepositoriesNode>(&_context, homeRepo);
-                repositoriesNode->ignoreConfigFile(false);
-                _context.repositoriesNode(repositoriesNode);
-            }
-            for (auto const& pair : _context.nodes().nodesMap()) {
-                auto node = pair.second;
-                if (node->state() != Node::State::Deleted) {
-                    node->setState(Node::State::Dirty);
-                } else {
-                    throw std::runtime_error("Unexpected Node::State::Delete");
+            std::filesystem::path buildStatePath = BuildStateVersion::select(yamDir, *(_context.logBook()));
+            if (buildStatePath.empty()) {
+                //incompatible file version
+                _result->succeeded(false);
+            } else {
+                std::filesystem::create_directories(buildStatePath.parent_path());
+                _buildState = std::make_shared<PersistentBuildState>(buildStatePath, &_context);
+                _buildState->retrieve();
+                auto repositoriesNode = _context.repositoriesNode();
+                if (repositoriesNode == nullptr) {
+                    auto homeRepo = std::make_shared<FileRepositoryNode>(
+                        &_context,
+                        repoName,
+                        repoDir);
+                    repositoriesNode = std::make_shared<RepositoriesNode>(&_context, homeRepo);
+                    repositoriesNode->ignoreConfigFile(false);
+                    _context.repositoriesNode(repositoriesNode);
                 }
+                for (auto const& pair : _context.nodes().nodesMap()) {
+                    auto node = pair.second;
+                    if (node->state() != Node::State::Deleted) {
+                        node->setState(Node::State::Dirty);
+                    } else {
+                        throw std::runtime_error("Unexpected Node::State::Delete");
+                    }
+                }
+                repositoriesNode->startWatching();
             }
-            repositoriesNode->startWatching();
         }
         return _result->succeeded();
     }
@@ -199,11 +207,12 @@ namespace YAM
     // Called in main thread
     void Builder::_clean() {
         uint32_t nFailures = 0;
+        ILogBook& logBook = *(_context.logBook());
         std::vector<std::shared_ptr<GeneratedFileNode>> genFiles;
         BuildScopeFinder finder;
         genFiles = finder.findGeneratedFiles(&_context, _context.buildRequest()->options());
         for (auto const& file : genFiles) {
-            if (!file->deleteFile(true)) nFailures += 1;
+            if (!file->deleteFile(true, true)) nFailures += 1;
         }
         _result->succeeded(nFailures == 0);
         _notifyCompletion(nFailures == 0 ? Node::State::Ok : Node::State::Failed);
@@ -256,10 +265,13 @@ namespace YAM
     }
 
     void Builder::_storeBuildState(bool logSave) {
+        auto start = std::chrono::system_clock::now();
         std::size_t nStored = _buildState->store();
         if (0 < nStored) {
+            auto duration = std::chrono::system_clock::now() - start;
+            auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration);
             std::stringstream ss;
-            ss << "Updated " << nStored << " nodes in buildstate." << std::endl;
+            ss << "Updated " << nStored << " nodes in buildstate in " << ms << std::endl;
             ILogBook& logBook = *(_context.logBook());
             LogRecord saving(LogRecord::Progress, ss.str());
             logBook.add(saving);

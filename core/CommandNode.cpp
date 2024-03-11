@@ -375,7 +375,7 @@ namespace YAM
     void CommandNode::outputs(std::vector<std::shared_ptr<GeneratedFileNode>> const & newOutputs) {
         if (_outputs != newOutputs) {
             for (auto output : _outputs) {
-                output->deleteFile(true);
+                output->deleteFile(true, true);
                 output->removeObserver(this);
             }
             _outputs = newOutputs;

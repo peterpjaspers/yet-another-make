@@ -100,20 +100,19 @@ namespace YAM
         void addToBuildState(std::shared_ptr<IPersistable> const& object);
         void removeFromBuildState(std::shared_ptr<IPersistable> const& object);
 
-        std::filesystem::path _directory;
-        ExecutionContext* _context
-            ;
+        std::filesystem::path _stateFile;
+        ExecutionContext* _context;
+
+        std::map<BTree::TreeIndex, BTree::StreamingTree<Key>*> _typeToTree;
         std::shared_ptr<BTree::PersistentPagePool> _pool;
         std::shared_ptr<BTree::Forest> _forest;
-        std::map<BTree::TreeIndex, BTree::StreamingTree<Key>*> _typeToTree;
-        uint64_t _nextId;
 
+        uint64_t _nextId;
         std::map<Key, std::shared_ptr<IPersistable>> _keyToObject;
         std::map<IPersistable*, Key> _objectToKey;
 
         std::map<Key, std::shared_ptr<IPersistable>> _keyToDeletedObject;
         std::map<IPersistable*, Key> _deletedObjectToKey;
-
     };
 
 }

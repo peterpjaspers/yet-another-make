@@ -178,7 +178,7 @@ namespace YAM
             default: throw std::exception("unknown node type");
             }
         }
-    };    
+    };
     BuildStateTypes buildStateTypes;
 
     class ValueStreamer : public IValueStreamer {
@@ -187,7 +187,7 @@ namespace YAM
             : _streamer(streamer)
             , _writing(false)
         {}
-        ValueStreamer(BTree::ValueWriter<PersistentBuildState::Key>&streamer)
+        ValueStreamer(BTree::ValueWriter<PersistentBuildState::Key>& streamer)
             : _streamer(streamer)
             , _writing(true)
         {}
@@ -227,7 +227,7 @@ namespace YAM
 
         void stream(IStreamer* writer, std::shared_ptr<IStreamable>& object) {
             if (object == nullptr) {
-                writer->stream(nullPtrKey);                
+                writer->stream(nullPtrKey);
             } else {
                 auto persistable = dynamic_pointer_cast<IPersistable>(object);
                 PersistentBuildState::Key key = _buildState.getKey(persistable);
@@ -268,9 +268,9 @@ namespace YAM
         const uint64_t idMask = (static_cast <uint64_t>(1) << idBits) - 1;
         const uint64_t maxId = idMask;
 
-        KeyCode(PersistentBuildState::Key key) 
+        KeyCode(PersistentBuildState::Key key)
             : _key(key)
-            , _id(key & idMask)
+            , _id(key& idMask)
             , _type(static_cast<BTree::TreeIndex>(key >> idBits))
         {
         }
@@ -294,18 +294,17 @@ namespace YAM
     };
 
     BTree::PersistentPagePool* createPagePool(std::filesystem::path const& path) {
-        std::filesystem::create_directories(path.parent_path());
         // Determine stored page size (if any)...
         const BTree::PageSize pageSize = 512; //32 * 1024;
         BTree::PageSize storedPageSize = BTree::PersistentPagePool::pageCapacity(path.string());
         return new BTree::PersistentPagePool(((0 < storedPageSize) ? storedPageSize : pageSize), path.string());
     }
 
-    BTree::Forest* createForest(
-        BTree::PersistentPagePool& pool, 
+    std::shared_ptr<BTree::Forest> createForest(
+        BTree::PersistentPagePool& pool,
         std::map<BTree::TreeIndex, BTree::StreamingTree<PersistentBuildState::Key>*>& typeToTree
     ) {
-        auto forest = new BTree::Forest(pool);
+        auto forest = std::make_shared<BTree::Forest>(pool);
         for (auto tid : buildStateTypes.ids) {
             auto index = static_cast<BTree::TreeIndex>(tid);
             BTree::StreamingTree<PersistentBuildState::Key>* tree;
@@ -318,20 +317,21 @@ namespace YAM
         }
         return forest;
     }
+
 }
 
 namespace YAM
 {
     PersistentBuildState::PersistentBuildState(
-        std::filesystem::path const& directory,
+        std::filesystem::path const& stateFile,
         ExecutionContext* context
     )
-        : _directory(directory)
+        : _stateFile(stateFile)
         , _context(context)
-        , _pool(createPagePool(directory/"buildstate.bt"))
+        , _pool(createPagePool(stateFile))
+        , _forest(createForest(*_pool, _typeToTree))
         , _nextId(1)
     {
-        _forest.reset(createForest(*_pool, _typeToTree));
     }
 
     PersistentBuildState::~PersistentBuildState() {

@@ -12,7 +12,6 @@ Features
       nodes when no longer refd => GC sweep over context to remove node with
       use_count 1. delete when not observed
     - directory enumeration
-- Versioning in PersistentBuildState, encode version in name of buildstate file
 - fileaspect configuration
       - hash = last-write-time (e.g. for generated files in cmd executionhash)
       - import lib exports hash (hash i/f of dll)

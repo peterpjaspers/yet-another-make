@@ -113,6 +113,7 @@
     <ClInclude Include="FileExecSpecsNode.h" />
     <ClInclude Include="BuildFileParserNode.h" />
     <ClInclude Include="FileRepositoryNode.h" />
+    <ClInclude Include="BuildStateVersion.h" />
     <ClInclude Include="RepositoriesNode.h" />
     <ClInclude Include="Glob.h" />
     <ClInclude Include="Globber.h" />
@@ -215,6 +216,7 @@
     <ClCompile Include="BuildFileParserNode.cpp" />
     <ClCompile Include="BuildFileTokenSpecs.cpp" />
     <ClCompile Include="FileRepositoryNode.cpp" />
+    <ClCompile Include="BuildStateVersion.cpp" />
     <ClCompile Include="RepositoriesNode.cpp" />
     <ClCompile Include="Glob.cpp" />
     <ClCompile Include="Globber.cpp" />

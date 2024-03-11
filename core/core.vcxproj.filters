@@ -342,6 +342,9 @@
     <ClInclude Include="TokenScriptSpec.h">
       <Filter>Header Files\BuildFileCompiler</Filter>
     </ClInclude>
+    <ClInclude Include="BuildStateVersion.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -574,6 +577,9 @@
     </ClCompile>
     <ClCompile Include="TokenScriptSpec.cpp">
       <Filter>Source Files\BuildFileCompiler</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildStateVersion.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -68,6 +68,35 @@ namespace
         return received;
     }
 
+    std::filesystem::path getBuildStateFile(std::filesystem::path const& repoDir) {
+        auto file = repoDir / ".yam\\buildState\\buildstate.bt";
+        std::filesystem::create_directories(file.parent_path());
+        return file;
+    }
+    class Repository
+    {
+        std::filesystem::path repoDir;
+        std::filesystem::path yamDir;
+        DirectoryTree testTree;
+        ExecutionContext context;
+        PersistentBuildState persistentState;
+
+        Repository(std::filesystem::path const& repoDirectory)
+            : repoDir(repoDirectory)
+            , yamDir(DotYamDirectory::create(repoDir))
+            , testTree(repoDir, 0, RegexSet({ ".yam" }))
+            , persistentState(getBuildStateFile(repoDir), &context)
+        {
+            //context.threadPool().size(1);
+            auto homeRepo = std::make_shared<FileRepositoryNode>(
+                &context,
+                "repo",
+                repoDir);
+            auto repos = std::make_shared<RepositoriesNode>(&context, homeRepo);
+            context.repositoriesNode(repos);
+        }
+    };
+
     // Create directory tree, mirror tree in source directory node and
     // store resulting directory node tree to repoDir/ "nodes"
     class SetupHelper
@@ -84,7 +113,7 @@ namespace
             : repoDir(repoDirectory)
             , yamDir(DotYamDirectory::create(repoDir))
             , testTree(repoDir, 3, RegexSet({ ".yam" }))
-            , persistentState(repoDir / ".yam\\buildState", &context)
+            , persistentState(getBuildStateFile(repoDir), &context)
         {
             //context.threadPool().size(1);
             auto homeRepo = std::make_shared<FileRepositoryNode>(
@@ -487,7 +516,7 @@ namespace
         SetupHelper1(std::filesystem::path const& repoDirectory)
             : repoDir(repoDirectory)
             , testTree(repoDir, 4, RegexSet({ ".yam" }))
-            , persistentState(repoDir / "r0\\.yam\\buildState", &context)
+            , persistentState(getBuildStateFile(repoDir), &context)
         {
             context.threadPool().size(1);
             std::filesystem::create_directory(repoDir / "r0");

@@ -22,7 +22,7 @@ namespace YAM
 
         std::shared_ptr<CommandNode> producer() const;
 
-        bool deleteFile(bool setDirty = false);
+        bool deleteFile(bool setDirty = false, bool logDeletion = false);
 
         static void setStreamableType(uint32_t type);
         // Inherited from IStreamable
