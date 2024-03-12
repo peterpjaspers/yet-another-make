@@ -1,36 +1,48 @@
-#include "MonitorProcess.h"
-#include "Log.h"
+#include "Patch.h"
+#include "FileNaming.h"
+#include "MonitorLogging.h"
+#include "Inject.h"
 
 #include <windows.h>
-#include <iostream>
-#include <fstream>
 
 using namespace AccessMonitor;
 using namespace std;
+using namespace std::filesystem;
 
-DWORD monitorMain( void* argument ) {
-    auto monitor = AccessEvent( "Monitor", CurrentProcessID() );
-    auto exit = AccessEvent( "ExitProcess", CurrentProcessID() );
-    monitorLog.enable( PatchedFunction | ParseLibrary | PatchExecution | FileAccess );
-    monitorLog() << "Start monitoring..." << record;
-    startMonitoringProcess();
-    EventSignal( monitor ); // Signal parent process that monitoring has started
-    // Wait for this process to exit
-    if (EventWait( exit )) {
-        monitorLog() << "Stop monitoring..." << record;
-        stopMonitoringProcess();
-        EventSignal( monitor ); // Signal parent process that monitoring has stopped
-        EventSignal( exit ); // Signal this process that it can exit
+namespace {
+
+
+    DWORD monitorDLLMain( void* argument ) {
+        ProcessID process = CurrentProcessID();
+        SessionID session;
+        ThreadID mainThread; // Main thread ID of (remote) process
+        retrieveSessionInfo( process, session, mainThread );
+        ThreadID monitorThread = CurrentThreadID();
+        // Simply add monitor thread and main thread to session adminstration, session was created by ancestor process
+        AddSessionThread( monitorThread, session );
+        AddSessionThread( mainThread, session );
+        auto processPatched = AccessEvent( "ProcessPatched", session, process );
+        auto processExit = AccessEvent( "ProcessExit", session, process );
+        createEventLog( session );
+        monitorLog.enable( PatchedFunction | ParseLibrary | PatchExecution | FileAccesses );
+        monitorLog() << "Start monitoring in process 0x" << hex << process << "..." << record;
+        patchProcess();
+        SetSessionState( SessionActive );
+        EventSignal( processPatched ); // Signal (parent) process that monitoring has started
+        EventWait( processExit ); // Wait for process to exit before exitting monitor thread
+        ReleaseEvent( processPatched );
+        ReleaseEvent( processExit );
+        RemoveSessionThread( monitorThread );
+        RemoveSessionThread( mainThread );
+        return ERROR_SUCCESS;
     }
-    ReleaseEvent( monitor );
-    ReleaseEvent( exit );
-    return ERROR_SUCCESS;
+
 }
 
 BOOL WINAPI DllMain( HINSTANCE dll,  DWORD reason, LPVOID arg ) {
     if (reason == DLL_PROCESS_ATTACH) {
-        auto thread = CreateThread( nullptr, 0, monitorMain, nullptr, 0, nullptr );
-        if (thread == nullptr) return false;
+        auto monitorThread = CreateThread( nullptr, 0, monitorDLLMain, nullptr, 0, nullptr );
+        if (monitorThread == nullptr) return false;
     } else if (reason == DLL_THREAD_ATTACH) {
     } else if (reason == DLL_THREAD_DETACH) {
     } else if (reason == DLL_PROCESS_DETACH) {

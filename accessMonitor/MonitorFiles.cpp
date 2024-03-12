@@ -1,32 +1,21 @@
 #include "MonitorFiles.h"
-#include "MonitorProcess.h"
+#include "FileAccess.h"
+#include "MonitorLogging.h"
 #include "Patch.h"
-#include "Log.h"
 
 #include <windows.h>
 #include <winternl.h>
-#include <chrono>
-#include <string>
 #include <filesystem>
 
 using namespace std;
 using namespace std::filesystem;
 
 // ToDo: Add function calling convention to all externals
+// ToDo: Last write time on directories
 
 namespace AccessMonitor {
 
     namespace {
-
-        typedef unsigned long FileAccessMode;
-        typedef std::chrono::time_point<std::chrono::system_clock> FileTime;
-
-        static const FileAccessMode AccessNone = (1 << 0);
-        static const FileAccessMode AccessRead = (1 << 1);
-        static const FileAccessMode AccessWrite = (1 << 2);
-        static const FileAccessMode AccessDelete = (1 << 3);
-        static const FileAccessMode AccessVariable = (1 << 4);
-        static const FileAccessMode AccessStopMonitoring = (1 << 10);
 
         FileAccessMode requestedAccessMode( DWORD desiredAccess );
 
@@ -501,15 +490,16 @@ namespace AccessMonitor {
                 if (fileName.starts_with( L"\\\\?\\" ))  fileName = &fileNameString[ 4 ];
                 if (fileName.starts_with( L"\\\\.\\" ))  fileName = &fileNameString[ 4 ];
             }
-            return fileName;
+            return path( fileName ).generic_wstring();
         }
         // Expand file name to full path (according to Windows semantics)
+        // Returns empty string if file name expansion fails.
         wstring fullName( const wchar_t* fileName ) {
             wchar_t filePath[ MaxFileName ];
             wchar_t* fileNameAddress;
             DWORD length = GetFullPathNameW( fileName, MaxFileName, filePath, &fileNameAddress );
-            if (length == 0) return wstring( fileName );
-            return wstring( filePath );
+            if (length == 0) return wstring( L"" );
+            return path( filePath ).generic_wstring();
         }
         wstring fullName( const char* fileName ) {
             return fullName( widen( string( fileName ) ).c_str() );
@@ -573,25 +563,15 @@ namespace AccessMonitor {
             return getLastWriteTime( widen( fileName ) );
         }
 
-        // Convert FileAccessMode value to string
-        wstring modeString( FileAccessMode mode ) {
-            auto s = wstring( L"" );
-            if ((mode & AccessRead) != 0) s += L"Read";
-            if ((mode & AccessWrite) != 0) s += L"Write";
-            if ((mode & AccessDelete) != 0) s += L"Delete";
-            if ((mode & AccessVariable) != 0) s += L"Variable";
-            return s;
-        }
-
         void recordFileEvent( const wstring& file, FileAccessMode mode, const FileTime& time ) {
-            monitorEvents() << file << L" [ " << time << L" ] " << modeString( mode ) << record;
+            if (SessionRecording()) eventRecord() << file << L" [ " << time << L" ] " << modeToString( mode ) << record;
         }
 
         // Register file access mode on file (path)
         wstring fileAccess( const wstring& fileName, FileAccessMode mode ) {
             DWORD error = GetLastError();
             auto fullFileName = fullName( fileName.c_str() );
-            if (monitorLog( FileAccess )) monitorLog() << L"MonitorFiles - " << modeString( mode ) << L" access by name on file " << fullFileName << record;
+            if (monitorLog( FileAccesses )) monitorLog() << L"MonitorFiles - " << modeToString( mode ) << L" access by name on file " << fullFileName << record;
             if (fullFileName != L"") recordFileEvent( fullFileName, mode, getLastWriteTime( fileName ) );
             SetLastError( error );
             return fullFileName;
@@ -604,7 +584,7 @@ namespace AccessMonitor {
             auto fullFileName = fullName( handle );
             if (fullFileName != L"") {
                 if (mode == AccessNone) mode = accessMode( handle );
-                if (monitorLog( FileAccess )) monitorLog() << L"MonitorFiles - " << modeString( mode ) << L" access by handle on file " << fullFileName << record;
+                if (monitorLog( FileAccesses )) monitorLog() << L"MonitorFiles - " << modeToString( mode ) << L" access by handle on file " << fullFileName << record;
                 if (fullFileName != L"") recordFileEvent( fullFileName, mode, getLastWriteTime( handle ) );
             }
             SetLastError( error );
@@ -615,7 +595,7 @@ namespace AccessMonitor {
             auto fullFileName = fullName( attributes );
             if (fullFileName != L"") {
                 FileAccessMode  mode = accessMode( handle );
-                if (monitorLog( FileAccess )) monitorLog() << L"MonitorFiles - " << modeString( mode ) << L" access by handle on file " << fullFileName << record;
+                if (monitorLog( FileAccesses )) monitorLog() << L"MonitorFiles - " << modeToString( mode ) << L" access by handle on file " << fullFileName << record;
                 if (fullFileName != L"") recordFileEvent( fullFileName, mode, getLastWriteTime( handle ) );
             }
             SetLastError( error );

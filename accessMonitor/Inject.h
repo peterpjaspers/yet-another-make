@@ -1,12 +1,17 @@
 #ifndef ACCESS_MONITOR_INJECT_H
 #define ACCESS_MONITOR_INJECT_H
 
+#include "Process.h"
+
 #include <string>
 
 namespace AccessMonitor {
-    typedef long int PID;
+
+    void patchProcess();
+    void unpatchProcess();
+
     // Inject a library in a process
-    void inject( PID pid, const std::wstring& library );
+    void inject( SessionID session, ProcessID process, ThreadID thread, const std::wstring& library );
 }
 
 #endif // ACCESS_MONITOR_INJECT_H

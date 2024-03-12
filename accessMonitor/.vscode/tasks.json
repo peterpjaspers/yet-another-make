@@ -1,6 +1,7 @@
 {
 	"version": "2.0.0",
 	"tasks": [
+/*
 		{
 			"type": "cppbuild",
 			"label": "C/C++: g++.exe build active file (debug)",
@@ -32,11 +33,8 @@
 				"-g",
 				"-U NDEBUG",
 				"-I${workspaceFolder}",
-				"-IC:/Program Files/boost/boost_1_81_0",
-				"${workspaceFolder}/Patch.cpp",
-				"${workspaceFolder}/MonitorFiles.cpp",
-				"${workspaceFolder}/MonitorThreadsAndProcesses.cpp",
 				"${workspaceFolder}/Monitor.cpp",
+				"${workspaceFolder}/FileAccess.cpp",
 				"${workspaceFolder}/test.cpp",
 				"-o",
 				"${workspaceFolder}/test.exe",
@@ -60,10 +58,7 @@
 				"-std:c++17",
 				"-U NDEBUG -Od -EHs -GA -Z7 -MTd",
 				"-I${workspaceFolder}",
-				"-IC:/Program Files/boost/boost_1_81_0",
-				"${workspaceFolder}/Patch.cpp",
-				"${workspaceFolder}/MonitorFiles.cpp",
-				"${workspaceFolder}/MonitorThreadsAndProcesses.cpp",
+				"${workspaceFolder}/FileAccess.cpp",
 				"${workspaceFolder}/Monitor.cpp",
 				"${workspaceFolder}/test.cpp",
                 "-o \"${workspaceFolder}/test\"",
@@ -74,10 +69,11 @@
 			"group": "build",
 			"detail": "compiler: \"C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/Llvm/bin/clang-cl.exe\""
 		},
+*/
 		{
 			"type": "cppbuild",
 			"label": "Microsoft build test (debug)",
-			"command": "\"C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/bin/Hostx64/x64/cl.exe\"",
+			"command": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/bin/Hostx64/x64/cl.exe",
 			"args": [
 				"-std:c++20", "-U NDEBUG", "-Od", "-EHs","-GA","-Zi","-MTd",
 				"-IC:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/include",
@@ -86,12 +82,19 @@
 				"-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/shared",
 				"${workspaceFolder}/test.cpp",
 				"${workspaceFolder}/Log.cpp",
+				"${workspaceFolder}/FileAccess.cpp",
+				"${workspaceFolder}/FileNaming.cpp",
 				"${workspaceFolder}/Process.cpp",
 				"${workspaceFolder}/Monitor.cpp",
+				"${workspaceFolder}/MonitorLogging.cpp",
+				"${workspaceFolder}/MonitorFiles.cpp",
+				"${workspaceFolder}/MonitorThreadsAndProcesses.cpp",
+				"${workspaceFolder}/Patch.cpp",
+				"${workspaceFolder}/Inject.cpp",
                 "-link /INCREMENTAL:NO",
-                "/LIBPATH:\"C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/lib/x64\"",
-                "/LIBPATH:\"C:/Program Files (x86)/Windows Kits/10/Lib/10.0.22621.0/ucrt/x64\"",
-                "/LIBPATH:\"C:/Program Files (x86)/Windows Kits/10/Lib/10.0.22621.0/um/x64\"",
+                "/LIBPATH:C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/lib/x64",
+                "/LIBPATH:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.22621.0/ucrt/x64",
+                "/LIBPATH:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.22621.0/um/x64",
             ],
 			"options": {
 				"cwd": "${workspaceFolder}"
@@ -102,7 +105,7 @@
 		{
 			"type": "cppbuild",
 			"label": "Microsoft build remoteTest (debug)",
-			"command": "\"C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/bin/Hostx64/x64/cl.exe\"",
+			"command": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/bin/Hostx64/x64/cl.exe",
 			"args": [
 				"-std:c++20", "-U NDEBUG", "-Od", "-EHs","-GA","-Zi","-MTd",
 				"-IC:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/include",
@@ -111,9 +114,9 @@
 				"-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/shared",
 				"${workspaceFolder}/remoteTest.cpp",
                 "-link /INCREMENTAL:NO",
-                "/LIBPATH:\"C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/lib/x64\"",
-                "/LIBPATH:\"C:/Program Files (x86)/Windows Kits/10/Lib/10.0.22621.0/ucrt/x64\"",
-                "/LIBPATH:\"C:/Program Files (x86)/Windows Kits/10/Lib/10.0.22621.0/um/x64\"",
+                "/LIBPATH:C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/lib/x64",
+                "/LIBPATH:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.22621.0/ucrt/x64",
+                "/LIBPATH:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.22621.0/um/x64",
             ],
 			"options": {
 				"cwd": "${workspaceFolder}"
@@ -124,7 +127,7 @@
 		{
 			"type": "cppbuild",
 			"label": "Microsoft build testDLL (debug)",
-			"command": "\"C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/bin/Hostx64/x64/cl.exe\"",
+			"command": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/bin/Hostx64/x64/cl.exe",
 			"args": [
 				"-std:c++20", "-U NDEBUG", "-Od", "-EHs","-GA","-Zi","-MTd",
 				"-IC:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/include",
@@ -132,11 +135,19 @@
 				"-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/um",
 				"-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/shared",
 				"${workspaceFolder}/testDLL.cpp",
+				"${workspaceFolder}/Log.cpp",
+				"${workspaceFolder}/FileAccess.cpp",
+				"${workspaceFolder}/FileNaming.cpp",
 				"${workspaceFolder}/Process.cpp",
+				"${workspaceFolder}/MonitorLogging.cpp",
+				"${workspaceFolder}/MonitorFiles.cpp",
+				"${workspaceFolder}/MonitorThreadsAndProcesses.cpp",
+				"${workspaceFolder}/Patch.cpp",
+				"${workspaceFolder}/Inject.cpp",
                 "-link /INCREMENTAL:NO",
-                "/LIBPATH:\"C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/lib/x64\"",
-                "/LIBPATH:\"C:/Program Files (x86)/Windows Kits/10/Lib/10.0.22621.0/ucrt/x64\"",
-                "/LIBPATH:\"C:/Program Files (x86)/Windows Kits/10/Lib/10.0.22621.0/um/x64\"",
+                "/LIBPATH:C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/lib/x64",
+                "/LIBPATH:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.22621.0/ucrt/x64",
+                "/LIBPATH:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.22621.0/um/x64",
             ],
 			"options": {
 				"cwd": "${workspaceFolder}"
@@ -147,7 +158,7 @@
 		{
 			"type": "cppbuild",
 			"label": "Microsoft build patchDLL (debug)",
-			"command": "\"C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/bin/Hostx64/x64/cl.exe\"",
+			"command": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/bin/Hostx64/x64/cl.exe",
 			"args": [
 				"-std:c++20", "-D NDEBUG", "-Od", "-EHs","-GA","-Zi","-MTd",
 				"-IC:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/include",
@@ -158,24 +169,25 @@
 				"-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/shared",
 				"${workspaceFolder}/patchDLL.cpp",
 				"${workspaceFolder}/Log.cpp",
+				"${workspaceFolder}/FileAccess.cpp",
+				"${workspaceFolder}/FileNaming.cpp",
 				"${workspaceFolder}/Process.cpp",
-				"${workspaceFolder}/Patch.cpp",
-				"${workspaceFolder}/Inject.cpp",
 				"${workspaceFolder}/MonitorFiles.cpp",
 				"${workspaceFolder}/MonitorThreadsAndProcesses.cpp",
-				"${workspaceFolder}/Monitor.cpp",
-				"${workspaceFolder}/MonitorProcess.cpp",
+				"${workspaceFolder}/MonitorLogging.cpp",
+				"${workspaceFolder}/Patch.cpp",
+				"${workspaceFolder}/Inject.cpp",
                 "libucrtd.lib",
                 "libvcruntimed.lib",
                 "libcmtd.lib",
                 "uuid.lib",
                 "Dbghelp.lib",
                 "-link /DLL /OUT:\"patchDLL.dll\" /INCREMENTAL:NO",
-                "/LIBPATH:\"C:/Program Files (x86)/Windows Kits/10/Lib/10.0.22621.0/ucrt/x64\"",
-                "/LIBPATH:\"C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/lib/x64\"",
-                "/LIBPATH:\"C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/lib/onecore/x64\"",
-                "/LIBPATH:\"C:/Program Files (x86)/Windows Kits/10/Lib/10.0.22621.0/um/x64\"",
-                "/LIBPATH:\"C:/Windows/System32\"",
+                "/LIBPATH:C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\ucrt\\x64",
+                "/LIBPATH:C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.38.33130\\lib\\x64",
+                "/LIBPATH:C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.38.33130\\lib\\onecore\\x64",
+                "/LIBPATH:C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.22621.0\\um\\x64",
+                "/LIBPATH:C:\\Windows\\System32",
             ],
 			"options": {
 				"cwd": "${workspaceFolder}"
@@ -186,7 +198,7 @@
 		{
 			"type": "cppbuild",
 			"label": "Microsoft build patchDLL (optimized)",
-			"command": "\"C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/bin/Hostx64/x64/cl.exe\"",
+			"command": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/bin/Hostx64/x64/cl.exe",
 			"args": [
 				"-std:c++20", "-U NDEBUG", "-O1", "-EHs","-GA","-Zi","-MT",
 				"-IC:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/include",
@@ -202,8 +214,7 @@
 				"${workspaceFolder}/Inject.cpp",
 				"${workspaceFolder}/MonitorFiles.cpp",
 				"${workspaceFolder}/MonitorThreadsAndProcesses.cpp",
-				"${workspaceFolder}/MonitorProcess.cpp",
-				"${workspaceFolder}/Monitor.cpp",
+				"${workspaceFolder}/MonitorLogging.cpp",
                 "libucrt.lib",
                 "libvcruntime.lib",
                 "libcmt.lib",
@@ -222,6 +233,7 @@
 			"group": "build",
 			"detail": "compiler: \"C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/bin/Hostx64/x64/cl.exe\""
 		},
+/*
 		{
 			"type": "cppbuild",
 			"label": "Microsoft build listDLLExternals (debug)",
@@ -292,6 +304,7 @@
 			"group": "build",
 			"detail": "compiler: \"C:/Program Files/mingw-w64/x86_64-8.1.0-posix-seh-rt_v6-rev0/mingw64/bin/g++.exe\""
 		}
+*/
 
 	]
 }

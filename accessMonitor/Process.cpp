@@ -1,8 +1,9 @@
 #include "Process.h"
 
-#include <Windows.h>
-#include <string>
 #include <sstream>
+#include <map>
+#include <set>
+#include <mutex>
 
 using namespace std;
 
@@ -11,19 +12,90 @@ using namespace std;
 
 namespace AccessMonitor {
 
-    ProcessID CurrentProcessID() { return static_cast<ProcessID>( GetCurrentProcessId() ); }
-    ProcessID GetProcessID( unsigned long id ) { return static_cast<ProcessID>( id ); }
-    ThreadID CurrentThreadID() { return static_cast<ThreadID>( GetCurrentThreadId() ); }
-    ThreadID GetThreadID( unsigned long id ) { return static_cast<ThreadID>( id ); }
+    namespace {
 
-    string uniqueEventName( const string& tag, ProcessID pid ) {
-        stringstream name;
-        name << "Global\\" << tag << "_Event_" << hex << pid;
-        return name.str();
+        mutex sessionMutex;
+        map<SessionID,set<ThreadID>> sessionToThreads;
+        map<ThreadID,SessionID> threadToSession;
+        map<ThreadID,SessionState> sessionStates;
+        SessionID nextSession = 1;
+
+        string uniqueEventName( const string& tag, const SessionID session, const ProcessID process ) {
+            stringstream name;
+            name << "Global\\" << tag << "_Event_" << hex << session << "_" << hex << process;
+            return name.str();
+        }
+
     }
 
-    EventID AccessEvent( const string& tag, const ProcessID pid ) {
-        HANDLE handle = CreateEventA( nullptr, false, false, uniqueEventName( tag, pid ).c_str() );
+    SessionID CurrentSessionID() { return ThreadSessionID( CurrentThreadID() ); }
+    SessionID ThreadSessionID( ThreadID thread ) {
+        static const char* signature = "SessionID ThreadSessionID( ThreadID thread )";
+        const lock_guard<mutex> lock( sessionMutex ); 
+        if (threadToSession.count( thread ) == 0) throw string( signature ) + " - Thread not active on a session!";
+        return threadToSession[ thread ];
+    }
+    size_t SessionCount() {
+        const lock_guard<mutex> lock( sessionMutex ); 
+        return sessionToThreads.size();
+    }
+    SessionID CreateSession() {
+        static const char* signature = "SessionID CreateSession()";
+        ThreadID thread = CurrentThreadID();
+        const lock_guard<mutex> lock( sessionMutex ); 
+        if (0 < threadToSession.count( thread )) throw string( signature ) + " - Thread already active on a session!";
+        SessionID session = nextSession++;
+        threadToSession[ thread ] = session;
+        sessionToThreads[ session ].insert( thread );
+        sessionStates[ session ] = SessionActive;
+        return session;
+    }
+    void RemoveSession() {
+        static const char* signature = "void RemoveSession()";
+        ThreadID thread = CurrentThreadID();
+        const lock_guard<mutex> lock( sessionMutex ); 
+        if (threadToSession.count( thread ) == 0) throw string( signature ) + " - Thread not active on a session!";
+        auto session = threadToSession[ thread ];
+        sessionToThreads[ session ].erase( thread );
+        for (auto thread : sessionToThreads[ session ]) threadToSession.erase( thread );
+        sessionToThreads.erase( session );
+        sessionStates.erase( session );
+        if (threadToSession.size() == 0) nextSession = 1;
+    }
+    void AddSessionThread( ThreadID thread, SessionID session ) {
+        const lock_guard<mutex> lock( sessionMutex ); 
+        threadToSession[ thread ] = session;
+        sessionToThreads[ session ].insert( thread );
+    }
+    void RemoveSessionThread( ThreadID thread ) {
+        const lock_guard<mutex> lock( sessionMutex );
+        SessionID session = threadToSession[ thread ];
+        sessionToThreads[ session ].erase( thread );
+        threadToSession.erase( thread );
+    }
+    void SetSessionState( const SessionState state ) {
+        static const char* signature = "void SessionActive( const bool state )";
+        auto thread = CurrentThreadID();
+        const lock_guard<mutex> lock( sessionMutex ); 
+        if (threadToSession.count( thread ) == 0) throw string( signature ) + " - Thread not active on a session!";
+        sessionStates[ threadToSession[ thread ] ] = state;
+    }
+    SessionState GetSessionState() {
+        auto thread = CurrentThreadID();
+        const lock_guard<mutex> lock( sessionMutex ); 
+        if (threadToSession.count( thread ) == 0) return SessionNone;
+        return sessionStates[ threadToSession[ thread ] ];
+    }
+    bool SessionRecording() { return (GetSessionState() == SessionActive); }
+
+    ProcessID CurrentProcessID() { return static_cast<ProcessID>( GetCurrentProcessId() ); }
+    ProcessID GetProcessID( DWORD id ) { return static_cast<ProcessID>( id ); }
+
+    ThreadID CurrentThreadID() { return static_cast<ThreadID>( GetCurrentThreadId() ); }
+    ThreadID GetThreadID( DWORD id ) { return static_cast<ThreadID>( id ); }
+
+    EventID AccessEvent( const string& tag, const SessionID session, const ProcessID process ) {
+        HANDLE handle = CreateEventA( nullptr, false, false, uniqueEventName( tag, session, process ).c_str() );
         return static_cast<EventID>( handle );
     }
     void ReleaseEvent( EventID event ) { CloseHandle( event ); }
@@ -35,5 +107,4 @@ namespace AccessMonitor {
     }
     void EventSignal( EventID event ) { SetEvent( event ); }
 
-
-}
+} // namespace AccessMonitor

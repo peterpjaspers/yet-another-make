@@ -2,13 +2,18 @@
 #include <string>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <thread>
 
 using namespace std;
 using namespace std::filesystem;
 
+bool multithreaded = false;
+string directory = "RemoteSession";
+
 void worker( const path directoryPath ) {
-    create_directory( directoryPath, current_path() );
+    current_path( temp_directory_path() );
+    create_directories( directoryPath );
     ofstream file( directoryPath / "junk.txt" );
     file << "Hello world!\n";
     file.close();
@@ -22,22 +27,28 @@ void worker( const path directoryPath ) {
     remove_all( directoryPath );
 }
 
-void doFileAccess( bool multithreaded = true ) {
+void doFileAccess( bool multithreaded, const string& directory ) {
     if (multithreaded) {
-        auto t = jthread( worker, path( "./remoteFileAccessTest" ) );
-        auto t0 = jthread( worker, path( "./remoteFileAccessTest0" ) );
-        auto t1 = jthread( worker, path( "./remoteFileAccessTest1" ) );
-        auto t2 = jthread( worker, path( "./remoteFileAccessTest2" ) );
-        auto t3 = jthread( worker, path( "./remoteFileAccessTest3" ) );
-        t.join();
-        t0.join();
-        t1.join();
-        t2.join();
-        t3.join();
+        auto t = jthread( worker, path( "." ) / directory / "fileAccessTest" );
+        auto t0 = jthread( worker, path( "." ) / directory / "fileAccessTest0" );
+        auto t1 = jthread( worker, path( "." ) / directory / "fileAccessTest1" );
+        auto t2 = jthread( worker, path( "." ) / directory / "fileAccessTest2" );
+        auto t3 = jthread( worker, path( "." ) / directory / "fileAccessTest3" );
     } else {
-        worker( path( "./remoteFileAccessTest" ) );
+        worker( path( "." ) / directory / "fileAccessTest" );
     }
 }
 
-int main() { doFileAccess( true ); };
+bool condition( const string& argument ) {
+    if ((argument == "t") || (argument == "T")) return true;
+    if ((argument == "true") || (argument == "TRUE")) return true;
+    return false;
+}
+
+int main( int argc, char* argv[] ) {
+    if (2 < argc) directory = argv[ 2 ];
+    if (1 < argc) multithreaded = condition( argv[ 1 ] );
+    cout << "Remote process running " << ((multithreaded) ? "multi-" : "single-" ) << "threaded on directory " << directory << endl;
+    doFileAccess( multithreaded, directory );
+};
 

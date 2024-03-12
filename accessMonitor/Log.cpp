@@ -14,20 +14,32 @@ using namespace std::filesystem;
 // ToDo: Conditionally compile logging code while compiling in debug controlled via NDEBUG
 
 namespace AccessMonitor {
+
+    namespace {
+
+        path uniqueLogFileName( const wstring& name, unsigned long sequence ) {
+            wstringstream unique;
+            unique << name << L"_" << hex << sequence << L".log";
+            return temp_directory_path() /unique.str();
+        }
+
+    }
     
-    Log::Log( const path& file, bool time, bool interval ) :
+    Log::Log( const path& file, bool time, bool interval ) : 
         logTime( time ), logInterval( interval ), previousTime( chrono::system_clock::now() )
     {
-        // Add process PID to file name to generate unique file name for log file...
-        wstringstream uniqueFile;
-        uniqueFile << file.c_str() << "_" << hex << CurrentProcessID() << ".log";
-        logFile = new wofstream( temp_directory_path() / uniqueFile.str() );
+        logFile = new wofstream( file );
         // static uint8_t UTF16BOMCodes[ 2 ] = { 0xFE, 0xFF };
         // static wchar_t* UTF16BOM = reinterpret_cast<wchar_t*>( &UTF16BOMCodes[ 0 ] );
         // *logFile << UTF16BOM;
         logMutex = new mutex;
         logRecords = new map<ThreadID,LogRecord*>;
+
     }
+
+    Log::Log( const std::filesystem::path& file, const unsigned long sequence, bool time, bool interval ) :
+        Log( uniqueLogFileName( file.c_str(), sequence ), time, interval )
+    {}
 
     Log::~Log() { close(); }
 

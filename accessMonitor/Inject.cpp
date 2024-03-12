@@ -1,13 +1,30 @@
 #include "Inject.h"
 #include "Process.h"
+#include "FileNaming.h"
+#include "MonitorLogging.h"
+#include "MonitorFiles.h"
+#include "MonitorThreadsAndProcesses.h"
+#include "Patch.h"
 
 #include <windows.h>
 #include <sstream>
+#include <filesystem>
 
 using namespace std;
 
 namespace AccessMonitor {
     
+    void patchProcess() {
+        registerFileAccess();
+        registerProcessesAndThreads();
+        patch();
+    }
+    void unpatchProcess() {
+        unpatch();
+        unregisterFileAccess();
+        unregisterProcessCreation();
+    }
+
     string exceptionText( const string& signature, const string& message ) {
         stringstream ss;
         ss << signature << " - " << message << "! [ " << GetLastError() << " ]";
@@ -18,32 +35,36 @@ namespace AccessMonitor {
     // that excutes LoadLibrary as its (main) function. The DLLMain entry point of the library is
     // called as a result of loading the DLL.
     // Throws one of a number of failure specific exceptions.
-    void inject( PID pid, const wstring& library ) {
-        const char* signature = "void inject( PID pid, const wstring& library )";
-        HANDLE process = OpenProcess( PROCESS_CREATE_THREAD | PROCESS_VM_OPERATION | PROCESS_VM_WRITE, FALSE, pid );
-        if (process != nullptr) {
+    void inject( SessionID session, ProcessID process, ThreadID thread, const wstring& library ) {
+        const char* signature = "void inject( SessionID session, ProcessID process, const wstring& library )";
+        HANDLE processHandle = OpenProcess( PROCESS_CREATE_THREAD | PROCESS_VM_OPERATION | PROCESS_VM_WRITE, FALSE, (DWORD)process );
+        if (processHandle != nullptr) {
             size_t fileNameSize = ((library.size() + 1) * sizeof(wchar_t));
-            wchar_t* fileName = static_cast<wchar_t*>( VirtualAllocEx( process, NULL, fileNameSize, MEM_COMMIT, PAGE_READWRITE ) );
+            wchar_t* fileName = static_cast<wchar_t*>( VirtualAllocEx( processHandle, NULL, fileNameSize, MEM_COMMIT, PAGE_READWRITE ) );
             if (fileName != nullptr) {
-                if (WriteProcessMemory( process, fileName, library.c_str(), fileNameSize, NULL)) {
+                if (WriteProcessMemory( processHandle, fileName, library.c_str(), fileNameSize, NULL)) {
                     HMODULE module = GetModuleHandleW( L"Kernel32" );
                     if (module != nullptr) {
                         PTHREAD_START_ROUTINE function = PTHREAD_START_ROUTINE( GetProcAddress( module, "LoadLibraryW" ) );
                         if (function != nullptr) {
-                            HANDLE thread = CreateRemoteThread( process, nullptr, 0, function, fileName, CREATE_SUSPENDED, nullptr );
-                            if (thread != nullptr) {
-                                auto monitor = AccessEvent( "Monitor", pid );
-                                if (ResumeThread( thread ) == 1) {
-                                    if (!EventWait( monitor )) throw exceptionText( signature, "Failed to synchronize with remote thread" );
+                            HANDLE threadHandle = CreateRemoteThread( processHandle, nullptr, 0, function, fileName, CREATE_SUSPENDED, nullptr );
+                            // Communicate session ID and main thread ID via session ID file...
+                            if (monitorLog( PatchExecution )) monitorLog() << L"Inject - Recording session " << session << L" for remote process 0x" << hex << process << record;
+                            recordSessionInfo( session, process, thread );
+                            if (threadHandle != nullptr) {
+                                auto processPatched = AccessEvent( "ProcessPatched", session, process );
+                                if (ResumeThread( threadHandle ) == 1) {
+                                    // Wait for remote thread to indicate process has been patched...
+                                    if (!EventWait( processPatched )) throw exceptionText( signature, "Failed to synchronize with remote thread" );
                                 } else throw exceptionText( signature, "Failed to resume remote thread" );
-                                ReleaseEvent( monitor );
-                                CloseHandle( thread );
+                                ReleaseEvent( processPatched );
+                                CloseHandle( threadHandle );
                             } else throw exceptionText( signature, "Failed to create remote thread" );
                         } else throw exceptionText( signature, "Failed to access LoadLibraryW function pointer" );
                     } else throw exceptionText( signature, "Failed to access Kernel32 module" );
                 } else throw exceptionText( signature, "Failed to write to remote memory" );
             } else throw exceptionText( signature, "Failed to allocate remote memory" );
-            CloseHandle( process );
+            CloseHandle( processHandle );
         } else throw string( signature ) + "Failed to open target process";
     }
 

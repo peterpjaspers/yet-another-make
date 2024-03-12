@@ -1,6 +1,5 @@
 #include "Patch.h"
-#include "MonitorProcess.h"
-#include "Log.h"
+#include "MonitorLogging.h"
 
 #include <windows.h>
 #include <imagehlp.h>

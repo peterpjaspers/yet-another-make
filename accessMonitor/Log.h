@@ -18,8 +18,8 @@ namespace AccessMonitor {
     class Log {
     public:
         Log() : logFile( nullptr ), logMutex( nullptr ), logRecords( nullptr ) {};
-        // Create a log file.
         Log( const std::filesystem::path& file, bool time = false, bool interval = false );
+        Log( const std::filesystem::path& file, const unsigned long sequence, bool time = false, bool interval = false );
         Log( const Log& other ) = delete;
         Log( Log&& other ) = delete;
         Log& operator=( const Log& other ) = delete;
@@ -65,10 +65,10 @@ namespace AccessMonitor {
 
     class LogRecord : public std::wostringstream {
     public:
-        LogRecord( Log& logFile ) : log( logFile ) {};
-        inline void record( std::wstring string ) { log.record( string ); };
+        LogRecord( Log& logFile ) : logger( logFile ) {};
+        inline void record( std::wstring string ) { logger.record( string ); };
     private:
-        Log& log;
+        Log& logger;
         friend std::wostream& record( std::wostream& record );
     };
 
