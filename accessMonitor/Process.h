@@ -35,8 +35,8 @@ namespace AccessMonitor {
     //    SessionNone, SessionActive or SessionUpdating
     void SetSessionState( const SessionState state );
     SessionState GetSessionState();
-    // Test if session is recording events on current thread
-    bool SessionRecording();
+    // Test if session is defined on current thread
+    bool SessionDefined();
 
     // Get ProcessID of current process
     ProcessID CurrentProcessID();
@@ -55,10 +55,16 @@ namespace AccessMonitor {
     // The event is destroyed when it is no longer accessed.
     void ReleaseEvent( EventID event );
 
-    // Wait for an event
+    // Wait for an event with an otional time-out
     bool EventWait( EventID event, unsigned long milliseconds = ULONG_MAX );
+    // Wait for a named event
+    // Unless defined elsewhere, event lifetime of named event is restricted to duration of EventWait unless.
+    bool EventWait( const std::string& tag, const SessionID session, const ProcessID process, unsigned long milliseconds = ULONG_MAX );
     // Signal an event
     void EventSignal( EventID event );
+    // Signal for a named event
+    // Unless defined elsewhere, event lifetime of named event is restricted to duration of EventWait unless.
+    void EventSignal( const std::string& tag, const SessionID session, const ProcessID process );
 
 } // namespace AccessMonitor
 

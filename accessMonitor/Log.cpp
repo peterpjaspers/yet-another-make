@@ -17,9 +17,14 @@ namespace AccessMonitor {
 
     namespace {
 
-        path uniqueLogFileName( const wstring& name, unsigned long sequence ) {
+        path uniqueLogFileName( const wstring& name, unsigned long code ) {
             wstringstream unique;
-            unique << name << L"_" << hex << sequence << L".log";
+            unique << name << L"_" << hex << code << L".log";
+            return temp_directory_path() /unique.str();
+        }
+        path uniqueLogFileName( const wstring& name, unsigned long code1, unsigned long code2 ) {
+            wstringstream unique;
+            unique << name << L"_" << code1 << L"_" << hex << code2 << L".log";
             return temp_directory_path() /unique.str();
         }
 
@@ -37,8 +42,11 @@ namespace AccessMonitor {
 
     }
 
-    Log::Log( const std::filesystem::path& file, const unsigned long sequence, bool time, bool interval ) :
-        Log( uniqueLogFileName( file.c_str(), sequence ), time, interval )
+    Log::Log( const std::filesystem::path& file, const unsigned long code, bool time, bool interval ) :
+        Log( uniqueLogFileName( file.c_str(), code ), time, interval )
+    {}
+    Log::Log( const std::filesystem::path& file, const unsigned long code1, const unsigned long code2, bool time, bool interval ) :
+        Log( uniqueLogFileName( file.c_str(), code1, code2 ), time, interval )
     {}
 
     Log::~Log() { close(); }

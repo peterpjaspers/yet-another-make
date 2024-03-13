@@ -48,7 +48,7 @@ bool condition( const string& argument ) {
 int main( int argc, char* argv[] ) {
     if (2 < argc) directory = argv[ 2 ];
     if (1 < argc) multithreaded = condition( argv[ 1 ] );
-    cout << "Remote process running " << ((multithreaded) ? "multi-" : "single-" ) << "threaded on directory " << directory << endl;
+    // cout << "Remote process running " << ((multithreaded) ? "multi-" : "single-" ) << "threaded on directory " << directory << endl;
     doFileAccess( multithreaded, directory );
 };
 

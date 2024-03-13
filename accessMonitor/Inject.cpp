@@ -45,11 +45,11 @@ namespace AccessMonitor {
                 if (WriteProcessMemory( processHandle, fileName, library.c_str(), fileNameSize, NULL)) {
                     HMODULE module = GetModuleHandleW( L"Kernel32" );
                     if (module != nullptr) {
-                        PTHREAD_START_ROUTINE function = PTHREAD_START_ROUTINE( GetProcAddress( module, "LoadLibraryW" ) );
+                        PTHREAD_START_ROUTINE function = reinterpret_cast<PTHREAD_START_ROUTINE>( GetProcAddress( module, "LoadLibraryW" ) );
                         if (function != nullptr) {
                             HANDLE threadHandle = CreateRemoteThread( processHandle, nullptr, 0, function, fileName, CREATE_SUSPENDED, nullptr );
                             // Communicate session ID and main thread ID via session ID file...
-                            if (monitorLog( PatchExecution )) monitorLog() << L"Inject - Recording session " << session << L" for remote process 0x" << hex << process << record;
+                            if (debugLog( PatchExecution )) debugRecord() << L"Inject - Recording session " << session << L" for remote process 0x" << hex << process << record;
                             recordSessionInfo( session, process, thread );
                             if (threadHandle != nullptr) {
                                 auto processPatched = AccessEvent( "ProcessPatched", session, process );

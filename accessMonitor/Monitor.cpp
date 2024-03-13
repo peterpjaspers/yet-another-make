@@ -86,29 +86,31 @@ namespace AccessMonitor {
     // ToDo: rename patchDLL.dll to accessMonitor.dll
 
     void startMonitoring() {
-        monitorLog.enable( PatchedFunction | ParseLibrary | PatchExecution | FileAccesses );
         SessionID session;
         {
             const lock_guard<mutex> lock( monitorMutex ); 
-            if (SessionCount() == 0) patchProcess();
             session = CreateSession();
+            createDebugLog();
+            debugLog().enable( PatchedFunction | ParseLibrary | PatchExecution | FileAccesses );
+            if (SessionCount() == 1)  patchProcess();
         }
-        monitorLog() << "Start monitoring session " << session << "..." << record;
+        debugRecord() << "Start monitoring session " << session << "..." << record;
         SetSessionState( SessionUpdating );
         createSessionData( session );
-        createEventLog( session );
+        createEventLog();
         SetSessionState( SessionActive );
     }
 
     MonitorEvents stopMonitoring() {
-        auto session = ThreadSessionID( CurrentThreadID() );
-        monitorLog() << "Stop monitoring session " << session << "..." << record;
+        auto session = CurrentSessionID();
+        debugRecord() << "Stop monitoring session " << session << "..." << record;
+        closeEventLog();
         {
-            const lock_guard<mutex> lock( monitorMutex ); 
+            const lock_guard<mutex> lock( monitorMutex );
+            if (SessionCount() == 1) unpatchProcess();
+            closeDebugLog();
             RemoveSession();
-            if (SessionCount() == 0) unpatchProcess();
         }
-        closeEventLog( session );
         auto events = collectMonitorEvents( session );
         removeSessionData( session );
         return events;

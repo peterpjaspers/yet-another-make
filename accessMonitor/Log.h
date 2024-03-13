@@ -19,7 +19,8 @@ namespace AccessMonitor {
     public:
         Log() : logFile( nullptr ), logMutex( nullptr ), logRecords( nullptr ) {};
         Log( const std::filesystem::path& file, bool time = false, bool interval = false );
-        Log( const std::filesystem::path& file, const unsigned long sequence, bool time = false, bool interval = false );
+        Log( const std::filesystem::path& file, const unsigned long code, bool time = false, bool interval = false );
+        Log( const std::filesystem::path& file, const unsigned long code1, const unsigned long code2, bool time = false, bool interval = false );
         Log( const Log& other ) = delete;
         Log( Log&& other ) = delete;
         Log& operator=( const Log& other ) = delete;

@@ -7,10 +7,16 @@ namespace AccessMonitor {
 
     static const unsigned long MaxFileName = 1024;
     
-    extern Log monitorLog;
+    void createDebugLog();
+    void closeDebugLog();
+    Log& debugLog();
+    bool debugLog( const LogAspects aspects );
+    LogRecord& debugRecord();
 
-    void createEventLog( SessionID session );
-    void closeEventLog( SessionID session );
+    void createEventLog();
+    void closeEventLog();
+    Log& eventLog();
+    bool recordingEvents();
     LogRecord& eventRecord();
 
     enum MonitorLogAspects {

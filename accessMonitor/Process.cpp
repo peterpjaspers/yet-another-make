@@ -86,7 +86,7 @@ namespace AccessMonitor {
         if (threadToSession.count( thread ) == 0) return SessionNone;
         return sessionStates[ threadToSession[ thread ] ];
     }
-    bool SessionRecording() { return (GetSessionState() == SessionActive); }
+    bool SessionDefined() { return (GetSessionState() == SessionActive); }
 
     ProcessID CurrentProcessID() { return static_cast<ProcessID>( GetCurrentProcessId() ); }
     ProcessID GetProcessID( DWORD id ) { return static_cast<ProcessID>( id ); }
@@ -101,10 +101,22 @@ namespace AccessMonitor {
     void ReleaseEvent( EventID event ) { CloseHandle( event ); }
 
     bool EventWait( EventID event, unsigned long milliseconds ) {
-        DWORD started = WaitForSingleObject( event, milliseconds );
-        if (started == WAIT_OBJECT_0) return true;
+        DWORD status = WaitForSingleObject( event, milliseconds );
+        if (status == WAIT_OBJECT_0) return true;
         return false;
     }
+    bool EventWait( const std::string& tag, const SessionID session, const ProcessID process, unsigned long milliseconds ) {
+        auto event = AccessEvent( tag, session, process );
+        auto signaled = EventWait( event, milliseconds );
+        ReleaseEvent( event );
+        return signaled;
+    }
+
     void EventSignal( EventID event ) { SetEvent( event ); }
+    void EventSignal( const std::string& tag, const SessionID session, const ProcessID process ) {
+        auto event = AccessEvent( tag, session, process );
+        EventSignal( event );
+        ReleaseEvent( event );
+    }
 
 } // namespace AccessMonitor

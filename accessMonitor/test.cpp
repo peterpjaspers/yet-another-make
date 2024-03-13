@@ -8,6 +8,8 @@
 #include <fstream>
 #include <thread>
 
+// ToDo: Synchronize with process exit prior to stop monitoring 
+
 using namespace AccessMonitor;
 using namespace std;
 using namespace std::filesystem;

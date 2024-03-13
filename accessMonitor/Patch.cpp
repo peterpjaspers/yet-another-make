@@ -64,7 +64,7 @@ namespace AccessMonitor {
                     patchData.original = nullptr;
                     return true;
                 } else {
-                    if (monitorLog( PatchedFunction )) { monitorLog() << L"      Function in " << widen( *patchData.library ) << L" was repatched!" << record; }
+                    if (debugLog( PatchedFunction )) { debugRecord() << L"      Function in " << widen( *patchData.library ) << L" was repatched!" << record; }
                 }
             }
         }
@@ -74,7 +74,7 @@ namespace AccessMonitor {
         for ( auto patchFunction : registeredPatches ) {
             if (repatchFunction( patchFunction.second )) {
                 auto patchData = functionToPatch[ patchFunction.second ];
-                if (monitorLog( PatchedFunction )) { monitorLog() << L"      Patched function " << widen( patchFunction.first ) << " in " << widen( *patchData.library ) << record; }
+                if (debugLog( PatchedFunction )) { debugRecord() << L"      Patched function " << widen( patchFunction.first ) << " in " << widen( *patchData.library ) << record; }
             }
         }
     }
@@ -82,7 +82,7 @@ namespace AccessMonitor {
         for ( auto patchFunction : registeredPatches ) {
             if (unpatchFunction( patchFunction.second )) {
                 auto patchData = functionToPatch[ patchFunction.second ];
-                if (monitorLog( PatchedFunction )) { monitorLog() << L"      Unpatched function " << widen( patchFunction.first ) << " in " << widen( *patchData.library ) << record; }
+                if (debugLog( PatchedFunction )) { debugRecord() << L"      Unpatched function " << widen( patchFunction.first ) << " in " << widen( *patchData.library ) << record; }
             }
         }        
     }
@@ -95,7 +95,7 @@ namespace AccessMonitor {
         if (librariesPatched) throw string( signature ) + string( " - Parsing library IATs while libraries are patched!" );
         auto libraryName = toUpper( libName );
         if (patchedLibraries.count( libraryName ) == 0)  {
-            if (monitorLog( ParseLibrary )) { monitorLog() << L"Parsing " << ((0 < libraryName.size()) ? widen( libraryName.c_str() ) : L"program executable" )<< record; }
+            if (debugLog( ParseLibrary )) { debugRecord() << L"Parsing " << ((0 < libraryName.size()) ? widen( libraryName.c_str() ) : L"program executable" )<< record; }
             HMODULE library = LoadLibraryExA( libraryName.c_str(), nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32 );
             patchedLibraries[ libraryName ] = library;
             static uint64_t Ordinal = 0x8000000000000000;
@@ -109,18 +109,18 @@ namespace AccessMonitor {
                 string importLibraryName = toUpper( importLibName );
                 HMODULE importLibrary = LoadLibraryExA( importLibraryName.c_str(), nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32 );
                 patchedLibraries[ importLibraryName ] = importLibrary;
-                if (monitorLog( ParseLibrary )) { monitorLog() << L"Parsing " << widen( importLibraryName.c_str() ) << L" IAT" << record; }
+                if (debugLog( ParseLibrary )) { debugRecord() << L"Parsing " << widen( importLibraryName.c_str() ) << L" IAT" << record; }
                 IMAGE_THUNK_DATA* originalFirstThunk = (IMAGE_THUNK_DATA*)((char*)imageBase + importDescriptor->OriginalFirstThunk);
                 IMAGE_THUNK_DATA* firstThunk = (IMAGE_THUNK_DATA*)((char*)imageBase + importDescriptor->FirstThunk);
                 while ((originalFirstThunk->u1.AddressOfData != 0) && ((originalFirstThunk->u1.Ordinal & IMAGE_ORDINAL_FLAG) == 0)) {
                     IMAGE_IMPORT_BY_NAME* importName = (IMAGE_IMPORT_BY_NAME*)((char*)imageBase + originalFirstThunk->u1.AddressOfData);
                     string name( (char *)importName->Name );
-                    if (monitorLog( ImportedFunction )) { monitorLog() << L"    Imported function " << widen( name ) << record; }
+                    if (debugLog( ImportedFunction )) { debugRecord() << L"    Imported function " << widen( name ) << record; }
                     DWORD protection = 0;
                     if (0 < registeredPatches.count( name )) {
                         PatchFunction function = registeredPatches[ name ];
                         Patch& patchData = functionToPatch[ function ];
-                        if (monitorLog( PatchedFunction )) { monitorLog() << L"      Located IAT patch function " << widen( name ) << " in " << widen( importLibraryName ) << record; }
+                        if (debugLog( PatchedFunction )) { debugRecord() << L"      Located IAT patch function " << widen( name ) << " in " << widen( importLibraryName ) << record; }
                         patchData.library = &(patchedLibraries.find( importLibraryName )->first);
                         patchData.address = reinterpret_cast<PatchFunction*>(&firstThunk->u1.Function);
                         patchData.original = *patchData.address;
@@ -129,7 +129,6 @@ namespace AccessMonitor {
                     ++firstThunk;
                 }
                 importDescriptor++;
-                // ToDo: Not sure if we (also) need to (recursively) parse the imported library...
             }
         }
     } // void parseLibrary( const string& libName )
@@ -139,14 +138,14 @@ namespace AccessMonitor {
         static const char* signature = "void registerPatch( std::string name, PatchFunction function, std::string library )";
         if (0 < registeredPatches.count( name )) throw string( signature ) + string( " - Function " ) + name + string( " already registered!" );
         registeredPatches[ name ] = function;
-        if (monitorLog( RegisteredFunctions )) monitorLog() << L"Registered function " << widen( name ) << record;;
+        if (debugLog( RegisteredFunctions )) debugRecord() << L"Registered function " << widen( name ) << record;;
 
     }
     void unregisterPatch( std::string name ) {
         static const char* signature = "void unregisterPatch( std::string name )";
         if (registeredPatches.count( name ) == 0) throw string( signature ) + string( " - Function " ) + name + string( " not registred!" );
         registeredPatches.erase( name );
-        if (monitorLog( RegisteredFunctions )) monitorLog() << L"Unregistered function " << widen( name ) << record;;
+        if (debugLog( RegisteredFunctions )) debugRecord() << L"Unregistered function " << widen( name ) << record;;
     }
 
     PatchFunction original( std::string name ) { return functionToPatch[ registeredPatches[ name ] ].original; }
@@ -164,9 +163,9 @@ namespace AccessMonitor {
     void patch() {
         static const char* signature = "void patch()";
         if (librariesPatched) throw string( signature ) + string( " - Libraries already patched!" );
-        if (monitorLog( ParseLibrary )) monitorLog() << L"Parsing libraries..." << record;
+        if (debugLog( ParseLibrary )) debugRecord() << L"Parsing libraries..." << record;
         parseLibrary( "" );
-        if (monitorLog( ParseLibrary )) monitorLog() << L"Done Parsing libraries..." << record;
+        if (debugLog( ParseLibrary )) debugRecord() << L"Done Parsing libraries..." << record;
         patchAll();
         librariesPatched = true;
     }

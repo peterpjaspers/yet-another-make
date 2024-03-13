@@ -5,12 +5,13 @@
 
 #include <windows.h>
 
+// ToDo: Understand why Stop monitoring debug message is not present in CMD process
+
 using namespace AccessMonitor;
 using namespace std;
 using namespace std::filesystem;
 
 namespace {
-
 
     DWORD monitorDLLMain( void* argument ) {
         ProcessID process = CurrentProcessID();
@@ -23,15 +24,18 @@ namespace {
         AddSessionThread( mainThread, session );
         auto processPatched = AccessEvent( "ProcessPatched", session, process );
         auto processExit = AccessEvent( "ProcessExit", session, process );
-        createEventLog( session );
-        monitorLog.enable( PatchedFunction | ParseLibrary | PatchExecution | FileAccesses );
-        monitorLog() << "Start monitoring in process 0x" << hex << process << "..." << record;
+        createEventLog();
+        createDebugLog();
+        debugLog().enable( PatchedFunction | ParseLibrary | PatchExecution | FileAccesses );
+        debugRecord() << "Start monitoring in process 0x" << hex << process << "..." << record;
         patchProcess();
         SetSessionState( SessionActive );
         EventSignal( processPatched ); // Signal (parent) process that monitoring has started
         EventWait( processExit ); // Wait for process to exit before exitting monitor thread
         ReleaseEvent( processPatched );
         ReleaseEvent( processExit );
+        closeEventLog();
+        closeDebugLog();
         RemoveSessionThread( monitorThread );
         RemoveSessionThread( mainThread );
         return ERROR_SUCCESS;
