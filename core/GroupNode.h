@@ -9,9 +9,17 @@
 namespace YAM
 {
     class CommandNode;
+    class FileNode;
 
-    // A GroupNode facilitates the execution of an arbitrary collection of
-    // nodes.
+    // A GroupNode facilitates the execution of a collection of nodes of 
+    // arbitrary type: executing a group will execute all elements.
+    // Special behavior is provided for GeneratedFileNodes: instead of 
+    // executing a generated file node (which only hashes the file) the 
+    // producer of a generated file node is executed (which makes the generated
+    // file up-to-date and hashes it).
+    // Special behavior is also provided for CommandNode elements, see the
+    // isDynamic() and dynamicFiles() functions.
+    // 
     class __declspec(dllexport) GroupNode : public Node
     {
     public:
@@ -20,20 +28,37 @@ namespace YAM
 
         std::string className() const override { return "GroupNode"; }
 
+        // Replace content by newContent.
         void content(std::vector<std::shared_ptr<Node>> newContent);
-        // Pre: !contains(node)
+        // Pre: !content().contains(node)
         void add(std::shared_ptr<Node> const& node);
-        // Pre: contains(node)
+        // Pre: content().contains(node)
         void remove(std::shared_ptr<Node> const& node);
-        // Return true when node was removed.
+        // Remove node if content().contains(node). 
+        // Return whether node was present.
         bool removeIfPresent(std::shared_ptr<Node> const& node);
 
+        // Return the content as defined by use of content(newContent), 
+        // add(node), remove(node), removeNodIfPresent(node) functions.
         std::set<std::shared_ptr<Node>, Node::CompareName> const& content() const { return _content; }
-        bool contains(std::shared_ptr<Node> const& node) const;
+
+        // Return the elements in content() that are FileNodes.
+        std::set<std::shared_ptr<FileNode>, Node::CompareName> files() const;
+
+        // Return whether the group contains one or more CommandNodes.
+        bool isDynamic() const;
+
+        // Pre: state() == Node::State::Ok
+        // Return the output file nodes of CommandNode elements.
+        std::set<std::shared_ptr<FileNode>, Node::CompareName> dynamicFiles() const;
+
+        // Pre: state() == Node::State::Ok
+        // Return union of files() and dynamicFiles().
+        // Note: !isDynamic() => allFiles() == files() 
+        std::set<std::shared_ptr<FileNode>, Node::CompareName> allFiles() const;
 
         // Override Node
         void start() override;
-        void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const override;
 
         // Return a hash of the names of the nodes in the group.
         XXH64_hash_t hash() const { return _hash; }

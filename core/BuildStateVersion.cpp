@@ -86,8 +86,8 @@ namespace YAM
             std::stringstream ss;
             ss << "Buildstate file " << oldBuildFile.string() << " has an incompatible version." << std::endl;
             ss << "This renders all previously generated build outputs stale." << std::endl;
-            ss << "If you want to build this repository you must delete the buildstate file," << std::endl;
-            ss << "delete all previously generated build output files and then restart the build." << std::endl;
+            ss << "Unfortunately you must delete the buildstate file and all previously" << std::endl;
+            ss << "generated build output files before you can build this repository." << std::endl;
             LogRecord error(LogRecord::Aspect::Error, ss.str());
             logBook.add(error);
         } else if (version != _writeVersion) {

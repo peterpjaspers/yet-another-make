@@ -38,10 +38,6 @@ namespace YAM
         setState(Node::State::Dirty);
     }
 
-    bool GroupNode::contains(std::shared_ptr<Node> const& node) const {
-        return _content.contains(node);
-    }
-
     void GroupNode::add(std::shared_ptr<Node> const& node) {
         auto result = _content.insert(node);
         if (!result.second) throw std::runtime_error("Attempt to add duplicate");
@@ -51,21 +47,66 @@ namespace YAM
     }
 
     void GroupNode::remove(std::shared_ptr<Node> const& node) {
-        std::size_t nErased = _content.erase(node);
-        if (nErased == 0) throw std::runtime_error("Attempt to remove unknown");
+        auto it = _content.find(node);
+        if (it == _content.end() || *it != node) {
+            throw std::runtime_error("Attempt to remove unknown node");
+        }
+        _content.erase(it);
         unsubscribe(node);
         modified(true);
         setState(Node::State::Dirty);
     }
 
     bool GroupNode::removeIfPresent(std::shared_ptr<Node> const& node) {
-        std::size_t nErased = _content.erase(node);
-        if (nErased == 1) {
+        auto it = _content.find(node);
+        if (it != _content.end()) {
+            if (*it != node) throw std::runtime_error("Attempt to remove unknown node");
             unsubscribe(node);
             modified(true);
             setState(Node::State::Dirty);
+            return true;
         }
-        return nErased == 1;
+        return false;
+    }
+
+    std::set<std::shared_ptr<FileNode>, Node::CompareName> GroupNode::files() const {
+        std::set<std::shared_ptr<FileNode>, Node::CompareName> result; 
+        for (auto const& node : _content) {
+            auto const& fileNode = dynamic_pointer_cast<FileNode>(node);
+            if (fileNode != nullptr) result.insert(fileNode);
+        }
+        return result;
+    }
+
+    // Return whether the group contains one or more CommandNodes.
+    bool GroupNode::isDynamic() const {
+        for (auto const& node : _content) {
+            if (dynamic_pointer_cast<CommandNode>(node) != nullptr) return true;
+        }
+        return false;
+    }
+
+    // Pre: state() == Node::State::Ok
+    // Return the output  file nodes of CommandNode elements.
+    std::set<std::shared_ptr<FileNode>, Node::CompareName> GroupNode::dynamicFiles() const {
+        if (state() != Node::State::Ok) throw std::runtime_error("wrong state");
+        std::set<std::shared_ptr<FileNode>, Node::CompareName> result;
+        for (auto const& node : _content) {
+            auto const& cmdNode = dynamic_pointer_cast<CommandNode>(node);
+            if (cmdNode != nullptr) {
+                auto const& outputs = cmdNode->outputs();
+                result.insert(outputs.begin(), outputs.end());
+            }
+        }
+        return result;
+    }
+    std::set<std::shared_ptr<FileNode>, Node::CompareName> GroupNode::allFiles() const {
+        auto files_ = files();
+        auto dynamicFiles_ = dynamicFiles();
+        std::set<std::shared_ptr<FileNode>, Node::CompareName> result;
+        result.insert(files_.begin(), files_.end());
+        result.insert(dynamicFiles_.begin(), dynamicFiles_.end());
+        return result;
     }
 
     void GroupNode::start() {
@@ -105,17 +146,6 @@ namespace YAM
         for (auto const& n : _content) hashes.push_back(XXH64_string(n->name().string()));
         XXH64_hash_t hash = XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
         return hash;
-    }
-
-    void GroupNode::getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const {
-        for (auto const& node : _content) {
-            auto const& groupNode = dynamic_pointer_cast<GroupNode>(node);
-            if (groupNode != nullptr) {
-                groupNode->getOutputs(outputs);
-            } else {
-                outputs.push_back(node);
-            }
-        }
     }
 
     void GroupNode::subscribe(std::shared_ptr<Node> const& node) {
