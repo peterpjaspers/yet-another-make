@@ -140,7 +140,7 @@ namespace
                         << "type " << repo.pietH.string() << " > " << pietOut->absolutePath().string()
                         << " & type " << repo.janH.string() << " >> " << pietOut->absolutePath().string()
                         << " & type " << repo.pietCpp.string() << " >> " << pietOut->absolutePath().string() << std::endl;
-                    ccPiet->outputs({ pietOut });
+                    ccPiet->mandatoryOutputs({ pietOut });
                     ccPiet->script(script.str());
                 }
                 {
@@ -149,12 +149,12 @@ namespace
                         << "type " << repo.janH.string() << " > " << janOut->absolutePath().string()
                         << " & type " << repo.janCpp.string() << " >> " << janOut->absolutePath().string() << std::endl;
 
-                    ccJan->outputs({ janOut });
+                    ccJan->mandatoryOutputs({ janOut });
                     ccJan->script(script.str());
                 }
                 {
                     std::stringstream script;
-                    linkPietJan->outputs({ pietjanOut });
+                    linkPietJan->mandatoryOutputs({ pietjanOut });
                     linkPietJan->orderOnlyInputs({ pietOut, janOut });
                     script
                         << "type " << pietOut->absolutePath().string() << " > " << pietjanOut->absolutePath().string()
@@ -503,12 +503,12 @@ namespace
         // Set-up command scripts to take ~10 seconds execution time as to
         // have sufficient time to stop a build-in-progress
         auto ping = boost::process::search_path("ping");
-        driver.ccPiet->outputs({ });
+        driver.ccPiet->mandatoryOutputs({ });
         driver.ccPiet->script(ping.string() + " -n 10 127.0.0.1");
-        driver.ccJan->outputs({ });
+        driver.ccJan->mandatoryOutputs({ });
         driver.ccJan->script(ping.string() + " -n 10 127.0.0.1");
         driver.linkPietJan->script(ping.string() + " -n 10 127.0.0.1");
-        driver.linkPietJan->outputs({ });
+        driver.linkPietJan->mandatoryOutputs({ });
 
         auto request = std::make_shared<BuildRequest>();
         request->repoDirectory(driver.repo.dir);

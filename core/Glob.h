@@ -25,6 +25,7 @@ namespace YAM {
 
         // Return whether pattern contains a glob special character.
         static bool isGlob(std::string const& pattern);
+        static bool isGlob(std::filesystem::path const& pattern);
 
         bool matches(std::string const& str) const;
         bool matches(std::filesystem::path const& path) const;

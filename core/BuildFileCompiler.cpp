@@ -572,7 +572,7 @@ namespace YAM {
         // Note that the not-compile script must be used because the content of
         // input groupNodes must be expanded at cmdNode execution time 
         cmdNode->script(rule.script.script);
-        cmdNode->outputs(outputs);
+        cmdNode->mandatoryOutputs(outputs);
         cmdNode->ignoreOutputs(ignoredOutputs);
 
         for (auto const& groupPath : rule.outputGroups) {

@@ -97,22 +97,34 @@ namespace
             {
                 std::stringstream script;
                 script << "type " << pietSrc->absolutePath().string() << " > " << pietOut->absolutePath().string();
-                pietCmd->outputs({ pietOut });
+                pietCmd->mandatoryOutputs({ pietOut });
                 pietCmd->script(script.str());
             }
             {
                 std::stringstream script;
                 script << "type " << janSrc->absolutePath().string() << " > " << janOut->absolutePath().string();
-                janCmd->outputs({ janOut });
+                janCmd->mandatoryOutputs({ janOut });
                 janCmd->script(script.str());
             }
             {
                 std::stringstream script;
-                pietjanCmd->outputs({ pietjanOut });
+                pietjanCmd->mandatoryOutputs({ pietjanOut });
                 pietjanCmd->orderOnlyInputs({ pietOut, janOut });
+                pietjanCmd->ignoreOutputs({
+                    pietjanOut->name().parent_path() / "ignore1.txt",
+                    "**/ignore2.txt"
+                });
+                pietjanCmd->optionalOutputs({
+                    pietjanOut->name().parent_path() / "optional[12].txt"
+                });
                 script
                     << "type " << pietOut->absolutePath().string() << " > " << pietjanOut->absolutePath().string()
-                    << " & type " << janOut->absolutePath().string() << " >> " << pietjanOut->absolutePath().string();
+                    << " & type " << janOut->absolutePath().string() << " >> " << pietjanOut->absolutePath().string()
+                    << " & echo optional1 > " << pietjanOut->absolutePath().parent_path() / "optional1.txt"
+                    << " & echo optional2 > " << pietjanOut->absolutePath().parent_path() / "optional2.txt"
+                    << " & echo ignore1 > " << pietjanOut->absolutePath().parent_path() / "ignore1.txt"
+                    << " & echo ignore2 > " << pietjanOut->absolutePath().parent_path() / "ignore2.txt";
+
                 pietjanCmd->script(script.str());
             }
 
@@ -189,8 +201,11 @@ namespace
         cmds.janCmd->getInputs(inputs);
         ASSERT_EQ(1, inputs.size());
         EXPECT_EQ(cmds.janSrc, inputs[0]);
+        CommandNode::OutputNodes const &optionalOutputs = cmds.pietjanCmd->detectedOptionalOutputs();
+        auto const& optional1 = optionalOutputs.find("@@.\\generated\\optional1.txt")->second;
+        auto const& optional2 = optionalOutputs.find("@@.\\generated\\optional2.txt")->second;
 
-        EXPECT_EQ(8, cmds.stats.started.size());
+        EXPECT_EQ(10, cmds.stats.started.size());
         EXPECT_TRUE(cmds.stats.started.contains(cmds.janSrc.get()));
         EXPECT_TRUE(cmds.stats.started.contains(cmds.pietSrc.get()));
         EXPECT_TRUE(cmds.stats.started.contains(cmds.pietOut.get()));
@@ -198,9 +213,10 @@ namespace
         EXPECT_TRUE(cmds.stats.started.contains(cmds.pietjanOut.get()));
         EXPECT_TRUE(cmds.stats.started.contains(cmds.janCmd.get()));
         EXPECT_TRUE(cmds.stats.started.contains(cmds.pietCmd.get()));
-        EXPECT_TRUE(cmds.stats.started.contains(cmds.pietjanCmd.get()));
+        EXPECT_TRUE(cmds.stats.started.contains(optional1.get()));
+        EXPECT_TRUE(cmds.stats.started.contains(optional2.get()));
 
-        EXPECT_EQ(8, cmds.stats.selfExecuted.size());
+        EXPECT_EQ(10, cmds.stats.selfExecuted.size());
         EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.janSrc.get()));
         EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietSrc.get()));
         EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietOut.get()));
@@ -209,10 +225,16 @@ namespace
         EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.janCmd.get()));
         EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietCmd.get()));
         EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietjanCmd.get()));
+        EXPECT_TRUE(cmds.stats.selfExecuted.contains(optional1.get()));
+        EXPECT_TRUE(cmds.stats.selfExecuted.contains(optional2.get()));
             
         EXPECT_EQ("piet", readFile(cmds.pietOut->absolutePath()));
         EXPECT_EQ("jan", readFile(cmds.janOut->absolutePath()));
         EXPECT_EQ("pietjan", readFile(cmds.pietjanOut->absolutePath()));
+        EXPECT_EQ("optional1  ", readFile(optional1->absolutePath()));
+        EXPECT_EQ("optional2  ", readFile(optional2->absolutePath()));
+        EXPECT_FALSE(std::filesystem::exists(cmds.pietjanOut->name().parent_path() / "ignore1.txt"));
+        EXPECT_FALSE(std::filesystem::exists(cmds.pietjanOut->name().parent_path() / "ignore2.txt"));
     }
 
     TEST(CommandNode, cleanBuildNoSources) {
@@ -247,7 +269,8 @@ namespace
         ASSERT_EQ(1, inputs.size());
         EXPECT_EQ(cmds.janSrc->name(), inputs[0]->name());
 
-        EXPECT_EQ(8, cmds.stats.started.size());
+        // +2 for the optional outputs
+        EXPECT_EQ(8+2, cmds.stats.started.size());
         EXPECT_TRUE(cmds.stats.started.contains(janSrc.get()));
         EXPECT_TRUE(cmds.stats.started.contains(pietSrc.get()));
         EXPECT_TRUE(cmds.stats.started.contains(cmds.pietOut.get()));
@@ -257,7 +280,8 @@ namespace
         EXPECT_TRUE(cmds.stats.started.contains(cmds.pietCmd.get()));
         EXPECT_TRUE(cmds.stats.started.contains(cmds.pietjanCmd.get()));
 
-        EXPECT_EQ(8, cmds.stats.selfExecuted.size());
+        // +2 for the optional outputs
+        EXPECT_EQ(8+2, cmds.stats.selfExecuted.size());
         EXPECT_TRUE(cmds.stats.selfExecuted.contains(janSrc.get()));
         EXPECT_TRUE(cmds.stats.selfExecuted.contains(pietSrc.get()));
         EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietOut.get()));
@@ -330,7 +354,8 @@ namespace
         
         EXPECT_TRUE(cmds.execute());
 
-        EXPECT_EQ(5, cmds.stats.started.size());
+        // +2 for the optional outputs
+        EXPECT_EQ(5+2, cmds.stats.started.size());
         EXPECT_TRUE(cmds.stats.started.contains(cmds.janSrc.get()));
         EXPECT_TRUE(cmds.stats.started.contains(cmds.janCmd.get()));
         EXPECT_TRUE(cmds.stats.started.contains(cmds.pietjanCmd.get()));
@@ -344,13 +369,14 @@ namespace
         // Note that janOut and pietjanOut are executed because Dirty
         // but that their time stamps have not changes and hence have
         // not added themselves to updateFiles.
-        EXPECT_EQ(5, cmds.stats.selfExecuted.size());
+        // +2 for the optional outputs
+        EXPECT_EQ(5+2, cmds.stats.selfExecuted.size());
         EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.janSrc.get()));
         EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.janOut.get()));
         EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.janCmd.get()));
         EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietjanOut.get()));
         EXPECT_TRUE(cmds.stats.selfExecuted.contains(cmds.pietjanCmd.get()));
-        EXPECT_EQ(3, cmds.stats.rehashedFiles.size()); // janSrc, janOut, pietjanOut
+        EXPECT_EQ(3+2, cmds.stats.rehashedFiles.size()); // janSrc, janOut, pietjanOut, optional[12]
 
         EXPECT_EQ(Node::State::Ok, cmds.pietCmd->state());
         EXPECT_EQ(Node::State::Ok, cmds.janCmd->state());
@@ -463,10 +489,10 @@ namespace
 
         // Execution fails because pietjanCmd writes to not declared 
         // output file
-        cmds.pietCmd->outputs({ });
+        cmds.pietCmd->mandatoryOutputs({ });
         EXPECT_TRUE(cmds.execute());
         EXPECT_EQ(Node::State::Failed, cmds.pietCmd->state());
-        EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Mismatch between declared outputs and actual outputs"));
+        EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Declared mandatory outputs do not match actual outputs"));
     }
 
     TEST(CommandNode, fail_notExpectedOutputProducer) {
@@ -480,7 +506,7 @@ namespace
         cmds.pietCmd->script(script.str());
         EXPECT_TRUE(cmds.execute());
         EXPECT_EQ(Node::State::Failed, cmds.pietCmd->state());
-        EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Output file is produced by 2 commands"));
+        EXPECT_NE(std::string::npos, cmds.memLogBook->records()[0].message.find("Mandatory output file is produced by 2 commands"));
     }
 
 }

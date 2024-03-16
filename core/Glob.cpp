@@ -121,6 +121,10 @@ namespace YAM {
         return std::regex_search(pattern, check);
     }
 
+    bool Glob::isGlob(std::filesystem::path const& pattern) {
+        return isGlob(pattern.string());
+    }
+
     bool Glob::matches(std::string const& str) const {
         return std::regex_match(str, _re);
     }

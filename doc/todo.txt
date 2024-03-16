@@ -4,7 +4,87 @@ Bugs
   Reproduce with coreTests EnduranceTest
 
 Features
-- implement wildcard/glob for output files (dynamic outputs)
+- update GroupCycleFinder to deal with CommandNode elements
+- update parser and compiler to deal with optional globs in rule output section
+- CommandNode only uses the mandatory file nodes in groups to compile %-flags
+- raise error when parsing/compiling  : |> echo piet |> <illegal>
+
+- implement glob for optional output files (dynamic outputs)
+  Rule examples: 
+      some/<unzipped> |> echo %f > %o |> zipTableOfContent.txt
+      foreach some/<unzipped>/*.cpp |> cc %f -out %o |> %B.obj
+      // Only outputs that match the glob are registered as cmd outputs.
+      // All other outputs are ignored (and deleted).
+      // Non-glob outputs are registered as cmd outputs.
+      // All registered outputs of the rule are added to the group.
+      |> unzip some1.zip |> some1_toc.txt some/* some/<unzipped>
+      |> unzip some2.zip |> some/* some/<unzipped>
+  The above would work fine for normal groups, i.e. groups whose content is
+  defined by enumerated output paths and whose content is complete once all 
+  compilations are done. It will not work however for the dynamic group because
+  a) cmd outputs are unknown until the command has been executed
+  b) all cmds that contribute to the group must be executed before a cmd that
+     uses the group as input.
+  The following design solves these issues:
+      - a GroupNode can contain any type of node with special behavior for
+        generated file (as currently implemented) and command nodes (new)
+      - GroupNode execution executes all contained nodes. Exception: for
+        generated file nodes it executes the command node that produces the
+        generated file.
+      - GroupNode content can be returned in 2 ways: as what was added to the 
+        group and as what was added to the group with the command nodes replaced
+        by their output nodes. The latter version only makes sense when the
+        group has executed, i.e when its state is Ok. The former version makes
+        sense after all compilation completed.
+      - A GroupNode that contains CommandNode elements is a Dynamic group.
+      - When compiling %B etc flags in the output section of a rule then these
+        flags are applied to the elements of an input group. This does not make 
+        sense for a Dynamic group because CommandNodes are not files. Either 
+        ignore or treat this as an error or defer output flag compilation to 
+        command node execution time (when GroupNode has executed and outputs
+        of all commands in group are defined). Will implement treat-as-error.
+        Same applies for %f flags in command section. But command section
+        compilation is already deffered to command execution time.
+         
+  Note: current implementation of adding command outputs to the group can be
+  replaced by just adding the command node itself to the group.
+  Note: adding generated file nodes to the group is still needed to allow for
+  phony rules.
+  Note: an input file cannot reference a dynamic output file. Input files can
+  only reference output files that are defined as paths (i.e. not as globs).
+  Example (come up with a better one):
+    foreach *.cpp |> cc %f -o %o |> %B.obj <objects>
+    <objects> ^main.obj |> linkdll %f -out %0 |> library.lib library.dll library.*
+    main.obj library.lib |> linkexe %f -out %0 |> app.exe
+    library.dll |>|> <installables>
+    library.
+- phony rule: Inputs |>|> Group
+  Example: 
+       *.cpp |>|> <sources>
+       foreach <sources> |> cc %f -o %o |> %B.obj
+       *.obj  |>|> <objects>
+       // or: foreach *.cpp |> cc %f -o %o |> %B.obj <objects>
+  Yam invokation:
+      yam <sources> // hash modified files when changed last-write-time
+      yam <objects> // compile all dirty .obj files
+      yam *.obj     // compile all dirty .obj files
+  Advantage: <objects> content is defined once at buildfile compile time
+  (and when cpp files are added or removed) while *.obj is evaluated each 
+  build again.
+  Advantage: currently supported output groups requires thinking ahead of what
+  groups are needed: for each rule it must be decided whether it adds outputs
+  and to which groups. Changing decisions may require updates of multiple rules
+  in multiple buildfiles. Phony rules can be added at any time without requiring
+  changes in existing rules. Can be added in only 1 buildfile (which then must
+  depend on all buildfiles that produce outputs to be added to group) but
+  preferably phony rule is added to each buildfile that produce outputs to be 
+  added to group.
+- buildscope: current implementation only searches for the producers of dirty 
+  generated file nodes. Could also search all dirty nodes to allow for example:
+      yam *.cpp // hash file nodes
+      yam buildfile_yam.txt // compile buildfile, or execute all commands 
+                            // produced by buildfile
+      yam submodules/<objects> // execute group
 - integrate Phil's file access monitor
     - how to deal with input dependencies on non-existing source files
       Note: these source file nodes are NOT in state Deleted. How to GC these
@@ -14,8 +94,6 @@ Features
 - fileaspect configuration
       - hash = last-write-time (e.g. for generated files in cmd executionhash)
       - import lib exports hash (hash i/f of dll)
-- environment variables
-  requires syntax for export of variables to environment of rule
 - response files
 - xxhash stream
 - build yam with yam
@@ -37,186 +115,26 @@ Out-of-scope:
 - tup-compatible syntax
 - variants (tup variants, MR build configurations)
   Requires syntax for variables
+- buildstate export to e.g. Jason or XML or to some graph format.
+  Export verbose or compact.
+  Verbose: references to nodes are path names
+  Compact: each node has a unique id, references to nodes are ids.
+
+Ideas:
+- yam creates group hierachy of output files. Hierarchy
+  mirrors the directory tree in which outputs are stored.
+  E.g. outputs are a/O1, a/O2, a/b/c/O3. 
+  Output groups <a> contains O1, O2 and <b>, <b> contains <c>, 
+  <c> contains O3.
+  yam <b>/** builds all outputs in <b> recursively. Same would happen
+  for yam b/**. 
+  <b>/** is kind of O(N) where N is nr of elements below <b>
+  b/** is O(N), where N is nr of dirty generated file nodes in buildstate.
+  yam <b>/<c>/O3 is O(N) where N is nr of elements in <b> and in <c>
 
 
 
-
-
-Todo: core
-- TODO: Builder::_dirtyCommands nodes must not be registered as dirty
-  nor modified. Solution: only register dirty/modified node when it is
-  in context::nodes().
-- decide on how to make finding dirty nodes O(1)
-- investigate scalability by measuring execution overhead, hashing overhead and 
-  handling found file dependencies.
-- implement DotIgnoreNode (no longer needed?)
-- File aspects as nodes
-- aspect hashing for Dll import lib and code parts of C++ files 
-- Hide btree behind interface and let current file storage inherit from this interface.
-- Command node script executes in shell: user must specify which shell.
-  It must also be possible to execute 'script' directly (e.g. cc -o a.obj a.cpp)
-- winkin (build cache)
-- detecting cycles in node graph: add trail argument to Node::start()
-- createFileRepositories(RepoConfigFile cfg) {
-      for (repo : cfg.repos) {
-          fileRepo = new FileRepository(repo.name, repo.rootDir)
-          context->addRepo(fileRepo)
-          createFileRepositories(fileRepo->repoConfigFile())
-      }
-- Handle changes in RepoConfig
-  Add RepositoriesNode to buildstate with well known name “.\FileRepositories”.
-  This node executes createFileRepositories and adds dependencies on the 
-   RepoConfigFiles.
-  On change: compute kept/added/removed repo names. Update root dirs of kept 
-   FileRepos, clear and remove removed FileRepos (remove all nodes related to
-   removed repos), reate added FileRepos
-- CommandNode: consider keeping script text as defined by buildfile.
-  Postpone resolving of %f, %i etc flags until execution time. This requires 
-  CommandNode to store references to cmdInput nodes, orderOnlyInput nodes.
-  Rationale: reduce script size in persistent buildstate.
-  ote: node paths are relative to repo, input paths are relative to working dir.
-  So paths of input nodes must be converted.
-- Adapt BuildFileParser to give better error messages.
-  replace BuildFileTokenizer approach by 'Phil' approach.
-- Adapt BuildFileParser/BuildFileContent executor to reject absolute path names.
-- implement ignoredOutputs in CommandNode
-- comprehensive test of compiling rule script
-- globs in rules are executed on directory nodes in graph.
-  However, initially dir nodes do not contain generated files.
-  So globs like *.obj will not work. Executing the glob on the entire
-  graph is O(N).
-  Possible solution: add generated file nodes to directory. Directory
-  keeps track of generated file nodes seperate from source file nodes.
-  Directory does not own these nodes. Add/remove is responsibility of
-  BuidFileProcessingNode. NB: directory must exist!
-  Alternative: A BFPN collects all outputs in an anonymous GroupNode.
-  This node is also passed to Globber. Can be expanded to explict groups
-  that are persistent. Input globs are executed on all dirs plus the 
-  anonymous GroupNode. %g<groupPath>/*.obj globs only on specified group.
-- tokenizer does not recognize symbolic path/glob: token value of glob 
-  <repo>\file is <repo
-- investigate use of std::filesystem::path.string() and intialing paths
+More:
+- implement DotIgnoreNode
+- investigate use of std::filesystem::path.string() and intializing paths
   from a std::string. Shouldn't we use wstring?
-- optimize group update in buildfilecompiler(node):
-    split old groups in map old grp name -> old outputs
-    compile parseTree into map new grp name -> new outputs
-    @end: update old grp when old out != new out
-  NB: GroupNode must maintain group content sorted by name for reproducable
-  hash.
-
-Done
-- Decide how to deal with using generated files from other repos
-    - first build in other repo using that repo's build server, then build this
-       repo versus build both repos in this repo's build server.
-       In first case generated files from other repos must be treated as source files.
-       In second case multi-repo-graph managed by this repo's build server and business
-       as usual. Disadvantage: if other repo was already build then this repo will build
-       it again.
-    - build file must tell YAM which repo's to build
-- Remove mutex from NodeSet. Instead post all NodeSet add/remove to main thread. 
-  To be changed: DirectoryNode::updateContent(),
-  DirectoryNode::DirectoryNode(), DotIgnoreNode::setDotIgnoreFiles()
-- decide on MT-safe buildstate access: lock buildstate or post all node/buildstate access
-  to main thread.
-  Decision: post to main thread
-- DirectoryNode execution must (also) notify completion of self-execution.
-- ensure MT-safe access of dependants and postParents
-  E.g. CommandNode::isPrerequisite()
-  Fixed/workedaround by only checking for direct input producer.
-  If support for indirect input producer is needed then post this function to
-  main thread.
-- build state storage (PersistentBuildState)
-- streaming btree (provides streaming of value types into btree via ValueStreamer i/f)
-- FileRepository: DirectoryNode takes exclude (ignore) patterns
-  from .gitignore and from .yamignore (having gitignore syntex).
-  In a git repo:
-      .gitignore typically ignores build outputs.
-      .yamignore can additionally ignore source files
-  Not a git repo:
-      .yamignore ignores build outputs and optionally source files
-- ExecutionContext
-  To avoid singletons a context object is passed to Node constructor.
-  It provides access to:
-    - NodeSet (renamed from Graph)
-    - main thread and thread pool and their dispatchers
-    - file aspect hasher configuration
-    - file repositories (the directories from which YAM is allowed to take input dependencies)
-    - command line options
-    - logBook
-- filenode, sourcefile, generatedfile (output file of command node)
-- Process class => boost process
-- file aspect hashes
-    - FileNode::_hashes (std::map<aspectName => XXH64_hash_t)
-      _hashes is populated when node is created and updated when context.filehashers changes
-      and file name matches one of filehashes patterns.
-      Note: it is more attractive to only add aspects to filenode that are actually used.
-      With this approach it may happen that hashes are computed that are never used.
-      Unfortunately this is not possible because it cannot be known in advance which commands
-      will use a file as input.
-    - CommandNode::_inputAspects (std::vector<{fileNamePattern, aspectName}>) 
-- client-server interface
-
-- decide on postrequisites
-  Non-consistent interface: executing directory node builds entire tree when
-  node is executed first time. Subsequent execution of the directory node
-  only update its children and executes its direct dirty children. Dirty children 
-  further down the tree will not be executed. To achieve full tree update the 
-  application must find all dirty nodes and then execute these. Both behaviors
-  are captured in this code:
-      vector dirtyNodes;
-      while (tree->findDirtyNodesRecursively(dirtyNodes)) {
-          execute(dirtyNodes)
-      }
-  Finding dirty nodes by iterating over all nodes is O(n). 
-  Another approach that is O(log(n) and that keeps the recursive implementation:
-  A node that is set dirty propagates dirty state to its postrequisiteParents.
-  Disadvantage: directory nodes in path from root to dirty node will self-execute even when
-  this is not necessary. Possible refinement: add hasDirtyPostRequisites flag. Nodes in state Ok
-  and hasDirtyPostRequisites only execute postRequisites that are dirty or hasDirtyPostRequisites.
-
-- Command node:
-    - file dependency detection
-        - define dependency detection interface, e.g. dependencies = track(program)
-        - pluggable dependency detection implementation
-        - script communicates file dependencies via stdout to YAM or 
-          via files (as Microsoft's filetracker and tup's dllinject)
-        - YAM provides file dependency detection support a la MS filetracker
-          Consider reuse of tup dependency detector
-    - integrate file dependency detectionIn CommandNode
-    - handle the race-conditions described in the last 2 notes in the description of
-      FileNode.h
-    - distinguish between modifications caused by user editing source files and tampering
-      (e.g. deleting) with generated files.
-      See TrackedFileRepository 
-
-  See https://miro.com/app/board/uXjVO-7wAmU=/ 
-  In this board a build file node generates all command nodes, including the command scripts.
-  The build file may reference files (e.g. a file that contains a version nr) and globs (e.g. 
-  to create a compile command for each cpp file found in the src directory).
-  The execution hash of a build file node the becomes:
-    executionHash = hash(hash(input build files), hash(other input files), hash(input globs))
-  Note: the output command nodes are not part of this hash because there is no way
-  that the user can tamper with this output.
-  Note: files and globs are nodes.
-
-- What node info can be updated in threadpool context and what not?
-  E.g. at first glance updating Node::_executionHash, FileNode::_lastWriteTime in ThreadPool seems harm-less
-  Why? Because no other threads rely on this data while the node execution is in progress.
-  E.g. detecting a input include file during C++ compilation requires creation of a FileNode and
-  computation of the include file hash(es). The hashing must be done in threadpool. Adding the new node
-  to Graph however must either be done in graph critical section or in main thread context.
-  Changing Node::State is another example that must either be done in critical section or main thread.
-  Why? Because node's that execute their prerequisites inspect Node::State to figure out which prerequisites
-  need to be started.
-  
-
-filenode: empty set of aspects: use write time as hash. 
-executioncontext should return either entirefileaspect or lastwritetimeaspect ico empty set.
-
-binaryvaluestreamer: take endianship into account
-
-builder: suspend threadpool during stopBuild
-
-split BuildRequest in Init, Build and Clean.
-
-Handle Init while in dir tree where a parent already contains .yam dir

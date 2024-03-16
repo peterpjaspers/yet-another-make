@@ -22,12 +22,12 @@ namespace {
     }
 
     void test(bool globstar) {
-        EXPECT_FALSE(Glob::isGlob("foo"));
-        EXPECT_FALSE(Glob::isGlob("a/b/c/foo"));
-        EXPECT_TRUE(Glob::isGlob("*.cpp"));
-        EXPECT_TRUE(Glob::isGlob("a/b/c/foo*.txt"));
-        EXPECT_TRUE(Glob::isGlob("a/b/c/foo[12].txt"));
-        EXPECT_FALSE(Glob::isGlob("a{1,3}")); // see Glob::isGlob
+        EXPECT_FALSE(Glob::isGlob(std::filesystem::path("foo")));
+        EXPECT_FALSE(Glob::isGlob(std::filesystem::path("a/b/c/foo")));
+        EXPECT_TRUE(Glob::isGlob(std::filesystem::path("*.cpp")));
+        EXPECT_TRUE(Glob::isGlob(std::filesystem::path("a/b/c/foo*.txt")));
+        EXPECT_TRUE(Glob::isGlob(std::filesystem::path("a/b/c/foo[12].txt")));
+        EXPECT_FALSE(Glob::isGlob(std::filesystem::path("a{1,3}"))); // see Glob::isGlob
 
         Glob glob("foo", globstar);
         EXPECT_TRUE(glob.matches(std::string("foo")));

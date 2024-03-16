@@ -93,22 +93,22 @@ namespace
         auto input00 = command0->cmdInputs()[0];
         EXPECT_EQ(setup.lib1File, input00);
         EXPECT_EQ("type %f > %o", command0->script());
-        ASSERT_EQ(1, command0->outputs().size());
-        auto output00 = command0->outputs()[0];
+        ASSERT_EQ(1, command0->mandatoryOutputs().size());
+        auto output00 = command0->mandatoryOutputs()[0];
         EXPECT_EQ("@@repo\\output\\lib1.obj", output00->name().string());
-        ASSERT_EQ(1, command0->ignoredOutputs().size());
-        EXPECT_EQ(repoRoot / ignoredOutput.path, command0->ignoredOutputs()[0]);
+        ASSERT_EQ(1, command0->ignoreOutputs().size());
+        EXPECT_EQ(repoRoot / ignoredOutput.path, command0->ignoreOutputs()[0]);
         EXPECT_EQ(3, command0->orderOnlyInputs().size());
 
         ASSERT_EQ(1, command1->cmdInputs().size());
         auto input10 = command1->cmdInputs()[0];
         EXPECT_EQ(setup.lib2File, input10);
         EXPECT_EQ("type %f > %o", command1->script());
-        ASSERT_EQ(1, command1->outputs().size());
-        auto output10 = command1->outputs()[0];
+        ASSERT_EQ(1, command1->mandatoryOutputs().size());
+        auto output10 = command1->mandatoryOutputs()[0];
         EXPECT_EQ("@@repo\\output\\lib2.obj", output10->name().string());
-        ASSERT_EQ(1, command1->ignoredOutputs().size());
-        EXPECT_EQ(repoRoot / ignoredOutput.path, command1->ignoredOutputs()[0]);
+        ASSERT_EQ(1, command1->ignoreOutputs().size());
+        EXPECT_EQ(repoRoot / ignoredOutput.path, command1->ignoreOutputs()[0]);
 
         auto const& globs = compiler.globs();
         ASSERT_EQ(2, globs.size());
@@ -242,8 +242,8 @@ namespace
         auto input00 = command0->cmdInputs()[0];
         EXPECT_EQ(setup.mainFile, input00);
         ASSERT_EQ(rule->script.script, command0->script());
-        ASSERT_EQ(1, command0->outputs().size());
-        auto output00 = command0->outputs()[0];
+        ASSERT_EQ(1, command0->mandatoryOutputs().size());
+        auto output00 = command0->mandatoryOutputs()[0];
         EXPECT_EQ(std::string("@@repo\\output\\main.obj"), output00->name().string());
     }
 

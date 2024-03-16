@@ -94,7 +94,7 @@ namespace YAM
         for (auto const& node : _content) {
             auto const& cmdNode = dynamic_pointer_cast<CommandNode>(node);
             if (cmdNode != nullptr) {
-                auto const& outputs = cmdNode->outputs();
+                auto const& outputs = cmdNode->mandatoryOutputs();
                 result.insert(outputs.begin(), outputs.end());
             }
         }
