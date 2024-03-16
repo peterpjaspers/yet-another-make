@@ -61,6 +61,7 @@ namespace YAM
         auto it = _content.find(node);
         if (it != _content.end()) {
             if (*it != node) throw std::runtime_error("Attempt to remove unknown node");
+            _content.erase(it);
             unsubscribe(node);
             modified(true);
             setState(Node::State::Dirty);
@@ -75,37 +76,6 @@ namespace YAM
             auto const& fileNode = dynamic_pointer_cast<FileNode>(node);
             if (fileNode != nullptr) result.insert(fileNode);
         }
-        return result;
-    }
-
-    // Return whether the group contains one or more CommandNodes.
-    bool GroupNode::isDynamic() const {
-        for (auto const& node : _content) {
-            if (dynamic_pointer_cast<CommandNode>(node) != nullptr) return true;
-        }
-        return false;
-    }
-
-    // Pre: state() == Node::State::Ok
-    // Return the output  file nodes of CommandNode elements.
-    std::set<std::shared_ptr<FileNode>, Node::CompareName> GroupNode::dynamicFiles() const {
-        if (state() != Node::State::Ok) throw std::runtime_error("wrong state");
-        std::set<std::shared_ptr<FileNode>, Node::CompareName> result;
-        for (auto const& node : _content) {
-            auto const& cmdNode = dynamic_pointer_cast<CommandNode>(node);
-            if (cmdNode != nullptr) {
-                auto const& outputs = cmdNode->mandatoryOutputs();
-                result.insert(outputs.begin(), outputs.end());
-            }
-        }
-        return result;
-    }
-    std::set<std::shared_ptr<FileNode>, Node::CompareName> GroupNode::allFiles() const {
-        auto files_ = files();
-        auto dynamicFiles_ = dynamicFiles();
-        std::set<std::shared_ptr<FileNode>, Node::CompareName> result;
-        result.insert(files_.begin(), files_.end());
-        result.insert(dynamicFiles_.begin(), dynamicFiles_.end());
         return result;
     }
 

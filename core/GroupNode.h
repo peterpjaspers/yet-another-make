@@ -17,8 +17,6 @@ namespace YAM
     // executing a generated file node (which only hashes the file) the 
     // producer of a generated file node is executed (which makes the generated
     // file up-to-date and hashes it).
-    // Special behavior is also provided for CommandNode elements, see the
-    // isDynamic() and dynamicFiles() functions.
     // 
     class __declspec(dllexport) GroupNode : public Node
     {
@@ -45,18 +43,6 @@ namespace YAM
         // Return the elements in content() that are FileNodes.
         std::set<std::shared_ptr<FileNode>, Node::CompareName> files() const;
 
-        // Return whether the group contains one or more CommandNodes.
-        bool isDynamic() const;
-
-        // Pre: state() == Node::State::Ok
-        // Return the output file nodes of CommandNode elements.
-        std::set<std::shared_ptr<FileNode>, Node::CompareName> dynamicFiles() const;
-
-        // Pre: state() == Node::State::Ok
-        // Return union of files() and dynamicFiles().
-        // Note: !isDynamic() => allFiles() == files() 
-        std::set<std::shared_ptr<FileNode>, Node::CompareName> allFiles() const;
-
         // Override Node
         void start() override;
 
@@ -77,6 +63,8 @@ namespace YAM
         XXH64_hash_t computeHash() const;
         void handleGroupCompletion(Node::State groupState);
 
+        // A set instead of a map from name->node is used to reduce memory 
+        // usage of groups with large number elements.
         std::set<std::shared_ptr<Node>, Node::CompareName> _content;
 
         // _contentVec is used to stream _content. When streaming nodes from
@@ -87,10 +75,10 @@ namespace YAM
         std::vector<std::shared_ptr<Node>> _contentVec;
 
         // _observed contains the nodes that are being observed.
-        // When a subset of N GeneratedFileNodes are output of same CommandNode
-        // C then C is observed and _observed[C]==N.
-        // For a node X not being a generated file node X itself is observed 
-        // and _observed[X]==1
+        // For a GeneratedFileNode X->producer() is observed. When a set of N
+        // GeneratedFileNodes have same producer C then _observed[C]==N.
+        // For a node X not being a GeneratedFileNode X is observed and
+        // _observed[X]==1
         std::unordered_map<Node*, uint32_t> _observed;
         XXH64_hash_t _hash;
     };

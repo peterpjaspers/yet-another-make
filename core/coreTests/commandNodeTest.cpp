@@ -118,12 +118,12 @@ namespace
                     pietjanOut->name().parent_path() / "optional[12].txt"
                 });
                 script
-                    << "type " << pietOut->absolutePath().string() << " > " << pietjanOut->absolutePath().string()
-                    << " & type " << janOut->absolutePath().string() << " >> " << pietjanOut->absolutePath().string()
-                    << " & echo optional1 > " << pietjanOut->absolutePath().parent_path() / "optional1.txt"
-                    << " & echo optional2 > " << pietjanOut->absolutePath().parent_path() / "optional2.txt"
-                    << " & echo ignore1 > " << pietjanOut->absolutePath().parent_path() / "ignore1.txt"
-                    << " & echo ignore2 > " << pietjanOut->absolutePath().parent_path() / "ignore2.txt";
+                    << "type " << pietOut->absolutePath().string() << " > " << pietjanOut->absolutePath().string() << std::endl
+                    << "type " << janOut->absolutePath().string() << " >> " << pietjanOut->absolutePath().string() << std::endl
+                    << "echo optional1 > " << pietjanOut->absolutePath().parent_path() / "optional1.txt" << std::endl
+                    << "echo optional2 > " << pietjanOut->absolutePath().parent_path() / "optional2.txt" << std::endl
+                    << "echo ignore1 > " << pietjanOut->absolutePath().parent_path() / "ignore1.txt" << std::endl
+                    << "echo ignore2 > " << pietjanOut->absolutePath().parent_path() / "ignore2.txt" << std::endl;
 
                 pietjanCmd->script(script.str());
             }
@@ -231,8 +231,8 @@ namespace
         EXPECT_EQ("piet", readFile(cmds.pietOut->absolutePath()));
         EXPECT_EQ("jan", readFile(cmds.janOut->absolutePath()));
         EXPECT_EQ("pietjan", readFile(cmds.pietjanOut->absolutePath()));
-        EXPECT_EQ("optional1  ", readFile(optional1->absolutePath()));
-        EXPECT_EQ("optional2  ", readFile(optional2->absolutePath()));
+        EXPECT_EQ("optional1 ", readFile(optional1->absolutePath()));
+        EXPECT_EQ("optional2 ", readFile(optional2->absolutePath()));
         EXPECT_FALSE(std::filesystem::exists(cmds.pietjanOut->name().parent_path() / "ignore1.txt"));
         EXPECT_FALSE(std::filesystem::exists(cmds.pietjanOut->name().parent_path() / "ignore2.txt"));
     }

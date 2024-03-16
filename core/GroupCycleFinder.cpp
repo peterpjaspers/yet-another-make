@@ -45,10 +45,16 @@ namespace
             cycles.push_back(cycle);
             return;
         }
-        for (auto const& node : group->content()) {
-            auto genFile = dynamic_pointer_cast<GeneratedFileNode>(node);
+        for (auto const &node : group->content()) {
+            auto const &genFile = dynamic_pointer_cast<GeneratedFileNode>(node);
+            std::shared_ptr<CommandNode> command; 
             if (genFile != nullptr) {
-                auto inputGroups = genFile->producer()->inputGroups();
+                command = genFile->producer();
+            } else {
+                command = dynamic_pointer_cast<CommandNode>(node);
+            }
+            if (command != nullptr) {
+                auto inputGroups = command->inputGroups();
                 for (auto const& inputGroup : inputGroups) {
                     findGroupCycle(trail, inputGroup.get(), cycles, doneGroups);
                 }

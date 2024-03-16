@@ -22,22 +22,23 @@ namespace
 {
     using namespace YAM;
 
-    std::filesystem::path uidPath() {
+    std::filesystem::path uidPath(std::filesystem::path const& baseDir) {
         std::stringstream ss;
         ss << rand();
-        return std::filesystem::path(ss.str());
+        return std::filesystem::path(baseDir / ss.str());
     }
 
     std::filesystem::path uniqueCmdName(
+        std::filesystem::path const& baseDir,
         NodeSet& nodes,
         std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const& newCommands
     ) {
-        std::filesystem::path uid = uidPath();
+        std::filesystem::path uid = uidPath(baseDir);
         while (
             (nodes.find(uid) != nullptr)
             && (newCommands.find(uid) != newCommands.end())
         ) {
-            uid = uidPath();
+            uid = uidPath(baseDir);
         }
         return uid;
     }
@@ -516,7 +517,7 @@ namespace YAM {
     {
         std::filesystem::path cmdName;
         if (outputPaths.empty()) {
-            cmdName = uniqueCmdName(_context->nodes(), _newCommands);
+            cmdName = uniqueCmdName(_baseDir->name(), _context->nodes(), _newCommands);
         } else {
             cmdName = outputPaths[0] / "__cmd";
         }

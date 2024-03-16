@@ -4,10 +4,9 @@ Bugs
   Reproduce with coreTests EnduranceTest
 
 Features
-- update GroupCycleFinder to deal with CommandNode elements
 - update parser and compiler to deal with optional globs in rule output section
 - CommandNode only uses the mandatory file nodes in groups to compile %-flags
-- raise error when parsing/compiling  : |> echo piet |> <illegal>
+- add error handling to cmd script when compiling it.
 
 - implement glob for optional output files (dynamic outputs)
   Rule examples: 
