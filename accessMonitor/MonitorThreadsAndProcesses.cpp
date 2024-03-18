@@ -24,15 +24,6 @@ namespace AccessMonitor {
             inject( CurrentSessionID(), GetProcessID( pid ), GetThreadID( tid ), patchDLLFile );
         }
 
-        void stopMonitoring() {
-            auto process = CurrentProcessID();
-            debugRecord() << "Stop monitoring in process 0x" << hex << process << "..." << record;
-            unpatchProcess();
-            remove( sessionInfoPath( process ) );
-            closeEventLog();
-            debugLog().close();
-        }
-
         typedef HANDLE(*TypeCreateThread)(LPSECURITY_ATTRIBUTES,SIZE_T,LPTHREAD_START_ROUTINE,LPVOID,DWORD,LPDWORD);
         HANDLE PatchCreateThread(
 
@@ -209,13 +200,17 @@ namespace AccessMonitor {
                 if (debugLog( PatchExecution )) debugRecord() << "MonitorProcessesAndThreads - ExitProcess( " << exitCode << " ) - " << fileName << record;
                 CloseHandle( handle );
             } else if (debugLog( PatchExecution )) debugRecord() << "MonitorProcessesAndThreads - ExitProcess( " << exitCode << " )" << record;
-            stopMonitoring();
-            EventSignal( "ProcessExit", CurrentSessionID(), CurrentProcessID() );
+            auto process = CurrentProcessID();
+            auto session = CurrentSessionID();
+            auto exitEvent = AccessEvent( "ExitProcess", session, process );
+            EventSignal( "RequestExit", session, process );
+            EventWait( exitEvent );
+            ReleaseEvent( exitEvent );
             SetLastError( error );
             function( exitCode );
         }
         typedef BOOL(*TypeTerminateProcess)(HANDLE,DWORD);
-        void PatchTerminateProcess( HANDLE handle, DWORD exitCode ) {
+        BOOL PatchTerminateProcess( HANDLE handle, DWORD exitCode ) {
             TypeTerminateProcess function = reinterpret_cast<TypeTerminateProcess>(original( (PatchFunction)PatchTerminateProcess));
             DWORD error = GetLastError();
             if (handle != NULL) {
@@ -225,11 +220,16 @@ namespace AccessMonitor {
             } else {
                 if (debugLog( PatchExecution )) debugRecord() << "MonitorProcessesAndThreads - TerminateProcess( " << exitCode << " )" << record;
             }
-            stopMonitoring();
+            auto process = GetProcessID( GetProcessId( handle ) );
+            if (process == CurrentProcessID()) {
+                auto session = CurrentSessionID();
+                auto exitEvent = AccessEvent( "ExitProcess", session, process );
+                EventSignal( "RequestExit", session, process );
+                EventWait( exitEvent );
+                ReleaseEvent( exitEvent );
+            }
             SetLastError( error );
-            BOOL result = function( handle, exitCode );
-            WaitForSingleObject( handle, 0 );
-            EventSignal( "ProcessExit", CurrentSessionID(), GetProcessID( GetProcessId( handle ) ) );
+            return function( handle, exitCode );
         }
 
         typedef NTSTATUS(*TypeNtCreateProcess)(HANDLE*,ACCESS_MASK,OBJECT_ATTRIBUTES*,HANDLE,BOOL,HANDLE,HANDLE,HANDLE);

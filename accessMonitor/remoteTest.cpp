@@ -29,7 +29,6 @@ void worker( const path directoryPath ) {
 
 void doFileAccess( bool multithreaded, const string& directory ) {
     if (multithreaded) {
-        auto t = jthread( worker, path( "." ) / directory / "fileAccessTest" );
         auto t0 = jthread( worker, path( "." ) / directory / "fileAccessTest0" );
         auto t1 = jthread( worker, path( "." ) / directory / "fileAccessTest1" );
         auto t2 = jthread( worker, path( "." ) / directory / "fileAccessTest2" );

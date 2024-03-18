@@ -2,9 +2,7 @@
 #include "Process.h"
 #include "FileNaming.h"
 #include "MonitorLogging.h"
-#include "MonitorFiles.h"
-#include "MonitorThreadsAndProcesses.h"
-#include "Patch.h"
+#include "PatchProcess.h"
 
 #include <windows.h>
 #include <sstream>
@@ -14,17 +12,6 @@ using namespace std;
 
 namespace AccessMonitor {
     
-    void patchProcess() {
-        registerFileAccess();
-        registerProcessesAndThreads();
-        patch();
-    }
-    void unpatchProcess() {
-        unpatch();
-        unregisterFileAccess();
-        unregisterProcessCreation();
-    }
-
     string exceptionText( const string& signature, const string& message ) {
         stringstream ss;
         ss << signature << " - " << message << "! [ " << GetLastError() << " ]";

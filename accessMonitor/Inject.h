@@ -6,11 +6,7 @@
 #include <string>
 
 namespace AccessMonitor {
-
-    void patchProcess();
-    void unpatchProcess();
-
-    // Inject a library in a process
+    // Inject (patch) library in a process
     void inject( SessionID session, ProcessID process, ThreadID thread, const std::wstring& library );
 }
 

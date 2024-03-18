@@ -4,7 +4,7 @@
 #include "FileNaming.h"
 #include "MonitorFiles.h"
 #include "MonitorThreadsAndProcesses.h"
-#include "Patch.h"
+#include "PatchProcess.h"
 
 #include <windows.h>
 #include <fstream>
@@ -19,36 +19,28 @@ namespace AccessMonitor {
 
     namespace {
 
-        mutex monitorMutex;
-
-        void patchProcess() {
-            registerFileAccess();
-            registerProcessesAndThreads();
-            patch();
-        }
-        void unpatchProcess() {
-            unpatch();
-            unregisterFileAccess();
-            unregisterProcessCreation();
-        }
-
+        // Create data directory for a session
         void createSessionData( const SessionID session ) {
             static const char* signature = "void createSessionData( const SessionID session )";
             const path sessionData( sessionDataPath( session ) );
-            if (!create_directory( sessionData )) throw string( signature ) + " - Creating existing session data directory!";
+            if (exists( sessionData )) {
+                // Session directory already exists, presumably due to a previous session 
+                // with the same ID that terminated abnormally (e.g., crashed or was killed).
+                // Remove all data session left behind...
+                remove_all( sessionData );
+            }
+            create_directory( sessionData );
         }
 
-        // Delete all data data associated with a session.
+        // Delete all data associated with a session.
         // Fails if session directory exists
         void removeSessionData( const SessionID session ) {
             static const char* signature = "void removeSessionData( const SessionID session )";
             const path sessionData( sessionDataPath( session ) );
-            if (create_directory( sessionData )) throw string( signature ) + " - Session data directory does not exist!";
-            for ( auto entry : directory_iterator( sessionData ) ) {
-                auto file = entry.path();
-                if ( is_regular_file( file ) ) remove( file );
-            }
-            remove( sessionData );
+            if (!exists( sessionData )) throw string( signature ) + " - Session data directory does not exist!";
+            remove_all( sessionData );
+            // Remove (remote) session ID files associated with a session
+            // ToDo: This does not work, ID file has process ID of remote process, not current process
             remove( sessionInfoPath( CurrentProcessID() ) );
         }
 
@@ -86,32 +78,25 @@ namespace AccessMonitor {
     // ToDo: rename patchDLL.dll to accessMonitor.dll
 
     void startMonitoring() {
-        SessionID session;
-        {
-            const lock_guard<mutex> lock( monitorMutex ); 
-            session = CreateSession();
-            createDebugLog();
-            debugLog().enable( PatchedFunction | ParseLibrary | PatchExecution | FileAccesses );
-            if (SessionCount() == 1)  patchProcess();
-        }
+        SessionID session = CreateSession();
+        createDebugLog();
+        debugLog().enable( PatchedFunction | ParseLibrary | PatchExecution | FileAccesses );
         debugRecord() << "Start monitoring session " << session << "..." << record;
         SetSessionState( SessionUpdating );
         createSessionData( session );
         createEventLog();
         SetSessionState( SessionActive );
+        patchProcess();
     }
 
     MonitorEvents stopMonitoring() {
         auto session = CurrentSessionID();
         debugRecord() << "Stop monitoring session " << session << "..." << record;
+        unpatchProcess();
         closeEventLog();
-        {
-            const lock_guard<mutex> lock( monitorMutex );
-            if (SessionCount() == 1) unpatchProcess();
-            closeDebugLog();
-            RemoveSession();
-        }
+        closeDebugLog();
         auto events = collectMonitorEvents( session );
+        RemoveSession();
         removeSessionData( session );
         return events;
     }

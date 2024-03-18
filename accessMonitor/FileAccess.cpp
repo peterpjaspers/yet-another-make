@@ -14,6 +14,7 @@ namespace AccessMonitor {
         if ((mode & AccessWrite) != 0) string += L"Write";
         if ((mode & AccessDelete) != 0) string += L"Delete";
         if ((mode & AccessVariable) != 0) string += L"Variable";
+        if (string == L"") string = L"None";
         return string;
     }
 
@@ -21,6 +22,7 @@ namespace AccessMonitor {
         FileAccessMode mode( AccessNone );
         wstring string( modeString );
         while (0 < string.size()) {
+            if (string.starts_with( L"None" )) { string.erase( 0, 4 ); continue; }
             if (string.starts_with( L"Read" )) { mode |= AccessRead; string.erase( 0, 4 ); continue; }
             if (string.starts_with( L"Write" )) { mode |= AccessWrite; string.erase( 0, 5 ); continue;  }
             if (string.starts_with( L"Delete" )) { mode |= AccessDelete; string.erase( 0, 6 ); continue;  }

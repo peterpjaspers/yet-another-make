@@ -44,7 +44,7 @@ namespace AccessMonitor {
         VirtualProtect((void*)address, sizeof( PatchFunction ), protection, nullptr );
     }
 
-    // Registered functions may not actually be patched in an executable or DLL.
+    // Registered functions may not actually be patched (imported) in an executable or DLL.
     // In that case, repatchFunction and unpatchFunction do nothing.
     bool repatchFunction( const PatchFunction function ) {
         if (0 < functionToPatch.count( function )) {

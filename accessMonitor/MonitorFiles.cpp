@@ -22,7 +22,7 @@ namespace AccessMonitor {
         wstring fileAccess( const string& fileName, FileAccessMode mode );
         wstring fileAccess( const wstring& fileName, FileAccessMode mode );
         wstring fileAccess( HANDLE handle, FileAccessMode mode = AccessNone );
-        wstring fileAccess( HANDLE handle, const OBJECT_ATTRIBUTES* attributes );
+        // wstring fileAccess( HANDLE handle, const OBJECT_ATTRIBUTES* attributes );
 
         inline uint64_t handleCode( HANDLE handle ) { return reinterpret_cast<uint64_t>( handle ); }
 
@@ -176,7 +176,7 @@ namespace AccessMonitor {
             auto function = reinterpret_cast<TypeCopyFileW>(original( (PatchFunction)PatchCopyFileW ));
             BOOL copied = function( existingFileName, newFileName, failIfExists );
             if (debugLog( PatchExecution )) debugRecord() << L"MonitorFiles - CopyFileW( " << existingFileName << L", " << newFileName << L", ... ) -> " << copied << record;
-            fileAccess( existingFileName, (AccessRead | AccessDelete) );
+            fileAccess( existingFileName, AccessRead);
             fileAccess( newFileName, AccessWrite );
             return copied;
         }
@@ -405,50 +405,51 @@ namespace AccessMonitor {
             // Record last write time when closing file opened for write
             wstring fileName = fileAccess( handle );
             BOOL closed = function( handle );
-            if (debugLog( PatchExecution ) && (fileName != L"")) debugRecord() << L"MonitorFiles - CloseHandle( " << handleCode( handle ) << L") on " << fileName.c_str() << L" -> " << (closed ? L"closed" : L"failed") << record;
+            if (debugLog( PatchExecution ) && (fileName != L"")) debugRecord() << L"MonitorFiles - CloseHandle( " << handleCode( handle ) << L" ) on " << fileName.c_str() << L" -> " << (closed ? L"closed" : L"failed") << record;
             return closed;
         }
-        typedef NTSTATUS(*TypeNtCreateFile)(HANDLE*,ACCESS_MASK,OBJECT_ATTRIBUTES*,IO_STATUS_BLOCK*,LARGE_INTEGER*,ULONG,ULONG,ULONG,ULONG,void*,ULONG);
-        NTSTATUS PatchNtCreateFile(
-            HANDLE*            FileHandle,
-            ACCESS_MASK        DesiredAccess,
-            OBJECT_ATTRIBUTES* ObjectAttributes,
-            IO_STATUS_BLOCK*   IoStatusBlock,
-            LARGE_INTEGER*     AllocationSize,
-            ULONG              FileAttributes,
-            ULONG              ShareAccess,
-            ULONG              CreateDisposition,
-            ULONG              CreateOptions,
-            void*              EaBuffer,
-            ULONG              EaLength
-        ) {
-            auto function = reinterpret_cast<TypeNtCreateFile>(original( (PatchFunction)PatchNtCreateFile ));
-            unpatchFunction( (PatchFunction)PatchNtCreateFile );
-            auto status = function( FileHandle, DesiredAccess, ObjectAttributes, IoStatusBlock, AllocationSize, FileAttributes, ShareAccess, CreateDisposition, CreateOptions, EaBuffer, EaLength );
-            // wstring fileName = fileAccess( *FileHandle, ObjectAttributes );
-            // if (debugLog( PatchExecution )) debugRecord() << L"MonitorFiles - NtCreateFile( ... " << fileName << " ... ) -> " << status << record;
-            if (debugLog( PatchExecution )) debugRecord() << L"MonitorFiles - NtCreateFile( ... ) -> " << status << record;
-            repatchFunction( (PatchFunction)PatchNtCreateFile );
-            return status;
-        }
-        typedef NTSTATUS(*TypeNtOpenFile)(HANDLE*,ACCESS_MASK,OBJECT_ATTRIBUTES*,IO_STATUS_BLOCK*,ULONG,ULONG);
-        NTSTATUS PatchNtOpenFile(
-            HANDLE*            FileHandle,
-            ACCESS_MASK        DesiredAccess,
-            OBJECT_ATTRIBUTES* ObjectAttributes,
-            IO_STATUS_BLOCK*   IoStatusBlock,
-            ULONG              ShareAccess,
-            ULONG              OpenOptions
-        ) {
-            auto function = reinterpret_cast<TypeNtOpenFile>(original( (PatchFunction)PatchNtOpenFile ));
-            unpatchFunction( (PatchFunction)PatchNtOpenFile );
-            auto status = function( FileHandle, DesiredAccess, ObjectAttributes, IoStatusBlock, ShareAccess, OpenOptions );
-            // wstring fileName = fileAccess( *FileHandle, ObjectAttributes );
-            // if (debugLog( PatchExecution )) debugRecord() << L"MonitorFiles - NtOpenFile( ... " << fileName << " ... ) -> " << status << record;
-            if (debugLog( PatchExecution )) debugRecord() << L"MonitorFiles - NtOpenFile( ... ) -> " << status << record;
-            repatchFunction( (PatchFunction)PatchNtOpenFile );
-            return status;
-        }
+        // typedef NTSTATUS(*TypeNtCreateFile)(HANDLE*,ACCESS_MASK,OBJECT_ATTRIBUTES*,IO_STATUS_BLOCK*,LARGE_INTEGER*,ULONG,ULONG,ULONG,ULONG,void*,ULONG);
+        // NTSTATUS PatchNtCreateFile(
+        //     HANDLE*            FileHandle,
+        //     ACCESS_MASK        DesiredAccess,
+        //     OBJECT_ATTRIBUTES* ObjectAttributes,
+        //     IO_STATUS_BLOCK*   IoStatusBlock,
+        //     LARGE_INTEGER*     AllocationSize,
+        //     ULONG              FileAttributes,
+        //     ULONG              ShareAccess,
+        //     ULONG              CreateDisposition,
+        //     ULONG              CreateOptions,
+        //     void*              EaBuffer,
+        //     ULONG              EaLength
+        // ) {
+        //     auto function = reinterpret_cast<TypeNtCreateFile>(original( (PatchFunction)PatchNtCreateFile ));
+        //     unpatchFunction( (PatchFunction)PatchNtCreateFile );
+        //     auto status = function( FileHandle, DesiredAccess, ObjectAttributes, IoStatusBlock, AllocationSize, FileAttributes, ShareAccess, CreateDisposition, CreateOptions, EaBuffer, EaLength );
+        //     wstring fileName = fileAccess( *FileHandle, ObjectAttributes );
+        //     if (debugLog( PatchExecution )) debugRecord() << L"MonitorFiles - NtCreateFile( ... " << fileName << " ... ) -> " << status << record;
+        //     if (debugLog( PatchExecution )) debugRecord() << L"MonitorFiles - NtCreateFile( ... ) -> " << status << record;
+        //     repatchFunction( (PatchFunction)PatchNtCreateFile );
+        //     return status;
+        // }
+        // typedef NTSTATUS(*TypeNtOpenFile)(HANDLE*,ACCESS_MASK,OBJECT_ATTRIBUTES*,IO_STATUS_BLOCK*,ULONG,ULONG);
+        // NTSTATUS PatchNtOpenFile(
+        //     HANDLE*            FileHandle,
+        //     ACCESS_MASK        DesiredAccess,
+        //     OBJECT_ATTRIBUTES* ObjectAttributes,
+        //     IO_STATUS_BLOCK*   IoStatusBlock,
+        //     ULONG              ShareAccess,
+        //     ULONG              OpenOptions
+        // ) {
+        //     auto function = reinterpret_cast<TypeNtOpenFile>(original( (PatchFunction)PatchNtOpenFile ));
+        //     unpatchFunction( (PatchFunction)PatchNtOpenFile );
+        //     auto status = function( FileHandle, DesiredAccess, ObjectAttributes, IoStatusBlock, ShareAccess, OpenOptions );
+        //     wstring fileName = fileAccess( *FileHandle, ObjectAttributes );
+        //     if (debugLog( PatchExecution )) debugRecord() << L"MonitorFiles - NtOpenFile( ... " << fileName << " ... ) -> " << status << record;
+        //     if (debugLog( PatchExecution )) debugRecord() << L"MonitorFiles - NtOpenFile( ... ) -> " << status << record;
+        //     repatchFunction( (PatchFunction)PatchNtOpenFile );
+        //     return status;
+        // }
+
         // Convert Windows access mode value to FileAccessMode value
         FileAccessMode requestedAccessMode( DWORD desiredAccess ) {
             FileAccessMode mode = 0;
@@ -460,17 +461,17 @@ namespace AccessMonitor {
         }
 
         // Determine access modes to opened file
-        FileAccessMode accessMode( HANDLE handle ) {
-            FileAccessMode mode( AccessNone );
-            uint32_t flags;
-            DWORD infoError = GetFileInformationByHandleEx( handle, (FILE_INFO_BY_HANDLE_CLASS)8, &flags, sizeof( flags ) );
-            if (infoError == ERROR_SUCCESS) {
-                if ((FILE_READ_DATA & flags) != 0) mode |= AccessRead;
-                if ((FILE_WRITE_DATA & flags) != 0) mode |= AccessWrite;
-                if ((FILE_APPEND_DATA & flags) != 0) mode |= AccessWrite;
-            }
-            return mode;
-        }
+        // FileAccessMode accessMode( HANDLE handle ) {
+        //     FileAccessMode mode( AccessNone );
+        //     uint32_t flags;
+        //     DWORD infoError = GetFileInformationByHandleEx( handle, (FILE_INFO_BY_HANDLE_CLASS)8, &flags, sizeof( flags ) );
+        //     if (infoError == ERROR_SUCCESS) {
+        //         if ((FILE_READ_DATA & flags) != 0) mode |= AccessRead;
+        //         if ((FILE_WRITE_DATA & flags) != 0) mode |= AccessWrite;
+        //         if ((FILE_APPEND_DATA & flags) != 0) mode |= AccessWrite;
+        //     }
+        //     return mode;
+        // }
 
         inline wstring widen( const string& fileName ) {
         if (fileName.empty()) return {};
@@ -508,16 +509,16 @@ namespace AccessMonitor {
             return fullName( fileName.c_str() );
         }
         // ToDo: Fix this function, required for patched NT functions...
-        wstring fullName( const OBJECT_ATTRIBUTES* attributes ) {
-            UNICODE_STRING* unicodeString = attributes->ObjectName;
-            wstring name( unicodeString->Buffer, unicodeString->Length );
-            path filePath( name );
-            if (attributes->RootDirectory != nullptr) {
-                filePath = fullName( attributes->RootDirectory );
-                filePath /= name;
-            }
-            return filePath.wstring();
-        }
+        // wstring fullName( const OBJECT_ATTRIBUTES* attributes ) {
+        //     UNICODE_STRING* unicodeString = attributes->ObjectName;
+        //     wstring name( unicodeString->Buffer, unicodeString->Length );
+        //     path filePath( name );
+        //     if (attributes->RootDirectory != nullptr) {
+        //         filePath = fullName( attributes->RootDirectory );
+        //         filePath /= name;
+        //     }
+        //     return filePath.wstring();
+        // }
 
         // Retrieve last write time on a file (handle)
         // Note that Windows file times have (limited) millisecond resolution
@@ -571,8 +572,10 @@ namespace AccessMonitor {
         wstring fileAccess( const wstring& fileName, FileAccessMode mode ) {
             DWORD error = GetLastError();
             auto fullFileName = fullName( fileName.c_str() );
-            if (debugLog( FileAccesses )) debugRecord() << L"MonitorFiles - " << modeToString( mode ) << L" access by name on file " << fullFileName << record;
-            if (fullFileName != L"") recordFileEvent( fullFileName, mode, getLastWriteTime( fileName ) );
+            if (fullFileName != L"") {
+                if (debugLog( FileAccesses )) debugRecord() << L"MonitorFiles - " << modeToString( mode ) << L" access by name on file " << fullFileName << record;
+                recordFileEvent( fullFileName, mode, getLastWriteTime( fileName ) );
+            }
             SetLastError( error );
             return fullFileName;
         }
@@ -580,27 +583,32 @@ namespace AccessMonitor {
             return fileAccess( widen( fileName ), mode );
         }
         wstring fileAccess( HANDLE handle, FileAccessMode mode ) {
+            // Closing handle if mode == AccessNone
             DWORD error = GetLastError();
             auto fullFileName = fullName( handle );
             if (fullFileName != L"") {
-                if (mode == AccessNone) mode = accessMode( handle );
-                if (debugLog( FileAccesses )) debugRecord() << L"MonitorFiles - " << modeToString( mode ) << L" access by handle on file " << fullFileName << record;
-                if (fullFileName != L"") recordFileEvent( fullFileName, mode, getLastWriteTime( handle ) );
+                // Record last write time on file being closed
+                if (debugLog( FileAccesses )) debugRecord() << L"MonitorFiles - " << modeToString( mode ) << L" access by handle " << handleCode( handle) << " on file " << fullFileName << record;
+                recordFileEvent( fullFileName, mode, getLastWriteTime( handle ) );
+            } else if (mode == AccessNone) {
+                // Possibly closing handle on a thread
+                DWORD id = GetThreadId( handle );
+                if (id != 0) RemoveSessionThread( GetThreadID( id ) );
             }
             SetLastError( error );
             return fullFileName;
         }
-        wstring fileAccess( HANDLE handle, const OBJECT_ATTRIBUTES* attributes ) {
-            DWORD error = GetLastError();
-            auto fullFileName = fullName( attributes );
-            if (fullFileName != L"") {
-                FileAccessMode  mode = accessMode( handle );
-                if (debugLog( FileAccesses )) debugRecord() << L"MonitorFiles - " << modeToString( mode ) << L" access by handle on file " << fullFileName << record;
-                if (fullFileName != L"") recordFileEvent( fullFileName, mode, getLastWriteTime( handle ) );
-            }
-            SetLastError( error );
-            return fullFileName;            
-        }
+        // wstring fileAccess( HANDLE handle, const OBJECT_ATTRIBUTES* attributes ) {
+        //     DWORD error = GetLastError();
+        //     auto fullFileName = fullName( attributes );
+        //     if (fullFileName != L"") {
+        //         FileAccessMode  mode = accessMode( handle );
+        //         if (debugLog( FileAccesses )) debugRecord() << L"MonitorFiles - " << modeToString( mode ) << L" access by handle " << handleCode( handle) << " on file " << fullFileName << record;
+        //         recordFileEvent( fullFileName, mode, getLastWriteTime( handle ) );
+        //     }
+        //     SetLastError( error );
+        //     return fullFileName;            
+        // }
 
 
     }
@@ -635,8 +643,8 @@ namespace AccessMonitor {
         registerPatch( "SetFileAttributesA", (PatchFunction)PatchSetFileAttributesA );
         registerPatch( "SetFileAttributesW", (PatchFunction)PatchSetFileAttributesW );
         registerPatch( "CloseHandle", (PatchFunction)PatchCloseHandle );
-        registerPatch( "NtCreateFile", (PatchFunction)PatchNtCreateFile );
-        registerPatch( "NtOpenFile", (PatchFunction)PatchNtOpenFile );
+        // registerPatch( "NtCreateFile", (PatchFunction)PatchNtCreateFile );
+        // registerPatch( "NtOpenFile", (PatchFunction)PatchNtOpenFile );
     }
     void unregisterFileAccess() {
         unregisterPatch( "CreateDirectoryA" );
@@ -668,8 +676,8 @@ namespace AccessMonitor {
         unregisterPatch( "SetFileAttributesA" );
         unregisterPatch( "SetFileAttributesW" );
         unregisterPatch( "CloseHandle" );
-        unregisterPatch( "NtCreateFile" );
-        unregisterPatch( "NtOpenFile" );
+        // unregisterPatch( "NtCreateFile" );
+        // unregisterPatch( "NtOpenFile" );
     }
 
 } // namespace AccessMonitor

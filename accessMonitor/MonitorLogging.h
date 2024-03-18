@@ -20,14 +20,14 @@ namespace AccessMonitor {
     LogRecord& eventRecord();
 
     enum MonitorLogAspects {
-        RegisteredFunctions = (1 << 0),
-        ParseLibrary        = (1 << 1),
-        ExportedFunction    = (1 << 2),
-        ImportedFunction    = (1 << 3),
-        PatchedFunction     = (1 << 4),
-        PatchExecution      = (1 << 5),
-        FileAccesses        = (1 << 6),
-        WriteTime           = (1 << 7),
+        RegisteredFunctions = (1 << 1),
+        ParseLibrary        = (1 << 2),
+        ExportedFunction    = (1 << 3),
+        ImportedFunction    = (1 << 4),
+        PatchedFunction     = (1 << 5),
+        PatchExecution      = (1 << 6),
+        FileAccesses        = (1 << 7),
+        WriteTime           = (1 << 8),
     };
 
 } // namespace AccessMonitor

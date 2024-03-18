@@ -1,7 +1,7 @@
-#include "Patch.h"
+#include "Process.h"
+#include "PatchProcess.h"
 #include "FileNaming.h"
 #include "MonitorLogging.h"
-#include "Inject.h"
 
 #include <windows.h>
 
@@ -22,20 +22,22 @@ namespace {
         // Simply add monitor thread and main thread to session adminstration, session was created by ancestor process
         AddSessionThread( monitorThread, session );
         AddSessionThread( mainThread, session );
-        auto processPatched = AccessEvent( "ProcessPatched", session, process );
-        auto processExit = AccessEvent( "ProcessExit", session, process );
         createEventLog();
         createDebugLog();
         debugLog().enable( PatchedFunction | ParseLibrary | PatchExecution | FileAccesses );
         debugRecord() << "Start monitoring in process 0x" << hex << process << "..." << record;
-        patchProcess();
         SetSessionState( SessionActive );
-        EventSignal( processPatched ); // Signal (parent) process that monitoring has started
-        EventWait( processExit ); // Wait for process to exit before exitting monitor thread
-        ReleaseEvent( processPatched );
-        ReleaseEvent( processExit );
+        patchProcess();
+        auto requestExit = AccessEvent( "RequestExit", session, process );
+        EventSignal( "ProcessPatched", session, process ); // Signal (parent) process that monitoring has started
+        EventWait( requestExit ); // Wait for process to (request) exit before exitting monitor thread
+        ReleaseEvent( requestExit );
+        debugRecord() << "Stop monitoring in process 0x" << hex << process << "..." << record;
+        unpatchProcess();
+        remove( sessionInfoPath( process ) );
         closeEventLog();
         closeDebugLog();
+        EventSignal( "ExitProcess", session, process ); // Signal process that it may exit
         RemoveSessionThread( monitorThread );
         RemoveSessionThread( mainThread );
         return ERROR_SUCCESS;
