@@ -18,7 +18,7 @@ namespace AccessMonitor {
         if (0 < extension.size()) unique << L"." << extension;
         return unique.str();
     }
-    std::wstring uniqueName( const std::wstring& name, unsigned long code1,  unsigned long code2,const std::wstring& extension ) {
+    wstring uniqueName( const wstring& name, unsigned long code1,  unsigned long code2,const wstring& extension ) {
         wstringstream unique;
         unique << name << L"_" << hex << code1 << L"_" << hex << code2;
         if (0 < extension.size()) unique << L"." << extension;
@@ -41,13 +41,13 @@ namespace AccessMonitor {
     // Record session ID and main thread ID of a (remote) process
     void recordSessionInfo( const SessionID session, const ProcessID process, ThreadID thread ) {
         auto sessionIDFile = ofstream( sessionInfoPath( process ) );
-        sessionIDFile << "0x" << hex << session << " 0x" << hex << thread << endl;
+        sessionIDFile << session << " 0x" << hex << thread << endl;
         sessionIDFile.close();
     }
     // Retrieve session ID and main thread ID of a (remote) process
     void retrieveSessionInfo( const ProcessID process, SessionID& session, ThreadID& thread ) {
         auto sessionFile = ifstream( sessionInfoPath( process ) );
-        sessionFile >> hex >> session >> hex >> thread;
+        sessionFile >> session >> hex >> thread;
         sessionFile.close();            
     }
 

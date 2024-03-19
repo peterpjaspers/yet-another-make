@@ -249,6 +249,32 @@ namespace AccessMonitor {
             fileAccess( newFileName, AccessWrite );
             return moved;
         }
+        typedef BOOL(*TypeMoveFileExA)(LPCSTR,LPCSTR,DWORD);
+        BOOL PatchMoveFileExA(
+            LPCSTR  existingFileName,
+            LPCSTR  newFileName,
+            DWORD   flags
+        ) {
+            auto function = reinterpret_cast<TypeMoveFileExA>(original( (PatchFunction)PatchMoveFileExA ));
+            BOOL moved = function( existingFileName, newFileName, flags );
+            if (debugLog( PatchExecution )) debugRecord() << L"MonitorFiles - MoveFileExA( " << existingFileName << L", " << newFileName << L", ... ) -> " << moved << record;
+            fileAccess( existingFileName, AccessDelete );
+            fileAccess( newFileName, AccessWrite );
+            return moved;
+        }       
+        typedef BOOL(*TypeMoveFileExW)(LPCWSTR,LPCWSTR,DWORD);
+        BOOL PatchMoveFileExW(
+            LPCWSTR existingFileName,
+            LPCWSTR newFileName,
+            DWORD   flags
+        ) {
+            auto function = reinterpret_cast<TypeMoveFileExW>(original( (PatchFunction)PatchMoveFileExW ));
+            BOOL moved = function( existingFileName, newFileName, flags );
+            if (debugLog( PatchExecution )) debugRecord() << L"MonitorFiles - MoveFileExA( " << existingFileName << L", " << newFileName << L", ... ) -> " << moved << record;
+            fileAccess( existingFileName, AccessDelete );
+            fileAccess( newFileName, AccessWrite );
+            return moved;
+        }       
         typedef BOOL(*TypeMoveFileWithProgressA)(LPCSTR,LPCSTR,LPPROGRESS_ROUTINE,LPVOID,DWORD);
         BOOL PatchMoveFileWithProgressA(
             LPCSTR             existingFileName,
@@ -593,7 +619,11 @@ namespace AccessMonitor {
             } else if (mode == AccessNone) {
                 // Possibly closing handle on a thread
                 DWORD id = GetThreadId( handle );
-                if (id != 0) RemoveSessionThread( GetThreadID( id ) );
+                if (id != 0) {
+                    auto thread = GetThreadID( id );
+                    if (debugLog( FileAccesses )) debugRecord() << L"MonitorFiles - Thread " << thread << " terminated" << record;
+                    RemoveSessionThread( thread );
+                }
             }
             SetLastError( error );
             return fullFileName;
@@ -630,6 +660,8 @@ namespace AccessMonitor {
         registerPatch( "CopyFile2", (PatchFunction)PatchCopyFile2 );
         registerPatch( "MoveFileA", (PatchFunction)PatchMoveFileA );
         registerPatch( "MoveFileW", (PatchFunction)PatchMoveFileW );
+        registerPatch( "MoveFileExA", (PatchFunction)PatchMoveFileExA );
+        registerPatch( "MoveFileExW", (PatchFunction)PatchMoveFileExW );
         registerPatch( "MoveFileWithProgressA", (PatchFunction)PatchMoveFileWithProgressA );
         registerPatch( "MoveFileWithProgressW", (PatchFunction)PatchMoveFileWithProgressW );
         registerPatch( "FindFirstFileA", (PatchFunction)PatchFindFirstFileA );
@@ -663,6 +695,8 @@ namespace AccessMonitor {
         unregisterPatch( "CopyFile2" );
         unregisterPatch( "MoveFileA" );
         unregisterPatch( "MoveFileW" );
+        unregisterPatch( "MoveFileExA" );
+        unregisterPatch( "MoveFileExW" );
         unregisterPatch( "MoveFileWithProgressA" );
         unregisterPatch( "MoveFileWithProgressW" );
         unregisterPatch( "FindFirstFileA" );

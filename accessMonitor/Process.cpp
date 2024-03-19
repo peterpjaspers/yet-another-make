@@ -22,7 +22,7 @@ namespace AccessMonitor {
 
         string uniqueEventName( const string& tag, const SessionID session, const ProcessID process ) {
             stringstream name;
-            name << "Global\\" << tag << "_Event_" << hex << session << "_" << hex << process;
+            name << "Global\\" << tag << "_Event_" << session << "_" << hex << process;
             return name.str();
         }
 

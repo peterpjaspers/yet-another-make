@@ -37,8 +37,9 @@ namespace AccessMonitor {
             TypeCreateThread function = reinterpret_cast<TypeCreateThread>(original( (PatchFunction)PatchCreateThread ));
             bool resume = !(dwCreationFlags & CREATE_SUSPENDED);
             HANDLE handle = function( lpThreadAttributes, dwStackSize, lpStartAddress, lpParameter, (dwCreationFlags | CREATE_SUSPENDED), lpThreadId );
-            if (debugLog( PatchExecution )) debugRecord() << "MonitorProcessesAndThreads - CreateThread( ... ) -> " << handle << record;
-            AddSessionThread( GetThreadID( *lpThreadId ), CurrentSessionID() );
+            auto thread = GetThreadID( GetThreadID( *lpThreadId ) );
+            if (debugLog( PatchExecution )) debugRecord() << "MonitorProcessesAndThreads - CreateThread( ... ) -> " << thread << record;
+            AddSessionThread( thread, CurrentSessionID() );
             if (resume) ResumeThread( handle );
             return handle;
         }
@@ -47,7 +48,7 @@ namespace AccessMonitor {
             DWORD   dwExitCode
         ) {
             TypeExitThread function = reinterpret_cast<TypeExitThread>(original( (PatchFunction)PatchExitThread ));
-            if (debugLog( PatchExecution )) debugRecord() << "MonitorProcessesAndThreads - ExitThread( " << CurrentThreadID() << " )" << record;
+            if (debugLog( PatchExecution )) debugRecord() << "MonitorProcessesAndThreads - ExitThread( " << CurrentThreadID() << ", "  << dwExitCode << " )" << record;
             RemoveSessionThread( CurrentThreadID() );
             function( dwExitCode );
         }
@@ -57,8 +58,9 @@ namespace AccessMonitor {
             DWORD   dwExitCode
         ) {
             TypeTerminateThread function = reinterpret_cast<TypeTerminateThread>(original( (PatchFunction)PatchTerminateThread ));
-            if (debugLog( PatchExecution )) debugRecord() << "MonitorProcessesAndThreads - TerminateThread( " << CurrentThreadID() << ", "  << dwExitCode << " )" << record;
-            RemoveSessionThread( GetThreadID( GetThreadId( hThread ) ) );
+            auto thread = GetThreadID( GetThreadId( hThread ) );
+            if (debugLog( PatchExecution )) debugRecord() << "MonitorProcessesAndThreads - TerminateThread( " << thread << ", "  << dwExitCode << " )" << record;
+            RemoveSessionThread( thread );
             return function( hThread, dwExitCode );
         }
         typedef BOOL(*TypeCreateProcessA)(LPCSTR,LPSTR,LPSECURITY_ATTRIBUTES,LPSECURITY_ATTRIBUTES,BOOL,DWORD,LPVOID,LPCSTR,LPSTARTUPINFOA,LPPROCESS_INFORMATION);
