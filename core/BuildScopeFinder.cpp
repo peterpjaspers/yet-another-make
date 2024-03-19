@@ -107,8 +107,8 @@ namespace
         std::vector<Glob> const& scope,
         std::shared_ptr<CommandNode> const& cmd
     ) {
-        for (auto const& genFile : cmd->mandatoryOutputs()) {
-            if (inScope(scope, genFile)) {
+        for (auto const& pair : cmd->mandatoryOutputs()) {
+            if (inScope(scope, pair.second)) {
                 return true;
             }
         }

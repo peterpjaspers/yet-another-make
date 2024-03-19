@@ -213,7 +213,8 @@ namespace
         EXPECT_NE(selfExecuted.end(), selfExecuted.find(setup.buildFileParserNode.get()));
         EXPECT_NE(selfExecuted.end(), selfExecuted.find(setup.buildFileNode.get()));
         auto executor = setup.buildFileParserNode->executor();
-        auto const& genBuildFile = executor->mandatoryOutputs()[0];
+        auto mouts = executor->mandatoryOutputsVec();
+        auto const genBuildFile = mouts[0];
         EXPECT_NE(selfExecuted.end(), selfExecuted.find(executor.get()));
         EXPECT_NE(selfExecuted.end(), selfExecuted.find(genBuildFile.get()));
         EXPECT_EQ(2, setup.context.statistics().nRehashedFiles);

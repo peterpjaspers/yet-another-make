@@ -40,7 +40,9 @@ namespace YAM
         // add(node), remove(node), removeNodIfPresent(node) functions.
         std::set<std::shared_ptr<Node>, Node::CompareName> const& content() const { return _content; }
 
-        // Return the elements in content() that are FileNodes.
+        // Return the union of the elements in content() that are FileNodes 
+        // and the mandatory and detected optional output nodes of elements
+        // that are CommandNodes.
         std::set<std::shared_ptr<FileNode>, Node::CompareName> files() const;
 
         // Override Node

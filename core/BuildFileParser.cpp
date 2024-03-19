@@ -273,12 +273,8 @@ namespace YAM {
                 output.pathType = BuildFile::PathType::Path;
                 output.path = eatPath();
             } else if (_lookAhead.type == "glob") {
-                if (output.ignore) {
-                    output.pathType = BuildFile::PathType::Glob;
-                    output.path = eatGlob();
-                } else {
-                    eatPath(); // will throw glob-not-allowed
-                }
+                output.pathType = BuildFile::PathType::Glob;
+                output.path = eatGlob();
             } else if (_lookAhead.type == "no_endquote") {
                 std::stringstream ss;
                 ss << "Missing endquote on output path"

@@ -25,7 +25,7 @@ namespace YAM {
         , _buildFile(buildFile.buildFile)
         , _globNameSpace(globNameSpace)
     {
-        if (compileMode == InputGlobs || compileMode == Both) {
+        if (compileMode == InputGlobs) {
             for (auto const& glob : buildFile.deps.depGlobs) {
                 compileGlob(glob);
             }
@@ -33,11 +33,12 @@ namespace YAM {
                 auto rule = dynamic_cast<BuildFile::Rule*>(varOrRule.get());
                 if (rule != nullptr) compileInputs(rule->cmdInputs);
             }
-        }
-        if (compileMode == BuildFileDeps || compileMode == Both) {
+        } else if (compileMode == BuildFileDeps) {
             for (auto const& buildFile : buildFile.deps.depBuildFiles) {
                 compileBuildFile(buildFile);
             }
+        } else {
+            throw std::exception("illegal compileMode");
         }
     }
 

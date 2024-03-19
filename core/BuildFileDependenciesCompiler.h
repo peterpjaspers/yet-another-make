@@ -16,13 +16,11 @@ namespace YAM {
     class __declspec(dllexport) BuildFileDependenciesCompiler {
     public:
         enum Mode { 
-            // compile globs from glob dependency section and from cmd and
+            // Compile globs from glob dependency section and from cmd and
             // order-only input sections
             InputGlobs,
-            // compile globs from buildfile dependency section
-            BuildFileDeps,
-            // compile all globs
-            Both
+            // Only compile globs from buildfile dependency section
+            BuildFileDeps
         };
         BuildFileDependenciesCompiler(
             ExecutionContext* context,

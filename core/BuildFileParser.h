@@ -14,44 +14,52 @@ namespace YAM
     // Buildfile syntax is inspired by tup buildfile syntax, see 
     // https://gittup.org/tup/manual.html
     // Syntax and semantics however are NOT tup compatible.
+    //
+    // TODO: not all syntax as describe below is implemented:
+    //    ExtraOutput
+    //    Ignored output is recognized by path/glob preceeded by '^'.
+    //    Optional output is recognized as glob.
     /*
     
     Syntactical symbols:
-    {A B}* =>  0, 1 or more times A B
-    {A B}+ =>  1 or more times A B
-    [A B]  =>  optional A B
-    A|B    =>  A or B
+    A*  => 0, 1 or more times A
+    A+  => 1 or more times
+    [A] => optional A
+    A|B => A or B
+    () group symbols, e.g. (A|B)*
 
     Syntax:
 
         BuildFile :== {Dependency}* {Rule}*
 
         Dependency :== DepBuildFile | DepGlob
-        BuildFile :== 'buildfile' Path | Glob
+        DepBuildFile :== 'buildfile' BuildFilePath | BuildFileDirPath | BuildFileGlob
+        BuildFilePath :== Path // path of buildfile
+        BuildFileDirPath :== Path // path of directory that contains buildfile
+        BuildFileGlob :== Path // with glob characters, matches directories or buildfiles
         DepGlob :== 'glob' Glob
-        DirPath :== Path
 
-        // TODO: add ignored outputs.
-        // Move syntax description to documentation.
-        //
-        Rule :== ':' [foreach] [CmdInputs] [ '|' OrderOnlyInputs ] '|>' Script '|>' [Output] { [Output] | [Group] | [Bin] }*
-        CmdInputs :== [Input]*
+        Rule :== ':' [foreach] [CmdInputs] [ '|' OrderOnlyInputs ] '|>' Script '|>' [CmdOutputs}
+        CmdInputs :== Input*
         Input :== Path | Glob | Exclude | [Group]
         Exclude :== '^'Path | '^'Glob
-        Glob :== Path with glob special characters (* ? [])
-        OrderOnlyInputs :== { Path | [Group] }*
-        Script :== { identifier | InputPathFlag | OutputPathFlag }+
+        Glob :== Path // with glob special characters (* ? [])
+        OrderOnlyInputs :== ( Path | Group )*
+        Script :== ( identifier | InputPathFlag | OutputPathFlag )*
         InputPathFlag :== %[Index] 'f' | '%b' | '%B' | '%e' | '%D' | '%d'
         Index :== integer
         OutputPathFlag :== '%o'
-        Output :== OutputPath | '^'Path // ^path excludes tracking of path
-        OutputPath :== Path containing InputPathFlag
-        Path :== RelPath | RepoPath
-        RelPath :== identifier [ { '/'identifier }* ]
-        RepoPath :== '<' RepoName '>/' AbsPath
-        RepoName :== identifier
-        Group :== Path where last path component is between angled brackets.
-                  E.g. ..\modules\<someGroupName>
+        CmdOutputs :== CmdOutput+  (Group | Bin )*
+        CmdOutput :== Output | ExtraOutput | OptionalOutput | IgnoreOutput
+        Output :== 'out=' Path (',' Path])* // paths optionally contain InputPathFlags
+        ExtraOutput :== 'extra=' Path (',' Path])* // paths optionally contain InputPathFlags
+        OptionalOutput :== 'opt=' (Path|Glob) (',' (Path|Glob))*
+        IgnoreOutput :== 'ign=' (Path|Glob) (',' (Path|Glob))*
+        Path :== RelPath | SymbolicPath
+        RelPath :== identifier ('/'identifier)*
+        SymbolicPath :== '@@'RepoName '/' RelPath
+        RepoName :== identifier // the name of a configured file repository
+        Group :== Path where last path component is between angled brackets, e.g. modules\<someGroupName>
         Bin :== '{' identifier '}'
 
     Semantics:
@@ -72,22 +80,27 @@ namespace YAM
     a single foreach rule with input src\*.cpp. In that case yam evaluates the
     glob and adds the glob as a dependency of the buildfile.
 
-    Group: a set of file paths. The group is identified by a unique path name.
-    Outputs Group: yam will add all output paths to the specified group.
+    Group: a set of file paths.
+    A group is populated by commands derived from rules that specify the group
+    in their output section. These commands add their mandatory, extra mandatory
+    and optional output paths to the group. 
 
-    CmdInputs: yam expands this into a list of file paths resulting from 
-    evaluating the Globs, Paths and Excludes plus the file paths in the 
-    referenced group(s). An Exclude removes all paths previously included that 
-    match the Path or Glob specified in the Exclude.
-    CmdInputs refer to source files and/or generated files. The generated files
-    must have been defined, as outputs of a rule, before they can be used as
-    inputs. CmdInputs serve two purposes:
-        - the command script can reference input files by means of %-flags
-        - build-ordering: yam ensures that input generated files are made
-          up-to-date before executing the command script.
+    Glob: a path that contains glob special characters, see class Glob. Globs
+    are supported for both source and output (generated) files. A glob on 
+    output files is evaluated against the set of output files defined by rules
+    in buildfiles that are declared in the DepBuildFile section.
 
-    Glob: a path that contains glob patterns, see class Glob. Globs are only
-    supported for source files.
+    CmdInputs: yam expands the Globs and Groups into a list of file paths.
+    An Exclude removes all paths previously included that match the Exclude.
+    Paths and Globs can reference source files and/or generated files that are
+    mandatory outputs of earlier defined rules. It is not possible to reference
+    optional outputs of rules.
+    Yam ensures that all generated input files are made up-to-date before 
+    executing the command script. This includes all mandatory and optional
+    outputs that were added to the input groups.
+    Note: optional outputs in groups ensure proper build-ordering. Although
+    it is not possible to reference optional outputs in the input section,
+    it is possible to reference optional output paths in the script section.
 
     OrderOnlyInputs: a list of generated files. Yam ensures that these files
     are made up-to-date before executing the command script.
@@ -95,14 +108,13 @@ namespace YAM
     RelPath: a relative path, relative to the directory that contains the
     buildfile.
 
+    SymbolicPath: in a symbolic path the repository root directory is replaced 
+    by the repository name. In buildfiles a symbolic path is used to reference
+    a file in another repository. This allows repositories to be moved to other 
+    directories without having to modify buildfiles.
+
     Repository: a directory tree that contains buildfiles and/or source files
     and/or files generated by yam.
-
-    AbsPath: a symbolic path in one of the configured repositories. A symbolic
-    path represents an absolute path in a repository. In a symbolic path the
-    repository root directory is replaced by the repository name. This allows
-    repositories to be moved to other directories without having to modify
-    build files.
 
     InputPathFlags:
     The %f, %b, %B, %e, %d and %D flags transform one or more paths in the
@@ -130,49 +142,36 @@ namespace YAM
     rule can use A as input.
 
     OutputPathFlag semantics:
-        %o -> path names resulting from Outputs (after processing the %-flags
-              in Outputs).
-
-    Exec: an exec path B in buildfile A identifies a buildfile that defines 
-    outputs that are used as inputs by buildfile A. Yam will process B before
-    it processes the rules generated by A to ensure that all generated inputs
-    inputs in A are defined.
-
-    Group: a group collects outputs of one or more rule. The content of a group 
-    can be used as inputs in one or more other rules. Groups are referenced by
-    their name (a path, see Path).
-    Given some group G then only one buildfile, say BFG, is allowed to define G,
-    i.e. to add outputs to G. In BFG all rules that add output to G must occur 
-    before the first rule that uses G as input. Buildfiles that reference G must
-    exec buildfile BFG.
+        %o -> references all (non-extra) mandatory outputs
+        %[i]0 -> references the i-th (non-extra) mandatory output.
     
     Example rules:
 
     # Rule to compile main.c and bar.c and link the resulting
     # object files into an executable program
-    : |> gcc -c main.c -o main.o |> main.o
-    : |> gcc -c bar.c -o bar.o |> bar.o
-    : main.obj bar.obj |> gcc main.obj bar.obj -o program |> program.exe
+    : |> gcc -c main.c -o main.o |> out=main.o
+    : |> gcc -c bar.c -o bar.o |> out=bar.o
+    : main.obj bar.obj |> gcc main.obj bar.obj -o program |> out=program.exe
 
     # Same as above but using foreach and %-flags and collecting all object
-    # files into a group
-    : foreach main.c bar.c |> gcc -c %f -o %o |> %B.o {objs}
-    : {objs} |> gcc main.obj bar.obj -o program |> program.exe
+    # files into a bin
+    : foreach main.c bar.c |> gcc -c %f -o %o |> out=%B.o {objs}
+    : {objs} |> gcc main.obj bar.obj -o program |> out=program.exe
 
-    # Same as above but compiling all cpp files in src directory
-    : foreach src/*.c |> gcc -c %f -o %o |> %B.o {objs}
-    : {objs} |> gcc %f -o %o |> program.exe
+    # Same as above but compiling all cpp files in src directory and
+    # collectiong all object files in a group
+    : foreach src/*.c |> gcc -c %f -o %o |> out=%B.o ./<objects>
+    : ./<objects> |> gcc %f -o %o |> out=program.exe
 
     # Two buildfiles: one that compiles all cpp files and collects the
     # resulting objects files in a group and one that links the (object
     # files in the) group into an executable program.
     #
-    # <repoRoot>/p/q/buildfile_yam.py:
-    : foreach src/*.c |> gcc -c %f -o %o |> %B.o {objs}
+    # <repoRoot>/p/q/buildfile_yam.txt:
+    : foreach src/*.c |> gcc -c %f -o %o |> out=%B.o ./<objects>
 
-    # <repoRoot>/p/r/buildfile_yam.rb:
-    import ../q
-    : {../q/objs} |> gcc %f -o %o |> program.exe
+    # <repoRoot>/p/r/buildfile_yam.txt:
+    : ../q/<objects> |> gcc %f -o %o |> program.exe
 
     */
 

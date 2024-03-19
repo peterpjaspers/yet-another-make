@@ -481,23 +481,25 @@ namespace YAM
             }
             auto it = _objectToKey.find(p.get());
             if (it == _objectToKey.end()) {
-                throw std::exception("Attempt to deleted a not-stored object.");
-            }
-            Key key = it->second;
-            // 2 strong refs left to p: from _toRemove and from _keyToObject,
-            // i.e. p is not referenced by other objects and can be safely
-            // removed from storage.
-            if (p.use_count() == 2) {
-                if (!remove(key, p)) {
-                    throw std::runtime_error("Failed to delete object from storage");
-                }
+                // Happens when node was added and again removed since previous
+                // store() call.
             } else {
-                // postpone deletion from forest until p is no longer referenced
-                _keyToObject.erase(key);
-                _objectToKey.erase(p.get());
-                _keyToDeletedObject.insert({ key, p });
-                _deletedObjectToKey.insert({ p.get(), key });
-                toReplaceDeleted.insert(p);
+                Key key = it->second;
+                // 2 strong refs left to p: from _toRemove and from _keyToObject,
+                // i.e. p is not referenced by other objects and can be safely
+                // removed from storage.
+                if (p.use_count() == 2) {
+                    if (!remove(key, p)) {
+                        throw std::runtime_error("Failed to delete object from storage");
+                    }
+                } else {
+                    // postpone deletion from forest until p is no longer referenced
+                    _keyToObject.erase(key);
+                    _objectToKey.erase(p.get());
+                    _keyToDeletedObject.insert({ key, p });
+                    _deletedObjectToKey.insert({ p.get(), key });
+                    toReplaceDeleted.insert(p);
+                }
             }
         }
 

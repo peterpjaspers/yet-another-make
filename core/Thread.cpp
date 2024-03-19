@@ -41,9 +41,6 @@ namespace YAM
     bool Thread::isThisThread() const {
         auto id = _thread.get_id();
         auto tid = std::this_thread::get_id();
-        if (id != tid) {
-            bool stop = true;
-        }
         return id == tid;
     }
 }

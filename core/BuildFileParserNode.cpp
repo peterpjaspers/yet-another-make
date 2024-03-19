@@ -157,10 +157,10 @@ namespace YAM
                     _buildFile->removeObserver(this);
                 } else {
                     _executor->removeObserver(this);
-                    std::shared_ptr<GeneratedFileNode> genNode = _executor->mandatoryOutputs()[0];
-                    _executor->mandatoryOutputs({});
+                    CommandNode::OutputNodes outputs = _executor->mandatoryOutputs();
+                    _executor->outputFilters({}, {});
                     context()->nodes().remove(_executor);
-                    context()->nodes().remove(genNode);
+                    for (auto const& pair : outputs) context()->nodes().remove(pair.second);
                     _executor = nullptr;
                 }
                 _dependencies.clear();
@@ -182,7 +182,8 @@ namespace YAM
                     std::filesystem::path genBfPath(srcBfDirPath / genBfName);
                     auto genNode = std::make_shared<GeneratedFileNode>(context(), genBfPath, _executor);
                     context()->nodes().add(genNode);
-                    _executor->mandatoryOutputs({ genNode });
+                    CommandNode::OutputFilter filter(CommandNode::OutputFilter::Output, genBfName);
+                    _executor->outputFilters({filter}, {genNode});
 
                     auto fileExecSpecsNode = repository()->fileExecSpecsNode();
                     std::string cmd = fileExecSpecsNode->command(srcBfName);
@@ -214,7 +215,7 @@ namespace YAM
     std::shared_ptr<FileNode> BuildFileParserNode::fileToParse() const {
         std::shared_ptr<FileNode> buildFile;
         if (_executor != nullptr) {
-            buildFile = _executor->mandatoryOutputs()[0];
+            buildFile = _executor->mandatoryOutputs().begin()->second;
         } else {
             buildFile = _buildFile;
         }

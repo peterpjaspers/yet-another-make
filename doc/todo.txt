@@ -4,59 +4,8 @@ Bugs
   Reproduce with coreTests EnduranceTest
 
 Features
-- update parser and compiler to deal with optional globs in rule output section
-- CommandNode only uses the mandatory file nodes in groups to compile %-flags
-- add error handling to cmd script when compiling it.
-
-- implement glob for optional output files (dynamic outputs)
-  Rule examples: 
-      some/<unzipped> |> echo %f > %o |> zipTableOfContent.txt
-      foreach some/<unzipped>/*.cpp |> cc %f -out %o |> %B.obj
-      // Only outputs that match the glob are registered as cmd outputs.
-      // All other outputs are ignored (and deleted).
-      // Non-glob outputs are registered as cmd outputs.
-      // All registered outputs of the rule are added to the group.
-      |> unzip some1.zip |> some1_toc.txt some/* some/<unzipped>
-      |> unzip some2.zip |> some/* some/<unzipped>
-  The above would work fine for normal groups, i.e. groups whose content is
-  defined by enumerated output paths and whose content is complete once all 
-  compilations are done. It will not work however for the dynamic group because
-  a) cmd outputs are unknown until the command has been executed
-  b) all cmds that contribute to the group must be executed before a cmd that
-     uses the group as input.
-  The following design solves these issues:
-      - a GroupNode can contain any type of node with special behavior for
-        generated file (as currently implemented) and command nodes (new)
-      - GroupNode execution executes all contained nodes. Exception: for
-        generated file nodes it executes the command node that produces the
-        generated file.
-      - GroupNode content can be returned in 2 ways: as what was added to the 
-        group and as what was added to the group with the command nodes replaced
-        by their output nodes. The latter version only makes sense when the
-        group has executed, i.e when its state is Ok. The former version makes
-        sense after all compilation completed.
-      - A GroupNode that contains CommandNode elements is a Dynamic group.
-      - When compiling %B etc flags in the output section of a rule then these
-        flags are applied to the elements of an input group. This does not make 
-        sense for a Dynamic group because CommandNodes are not files. Either 
-        ignore or treat this as an error or defer output flag compilation to 
-        command node execution time (when GroupNode has executed and outputs
-        of all commands in group are defined). Will implement treat-as-error.
-        Same applies for %f flags in command section. But command section
-        compilation is already deffered to command execution time.
-         
-  Note: current implementation of adding command outputs to the group can be
-  replaced by just adding the command node itself to the group.
-  Note: adding generated file nodes to the group is still needed to allow for
-  phony rules.
-  Note: an input file cannot reference a dynamic output file. Input files can
-  only reference output files that are defined as paths (i.e. not as globs).
-  Example (come up with a better one):
-    foreach *.cpp |> cc %f -o %o |> %B.obj <objects>
-    <objects> ^main.obj |> linkdll %f -out %0 |> library.lib library.dll library.*
-    main.obj library.lib |> linkexe %f -out %0 |> app.exe
-    library.dll |>|> <installables>
-    library.
+- FileNode: verify last-write-time after hashing is equal to lwt before hashing.
+  If not: fail execution and set hashes to rand()
 - phony rule: Inputs |>|> Group
   Example: 
        *.cpp |>|> <sources>
@@ -67,6 +16,11 @@ Features
       yam <sources> // hash modified files when changed last-write-time
       yam <objects> // compile all dirty .obj files
       yam *.obj     // compile all dirty .obj files
+
+  Problem: foreach <sources> is not supported by yam because files in
+  group are only known after execution of its contained command nodes.
+  This would require compiling the foreach after group execution.
+
   Advantage: <objects> content is defined once at buildfile compile time
   (and when cpp files are added or removed) while *.obj is evaluated each 
   build again.
@@ -90,6 +44,10 @@ Features
       nodes when no longer refd => GC sweep over context to remove node with
       use_count 1. delete when not observed
     - directory enumeration
+    - After execution (hashing) of detected input and output files: check whether
+      last write times match the ones provided by access monitor. If not equal
+      then fail the execution and invalidate the execution hash to force command 
+      to re-execute at next build. 
 - fileaspect configuration
       - hash = last-write-time (e.g. for generated files in cmd executionhash)
       - import lib exports hash (hash i/f of dll)

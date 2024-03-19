@@ -63,18 +63,12 @@ namespace
         }
     }
     void removeNode(std::shared_ptr<CommandNode> cmd, StateObserver* observer) {
-        static std::vector<std::shared_ptr<GeneratedFileNode>> emptyOutputs;
-        static std::vector<std::shared_ptr<Node>> emptyCmdInputs;
-        static std::vector<std::shared_ptr<Node>> emptyOrderOnlyInputs;
         ExecutionContext* context = cmd->context();
-        std::vector<std::shared_ptr<GeneratedFileNode>> outputs = cmd->mandatoryOutputs();
-        cmd->cmdInputs(emptyCmdInputs);
-        cmd->orderOnlyInputs(emptyOrderOnlyInputs);
+        cmd->cmdInputs({});
+        cmd->orderOnlyInputs({});
         cmd->script("");
         cmd->workingDirectory(nullptr);
-        cmd->mandatoryOutputs(emptyOutputs);
-        cmd->optionalOutputs({});
-        cmd->ignoreOutputs({});
+        cmd->outputFilters({}, {});
         cmd->modified(true);
         cmd->context()->nodes().remove(cmd);
     }
@@ -273,7 +267,7 @@ namespace YAM
     }
 
     void BuildFileCompilerNode::cleanOutputGroup(GroupNode* group) {
-        for (auto const& pair : _outputs) {
+        for (auto const& pair : _commands) {
             group->removeIfPresent(pair.second);
         }
     }
@@ -297,7 +291,7 @@ namespace YAM
                 allowedInputs);
             updateMap(context(), this, _commands, compiler.commands());
             updateMap(context(), this, _outputGroups, compiler.outputGroups());
-            updateMap(context(), this, _outputs, compiler.outputs());
+            updateMap(context(), this, _outputs, compiler.mandatoryOutputs());
             updateLineNrs(_ruleLineNrs, _commands, compiler.ruleLineNrs(), _buildFileParser->buildFile());
    
             if (validGeneratedInputs()) {

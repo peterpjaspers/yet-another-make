@@ -200,7 +200,7 @@ namespace {
         }
     }
 
-    TEST(BuildFileParser, illegalMissingEndQuoteInputPath) {
+    TEST(BuildFileParser, missingEndQuoteInputPath) {
         const std::string file = R"(: "hello world |> gcc hello.c -o hello |> hello)";
         try
         {
@@ -213,7 +213,7 @@ namespace {
         }
     }
 
-    TEST(BuildFileParser, illegalMissingEndQuoteOutputPath) {
+    TEST(BuildFileParser, missingEndQuoteOutputPath) {
         const std::string file = R"(: hello.c |> gcc hello.c -o hello |> "hello)";
         try
         {
@@ -225,17 +225,19 @@ namespace {
             EXPECT_EQ(expected, actual);
         }
     }
-    TEST(BuildFileParser, illegalOutputPath) {
+
+    TEST(BuildFileParser, optionalOutputPath) {
         const std::string file = R"(: hello.c |> gcc hello.c -o hello |> hello*)";
-        try
-        {
-            BuildFileParser parser(file);
-        } catch (std::runtime_error e)
-        {
-            std::string expected("Illegal use of glob characters in path 'hello*' at line 1, from column 38 to 44 in file test\n");
-            std::string actual = e.what();
-            EXPECT_EQ(expected, actual);
-        }
+        BuildFileParser parser(file);
+        auto const buildFile = parser.file();
+        ASSERT_EQ(1, buildFile->variablesAndRules.size());
+        auto rule = dynamic_pointer_cast<BuildFile::Rule>(buildFile->variablesAndRules[0]);
+        ASSERT_NE(nullptr, rule);
+        ASSERT_EQ(1, rule->outputs.outputs.size());
+        auto output = rule->outputs.outputs[0];
+        EXPECT_EQ("hello*", output.path);
+        EXPECT_EQ(BuildFile::PathType::Glob, output.pathType);
+        EXPECT_FALSE(output.ignore);
     }
 
     TEST(BuildFileParser, twoRules) {

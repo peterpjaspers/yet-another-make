@@ -11,6 +11,7 @@
 #include "PercentageFlagsCompiler.h"
 #include "NodeMapStreamer.h"
 #include "IStreamer.h"
+#include "Globber.h"
 #include "computeMapsDifference.h"
 
 #include <iostream>
@@ -26,11 +27,6 @@ namespace
 
     std::string cmdExe = boost::process::search_path("cmd").string();
     uint32_t streamableTypeId = 0;
-
-    template <typename V>
-    bool contains(std::vector<V> const& vec, V el) {
-        return std::find(vec.begin(), vec.end(), el) != vec.end();
-    }
 
     std::vector<std::shared_ptr<Node>> getFileNodes(std::vector<std::shared_ptr<Node>> const& nodes) {
         std::vector<std::shared_ptr<Node>> files;
@@ -104,30 +100,25 @@ namespace
         std::unordered_set<std::shared_ptr<Node>> const& producers,
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>>& outputFiles
     ) {
-        std::vector<std::shared_ptr<Node>> outputs;
-        for (auto const& producer : producers) producer->getOutputs(outputs);
-
-        for (auto const& output : outputs) {
-            auto genFileNode = dynamic_pointer_cast<GeneratedFileNode>(output);
-            if (genFileNode != nullptr) {
-                outputFiles.insert(std::pair{ genFileNode->name(), genFileNode });
+        for (auto const& producer : producers) {
+            auto const &cmd = dynamic_pointer_cast<CommandNode>(producer);
+            if (cmd != nullptr) {
+                std::vector<std::shared_ptr<GeneratedFileNode>> outputs = cmd->detectedOutputs();
+                for (auto const& output : outputs) {
+                    outputFiles.insert({ output->name(), output });
+                }
+            } else {
+                auto const &group = dynamic_pointer_cast<GroupNode>(producer);
+                if (group == nullptr) throw std::exception("not supported producer type");
+                std::set<std::shared_ptr<FileNode>, Node::CompareName> files = group->files();
+                for (auto const& file : files) {
+                    auto genFileNode = dynamic_pointer_cast<GeneratedFileNode>(file);
+                    if (genFileNode != nullptr) {
+                        outputFiles.insert({ genFileNode->name(), genFileNode });
+                    }
+                }
             }
         }
-    }
-
-    std::vector<Glob> toGlobs(std::vector<std::filesystem::path> const& paths) {
-        std::vector<Glob> globs;
-        for (auto const& p : paths) {
-            globs.push_back(std::move(Glob(p)));
-        }
-        return globs;
-    }
-
-    bool matches(std::filesystem::path const& path, std::vector<Glob> const& globs) {
-        for (auto const &glob : globs) {
-            if (glob.matches(path)) return true;
-        }
-        return false;
     }
 
     void logBuildOrderNotGuaranteed(
@@ -188,6 +179,12 @@ namespace
         logBook.add(record);
     }
 
+    bool deleteFile(std::filesystem::path const& absPath) {
+        std::error_code ec;
+        std::filesystem::remove(absPath, ec);
+        return !std::filesystem::exists(absPath);
+    }
+
     void deleteNotDeclaredOutput(
         CommandNode* cmd,
         std::filesystem::path const& outputPath,
@@ -195,15 +192,32 @@ namespace
     ) {
         auto repo = cmd->context()->findRepositoryContaining(outputPath);
         auto absPath = repo->absolutePathOf(outputPath);
-        std::error_code ec;
-        std::filesystem::remove(absPath, ec);
+        bool deleted = deleteFile(absPath);
         std::stringstream ss;
-        if (ec) {
+        if (!deleted) {
             ss << "Failed to delete not-declared output file " << absPath << std::endl;
         } else {
             ss << "Deleted not-declared output file " << absPath << std::endl;
         }
         LogRecord deleteRecord(LogRecord::Error, ss.str());
+        logBook.add(deleteRecord);
+    }
+
+    void deleteIgnoredOutput(
+        CommandNode* cmd,
+        std::filesystem::path const& outputPath,
+        ILogBook& logBook
+    ) {
+        auto repo = cmd->context()->findRepositoryContaining(outputPath);
+        auto absPath = repo->absolutePathOf(outputPath);
+        bool deleted = deleteFile(absPath);
+        std::stringstream ss;
+        if (!deleted) {
+            ss << "Failed to delete ignored output file " << absPath << std::endl;
+        } else {
+            ss << "Deleted ignored output file " << absPath << std::endl;
+        }
+        LogRecord deleteRecord(LogRecord::Progress, ss.str());
         logBook.add(deleteRecord);
     }
 
@@ -229,15 +243,29 @@ namespace
     void logAlreadyProducedByOtherCommand(
         CommandNode* cmd,
         GeneratedFileNode* outputNode,
-        bool ignore,
-        bool optional,
-        bool mandatory,
+        CommandNode::OutputFilter::Type type,
         ILogBook& logBook
     ) {
+        std::string typeStr;
+        switch (type) {
+        case CommandNode::OutputFilter::Type::Output:
+        case CommandNode::OutputFilter::Type::ExtraOutput:
+                typeStr = "Mandatory"; 
+                break;
+            case CommandNode::OutputFilter::Type::Optional:
+                typeStr = "Optional";
+                break;
+            case CommandNode::OutputFilter::Type::Ignore:
+                typeStr = "Ignore";
+                break;
+            case CommandNode::OutputFilter::Type::None:
+                typeStr = "Not-declared";
+                break;
+            default: throw std::exception("illegal filter type");
+        }
         std::stringstream ss;
         ss
-            << (ignore ? "Ignored " : (optional ? "Optional" : "Mandatory"))
-            << " output file is produced by 2 commands." << std::endl
+            << typeStr << " output file is produced by 2 commands." << std::endl
             << "Fix: adapt command script to ensure that file is produced by one command only." << std::endl
             << "Command 1  : " << outputNode->producer()->name().string() << std::endl
             << "Command 2  : " << cmd->name().string() << std::endl
@@ -322,6 +350,47 @@ namespace
 namespace YAM
 {
     using namespace boost::process;
+    CommandNode::OutputFilter::OutputFilter(
+        CommandNode::OutputFilter::Type type, 
+        std::filesystem::path const& path)
+        : _type(type) , _path(path)
+    {}
+
+    bool CommandNode::OutputFilter::operator==(OutputFilter const& rhs) const {
+        return _type == rhs._type && _path == rhs._path;
+    }
+
+    void CommandNode::OutputFilter::stream(IStreamer* streamer) {
+        uint32_t t;
+        if (streamer->writing()) {
+            t = static_cast<uint32_t>(_type);
+        }
+        streamer->stream(t);
+        streamer->stream(_path);
+        if (streamer->reading()) {
+            _type = static_cast<OutputFilter::Type>(t);
+        }
+    }
+
+    void CommandNode::OutputFilter::streamVector(
+        IStreamer* streamer,
+        std::vector<OutputFilter>& filters
+    ) {
+        uint32_t cnt;
+        if (streamer->writing()) cnt = static_cast<uint32_t>(filters.size());
+        streamer->stream(cnt);
+        if (streamer->reading()) filters = std::vector<OutputFilter>(cnt);
+        for (uint32_t i = 0; i < cnt; i++) filters[i].stream(streamer);
+    }
+
+    CommandNode::OutputNameFilter::OutputNameFilter(
+        OutputFilter::Type type,
+        std::filesystem::path const& symPath
+    )
+        : _type(type)
+        , _symPath(symPath)
+        , _glob(symPath)
+    {}
 
     CommandNode::CommandNode()
         : Node()
@@ -350,21 +419,18 @@ namespace YAM
         }
         _inputProducers.clear();
         _script.clear();
-        for (auto const &output : _mandatoryOutputs) {
-            output->removeObserver(this);
+        for (auto const &pair : _mandatoryOutputs) {
+            pair.second->removeObserver(this);
         }
         _mandatoryOutputs.clear();
-        _ignoreOutputs.clear();
-        _optionalOutputs.clear();
-        _ignoreOutputGlobs.clear();
-        _optionalOutputGlobs.clear();
+        _outputFilters.clear();
+        _outputNameFilters.clear();
         for (auto const &pair : _detectedOptionalOutputs) {
             pair.second->removeObserver(this);
             pair.second->deleteFile(false, true);
             context()->nodes().remove(pair.second);
         }
         _detectedOptionalOutputs.clear();
-        _detectedOutputs.clear();
         clearDetectedInputs();
     }
 
@@ -453,47 +519,105 @@ namespace YAM
         }
     }
     std::shared_ptr<DirectoryNode> CommandNode::workingDirectory() const {
-        return _workingDir.lock();
+        auto wdir = _workingDir.lock();
+        if (wdir == nullptr) {
+            auto repo = repository();
+            if (repo != nullptr) wdir = repo->directoryNode();
+        }
+        return wdir;
     }
 
-    void CommandNode::mandatoryOutputs(std::vector<std::shared_ptr<GeneratedFileNode>> const & newOutputs) {
-        if (_mandatoryOutputs != newOutputs) {
-            for (auto output : _mandatoryOutputs) {
-                output->deleteFile(true, true);
-                output->removeObserver(this);
+    void CommandNode::outputFilters(
+        std::vector<CommandNode::OutputFilter> const& newFilters,
+        std::vector<std::shared_ptr<GeneratedFileNode>> const& mandatoryOutputs
+    ) {
+        if (_outputFilters != newFilters) {
+            _outputFilters = newFilters;
+            _outputNameFilters.clear();
+            updateMandatoryOutputs(mandatoryOutputs);
+            clearOptionalOutputs();
+            modified(true);
+            setState(State::Dirty);
+        }
+    }
+
+    std::vector<CommandNode::OutputFilter> const& CommandNode::outputFilters() const {
+        return _outputFilters;
+    }
+
+    std::vector<CommandNode::OutputNameFilter> const& CommandNode::outputNameFilters() {
+        if (_outputNameFilters.size() != _outputFilters.size()) {
+            updateOutputNameFilters();
+        }
+        return _outputNameFilters;
+    }
+
+    void CommandNode::updateOutputNameFilters() {
+        _outputNameFilters.clear();
+        for (auto const& filter : _outputFilters) {
+            auto baseDir = workingDirectory();
+            auto pattern = filter._path;
+            Globber::optimize(context(), baseDir, pattern);
+            auto symPath = baseDir->name() / pattern;
+            _outputNameFilters.push_back(OutputNameFilter(filter._type, symPath));
+        }
+    }
+
+    void CommandNode::updateMandatoryOutputs(std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs) {
+        OutputNodes newMandatoryOutputs;
+        for (auto const& output : outputs) newMandatoryOutputs.insert({ output->name(), output });
+        std::vector<std::shared_ptr<GeneratedFileNode>> toRemove;
+        std::vector<std::shared_ptr<GeneratedFileNode>> toAdd;
+        for (auto const& pair : newMandatoryOutputs) {
+            auto& newOutput = pair.second;
+            if (!_mandatoryOutputs.contains(newOutput->name())) {
+                toAdd.push_back(newOutput);
             }
-            _mandatoryOutputs = newOutputs;
-            for (auto output : _mandatoryOutputs) output->addObserver(this);
-            modified(true);
-            setState(State::Dirty);
         }
-    }
-    std::vector<std::shared_ptr<GeneratedFileNode>> const& CommandNode::mandatoryOutputs() const { 
-        return _mandatoryOutputs; 
+        for (auto const& pair : _mandatoryOutputs) {
+            auto& oldOutput = pair.second;
+            if (!newMandatoryOutputs.contains(oldOutput->name())) {
+                toRemove.push_back(oldOutput);
+            }
+        }
+        for (auto& n : toRemove) {
+            n->deleteFile(false, true);
+            n->removeObserver(this);
+        }
+        for (auto& n : toAdd) n->addObserver(this);
+        if (!toRemove.empty() || !toAdd.empty()) _mandatoryOutputs = newMandatoryOutputs;
     }
 
-    void CommandNode::optionalOutputs(std::vector<std::filesystem::path> const& newOutputs) {
-        if (_optionalOutputs != newOutputs) {
-            _optionalOutputs = newOutputs;
-            _optionalOutputGlobs = toGlobs(_optionalOutputs);
-            modified(true);
-            setState(State::Dirty);
-        }        
-    }
-    std::vector<std::filesystem::path> const& CommandNode::optionalOutputs() const {
-        return _optionalOutputs;
+    void CommandNode::clearOptionalOutputs() {
+        for (auto const &pair : _detectedOptionalOutputs) {
+            auto& output = pair.second;
+            output->deleteFile(false, true);
+            output->removeObserver(this);
+            context()->nodes().remove(output);
+        }
+        _detectedOptionalOutputs.clear();
     }
 
-    void CommandNode::ignoreOutputs(std::vector<std::filesystem::path> const& newOutputs) {
-        if (_ignoreOutputs != newOutputs) {
-            _ignoreOutputs = newOutputs;
-            _ignoreOutputGlobs = toGlobs(_ignoreOutputs);
-            modified(true);
-            setState(State::Dirty);
+    void CommandNode::mandatoryOutputs(std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs) {
+        std::filesystem::path wdir = workingDirectory()->absolutePath();
+        std::vector<OutputFilter> filters;
+        for (auto const& output : outputs) {
+            std::filesystem::path absPath = output->absolutePath();
+            std::filesystem::path relPath = std::filesystem::relative(absPath, wdir);
+            OutputFilter filter(OutputFilter::Type::Output, relPath);
+            filters.push_back(filter);
         }
+        outputFilters(filters, outputs);
     }
-    std::vector<std::filesystem::path> const& CommandNode::ignoreOutputs() const {
-        return _ignoreOutputs;
+
+    CommandNode::OutputNodes const& CommandNode::mandatoryOutputs() const {
+        return _mandatoryOutputs;
+    }
+
+    std::vector<std::shared_ptr<GeneratedFileNode>> CommandNode::mandatoryOutputsVec() const {
+        std::vector<std::shared_ptr<GeneratedFileNode>> outputs;
+        for (auto const& pair : _mandatoryOutputs) outputs.push_back(pair.second);
+        return outputs;
     }
 
     CommandNode::OutputNodes const& CommandNode::detectedOptionalOutputs() const {
@@ -501,9 +625,11 @@ namespace YAM
         return _detectedOptionalOutputs;
     }
 
-    CommandNode::OutputNodes const& CommandNode::detectedOutputs() const {
-        if (state() != Node::State::Ok) throw std::exception("illegal state");
-        return _detectedOutputs;
+    std::vector<std::shared_ptr<GeneratedFileNode>> CommandNode::detectedOutputs() const {
+        std::vector<std::shared_ptr<GeneratedFileNode>> outputs;
+        for (auto const& pair : _mandatoryOutputs) outputs.push_back(pair.second);
+        for (auto const& pair : _detectedOptionalOutputs) outputs.push_back(pair.second);
+        return outputs;
     }
 
     CommandNode::InputNodes const& CommandNode::detectedInputs() const {
@@ -512,7 +638,7 @@ namespace YAM
     }
 
     void CommandNode::getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const {
-        for (auto const& n : _mandatoryOutputs) outputs.push_back(dynamic_pointer_cast<Node>(n));
+        for (auto const& pair : _mandatoryOutputs) outputs.push_back(pair.second);
     }
 
     void CommandNode::getInputs(std::vector<std::shared_ptr<Node>>& inputs) const {
@@ -544,7 +670,7 @@ namespace YAM
         return _executionHash;
     }
 
-    XXH64_hash_t CommandNode::computeExecutionHash() const {
+    XXH64_hash_t CommandNode::computeExecutionHash(std::vector<OutputNameFilter> const& filters) const {
         std::vector<XXH64_hash_t> hashes;
         auto wdir = _workingDir.lock();
         if (wdir != nullptr) hashes.push_back(XXH64_string(wdir->name().string()));
@@ -559,15 +685,13 @@ namespace YAM
             auto grpNode = dynamic_pointer_cast<GroupNode>(node);
             if (grpNode != nullptr) hashes.push_back(grpNode->hash());
         }
-        for (auto const& path : _optionalOutputs) {
-            hashes.push_back(XXH64_string(path.string()));
-        }
-        for (auto const& path : _ignoreOutputs) {
-            hashes.push_back(XXH64_string(path.string()));
+        for (auto const& filter : filters) {
+            hashes.push_back(filter._type);
+            hashes.push_back(XXH64_string(filter._symPath.string()));
         }
         auto entireFile = FileAspect::entireFileAspect().name();
-        for (auto const& node : _mandatoryOutputs) {
-            hashes.push_back(node->hashOf(entireFile));
+        for (auto const& pair : _mandatoryOutputs) {
+            hashes.push_back(pair.second->hashOf(entireFile));
         }
         for (auto const& pair : _detectedOptionalOutputs) {
             hashes.push_back(pair.second->hashOf(entireFile));
@@ -656,32 +780,89 @@ namespace YAM
         if (changed) modified(true);
     }
 
+    CommandNode::OutputFilter::Type CommandNode::findFilterType(
+        std::filesystem::path const& symPath,
+        std::vector<OutputNameFilter> const& filters
+    ) const {
+        auto type = OutputFilter::Type::None;
+        for (auto const& filter : filters) {
+            if (filter._glob.matches(symPath)) {
+                switch (filter._type) {
+                    case OutputFilter::Type::Output:
+                    case OutputFilter::Type::ExtraOutput: {
+                        type = OutputFilter::Type::Output;
+                        break;
+                    }
+                    case OutputFilter::Type::Optional: {
+                        if (
+                            type == OutputFilter::Type::None
+                            || type == OutputFilter::Type::Ignore
+                        ) {
+                            type = OutputFilter::Type::Optional;
+                        }
+                        break;
+                    }
+                    case OutputFilter::Type::Ignore: {
+                        if (
+                            type == OutputFilter::Type::None
+                            || type == OutputFilter::Type::Optional
+                        ) {
+                            type = OutputFilter::Type::Ignore;
+                        }
+                        break;
+                    }
+                    default: throw std::exception("illegal filtertype");
+                }
+            }
+        }
+        return type;
+    }
+
+    std::vector<std::shared_ptr<GeneratedFileNode>> CommandNode::filterOutputs(
+        OutputNodes const& outputs,
+        CommandNode::OutputFilter::Type filterType
+    ) {
+        std::vector<std::shared_ptr<GeneratedFileNode>> filtered;
+        for (auto const& pair : outputs) {
+            auto& node = pair.second;
+            if (findFilterType(node->name(), outputNameFilters()) == filterType) {
+                filtered.push_back(node);
+            }
+        }
+        return filtered;
+    }
+
     bool CommandNode::findOutputNodes(
-        std::set<std::filesystem::path> const& outputSymPaths,
+        std::map<std::filesystem::path, OutputFilter::Type> const& outputSymPaths,
         std::vector<std::shared_ptr<GeneratedFileNode>>& optionalOutputNodes,
         std::vector<std::shared_ptr<GeneratedFileNode>>& newOptionalOutputNodes,
         MemoryLogBook& logBook
     ) {
         bool valid = true;
         std::vector<std::shared_ptr<GeneratedFileNode>> mandatoryOutputNodes;
-        std::vector<std::shared_ptr<GeneratedFileNode>> ignoredOutputNodes;
+        std::vector<std::filesystem::path> ignoredOutputs;
         std::vector<std::filesystem::path> notDeclaredOutputs;
-        for (auto const& outputPath : outputSymPaths) {
+        for (auto const& pair : outputSymPaths) {
+            OutputFilter::Type outputType = pair.second;
+            std::filesystem::path const& outputPath = pair.first;
             std::shared_ptr<GeneratedFileNode> outputNode;
             std::shared_ptr<Node> node = context()->nodes().find(outputPath);
             if (node == nullptr) {
-                if (matches(outputPath, _optionalOutputGlobs)) {
+                // must be optional or ignore output because mandatory output
+                // nodes were created in advance, see updateMandatoryNodes().
+                if (outputType == OutputFilter::Type::Output) {
+                    throw std::exception("illegal filter type");
+                } else if (outputType == OutputFilter::Type::Optional) {
                     auto sharedThis = dynamic_pointer_cast<CommandNode>(shared_from_this());
                     outputNode = std::make_shared<GeneratedFileNode>(context(), outputPath, sharedThis);
                     optionalOutputNodes.push_back(outputNode);
                     newOptionalOutputNodes.push_back(outputNode);
-                } else if (!matches(outputPath, _ignoreOutputGlobs)) {
+                } else if (outputType == OutputFilter::Type::Ignore) {
+                    ignoredOutputs.push_back(outputPath);
+                } else {
                     notDeclaredOutputs.push_back(outputPath);
                 }
             } else {
-                bool ignore = false;
-                bool optional = false;
-                bool mandatory = false;
                 outputNode = dynamic_pointer_cast<GeneratedFileNode>(node);
                 if (outputNode == nullptr) {
                     auto srcFileNode = dynamic_pointer_cast<SourceFileNode>(node);
@@ -691,20 +872,19 @@ namespace YAM
                     } else {
                         throw std::exception("unexpected node type");
                     }
-                } else if (matches(outputPath, _ignoreOutputGlobs)) {
-                    ignoredOutputNodes.push_back(outputNode);
-                    ignore = true;
-                } else if (matches(outputPath, _optionalOutputGlobs)) {
+                } else if (outputType == OutputFilter::Type::Ignore) {
+                    // Must be an output of another node.
+                    if (outputNode->producer().get() == this) throw std::exception("unexpected registered node");
+                } else if (outputType == OutputFilter::Type::Optional) {
                     optionalOutputNodes.push_back(outputNode);
-                    optional = true;
-                } else {
+                } else if (outputType == OutputFilter::Type::Output) {
                     mandatoryOutputNodes.push_back(outputNode);
-                    auto end = _mandatoryOutputs.end();
-                    mandatory = end != std::find(_mandatoryOutputs.begin(), end, outputNode);
+                } else {
+                    notDeclaredOutputs.push_back(outputNode->name());
                 }
                 if (outputNode != nullptr && outputNode->producer().get() != this) {
                     valid = false;
-                    logAlreadyProducedByOtherCommand(this, outputNode.get(), ignore, optional, mandatory, logBook);
+                    logAlreadyProducedByOtherCommand(this, outputNode.get(), outputType, logBook);
                 }
             }
         }
@@ -714,8 +894,10 @@ namespace YAM
             logNotDeclaredOutput(this, outputPath, logBook);
             deleteNotDeclaredOutput(this, outputPath, logBook);
         }
+        for (auto const& outputPath : ignoredOutputs) {
+            deleteIgnoredOutput(this, outputPath, logBook);;
+        }
         return valid;
-
     }
 
     bool CommandNode::verifyMandatoryOutputs(
@@ -724,15 +906,14 @@ namespace YAM
     ) {
         bool valid = outputNodes.size() == _mandatoryOutputs.size();
         if (valid) {
-            auto end = _mandatoryOutputs.end();
             for (auto const& node : outputNodes) {
-                valid = end != std::find(_mandatoryOutputs.begin(), end, node);
+                valid = _mandatoryOutputs.contains(node->name());
                 if (!valid) break;
             }
             if (valid) {
                 auto end = outputNodes.end();
-                for (auto const& node : _mandatoryOutputs) {
-                    valid = end != std::find(outputNodes.begin(), end, node);
+                for (auto const& pair : _mandatoryOutputs) {
+                    valid = end != std::find(outputNodes.begin(), end, pair.second);
                     if (!valid) break;
                 }
             }
@@ -740,7 +921,7 @@ namespace YAM
         if (!valid) {
             std::set<std::filesystem::path> mandatoryPaths;
             std::set<std::filesystem::path> outputPaths;
-            for (auto const& node : _mandatoryOutputs) mandatoryPaths.insert(node->name());
+            for (auto const& pair : _mandatoryOutputs) mandatoryPaths.insert(pair.second->name());
             for (auto const& node : outputNodes) outputPaths.insert(node->name());
             logUnexpectedOutputs(this, mandatoryPaths, outputPaths, logBook);
         }
@@ -780,7 +961,8 @@ namespace YAM
             requisites.push_back(ip.get());
         }
         getSourceInputs(requisites);
-        for (auto const& n : _mandatoryOutputs) requisites.push_back(n.get());
+        for (auto const& pair : _mandatoryOutputs) requisites.push_back(pair.second.get());
+        for (auto const& pair : _detectedOptionalOutputs) requisites.push_back(pair.second.get());
         auto callback = Delegate<void, Node::State>::CreateLambda(
             [this](Node::State state) { handleRequisitesCompletion(state); }
         );
@@ -792,7 +974,7 @@ namespace YAM
             Node::notifyCompletion(state);
         } else if (canceling()) {
             Node::notifyCompletion(Node::State::Canceled);
-        } else if (_executionHash != computeExecutionHash()) {
+        } else if (_executionHash != computeExecutionHash(outputNameFilters())) {
             context()->statistics().registerSelfExecuted(this);
             auto d = Delegate<void>::CreateLambda(
                 [this]() { executeScript(); }
@@ -820,8 +1002,10 @@ namespace YAM
             LogRecord warning(LogRecord::Warning, ss.str());
             logBook.add(warning);
             return "";
-        } else {
+        } else if (repo->repoType() != FileRepositoryNode::Ignore) {
             return repo->symbolicPathOf(absPath);
+        } else {
+            return "";
         }
     }
 
@@ -860,8 +1044,11 @@ namespace YAM
                     result->_keptInputPaths,
                     result->_removedInputPaths,
                     result->_addedInputPaths);
-                
-                result->_outputPaths = convertToSymbolicPaths(scriptResult.writtenFiles, result->_log);
+
+                std::set<std::filesystem::path> outputPaths = convertToSymbolicPaths(scriptResult.writtenFiles, result->_log);
+                for (auto const& path : outputPaths) {
+                    result->_outputPaths.insert({ path,findFilterType(path, outputNameFilters())});
+                }
                 if (_postProcessor != nullptr) {
                     _postProcessor->process(scriptResult);
                 }
@@ -910,7 +1097,8 @@ namespace YAM
                     setDetectedOptionalOutputs(optionalOutputNodes, newOptionalOutputNodes);
                     // output nodes have been updated by command script, hence their
                     // hashes need to be re-computed.
-                    for (auto& n : _mandatoryOutputs) {
+                    for (auto& pair : _mandatoryOutputs) {
+                        auto& n = pair.second;
                         // temporarily stop observing n to avoid Dirty state to
                         // propagate to this command (see handleDirtyOf()).
                         n->removeObserver(this);
@@ -950,7 +1138,7 @@ namespace YAM
         result._newState = newState;
         if (newState == Node::State::Ok) {
             auto prevHash = _executionHash;
-            _executionHash = computeExecutionHash();
+            _executionHash = computeExecutionHash(outputNameFilters());
             if (
                 _postProcessor == nullptr 
                 && prevHash != _executionHash 
@@ -963,7 +1151,7 @@ namespace YAM
             }
         } else {
             clearDetectedInputs();
-            for (auto const &output : _mandatoryOutputs) output->deleteFile();
+            for (auto const &pair : _mandatoryOutputs) pair.second->deleteFile();
             for (auto const &pair : _detectedOptionalOutputs) pair.second->deleteFile();
             _executionHash = rand();
         }
@@ -987,6 +1175,7 @@ namespace YAM
         std::filesystem::path buildFile = _buildFile == nullptr ? "" : _buildFile->name();
         std::vector<std::shared_ptr<Node>> cmdInputs = getFileNodes(_cmdInputs);
         std::vector<std::shared_ptr<Node>> orderOnlyInputs = getFileNodes(_orderOnlyInputs);
+        std::vector<std::shared_ptr<GeneratedFileNode>> nonExtraOutputs = filterOutputs(_mandatoryOutputs, OutputFilter::Type::Output);
         try {
             PercentageFlagsCompiler compiler(
                 buildFile,
@@ -994,7 +1183,7 @@ namespace YAM
                 workingDir,
                 cmdInputs,
                 orderOnlyInputs,
-                _mandatoryOutputs);
+                nonExtraOutputs);
             return compiler.result();
         } catch (std::runtime_error e) {
             LogRecord error(LogRecord::Error, e.what());
@@ -1005,7 +1194,7 @@ namespace YAM
 
     // threadpool
     MonitoredProcessResult CommandNode::executeMonitoredScript(ILogBook& logBook) {
-        for (auto const &output : _mandatoryOutputs) output->deleteFile();
+        for (auto const &pair : _mandatoryOutputs) pair.second->deleteFile();
         for (auto const &pair : _detectedOptionalOutputs) pair.second->deleteFile();
 
         std::string script = compileScript(logBook);
@@ -1114,43 +1303,35 @@ namespace YAM
         streamer->stream(_inputAspectsName);
         streamer->streamVector(_cmdInputs);
         streamer->streamVector(_orderOnlyInputs);
+        std::shared_ptr<DirectoryNode> wdir;
+        if (streamer->writing()) wdir = _workingDir.lock();
+        streamer->stream(wdir);
+        if (streamer->reading()) _workingDir = wdir;
         streamer->stream(_script);
-        streamer->streamVector(_mandatoryOutputs);
-        streamer->streamVector(_optionalOutputs);
-        streamer->streamVector(_ignoreOutputs);
+        OutputFilter::streamVector(streamer, _outputFilters);
+        NodeMapStreamer::stream(streamer, _mandatoryOutputs);
         NodeMapStreamer::stream(streamer, _detectedOptionalOutputs);
         NodeMapStreamer::stream(streamer, _detectedInputs);
-        std::shared_ptr<DirectoryNode> wdir;
-        if (streamer->writing()) {
-            wdir = _workingDir.lock();
-        }
-        streamer->stream(wdir);
-        if (streamer->reading()) {
-            _workingDir = wdir;
-        }
         streamer->stream(_executionHash);
     }
 
     void CommandNode::prepareDeserialize() {
         Node::prepareDeserialize();
         for (auto const& i : _inputProducers) i->removeObserver(this);
-        for (auto const& i : _mandatoryOutputs) i->removeObserver(this);
-        for (auto const& i : _detectedOptionalOutputs) i.second->removeObserver(this);
+        for (auto const& p : _mandatoryOutputs) p.second->removeObserver(this);
+        for (auto const& p : _detectedOptionalOutputs) p.second->removeObserver(this);
         for (auto const& p : _detectedInputs) {
             auto const& genFile = dynamic_pointer_cast<GeneratedFileNode>(p.second);
             if (genFile == nullptr) p.second->removeObserver(this);
         }
         _cmdInputs.clear();
         _orderOnlyInputs.clear();
+        _outputFilters.clear();
         _inputProducers.clear();
+        _outputNameFilters.clear();
         _mandatoryOutputs.clear();
         _detectedOptionalOutputs.clear();
-        _detectedOutputs.clear();
         _detectedInputs.clear();
-        _optionalOutputs.clear();
-        _ignoreOutputs.clear();
-        _optionalOutputGlobs.clear();
-        _ignoreOutputGlobs.clear();
     }
 
     bool CommandNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
@@ -1161,19 +1342,29 @@ namespace YAM
         for (auto const& genFileNode : _orderOnlyInputs) {
             genFileNode->restore(context, restored);
         }
+        auto wdir = _workingDir.lock();
+        if (wdir != nullptr) wdir->restore(context, restored);
+
         updateInputProducers();
-        for (auto const& i : _mandatoryOutputs) {
-            i->restore(context, restored);
-            i->addObserver(this);
-            _detectedOutputs.insert({ i->name(), i });
+
+        // Cannot update outputname filters in restore because it
+        // relies on workingDir to have an initalized _parent field.
+        // This however is only guaranteed after all restores have
+        // completed. Therefore updateOutputNameFilters() is called
+        // lazily by outputNameFilters().
+        // Another solution is to also stream the references to the
+        // parent directory. 
+        //updateOutputNameFilters();
+
+        NodeMapStreamer::restore(_mandatoryOutputs);
+        for (auto const& pair : _mandatoryOutputs) {
+            pair.second->restore(context, restored);
+            pair.second->addObserver(this);
         }
-        _optionalOutputGlobs = toGlobs(_optionalOutputs);
-        _ignoreOutputGlobs = toGlobs(_ignoreOutputs);
         NodeMapStreamer::restore(_detectedOptionalOutputs);
         for (auto const& pair : _detectedOptionalOutputs) {
             pair.second->restore(context, restored);
             pair.second->addObserver(this);
-            _detectedOutputs.insert(pair);
         }
         NodeMapStreamer::restore(_detectedInputs);
         for (auto const& pair : _detectedInputs) {
@@ -1181,8 +1372,6 @@ namespace YAM
             auto const& genFile = dynamic_pointer_cast<GeneratedFileNode>(pair.second);
             if (genFile == nullptr) pair.second->addObserver(this);
         }
-        auto wdir = _workingDir.lock();
-        if (wdir != nullptr) wdir->restore(context, restored);
         return true;
     }
 }

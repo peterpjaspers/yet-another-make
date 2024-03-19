@@ -48,6 +48,46 @@ namespace YAM
     public:
         typedef std::map<std::filesystem::path, std::shared_ptr<FileNode>> InputNodes;
         typedef std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> OutputNodes;
+
+        // Output filters define how CommandNode treats detected output files.
+        // A CommandNode can have 0, 1 or more output filters.
+        // 
+        // Output and ExtraOutput: _path is a path relative to the CommandNode
+        // working directory. All Output and  ExtraOutput files must be in the
+        // set of detected output files, execution fails otherwise. 
+        // ExtraOutputs are treated like Outputs except that they do not appear
+        // in the %o flag(s) in the command script.
+        // Detected files that do not match Output or ExtraOutput filters must 
+        // match Optional or Ignore filters, execution fails otherwise.
+        // 
+        // Optional and Ignore: _path is a path or a glob path relative to the
+        // CommandNode working directory. A glob path is a path with glob 
+        // special characters, see class Glob.
+        // Files that match an Optional filter are accepted as valid output and
+        // are registered as output dependency.
+        // Files that match an Ignore filter are deleted and not registered as
+        // output dependency.
+        // 
+        // Filter precedence: the Output and ExtraOutput filters have precedence
+        // over Optional and Ignore filters: an Ignore or optional filter that 
+        // matches a file that also matches an Output or ExtraOutput file has 
+        // no effect.
+        // The order of Optional and Ignore filters defines precedence. E.g. 
+        // Optional * followed by Ignore *.txt accept as outputs all files 
+        // except .txt files. E.g. Ignore *.txt followed by Optional foo.txt 
+        // ignores all .txt files except foo.txt. 
+        //
+        struct OutputFilter {
+            enum Type { Output, ExtraOutput, Optional, Ignore, None };
+            OutputFilter() {}
+            OutputFilter(Type type, std::filesystem::path const& path);
+            Type _type;
+            std::filesystem::path _path;
+            bool operator==(OutputFilter const& rhs) const;
+            void stream(IStreamer* streamer);
+            static void streamVector(IStreamer* streamer, std::vector<OutputFilter>& filters);
+        };
+
         class __declspec(dllexport) PostProcessor {
         public:
             // Called after successfull completion of script.
@@ -87,27 +127,31 @@ namespace YAM
         void workingDirectory(std::shared_ptr<DirectoryNode> const& dir);
         std::shared_ptr<DirectoryNode> workingDirectory() const;
 
-        void mandatoryOutputs(std::vector<std::shared_ptr<GeneratedFileNode>> const& newOutputs);
-        std::vector<std::shared_ptr<GeneratedFileNode>> const& mandatoryOutputs() const;
+        // Set/get output filter and output nodes for the paths specified in
+        // filters of type Output and ExtraOutput.
+        void outputFilters(
+            std::vector<OutputFilter> const& newFilters,
+            std::vector<std::shared_ptr<GeneratedFileNode>> const &mandatoryOutputs);
+        std::vector<OutputFilter> const& outputFilters() const;
 
-        // Set/get paths/globs of optional output files. Detected output files 
-        // that match one of these paths/globs are registered in 
-        // detectedOptionalOutputs().
-        void optionalOutputs(std::vector<std::filesystem::path> const& newOutputs);
-        std::vector<std::filesystem::path> const& optionalOutputs() const;
+        // Convenience function in case command only has mandatory outputs.
+        // Equivalent to: outputFilters(mandatoryFiltersForOutputs, outputs).
+        void mandatoryOutputs(std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs);
 
-        // Set/get paths and/or glob paths. Detected output files that match
-        // one of these paths/globs are ignored and deleted.
-        void ignoreOutputs(std::vector<std::filesystem::path> const& newOutputs);
-        std::vector<std::filesystem::path> const& ignoreOutputs() const;
+        // Return the output nodes passed to outputFilters(..) of type Output 
+        // and ExtraOutput.
+        OutputNodes const& mandatoryOutputs() const;
+        std::vector<std::shared_ptr<GeneratedFileNode>> mandatoryOutputsVec() const;
 
         // Return optional outputs detected during last script execution.
+        // Command node owns these nodes, i.e. is responsible for adding/removing
+        // them from execution context.
         // Pre: state() == Node::State::Ok
         OutputNodes const& detectedOptionalOutputs() const;
 
         // Return union of mandatoryOutputs() and detectedOptionalOutputs() 
         // Pre: state() == Node::State::Ok
-        OutputNodes const& detectedOutputs() const;
+        std::vector<std::shared_ptr<GeneratedFileNode>> detectedOutputs() const;
 
         // Pre: state() == Node::State::Ok
         // Return inputs detected during last script execution.
@@ -144,29 +188,41 @@ namespace YAM
         void cleanup() override;
 
     private:
+        struct OutputNameFilter {
+            OutputNameFilter(OutputFilter::Type type, std::filesystem::path const& symPath);
+            OutputFilter::Type _type;
+            std::filesystem::path _symPath; // Symbolic path for workingDir()/_filter.path
+            Glob _glob; // Glob(_symPath);
+        };
+
         struct ExecutionResult {
             MemoryLogBook _log;
             Node::State _newState;
-            std::set<std::filesystem::path> _outputPaths;
+            std::map<std::filesystem::path, OutputFilter::Type> _outputPaths;
             std::set<std::filesystem::path> _keptInputPaths;
             std::set<std::filesystem::path> _removedInputPaths;
             std::set<std::filesystem::path> _addedInputPaths;
             std::vector<std::shared_ptr<FileNode>> _addedInputNodes;
         };
+        void updateOutputNameFilters();
+        void updateMandatoryOutputs(std::vector<std::shared_ptr<GeneratedFileNode>> const& outputs);
+        void clearOptionalOutputs();
+        OutputFilter::Type findFilterType(
+            std::filesystem::path const& symPath,
+            std::vector<OutputNameFilter> const& filters) const;
+        std::vector<std::shared_ptr<GeneratedFileNode>> filterOutputs(
+            OutputNodes const& outputs,
+            CommandNode::OutputFilter::Type filterType);
 
         std::filesystem::path convertToSymbolicPath(std::filesystem::path const& absPath, MemoryLogBook& logBook);
         std::set<std::filesystem::path> convertToSymbolicPaths(
             std::set<std::filesystem::path> const& absPaths,
             MemoryLogBook& logBook);
-        std::set<std::filesystem::path> convertToSymbolicPaths(
-            std::set<std::filesystem::path> const& absPaths,
-            MemoryLogBook& logBook,
-            std::vector<std::filesystem::path> const &toIgnore,
-            std::vector<std::filesystem::path>& ignored);
         void handleRequisitesCompletion(Node::State state);
         void executeScript();
         void handleExecuteScriptCompletion(std::shared_ptr<ExecutionResult> result);
         void handleOutputAndNewInputFilesCompletion(Node::State newState, std::shared_ptr<ExecutionResult> result);
+        std::vector<OutputNameFilter> const& outputNameFilters();
         void updateInputProducers();
         void notifyCommandCompletion(std::shared_ptr<ExecutionResult> result);
 
@@ -179,7 +235,7 @@ namespace YAM
             std::vector<std::shared_ptr<GeneratedFileNode>> const& optionals,
             std::vector<std::shared_ptr<GeneratedFileNode>> const& newOptionals);
 
-        XXH64_hash_t computeExecutionHash() const;
+        XXH64_hash_t computeExecutionHash(std::vector<OutputNameFilter> const& filters) const;
 
         bool findInputNodes(
             std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const& allowedGenInputFiles,
@@ -189,7 +245,7 @@ namespace YAM
             ILogBook& logBook
         );
         bool findOutputNodes(
-            std::set<std::filesystem::path> const& outputSymPaths,
+            std::map<std::filesystem::path, OutputFilter::Type> const& outputSymPaths,
             std::vector<std::shared_ptr<GeneratedFileNode>>& optionalOutputNodes,
             std::vector<std::shared_ptr<GeneratedFileNode>>& newOptionalOutputNodes,
             MemoryLogBook& logBook);
@@ -198,38 +254,37 @@ namespace YAM
             MemoryLogBook& logBook);
 
 
-        // buildFile that contains the rule from which this node is created
+        // buildFile that contains the rule from which this command was created.
         SourceFileNode* _buildFile;
         std::size_t _ruleLineNr;
 
         std::string _inputAspectsName;
         std::vector<std::shared_ptr<Node>> _cmdInputs;
         std::vector<std::shared_ptr<Node>> _orderOnlyInputs;
-        // _inputProducers contains pointers to CommandNode and/or GroupNode
-        std::unordered_set<std::shared_ptr<Node>> _inputProducers;
-        std::string _script;
         std::weak_ptr<DirectoryNode> _workingDir;
-        std::vector<std::shared_ptr<GeneratedFileNode>> _mandatoryOutputs;
-        std::vector<std::filesystem::path> _optionalOutputs;
-        std::vector<std::filesystem::path> _ignoreOutputs;
-        std::vector<Glob> _optionalOutputGlobs;
-        std::vector<Glob> _ignoreOutputGlobs;
+        std::string _script;
+        std::shared_ptr<PostProcessor> _postProcessor;
+        std::vector<OutputFilter> _outputFilters;
+
+        // _inputProducers contains command and/or group nodes
+        // present in _cmdInputs and _orderOnlyInputs
+        std::unordered_set<std::shared_ptr<Node>> _inputProducers;
+
+        std::vector<OutputNameFilter> _outputNameFilters;
 
         std::atomic<std::shared_ptr<IMonitoredProcess>> _scriptExecutor;
-        std::shared_ptr<PostProcessor> _postProcessor;
-        
-        // Optional outputs detected during last script execution. 
-        OutputNodes _detectedOptionalOutputs;
 
-        // Union of _mandatoryOutputs and _detectedOptionalOutputs
-        OutputNodes _detectedOutputs;
+        // Mandatory and extra-mandatory outputs
+        OutputNodes _mandatoryOutputs;
+
+        // Optional outputs detected during last script execution.
+        OutputNodes _detectedOptionalOutputs;
 
         // Inputs detected during last script execution.
         InputNodes _detectedInputs;
 
         // The hash of the hashes of all items that, when changed, invalidate
-        // the output files. Items include the script, the output files and 
-        // the relevant aspects of the input files.
+        // the output files.
         XXH64_hash_t _executionHash;
     };
 }

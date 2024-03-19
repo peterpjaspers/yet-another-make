@@ -345,8 +345,8 @@ namespace
         EXPECT_TRUE(driver.stats.started.contains(driver.pietjanOut.get()));
 
         // Verify nodes self-executed 
-        EXPECT_EQ(13, driver.stats.nSelfExecuted);
-        EXPECT_EQ(10, driver.stats.selfExecuted.size());
+        EXPECT_EQ(14, driver.stats.nSelfExecuted);
+        EXPECT_EQ(11, driver.stats.selfExecuted.size());
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietCpp))));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.pietH))));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.findNode(srcRepo->symbolicPathOf(driver.repo.janCpp))));
@@ -449,7 +449,7 @@ namespace
         // 4: execution of linkPietJan updates and rehashes pietjanOut
         auto srcRepo = driver.sourceRepo();
         auto janCppNode = driver.context->nodes().find(srcRepo->symbolicPathOf(driver.repo.janCpp));
-        EXPECT_EQ(6, driver.stats.selfExecuted.size());
+        EXPECT_EQ(8, driver.stats.selfExecuted.size());
         EXPECT_TRUE(driver.stats.selfExecuted.contains(janCppNode.get()));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.ccJan.get()));
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.janOut.get()));
@@ -493,7 +493,7 @@ namespace
         EXPECT_EQ(Node::State::Ok, driver.pietjanOut->state());
 
         EXPECT_EQ(0, driver.stats.nRehashedFiles); // node in state Deleted is not executed
-        EXPECT_EQ(3, driver.stats.selfExecuted.size());
+        EXPECT_EQ(5, driver.stats.selfExecuted.size());
         EXPECT_TRUE(driver.stats.selfExecuted.contains(driver.ccJan.get()));;
     }
 

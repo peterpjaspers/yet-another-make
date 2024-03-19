@@ -92,25 +92,39 @@ namespace
         ASSERT_EQ(1, command0->cmdInputs().size());
         auto input00 = command0->cmdInputs()[0];
         EXPECT_EQ(setup.lib1File, input00);
-        EXPECT_EQ("type %f > %o", command0->script());
-        ASSERT_EQ(1, command0->mandatoryOutputs().size());
-        auto output00 = command0->mandatoryOutputs()[0];
-        EXPECT_EQ("@@repo\\output\\lib1.obj", output00->name().string());
-        ASSERT_EQ(1, command0->ignoreOutputs().size());
-        EXPECT_EQ(repoRoot / ignoredOutput.path, command0->ignoreOutputs()[0]);
         EXPECT_EQ(3, command0->orderOnlyInputs().size());
+        EXPECT_EQ("type %f > %o", command0->script());
+
+        ASSERT_EQ(1, command0->mandatoryOutputs().size());
+        auto mouts0 = command0->mandatoryOutputsVec();
+        auto output00 = mouts0[0];
+        EXPECT_EQ("@@repo\\output\\lib1.obj", output00->name().string());
+
+        std::vector<CommandNode::OutputFilter> const &filters0 = command0->outputFilters();
+        ASSERT_EQ(2, filters0.size());
+        EXPECT_EQ(CommandNode::OutputFilter::Output, filters0[0]._type);
+        EXPECT_EQ("output\\lib1.obj", filters0[0]._path);
+        EXPECT_EQ(CommandNode::OutputFilter::Ignore, filters0[1]._type);
+        EXPECT_EQ(ignoredOutput.path, filters0[1]._path);
 
         ASSERT_EQ(1, command1->cmdInputs().size());
         auto input10 = command1->cmdInputs()[0];
         EXPECT_EQ(setup.lib2File, input10);
         EXPECT_EQ("type %f > %o", command1->script());
-        ASSERT_EQ(1, command1->mandatoryOutputs().size());
-        auto output10 = command1->mandatoryOutputs()[0];
-        EXPECT_EQ("@@repo\\output\\lib2.obj", output10->name().string());
-        ASSERT_EQ(1, command1->ignoreOutputs().size());
-        EXPECT_EQ(repoRoot / ignoredOutput.path, command1->ignoreOutputs()[0]);
 
-        auto const& globs = compiler.globs();
+        ASSERT_EQ(1, command1->mandatoryOutputs().size());
+        auto mouts1 = command1->mandatoryOutputsVec();
+        auto output10 = mouts1[0];
+        EXPECT_EQ("@@repo\\output\\lib2.obj", output10->name().string());
+
+        std::vector<CommandNode::OutputFilter> const& filters1 = command1->outputFilters();
+        ASSERT_EQ(2, filters1.size());
+        EXPECT_EQ(CommandNode::OutputFilter::Output, filters1[0]._type);
+        EXPECT_EQ("output\\lib2.obj", filters1[0]._path);
+        EXPECT_EQ(CommandNode::OutputFilter::Ignore, filters1[1]._type);
+        EXPECT_EQ( ignoredOutput.path, filters1[1]._path);
+
+        auto const& globs = compiler.inputGlobs();
         ASSERT_EQ(2, globs.size());
         std::filesystem::path depGlobName(globNameSpace / setup.repo->directoryNode()->name() / "*.h");
         std::filesystem::path ruleGlobName(globNameSpace / setup.repo->directoryNode()->name() / "src\\*.cpp");
@@ -136,8 +150,8 @@ namespace
         auto groupIt = groups.find("@@repo\\outputGroup1");
         ASSERT_TRUE(groups.end() != groupIt);
         auto const& grpContent = groupIt->second->content();
-        EXPECT_NE(grpContent.end(), std::find(grpContent.begin(), grpContent.end(), output00));
-        EXPECT_NE(grpContent.end(), std::find(grpContent.begin(), grpContent.end(), output10));
+        EXPECT_NE(grpContent.end(), std::find(grpContent.begin(), grpContent.end(), command0));
+        EXPECT_NE(grpContent.end(), std::find(grpContent.begin(), grpContent.end(), command1));
     }
 
     // TODO
@@ -189,10 +203,10 @@ namespace
         for (auto const& pair : compiler1.commands()) {
             setup.context.nodes().add(pair.second);
         }
-        for (auto const& pair : compiler1.globs()) {
+        for (auto const& pair : compiler1.inputGlobs()) {
             setup.context.nodes().add(pair.second);
         }
-        for (auto const& pair : compiler1.outputs()) {
+        for (auto const& pair : compiler1.mandatoryOutputs()) {
             setup.context.nodes().add(pair.second);
         }
         for (auto const& pair : compiler1.outputGroups()) {
@@ -201,11 +215,11 @@ namespace
         BuildFileCompiler compiler2(
             &setup.context,
             setup.repo->directoryNode(), file,
-            compiler1.commands(), compiler1.outputs(), compiler1.outputGroups(),
+            compiler1.commands(), compiler1.mandatoryOutputs(), compiler1.outputGroups(),
             std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>>(),
             globNameSpace);
         EXPECT_EQ(compiler1.commands(), compiler2.commands());
-        EXPECT_EQ(compiler1.outputs(), compiler2.outputs());
+        EXPECT_EQ(compiler1.mandatoryOutputs(), compiler2.mandatoryOutputs());
         EXPECT_EQ(compiler1.outputGroups(), compiler2.outputGroups());
         verify(setup, compiler2, ignoredOutput, globNameSpace);
     }
@@ -218,7 +232,7 @@ namespace
         input.path = "src\\main.cpp";
         BuildFile::Output output;
         output.ignore = false;
-        input.pathType = BuildFile::PathType::Path;
+        output.pathType = BuildFile::PathType::Path;
         output.path = "output\\main.obj";
         auto rule = std::make_shared<BuildFile::Rule>();
         rule->forEach = true;
@@ -242,8 +256,9 @@ namespace
         auto input00 = command0->cmdInputs()[0];
         EXPECT_EQ(setup.mainFile, input00);
         ASSERT_EQ(rule->script.script, command0->script());
-        ASSERT_EQ(1, command0->mandatoryOutputs().size());
-        auto output00 = command0->mandatoryOutputs()[0];
+        auto mouts0 = command0->mandatoryOutputsVec();
+        ASSERT_EQ(1, mouts0.size());
+        auto output00 = mouts0[0];
         EXPECT_EQ(std::string("@@repo\\output\\main.obj"), output00->name().string());
     }
 
@@ -262,7 +277,7 @@ namespace
     TEST(BuildFileCompiler, scriptOnly) {
         BuildFile::File file;
         ExecutionContext context;
-        std::shared_ptr<DirectoryNode> baseDir;
+        auto baseDir = std::make_shared<DirectoryNode>(&context, "base", nullptr);
         
         auto rule = std::make_shared<BuildFile::Rule>();
         rule->forEach = false;

@@ -71,12 +71,20 @@ namespace YAM
     }
 
     std::set<std::shared_ptr<FileNode>, Node::CompareName> GroupNode::files() const {
-        std::set<std::shared_ptr<FileNode>, Node::CompareName> result; 
+        std::set<std::shared_ptr<FileNode>, Node::CompareName> files; 
         for (auto const& node : _content) {
             auto const& fileNode = dynamic_pointer_cast<FileNode>(node);
-            if (fileNode != nullptr) result.insert(fileNode);
+            if (fileNode != nullptr) {
+                files.insert(fileNode);
+            }  else {
+                auto const& cmdNode = dynamic_pointer_cast<CommandNode>(node);
+                if (cmdNode != nullptr) {
+                    std::vector<std::shared_ptr<GeneratedFileNode>> outputs = cmdNode->detectedOutputs();
+                    files.insert(outputs.begin(), outputs.end());
+                }
+            }
         }
-        return result;
+        return files;
     }
 
     void GroupNode::start() {
@@ -97,6 +105,7 @@ namespace YAM
     }
 
     void GroupNode::handleGroupCompletion(Node::State groupState) {
+        context()->statistics().registerSelfExecuted(this);
         if (groupState == Node::State::Ok) {
             XXH64_hash_t prevHash = _hash;
             _hash = computeHash();
@@ -113,7 +122,13 @@ namespace YAM
 
     XXH64_hash_t GroupNode::computeHash() const {
         std::vector<XXH64_hash_t> hashes;
-        for (auto const& n : _content) hashes.push_back(XXH64_string(n->name().string()));
+        for (auto const& n : _content) {
+            hashes.push_back(XXH64_string(n->name().string()));
+            // The outputs of a commandnode may have changed.
+            // Therefore include command executionHash.
+            auto const& cmd = dynamic_pointer_cast<CommandNode>(n);
+            if (cmd != nullptr) hashes.push_back(cmd->executionHash());
+        }
         XXH64_hash_t hash = XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
         return hash;
     }
@@ -162,6 +177,7 @@ namespace YAM
         }
         streamer->streamVector(_contentVec);
         streamer->stream(_hash);
+        if (streamer->writing()) _contentVec.clear();
     }
 
     void GroupNode::prepareDeserialize() {
@@ -169,6 +185,7 @@ namespace YAM
         Node::prepareDeserialize();
         for (auto const& node: _content) unsubscribe(node);
         _content.clear();
+        _contentVec.clear();
     }
 
     bool GroupNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {

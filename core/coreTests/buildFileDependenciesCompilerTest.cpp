@@ -74,21 +74,28 @@ namespace
         file.variablesAndRules.push_back(rule);
 
         std::filesystem::path globNameSpace("private");
-        BuildFileDependenciesCompiler compiler(
+        BuildFileDependenciesCompiler compiler0(
             &setup.context, 
             setup.fileRepo->directoryNode(), 
             file, 
-            BuildFileDependenciesCompiler::Mode::Both,
+            BuildFileDependenciesCompiler::Mode::BuildFileDeps,
             globNameSpace);
 
-        auto const& bfs = compiler.buildFiles();
+        auto const& bfs = compiler0.buildFiles();
         ASSERT_EQ(2, bfs.size());
         auto const& bfsDir1It = bfs.find(setup.bfn1->name());
         auto const& bfsDir2It = bfs.find(setup.bfn2->name());
         ASSERT_NE(bfs.end(), bfsDir1It);
         ASSERT_NE(bfs.end(), bfsDir2It);
 
-        auto const& globs = compiler.globs();
+        BuildFileDependenciesCompiler compiler1(
+            &setup.context,
+            setup.fileRepo->directoryNode(),
+            file,
+            BuildFileDependenciesCompiler::Mode::InputGlobs,
+            globNameSpace);
+
+        auto const& globs = compiler1.globs();
         ASSERT_EQ(3, globs.size());
         std::filesystem::path glob1Name(globNameSpace / setup.fileRepo->directoryNode()->name() / "*.h");
         std::filesystem::path glob2Name(globNameSpace / setup.fileRepo->directoryNode()->name() / "src1\\*.cpp");

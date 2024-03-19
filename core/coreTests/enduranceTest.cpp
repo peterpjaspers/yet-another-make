@@ -129,7 +129,7 @@ namespace
         std::filesystem::remove_all("D:\\test_yam_1");
         std::filesystem::copy("D:\\clean_repos\\test_yam", "D:\\test_yam", std::filesystem::copy_options::recursive);
         std::filesystem::copy("D:\\clean_repos\\test_yam_1", "D:\\test_yam_1", std::filesystem::copy_options::recursive);
-        for (int nRestarts = 0; nRestarts < 3; nRestarts++) {
+        for (int nRestarts = 0; nRestarts < 10; nRestarts++) {
             TestDriver driver;
             auto& stats = driver.context->statistics();
             stats.registerNodes = true;

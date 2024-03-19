@@ -122,7 +122,16 @@ namespace
                 repoDir);
             auto repos = std::make_shared<RepositoriesNode>(&context, homeRepo);
             context.repositoriesNode(repos);
-            sourceFileRepo()->startWatching();
+            homeRepo->repoType(FileRepositoryNode::RepoType::Build);
+            homeRepo->startWatching();
+
+            //auto winRepo =
+            //    std::make_shared<FileRepositoryNode>(
+            //        &context,
+            //        "windows",
+            //        std::filesystem::path("C:\\Windows"));
+            //repos->addRepository(winRepo);
+            //winRepo->repoType(FileRepositoryNode::RepoType::Ignore);
 
             bool completed = YAMTest::executeNode(sourceFileRepo()->directoryNode().get());
             EXPECT_TRUE(completed);
@@ -130,12 +139,12 @@ namespace
             std::vector<std::shared_ptr<DirectoryNode>> subDirs; 
             sourceFileRepo()->directoryNode()->getSubDirs(subDirs); 
             auto cmdNode = std::make_shared<CommandNode>(&context, std::filesystem::path("@@repo") / "__cmd");
-            cmdNode->script(R"(C:\Windows\System32\cmd.exe /c echo piet)");
+            cmdNode->script(R"(echo piet)");
             cmdNode->workingDirectory(subDirs[0]);
             context.nodes().add(cmdNode);
 
             auto cmdNode1 = std::make_shared<CommandNode>(&context, std::filesystem::path("@@repo") / "__cmd1");
-            cmdNode1->script(R"(C:\Windows\System32\cmd.exe /c echo piet1)");
+            cmdNode1->script(R"(echo piet1)");
             cmdNode1->workingDirectory(sourceFileRepo()->directoryNode());
             cmdNode1->cmdInputs({ cmdNode });
             context.nodes().add(cmdNode1);
@@ -313,6 +322,15 @@ namespace
         ASSERT_EQ(nullptr, setup.context.nodes().find(nodeName));
     }
 
+    TEST(PersistentBuildState, storeAfterAddAndRemoveOfNodeInContext) {
+        SetupHelper setup(FileSystem::createUniqueDirectory());
+
+        ExecutionContext* context = &(setup.context);
+        auto fileNode = std::make_shared<SourceFileNode>(context, "testFile");
+        context->nodes().add(fileNode);
+        context->nodes().remove(fileNode);
+        setup.persistentState.store();
+    }
 
     TEST(PersistentBuildState, storeRemovedNode) {
         SetupHelper setup(FileSystem::createUniqueDirectory());
