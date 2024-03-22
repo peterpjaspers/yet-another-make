@@ -4,9 +4,7 @@ Bugs
   Reproduce with coreTests EnduranceTest
 
 Features
-- FileNode: verify last-write-time after hashing is equal to lwt before hashing.
-  If not: fail execution and set hashes to rand()
-- Investigate directory links as alernative for repos
+- Investigate directory symlinks and/or junction as alernative for repos
 - phony rule: Inputs |>|> Group
   Example: 
        *.cpp |>|> <sources>

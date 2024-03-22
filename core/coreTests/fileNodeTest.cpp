@@ -97,4 +97,41 @@ namespace
         EXPECT_EQ(Node::State::Ok, fnode->state());
         EXPECT_NE(expectedHash, fnode->hashOf(entireFile));
     }
+
+    std::chrono::time_point<std::filesystem::_File_time_clock> lastWriteTime(std::filesystem::path const& path) {
+        std::error_code ec;
+        auto lwt = std::filesystem::last_write_time(path, ec);
+        return lwt;
+    }
+
+    std::chrono::time_point<std::chrono::utc_clock> lastWriteTimeUtc(std::filesystem::path const& path) {
+        auto lwt = lastWriteTime(path);
+        auto lwutc = decltype(lwt)::clock::to_utc(lwt);
+        return lwutc;
+    }
+
+    bool appendToFile(std::filesystem::path path, std::string const& content) {
+        std::ofstream stream(path, std::ios_base::app);
+        stream << content;
+        bool ok = stream.good();
+        stream.close();
+        return ok;
+    }
+
+    TEST(FileNode, lastWriteTimeResolution) {
+        Driver driver;
+        std::filesystem::path testFile(driver.repoDir / "text.txt");
+
+        std::vector<long long> deltas;
+        appendToFile(testFile, "");
+        auto t0 = lastWriteTime(testFile);
+        for (int i = 0; i < 100; ++i) {
+            appendToFile(testFile, "a");
+            auto t = lastWriteTime(testFile);
+            auto delta = t - t0;
+            auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(delta).count();
+            deltas.push_back(ns);
+            t0 = t;
+        }
+    }
 }

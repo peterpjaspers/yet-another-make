@@ -32,39 +32,58 @@ namespace YAM
     }
 
     void FileNode::execute() {
+        auto newState = Node::State::Ok;
         std::map<std::string, XXH64_hash_t> newHashes;
+        auto lwt = _lastWriteTime;
         auto newLastWriteTime = retrieveLastWriteTime();
         if (newLastWriteTime != _lastWriteTime) {
             std::vector<FileAspect> aspects = context()->findFileAspects(name());
             for (auto const& aspect : aspects) {
                 newHashes[aspect.name()] = aspect.hash(absolutePath());
             }
+            auto lastWriteTime = retrieveLastWriteTime();
+            if (lastWriteTime != newLastWriteTime) {
+                // file was modified while being hashed.
+                newState = Node::State::Failed;
+                for (auto const& pair : newHashes) {
+                    newHashes[pair.first] = rand();
+                }
+            }
         }
         auto d = Delegate<void>::CreateLambda(
-            [this, newLastWriteTime, newHashes]() {
-                finish(newLastWriteTime, newHashes);
+            [this, newState, newLastWriteTime, newHashes]() {
+                finish(newState, newLastWriteTime, newHashes);
             });
         context()->mainThreadQueue().push(std::move(d));
     }
        
     void FileNode::finish(
-            std::chrono::time_point<std::chrono::utc_clock> const& newLastWriteTime,
-            std::map<std::string, XXH64_hash_t> const& newHashes
+        Node::State newState,
+        std::chrono::time_point<std::chrono::utc_clock> const& newLastWriteTime,
+        std::map<std::string, XXH64_hash_t> const& newHashes
     ) {
-        if (newLastWriteTime != _lastWriteTime) {
-            _lastWriteTime = newLastWriteTime;
-            bool changedContent = _hashes != newHashes;
-            _hashes = newHashes;
-            modified(true);
-            if (changedContent) {
-                std::stringstream ss;
-                ss << className() << " " << name().string() << " has changed file content.";
-                LogRecord change(LogRecord::FileChanges, ss.str());
-                context()->logBook()->add(change);
+        if (newState == Node::State::Ok) {
+            if (newLastWriteTime != _lastWriteTime) {
+                _lastWriteTime = newLastWriteTime;
+                bool changedContent = _hashes != newHashes;
+                _hashes = newHashes;
+                modified(true);
+                if (changedContent) {
+                    std::stringstream ss;
+                    ss << className() << " " << name().string() << " has changed file content.";
+                    LogRecord change(LogRecord::FileChanges, ss.str());
+                    context()->logBook()->add(change);
+                }
+                context()->statistics().registerRehashedFile(this);
             }
-            context()->statistics().registerRehashedFile(this);
+        } else {
+            std::stringstream ss;
+            ss << "File " << absolutePath() << " was modified while being hashed." << std::endl;
+            ss << "Restart the build to get correct output." << std::endl;
+            LogRecord error(LogRecord::Error, ss.str());
+            context()->logBook()->add(error);
         }
-        Node::notifyCompletion(Node::State::Ok);
+        Node::notifyCompletion(newState);
     }
 
     XXH64_hash_t FileNode::hashOf(std::string const& aspectName) {
