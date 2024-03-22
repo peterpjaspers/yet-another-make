@@ -6,6 +6,7 @@ Bugs
 Features
 - FileNode: verify last-write-time after hashing is equal to lwt before hashing.
   If not: fail execution and set hashes to rand()
+- Investigate directory links as alernative for repos
 - phony rule: Inputs |>|> Group
   Example: 
        *.cpp |>|> <sources>
@@ -20,6 +21,8 @@ Features
   Problem: foreach <sources> is not supported by yam because files in
   group are only known after execution of its contained command nodes.
   This would require compiling the foreach after group execution.
+  Possibly allow it for groups that only contain source files, generated
+  files and commands with only mandatory outputs.
 
   Advantage: <objects> content is defined once at buildfile compile time
   (and when cpp files are added or removed) while *.obj is evaluated each 

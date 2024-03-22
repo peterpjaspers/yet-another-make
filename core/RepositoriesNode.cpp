@@ -308,12 +308,16 @@ namespace YAM
                 ok = false;
             }
         }
-        if (ok) {
-            modified(true);
-            context()->nodes().add(repo);
-            _repositories.insert({ repo->repoName(), repo });
-            repo->addObserver(this);
-        }
+        // If !ok: still add repository and remove after adding. This is
+        // needed to workaround the fact that constructing a FileRepositoryNode
+        // already adds nodes to the context. Removing these nodes via 
+        // repo->removeYourself is only possible when the repo is in the
+        // _repositories map.  
+        modified(true);
+        context()->nodes().add(repo);
+        _repositories.insert({ repo->repoName(), repo });
+        repo->addObserver(this);
+        if (!ok) removeRepository(repo->repoName());
         return ok;
     }
 
