@@ -64,6 +64,15 @@ namespace YAM
         // in state Node::State::Dirty
         std::unordered_map<std::string, std::unordered_set<std::shared_ptr<Node>>> const& dirtyNodes() const;
 
+
+        // Pre: node->state() == Node::State::Failed || Node::State::Canceled
+        void registerFailedOrCanceledNode(std::shared_ptr<Node> const& node);
+        // Pre: node->state() != Node::State::Failed || Node::State::Canceled
+        void unregisterFailedOrCanceledNode(std::shared_ptr<Node> const& node);
+        // Return map from node class name to the set of instances of that class
+        // in state Node::State::Failed || Node::State::Canceled
+        std::unordered_map<std::string, std::unordered_set<std::shared_ptr<Node>>> const& failedOrCanceledNodes() const;
+
         // Register node as modified in changeset.
         // Pre: node->modified()
         void changeSetModify(std::shared_ptr<Node> const& node);
@@ -84,6 +93,7 @@ namespace YAM
         std::unordered_map<std::filesystem::path, std::shared_ptr<Node>> _nodes;
 
         std::unordered_map<std::string, std::unordered_set<std::shared_ptr<Node>>> _dirtyNodes;
+        std::unordered_map<std::string, std::unordered_set<std::shared_ptr<Node>>> _failedOrCanceledNodes;
 
         // Changeset
         std::unordered_set<std::shared_ptr<Node>> _addedNodes;

@@ -36,17 +36,12 @@ namespace
     static std::string compilerClass("BuildFileCompilerNode");
     static std::string cmdClass("CommandNode");
 
-    void resetNodeStates(NodeSet& nodes) {
-        auto resetState = Delegate<void, std::shared_ptr<Node> const&>::CreateLambda(
-            [](std::shared_ptr<Node> const& node) {
-            if (
-                node->state() != Node::State::Ok
-                && node->state() != Node::State::Deleted
-             ) {
-                node->setState(Node::State::Dirty);
-            }
-        });
-        nodes.foreach(resetState);
+    void resetFailedAndCanceledNodes(NodeSet& nodes) {
+        std::vector<std::shared_ptr<Node>> toReset;
+        for (auto const &pair : nodes.failedOrCanceledNodes()) {
+            toReset.insert(toReset.end(), pair.second.begin(), pair.second.end());
+        }
+        for (auto const& node : toReset) node->setState(Node::State::Dirty);
     }
 
     template<typename T>
@@ -287,7 +282,7 @@ namespace YAM
     // Called in main thread
     void Builder::_start() {
         _periodicStorage->resume();
-        resetNodeStates(_context.nodes());
+        resetFailedAndCanceledNodes(_context.nodes());
         std::vector<std::shared_ptr<Node>> dirtyNodes;
         auto repositoriesNode = _context.repositoriesNode();
         repositoriesNode->homeRepository()->consumeChanges();

@@ -64,10 +64,15 @@ namespace YAM
             }
             State oldState = _state;
             _state = newState;
+            if (oldState == State::Failed || oldState == State::Canceled) {
+                _context->nodes().unregisterFailedOrCanceledNode(shared_from_this());
+            } else if (oldState == State::Dirty) {
+                _context->nodes().unregisterDirtyNode(shared_from_this());
+            }
             if (_state == State::Dirty) {
                 _context->nodes().registerDirtyNode(shared_from_this());
-            } else if (oldState == State::Dirty && _state != State::Deleted) {
-                _context->nodes().unregisterDirtyNode(shared_from_this());
+            } else if (_state == State::Failed || _state == State::Canceled) {
+                _context->nodes().registerFailedOrCanceledNode(shared_from_this());
             }
             bool nowCompleted =
                 _state == State::Ok

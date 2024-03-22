@@ -104,10 +104,24 @@ namespace YAM
         if (nRemoved != 1) throw std::runtime_error("Attempt to remove unknown dirty node");
     }
 
-    // Return map from node class name to the set of instances of that class
-    // in state Node::State::Dirty
     std::unordered_map<std::string, std::unordered_set<std::shared_ptr<Node>>> const& NodeSet::dirtyNodes() const {
         return _dirtyNodes;
+    }
+
+    void NodeSet::NodeSet::registerFailedOrCanceledNode(std::shared_ptr<Node> const& node) {
+        if (!_nodes.contains(node->name())) return;
+        auto result = _failedOrCanceledNodes[node->className()].insert(node);
+        if (!result.second) throw std::runtime_error("Attempt to add duplicate failed|canceled node");
+    }
+
+    void NodeSet::unregisterFailedOrCanceledNode(std::shared_ptr<Node> const& node) {
+        if (!_nodes.contains(node->name())) return;
+        std::size_t nRemoved = _failedOrCanceledNodes[node->className()].erase(node);
+        if (nRemoved != 1) throw std::runtime_error("Attempt to remove unknown failed|canceled node");
+    }
+
+    std::unordered_map<std::string, std::unordered_set<std::shared_ptr<Node>>> const& NodeSet::failedOrCanceledNodes() const {
+        return _failedOrCanceledNodes;
     }
 
     void NodeSet::changeSetModify(std::shared_ptr<Node> const& node) {
