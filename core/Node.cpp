@@ -131,7 +131,8 @@ namespace YAM
 
     void Node::startNodes(
             std::vector<Node*> const& nodes,
-            Delegate<void, Node::State> const& callback
+            Delegate<void, Node::State> const& callback,
+            bool nonCancelable
     ) {
         ASSERT_MAIN_THREAD(_context);
         if (_state != Node::State::Executing) throw std::runtime_error("Attempt to start nodes while not in executing state");
@@ -142,6 +143,7 @@ namespace YAM
             _nodesToExecute.insert(n);
         }
         _callback = callback;
+        _nonCancelable = nonCancelable;
         if (stop) {
             cancel();
         } else {
@@ -238,6 +240,7 @@ namespace YAM
         } else {
             state = State::Failed;
         }
+        _nonCancelable = false;
         auto d = Delegate<void>::CreateLambda([this, state]()
         {
             _callback.Execute(state);
@@ -272,6 +275,7 @@ namespace YAM
 
     void Node::cancel() {
         if (_state != Node::State::Executing) return;
+        if (_nonCancelable) return;
         if (!_canceling) {
             _canceling = true;
             for (auto p : _nodesToExecute) {

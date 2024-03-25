@@ -12,6 +12,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "core", "core\core.vcxproj",
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "doc", "doc", "{37AB3F5E-F8E1-4C30-AD77-DBA85126DEF7}"
 	ProjectSection(SolutionItems) = preProject
+		doc\analysis_junctions.txt = doc\analysis_junctions.txt
 		doc\codingStyle.md = doc\codingStyle.md
 		doc\design_aspectHashes.txt = doc\design_aspectHashes.txt
 		doc\design_buildfile.txt = doc\design_buildfile.txt

@@ -8,6 +8,8 @@ namespace YAM
         if (result.second) {
             if (node->state() == Node::State::Dirty) {
                 registerDirtyNode(node);
+            } else if (node->state() == Node::State::Failed || node->state() == Node::State::Canceled) {
+                registerFailedOrCanceledNode(node);
             }
             changeSetAdd(node);
         }
@@ -18,6 +20,8 @@ namespace YAM
         if (!success) throw std::runtime_error("failed to add node");
         if (node->state() == Node::State::Dirty) {
             registerDirtyNode(node);
+        } else if (node->state() == Node::State::Failed || node->state() == Node::State::Canceled) {
+            registerFailedOrCanceledNode(node);
         }
         changeSetAdd(node);
     }

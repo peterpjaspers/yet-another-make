@@ -101,7 +101,7 @@ namespace YAM
         }
         {
             if (result == nullptr) {
-                result = std::make_shared<BuildResult>(false);
+                result = std::make_shared<BuildResult>(BuildResult::State::Failed);
             }
             std::lock_guard<std::mutex> lock(_mutex);
             _state = Done;

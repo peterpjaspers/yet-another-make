@@ -188,16 +188,18 @@ namespace YAM
         template <class TNode> 
         void startNodes(
             std::vector<std::shared_ptr<TNode>> const& nodes,
-            Delegate<void, Node::State> const& callback
+            Delegate<void, Node::State> const& callback,
+            bool nonCancelable = false
         ) {
             std::vector<Node*> rawNodes;
             for (auto const& n : nodes) rawNodes.push_back(n.get());
-            startNodes(rawNodes, callback);
+            startNodes(rawNodes, callback, nonCancelable);
         }
 
         void startNodes(
             std::vector<Node*> const& nodes,
-            Delegate<void, Node::State> const& callback);
+            Delegate<void, Node::State> const& callback,
+            bool nonCancelable = false);
 
         // Push notifyCompletion(newState) to context()->mainThreadQueue()
         // To be called by subclass to notify execution completion from 
@@ -219,6 +221,7 @@ namespace YAM
         std::filesystem::path _name;
         State _state;
         std::atomic<bool> _canceling;
+        bool _nonCancelable;
 
         // As requested by startNodes(..),
         Delegate<void, Node::State> _callback;

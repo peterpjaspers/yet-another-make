@@ -282,7 +282,7 @@ namespace
 
         std::shared_ptr<BuildResult> result = driver.build();
 
-        EXPECT_TRUE(result->succeeded());
+        EXPECT_TRUE(result->state() == BuildResult::State::Ok);
         EXPECT_EQ(Node::State::Ok, driver.ccPiet->state());
         EXPECT_EQ(Node::State::Ok, driver.pietOut->state());
         EXPECT_EQ(Node::State::Ok, driver.ccJan->state());
@@ -402,7 +402,7 @@ namespace
         std::shared_ptr<BuildResult> result = driver.build();
 
         result = driver.build();
-        EXPECT_TRUE(result->succeeded());
+        EXPECT_TRUE(result->state() == BuildResult::State::Ok);
         EXPECT_EQ(0, driver.stats.nDirectoryUpdates);
         EXPECT_EQ(0, driver.stats.nRehashedFiles);
         EXPECT_EQ(0, driver.stats.started.size());
@@ -430,7 +430,7 @@ namespace
 
         // Incremental build
         std::shared_ptr<BuildResult> result = driver.build();
-        EXPECT_TRUE(result->succeeded());
+        EXPECT_TRUE(result->state() == BuildResult::State::Ok);
         EXPECT_EQ(Node::State::Ok, driver.ccPiet->state());
         EXPECT_EQ(Node::State::Ok, driver.ccJan->state());
         EXPECT_EQ(Node::State::Ok, driver.linkPietJan->state());
@@ -482,7 +482,7 @@ namespace
 
         // Incremental build
         std::shared_ptr<BuildResult> result = driver.build();
-        EXPECT_FALSE(result->succeeded());
+        EXPECT_FALSE(result->state() == BuildResult::State::Ok);
         EXPECT_EQ(Node::State::Ok, driver.ccPiet->state());
         EXPECT_EQ(Node::State::Ok, srcDirNode->state());
         EXPECT_EQ(Node::State::Failed, driver.ccJan->state());

@@ -4,6 +4,8 @@
 
 using namespace YAM;
 
+std::filesystem::path watchedDirectory("D:\\Peter");
+
 std::string toString(FileChange::Action action) {
     std::string actionStr("Bad action");
     if (action == FileChange::Action::Added) actionStr = "Added";
@@ -18,19 +20,18 @@ std::string toString(FileChange::Action action) {
      std::string action = toString(change.action);
      std::cout 
          << action 
-         << " file=" << change.fileName 
-         << " oldFile=" << change.oldFileName 
+         << " file=" << watchedDirectory / change.fileName 
+         << " oldFile=" << watchedDirectory / change.oldFileName
          <<  std::endl;
 }
 
 int main(int argc, char** argv) {
-    std::filesystem::path dir("d:\\Peter");
     if (argc > 1) {
-        dir = std::filesystem::path(argv[1]);
+        watchedDirectory = std::filesystem::path(argv[1]);
     }
-    std::cout << "watching " << dir << std::endl;
+    std::cout << "watching " << watchedDirectory << std::endl;
     auto handler = Delegate<void, FileChange const&>::CreateStatic(handle);
-    DirectoryWatcher watcher(dir, true, handler);
+    DirectoryWatcher watcher(watchedDirectory, true, handler);
     std::string input;    
     while (input.empty()) std::cin >> input;
 

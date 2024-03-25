@@ -224,7 +224,6 @@ namespace YAM
         void handleOutputAndNewInputFilesCompletion(Node::State newState, std::shared_ptr<ExecutionResult> result);
         std::vector<OutputNameFilter> const& outputNameFilters();
         void updateInputProducers();
-        void notifyCommandCompletion(std::shared_ptr<ExecutionResult> result);
 
         std::string compileScript(ILogBook& logBook);
         MonitoredProcessResult executeMonitoredScript(ILogBook& logBook);

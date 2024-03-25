@@ -1,4 +1,7 @@
 
-: foreach *.cpp |> copy %f %o |> bin\%B.obj { objectFiles }
-: { objectFiles } |> echo %f > %o |> bin\core.txt { dlls }
-: { dlls } |> type %f > %o |> bin\core.dll
+: foreach *.cpp |> 
+  copy %f %o
+  C:\Windows\System32\PING.EXE -n 3 127.0.0.1
+|> bin\%B.obj {objectFiles}
+: {objectFiles} |> echo %f > %o |> bin\core.txt {dlls}
+: {dlls} |> type %f > %o |> bin\core.dll

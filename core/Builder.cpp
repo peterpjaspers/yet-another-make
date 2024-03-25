@@ -165,8 +165,12 @@ namespace YAM
         std::filesystem::path repoDir = request->repoDirectory();
         RepositoryNameFile nameFile(repoDir);
         std::string repoName = nameFile.repoName();
-        _result->succeeded(!repoName.empty() && repoName == request->repoName());
-        if (!_result->succeeded()) {
+        auto state = BuildResult::State::Ok;
+        if (repoName.empty() || repoName != request->repoName()) {
+            state = BuildResult::State::Failed;
+        }
+        _result->state(state);
+        if (state != BuildResult::State::Ok) {
             logRepoNotInitialized();
             return false;
         }
@@ -176,7 +180,7 @@ namespace YAM
             std::filesystem::path buildStatePath = BuildStateVersion::select(yamDir, *(_context.logBook()));
             if (buildStatePath.empty()) {
                 //incompatible file version
-                _result->succeeded(false);
+                _result->state(BuildResult::State::Failed);
             } else {
                 std::filesystem::create_directories(buildStatePath.parent_path());
                 _buildState = std::make_shared<PersistentBuildState>(buildStatePath, &_context);
@@ -202,7 +206,7 @@ namespace YAM
                 repositoriesNode->startWatching();
             }
         }
-        return _result->succeeded();
+        return _result->state() == BuildResult::State::Ok;
     }
 
     // Called in main thread
@@ -215,7 +219,8 @@ namespace YAM
         for (auto const& file : genFiles) {
             if (!file->deleteFile(true, true)) nFailures += 1;
         }
-        _result->succeeded(nFailures == 0);
+        auto state = (nFailures == 0) ? BuildResult::State::Ok : BuildResult::State::Failed;
+        _result->state(state);
         _notifyCompletion(nFailures == 0 ? Node::State::Ok : Node::State::Failed);
     }
 
@@ -445,13 +450,15 @@ namespace YAM
     void Builder::_notifyCompletion(Node::State resultState) {\
         _periodicStorage->suspend();
         _storeBuildState();
-        _result->succeeded(resultState == Node::State::Ok);
-        if (resultState == Node::State::Ok) {
-            _result->nDirectoryUpdates(_context.statistics().nDirectoryUpdates);
-            _result->nNodesExecuted(_context.statistics().nSelfExecuted);
-            _result->nNodesStarted(_context.statistics().nStarted);
-            _result->nRehashedFiles(_context.statistics().nRehashedFiles);
-        }
+        auto state = BuildResult::State::Unknown;
+        if (resultState == Node::State::Ok) state = BuildResult::State::Ok;
+        else if (resultState == Node::State::Canceled) state = BuildResult::State::Canceled;
+        else if (resultState == Node::State::Failed) state = BuildResult::State::Failed;
+        _result->state(state);
+        _result->nDirectoryUpdates(_context.statistics().nDirectoryUpdates);
+        _result->nNodesExecuted(_context.statistics().nSelfExecuted);
+        _result->nNodesStarted(_context.statistics().nStarted);
+        _result->nRehashedFiles(_context.statistics().nRehashedFiles);
         _dirtyConfigNodes->content(emptyNodes);
         _dirtyDirectories->content(emptyNodes);
         _dirtyBuildFileParsers->content(emptyNodes);

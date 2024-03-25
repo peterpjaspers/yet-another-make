@@ -1121,7 +1121,15 @@ namespace YAM
                         [this, sresult](Node::State state) { 
                             handleOutputAndNewInputFilesCompletion(state, sresult); }
                     );
-                    startNodes(rawNodes, std::move(callback));
+                    // Make (re-)hashing of file nodes non-cancelable because 
+                    // these operations are queued behind all other command
+                    // nodes. A used canceling the build would cancel all 
+                    // the rehash operations and as a consequence all command
+                    // nodes. As a consequence all already generated would be
+                    // deleted.
+                    // Other approach would be to start these nodes with high
+                    // priority. 
+                    startNodes(rawNodes, std::move(callback), true);
                 } else {
                     result._newState = Node::State::Failed;
                 }
@@ -1156,11 +1164,7 @@ namespace YAM
             _executionHash = rand();
         }
         modified(true);
-        notifyCommandCompletion(sresult);
-    }
-
-    void CommandNode::notifyCommandCompletion(std::shared_ptr<ExecutionResult> sresult) {
-        Node::notifyCompletion(sresult->_newState);
+        notifyCompletion(sresult->_newState);
     }
 
     std::string CommandNode::compileScript(ILogBook& logBook) {

@@ -138,7 +138,7 @@ namespace
                 stats.reset();
                 std::cout << "\nStarting build " << nRestarts << "." << nBuilds << std::endl;
                 std::shared_ptr<BuildResult> result = driver.build();
-                ASSERT_EQ(TRUE, result->succeeded());
+                ASSERT_EQ(TRUE, result->state() == BuildResult::State::Ok);
                 std::cout << "Completed build " << nRestarts << "." << nBuilds << std::endl;
                 if (nBuilds % 2 == 0) {
                     driver.addRepos();
@@ -169,7 +169,7 @@ namespace
                 stats.reset();
                 std::cout << "\nStarting build " << nRestarts << "." << nBuilds << std::endl;
                 std::shared_ptr<BuildResult> result = driver.build();
-                ASSERT_EQ(TRUE, result->succeeded());
+                ASSERT_EQ(TRUE, result->state() == BuildResult::State::Ok);
                 std::cout << "Completed build " << nRestarts << "." << nBuilds << std::endl;
             }
         }

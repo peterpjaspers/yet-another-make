@@ -11,7 +11,7 @@ namespace
 namespace YAM
 {
     BuildResult::BuildResult()
-        : _succeeded(false)
+        : _state(State::Unknown)
         , _startTime(std::chrono::system_clock::now())
         , _nNodesStarted(0)
         , _nNodesExecuted(0)
@@ -19,21 +19,22 @@ namespace YAM
         , _nDirectoryUpdates(0)
     {}
 
-    BuildResult::BuildResult(bool success) {
-        succeeded(success);
+    BuildResult::BuildResult(State state_) : BuildResult() {
+        state(state_);
     }
 
     BuildResult::BuildResult(IStreamer* reader) {
         stream(reader);
     }
 
-    void BuildResult::succeeded(bool value) {
-        _succeeded = value;
-        _endTime = std::chrono::system_clock::now();
+    void BuildResult::state(State newState) {
+        if (_state != newState) {
+            _state = newState;
+            _endTime = std::chrono::system_clock::now();
+        }
     }
-
-    bool BuildResult::succeeded() const {
-        return _succeeded;
+    BuildResult::State BuildResult::state() const {
+        return _state;
     }
 
     std::chrono::system_clock::time_point BuildResult::startTime() const {
@@ -102,7 +103,9 @@ namespace YAM
     }
 
     void BuildResult::stream(IStreamer* streamer) {
-        streamer->stream(_succeeded);
+        uint32_t s = _state;
+        streamer->stream(s);
+        if (streamer->reading()) _state = static_cast<State>(s);
         streamer->stream(_startTime);
         streamer->stream(_endTime);
         streamer->stream(_nNodesStarted);

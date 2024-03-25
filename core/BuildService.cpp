@@ -45,7 +45,7 @@ namespace YAM
                     shutdown = dynamic_pointer_cast<ShutdownRequest>(request) != nullptr;
                 }
                 if (shutdown) {
-                    send(std::make_shared<BuildResult>(true));
+                    send(std::make_shared<BuildResult>(BuildResult::State::Ok));
                 }
             } catch (std::exception) {
             } catch (EndOfStreamException) {

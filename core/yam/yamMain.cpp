@@ -16,10 +16,51 @@
 #include <sstream>
 #include <chrono>
 #include <boost/process.hpp>
+#include <windows.h> 
+#include <stdio.h> 
 
 using namespace YAM;
 using namespace std::chrono_literals;
 
+namespace
+{
+    class CtrlCHandler
+    {
+    public:
+        CtrlCHandler(BuildClient& client);
+        ~CtrlCHandler();
+        void handleCtrlC();
+
+    private:
+        BuildClient& _client;
+    };
+
+    CtrlCHandler* handler;
+    BOOL WINAPI consoleHandler(DWORD signal) {
+
+        if (signal == CTRL_C_EVENT) {
+            printf("Stopping the build\n");
+            handler->handleCtrlC();
+        }
+        return TRUE;
+    }
+
+    CtrlCHandler::CtrlCHandler(BuildClient& client) : _client(client) {
+        handler = this;
+        if (!SetConsoleCtrlHandler(consoleHandler, TRUE)) {
+            printf("\nERROR: Could not add ctrl-C handler");
+        }
+    }
+    CtrlCHandler::~CtrlCHandler() {
+        if (!SetConsoleCtrlHandler(consoleHandler, FALSE)) {
+            printf("\nERROR: Could not remove ctrl-C handler");
+        }
+    }
+
+    void CtrlCHandler::handleCtrlC() {
+        _client.stopBuild();
+    }
+}
 void logStartingServer(ILogBook& logBook) {
     std::string msg("Starting yamServer");
     LogRecord progress(LogRecord::Aspect::Progress, msg);
@@ -44,11 +85,23 @@ void logFailStartServer(ILogBook& logBook) {
 }
 
 void logResult(ILogBook& logBook, BuildResult& result) {
-    std::stringstream ss;
-    ss << "Build completed " << (result.succeeded() ? "successfully" : "with errors");
-    //auto duration = result.niceDuration();
-    //if (!duration.empty()) ss << " in " << duration;
-    //else ss << " in less than 1 ms ";
+    LogRecord::Aspect aspect;
+    std::stringstream ss;   
+    if (result.state() == BuildResult::State::Ok) {
+        aspect = LogRecord::Aspect::Progress;
+        ss << "Build completed successfully";
+    } else if (result.state() == BuildResult::State::Failed) {
+        aspect = LogRecord::Aspect::Error;
+        ss << "Build completed with errors";
+    } else if (result.state() == BuildResult::State::Canceled) {
+        aspect = LogRecord::Aspect::Warning;
+        ss << "Build canceled by user";
+    } else {
+        ss << "Build completed with unknown result";
+    }
+    auto duration = result.niceDuration();
+    if (!duration.empty()) ss << " in " << duration;
+    else ss << " in less than 1 ms ";
     ss
         << std::endl
         << "#started=" << result.nNodesStarted()
@@ -56,9 +109,8 @@ void logResult(ILogBook& logBook, BuildResult& result) {
         << ", #dirHashes=" << result.nDirectoryUpdates()
         << ", #fileHashes=" << result.nRehashedFiles() << std::endl;
 
-    LogRecord::Aspect aspect = result.succeeded() ? LogRecord::Aspect::Progress : LogRecord::Aspect::Error;
-    LogRecord progress(aspect, ss.str());
-    logBook.add(progress);
+    LogRecord record(aspect, ss.str());
+    logBook.add(record);
 }
 void logCannotFindYamServer(ILogBook& logBook) {
     std::stringstream ss;
@@ -229,10 +281,11 @@ int main(int argc, char* argv[]) {
             }));
         });
         client.startBuild(request);
+        CtrlCHandler handler(client);
         dispatcher.run();
         if (inProcess) client.startShutdown();
         logResult(logBook, *result);
-        success = result->succeeded();
+        success = result->state() == BuildResult::State::Ok;
     }
     return success ? 0 : 1;
 }

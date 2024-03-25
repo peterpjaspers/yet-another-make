@@ -4,7 +4,6 @@ Bugs
   Reproduce with coreTests EnduranceTest
 
 Features
-- Investigate directory symlinks and/or junction as alernative for repos
 - phony rule: Inputs |>|> Group
   Example: 
        *.cpp |>|> <sources>

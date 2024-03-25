@@ -14,6 +14,8 @@ namespace
 {
     using namespace YAM;
 
+    BuildResult::State fail = BuildResult::State::Failed;
+
     class Session {
     private:
         bool _shutdown;
@@ -57,7 +59,7 @@ namespace
 
         std::shared_ptr<BuildResult> shutdown() {
             _shutdown = true;
-            if (!client->startShutdown()) return std::make_shared<BuildResult>(false);
+            if (!client->startShutdown()) return std::make_shared<BuildResult>(fail);
             return wait();
         }
 
@@ -69,7 +71,7 @@ namespace
         }
 
         std::shared_ptr<BuildResult> init() {
-            if (!startBuild(buildRequest())) return std::make_shared<BuildResult>(false);
+            if (!startBuild(buildRequest())) return std::make_shared<BuildResult>(fail);
             return wait();
         }
 
@@ -78,7 +80,7 @@ namespace
         }
 
         std::shared_ptr<BuildResult> build() {
-            if (!startBuild(buildRequest())) return std::make_shared<BuildResult>(false);
+            if (!startBuild(buildRequest())) return std::make_shared<BuildResult>(fail);
             return wait();
         }
 
@@ -113,13 +115,13 @@ namespace
     TEST(BuildService, init) {
         Session session;
         auto result = session.init();
-        EXPECT_TRUE(result->succeeded());
+        EXPECT_TRUE(result->state() == BuildResult::State::Ok);
     }
 
     TEST(BuildService, build) {
         Session session;
         auto result = session.build();
-        EXPECT_TRUE(result->succeeded());
+        EXPECT_TRUE(result->state() == BuildResult::State::Ok);
     }
 
     TEST(BuildService, stopBuild) {
@@ -138,23 +140,23 @@ namespace
     TEST(BuildService, shutdown) {
         Session session;
         auto result = session.shutdown();
-        EXPECT_TRUE(result->succeeded());
+        EXPECT_TRUE(result->state() == BuildResult::State::Ok);
     }
 
     TEST(BuildService, successiveBuilds) {
         Session session;
         auto result = session.build();
-        EXPECT_TRUE(result->succeeded());
+        EXPECT_TRUE(result->state() == BuildResult::State::Ok);
 
         session.newClient();
         result = session.build();
-        EXPECT_TRUE(result->succeeded());
+        EXPECT_TRUE(result->state() == BuildResult::State::Ok);
     }
 
     TEST(BuildService, illegalClientUse) {
         Session session;
         auto result = session.build();
-        EXPECT_TRUE(result->succeeded());
+        EXPECT_TRUE(result->state() == BuildResult::State::Ok);
 
         auto request = std::make_shared<BuildRequest>();
         EXPECT_FALSE(session.startBuild(request));
