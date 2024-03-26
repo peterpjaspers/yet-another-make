@@ -11,7 +11,14 @@ namespace YAM
 
         bool parseError() const { return _parseError; }
 
+        bool help() const { return _help; }
+        bool noServer() const { return _noServer; }
+        bool shutdown() const { return _shutdown; }
+
     private:
         bool _parseError;
+        bool _help;
+        bool _noServer;
+        bool _shutdown;
     };
 }

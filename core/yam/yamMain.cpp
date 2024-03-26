@@ -61,8 +61,15 @@ namespace
         _client.stopBuild();
     }
 }
+
 void logStartingServer(ILogBook& logBook) {
     std::string msg("Starting yamServer");
+    LogRecord progress(LogRecord::Aspect::Progress, msg);
+    logBook.add(progress);
+}
+
+void logConnectingToServer(ILogBook& logBook) {
+    std::string msg("Connecting to yamServer...");
     LogRecord progress(LogRecord::Aspect::Progress, msg);
     logBook.add(progress);
 }
@@ -77,14 +84,43 @@ void logFailStartServer(ILogBook& logBook) {
     std::stringstream ss;
     ss
         << "Cannot verify that yamServer is running" << std::endl
-        << "If yamServer is running: kill yamServer ... " << std::endl
-        << "Delete file " << BuildServicePortRegistry::servicePortRegistryPath().string() << " ..." << std::endl
-        << "Retry running yam" << std::endl;
+        << "If yamServer is running: kill yamServer manually with taskmanager" << std::endl
+        << "and delete file " << BuildServicePortRegistry::servicePortRegistryPath().string() << " ..." << std::endl
+        << "Then retry running yam" << std::endl;
     LogRecord error(LogRecord::Aspect::Error, ss.str());
     logBook.add(error);
 }
 
-void logResult(ILogBook& logBook, BuildResult& result) {
+void logFailConnectServer(ILogBook& logBook, bool shutdown) {
+    std::stringstream ss;
+    if (shutdown) {
+        ss << "Shutdown failed. Please kill yamServer with taskmanager." << std::endl;
+    } else {
+        ss
+            << "Failed to connect to yamServer." << std::endl
+            << "If yamServer is running: kill yamServer with taskmanager." << std::endl
+            << "Then delete file " << BuildServicePortRegistry::servicePortRegistryPath().string() << "." << std::endl
+            << "Then restart yam" << std::endl;
+    }
+    LogRecord error(LogRecord::Aspect::Error, ss.str());
+    logBook.add(error);
+}
+
+void logShutdownResult(ILogBook& logBook, BuildResult& result) {
+    LogRecord::Aspect aspect;
+    std::stringstream ss;
+    if (result.state() == BuildResult::State::Ok) {
+        aspect = LogRecord::Aspect::Progress;
+        ss << "Shutdown completed successfully";
+    } else {
+        aspect = LogRecord::Aspect::Error;
+        ss << "Shutdown failed. Please kill yamServer with taskmanager.";
+    }
+    LogRecord record(aspect, ss.str());
+    logBook.add(record);
+}
+
+void logBuildResult(ILogBook& logBook, BuildResult& result) {
     LogRecord::Aspect aspect;
     std::stringstream ss;   
     if (result.state() == BuildResult::State::Ok) {
@@ -97,6 +133,7 @@ void logResult(ILogBook& logBook, BuildResult& result) {
         aspect = LogRecord::Aspect::Warning;
         ss << "Build canceled by user";
     } else {
+        aspect = LogRecord::Aspect::Error;
         ss << "Build completed with unknown result";
     }
     auto duration = result.niceDuration();
@@ -138,14 +175,15 @@ class OutProcessServer : public ServerAccess
 public:
     OutProcessServer(
         ILogBook& logBook,
-        std::filesystem::path const& startDir        
+        std::filesystem::path const& startDir,
+        bool startServer
     ) {
         boost::asio::ip::port_type port;
         const auto pollInterval = 1000ms;
         bool success = true;
         bool startedServer = false;
         BuildServicePortRegistry portReader;
-        if (!portReader.serverRunning()) {
+        if (!portReader.serverRunning() && startServer) {
             logStartingServer(logBook);
             auto server = boost::process::search_path("yamServer");
             success = !server.empty();
@@ -161,14 +199,16 @@ public:
         if (success) {
             const int maxRetries = 5;
             int nRetries = 0;
-            while (nRetries < maxRetries && !portReader.serverRunning()) {
+            while (startServer && nRetries < maxRetries && !portReader.serverRunning()) {
+                logConnectingToServer(logBook);
                 nRetries += 1;
                 std::this_thread::sleep_for(pollInterval);
                 portReader.read();
             }
             success = portReader.serverRunning();
             if (!success) {
-                logFailStartServer(logBook);
+                if (startServer) logFailStartServer(logBook);
+                else logFailConnectServer(logBook, !startServer);
             } else {
                 if (startedServer) logServerStarted(logBook);
                 port = portReader.port();
@@ -243,6 +283,7 @@ int main(int argc, char* argv[]) {
     BuildOptions options;
     BuildOptionsParser parser(argc, argv, options);
     if (parser.parseError()) return 1;
+    if (parser.help()) return 0;
 
     // TODO: remove before release.
     std::vector<LogRecord::Aspect> logAspects = logBook.aspects();
@@ -255,22 +296,18 @@ int main(int argc, char* argv[]) {
     std::string repoName;
     bool success = initializeYam(logBook, repoDir, repoName);
 
+    bool shutdown = parser.shutdown();
+    bool inProcess = parser.noServer() && !shutdown;
     std::shared_ptr<ServerAccess> server;
-    bool inProcess = false;
     if (success) {
         if (inProcess) {
             server = std::make_shared<InProcessServer>(logBook, repoDir);
         } else {
-            server = std::make_shared<OutProcessServer>(logBook, repoDir);
+            server = std::make_shared<OutProcessServer>(logBook, repoDir, !shutdown);
         }
         success = server->connected();
     }
     if (success) {
-        auto request = std::make_shared<BuildRequest>();
-        request->repoDirectory(repoDir);
-        request->repoName(repoName);
-        request->options(options);
-
         std::shared_ptr<BuildResult> result;
         Dispatcher dispatcher;
         BuildClient& client = server->client();
@@ -280,11 +317,21 @@ int main(int argc, char* argv[]) {
                 dispatcher.stop();
             }));
         });
-        client.startBuild(request);
-        CtrlCHandler handler(client);
-        dispatcher.run();
-        if (inProcess) client.startShutdown();
-        logResult(logBook, *result);
+        if (shutdown) {
+            client.startShutdown();
+            dispatcher.run();
+            logShutdownResult(logBook, *result);
+        } else {
+            auto request = std::make_shared<BuildRequest>();
+            request->repoDirectory(repoDir);
+            request->repoName(repoName);
+            request->options(options);
+            client.startBuild(request);
+            CtrlCHandler handler(client);
+            dispatcher.run();
+            if (parser.noServer()) client.startShutdown();
+            logBuildResult(logBook, *result);
+        }    
         success = result->state() == BuildResult::State::Ok;
     }
     return success ? 0 : 1;

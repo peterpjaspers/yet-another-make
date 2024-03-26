@@ -25,6 +25,8 @@ namespace YAM
         // Only log records whose aspect is in _logAspects.
         std::vector<LogRecord::Aspect> _logAspects;
 
+        uint32_t _threads;
+
         // Inherited via IStreamable
         uint32_t typeId() const override { throw std::runtime_error("not supported"); }
         void stream(IStreamer* streamer) override;

@@ -174,7 +174,14 @@ namespace YAM
             logRepoNotInitialized();
             return false;
         }
-        
+
+        static unsigned int defaultThreads = std::thread::hardware_concurrency();
+        static const unsigned int maxThreads = 5 * defaultThreads;
+        uint32_t threads = request->options()._threads;
+        if (threads == 0) threads = defaultThreads;
+        else if (threads > maxThreads) threads = maxThreads;
+        _context.threadPool().size(threads);
+
         if (_buildState == nullptr) {
             std::filesystem::path yamDir = repoDir / DotYamDirectory::yamName();
             std::filesystem::path buildStatePath = BuildStateVersion::select(yamDir, *(_context.logBook()));
