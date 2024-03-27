@@ -19,12 +19,12 @@ namespace AccessMonitor {
 
         path uniqueLogFileName( const wstring& name, unsigned long code ) {
             wstringstream unique;
-            unique << name << L"_" << hex << code << L".log";
+            unique << name << L"_" << code << L".log";
             return temp_directory_path() /unique.str();
         }
         path uniqueLogFileName( const wstring& name, unsigned long code1, unsigned long code2 ) {
             wstringstream unique;
-            unique << name << L"_" << code1 << L"_" << hex << code2 << L".log";
+            unique << name << L"_" << code1 << L"_" << code2 << L".log";
             return temp_directory_path() /unique.str();
         }
 
@@ -119,5 +119,26 @@ namespace AccessMonitor {
         static wstring_convert< codecvt_utf8_utf16< wstring::value_type >, wstring::value_type > utf16conv;
         return utf16conv.to_bytes( string );
     }
+
+    wstring GetLastErrorString() {
+        DWORD errorMessageID = GetLastError();
+        if(errorMessageID == 0) return L"";
+        LPWSTR messageBuffer = nullptr;
+        size_t size =
+            FormatMessageW(
+                (FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS),
+                NULL,
+                errorMessageID,
+                MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ),
+                (LPWSTR)&messageBuffer,
+                0,
+                NULL
+            );
+        wstring message( messageBuffer, size );
+        LocalFree(messageBuffer);
+        if (message.back() == '\n') message.pop_back();
+        return message;
+    }
+
 
 } // namespace AccessMonitor

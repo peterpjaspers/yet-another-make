@@ -14,13 +14,13 @@ namespace AccessMonitor {
 
     wstring uniqueName( const wstring& name, unsigned long code, const wstring& extension ) {
         wstringstream unique;
-        unique << name << L"_" << hex << code;
+        unique << name << L"_" << code;
         if (0 < extension.size()) unique << L"." << extension;
         return unique.str();
     }
     wstring uniqueName( const wstring& name, unsigned long code1,  unsigned long code2,const wstring& extension ) {
         wstringstream unique;
-        unique << name << L"_" << hex << code1 << L"_" << hex << code2;
+        unique << name << L"_" << code1 << L"_" << code2;
         if (0 < extension.size()) unique << L"." << extension;
         return unique.str();
     }
@@ -41,13 +41,13 @@ namespace AccessMonitor {
     // Record session ID and main thread ID of a (remote) process
     void recordSessionInfo( const SessionID session, const ProcessID process, ThreadID thread ) {
         auto sessionIDFile = ofstream( sessionInfoPath( process ) );
-        sessionIDFile << session << " 0x" << hex << thread << endl;
+        sessionIDFile << session << " " << thread << endl;
         sessionIDFile.close();
     }
     // Retrieve session ID and main thread ID of a (remote) process
     void retrieveSessionInfo( const ProcessID process, SessionID& session, ThreadID& thread ) {
         auto sessionFile = ifstream( sessionInfoPath( process ) );
-        sessionFile >> session >> hex >> thread;
+        sessionFile >> session >> thread;
         sessionFile.close();            
     }
 

@@ -81,6 +81,10 @@ namespace AccessMonitor {
     // Convert wide string to ANSI string
     std::string narrow( const std::wstring& string );
 
+    // Returns last Windows error as string.
+    // Returns empty string if there is no error.
+    std::wstring GetLastErrorString();
+
 } // namespace AccessMonitor
 
 #endif // ACCESS_MONITOR_LOG_H

@@ -44,6 +44,7 @@ namespace AccessMonitor {
             remove( sessionInfoPath( CurrentProcessID() ) );
         }
 
+        // ToDo: Access mode merge logic depending on event order
         // Collect events from monitor event files in a session
         MonitorEvents collectMonitorEvents( const SessionID session ) {
             const path sessionData( sessionDataPath( session ) );
@@ -80,7 +81,7 @@ namespace AccessMonitor {
     void startMonitoring() {
         SessionID session = CreateSession();
         createDebugLog();
-        debugLog().enable( PatchedFunction | ParseLibrary | PatchExecution | FileAccesses );
+        debugLog().enable( PatchedFunction | ParseLibrary | PatchExecution | FileAccesses | WriteTime );
         debugRecord() << "Start monitoring session " << session << "..." << record;
         SetSessionState( SessionUpdating );
         createSessionData( session );

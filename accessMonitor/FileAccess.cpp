@@ -5,7 +5,7 @@ using namespace std::chrono;
 
 namespace AccessMonitor {
 
-    FileAccess::FileAccess() : mode( AccessNone ), lastWriteTime( time_point<system_clock>{} ) {}
+    FileAccess::FileAccess() : mode( AccessNone ) {}
     FileAccess::FileAccess( const FileAccessMode& accessMode, const FileTime& time ) : mode( accessMode), lastWriteTime( time ) {}
 
     wstring modeToString( FileAccessMode mode ) {

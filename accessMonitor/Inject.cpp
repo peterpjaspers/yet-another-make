@@ -36,7 +36,7 @@ namespace AccessMonitor {
                         if (function != nullptr) {
                             HANDLE threadHandle = CreateRemoteThread( processHandle, nullptr, 0, function, fileName, CREATE_SUSPENDED, nullptr );
                             // Communicate session ID and main thread ID via session ID file...
-                            if (debugLog( PatchExecution )) debugRecord() << L"Inject - Recording session " << session << L" for remote process 0x" << hex << process << dec << record;
+                            if (debugLog( PatchExecution )) debugRecord() << L"Inject - Recording session " << session << L" for remote process " << process << dec << record;
                             recordSessionInfo( session, process, thread );
                             if (threadHandle != nullptr) {
                                 auto processPatched = AccessEvent( "ProcessPatched", session, process );

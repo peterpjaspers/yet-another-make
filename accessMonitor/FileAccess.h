@@ -7,7 +7,7 @@
 namespace AccessMonitor {
 
     typedef unsigned long FileAccessMode;
-    typedef std::chrono::time_point<std::chrono::system_clock> FileTime;
+    typedef std::chrono::time_point<std::chrono::file_clock> FileTime;
 
     static const FileAccessMode AccessNone = (1 << 0);
     static const FileAccessMode AccessRead = (1 << 1);

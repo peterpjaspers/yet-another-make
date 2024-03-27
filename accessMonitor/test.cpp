@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <thread>
+#include <cstdlib>
 
 // ToDo: Synchronize with process exit and thread exit (via close handle) prior to stop monitoring 
 
@@ -15,8 +16,8 @@ using namespace AccessMonitor;
 using namespace std;
 using namespace std::filesystem;
 
-static bool multisession = false;
-static bool multithreaded = false;
+static int sessions = 1;
+static int threads = 1;
 static bool remoteProcess = false;
 
 void worker( const path directoryPath ) {
@@ -51,20 +52,19 @@ void doFileAccess() {
         command
             << L"C:\\Users\\philv\\Code\\yam\\yet-another-make\\accessMonitor\\remoteTest.exe"
             << L" " 
-            << ((multithreaded) ? L"true" : L"false" )
+            << ((threads) ? L"true" : L"false" )
             << L" "
             << uniqueName( L"RemoteSession", session );
         auto exitCode = system( narrow( command.str() ).c_str() );
     }
     auto sessionDir = uniqueName( L"Session", session );
-    if (multithreaded) {
-        auto t0 = jthread( worker, path( "." ) / sessionDir / "fileAccessTest0" );
-        auto t1 = jthread( worker, path( "." ) / sessionDir / "fileAccessTest1" );
-        auto t2 = jthread( worker, path( "." ) / sessionDir / "fileAccessTest2" );
-        auto t3 = jthread( worker, path( "." ) / sessionDir / "fileAccessTest3" );
-    } else {
-        worker( path( "." ) / sessionDir / "fileAccessTest" );
+    vector<thread> workerThreads;
+    for (int i = 0; i < threads; ++i) {
+        wstringstream subdir;
+        subdir << L"fileAccessTest" << i;
+        workerThreads.push_back( thread( worker, path( "." ) / sessionDir / subdir.str() ) );
     }
+    for (int i = 0; i < threads; ++i) workerThreads[ i ].join();
 }
 
 void doMonitoredFileAccess() {
@@ -73,7 +73,7 @@ void doMonitoredFileAccess() {
     doFileAccess();
     auto results( stopMonitoring() );
     // Log results...
-    Log output( L"TestProgramOuptut", session  );
+    Log output( L"TestProgramOutput", session  );
     for ( auto access : results ) {
         output() << access.first << L" [ " << access.second.lastWriteTime << L" ] " << modeToString( access.second.mode ) << record;
     }
@@ -88,19 +88,16 @@ bool condition( const string& argument ) {
 }
 
 int main( int argc, char* argv[] ) {
-    multisession = false;
-    multithreaded = false;
+    sessions = 1;
+    threads = 1;
     remoteProcess = false;
     if (3 < argc) { remoteProcess = condition( argv[ 3 ] ); }
-    if (2 < argc) { multithreaded = condition( argv[ 2 ] ); }
-    if (1 < argc) { multisession = condition( argv[ 1 ] ); }
-    if (multisession) {
-        auto s0 = jthread( doMonitoredFileAccess );
-        auto s1 = jthread( doMonitoredFileAccess );
-        auto s2 = jthread( doMonitoredFileAccess );
-        auto s3 = jthread( doMonitoredFileAccess );
-    } else {
-        doMonitoredFileAccess();
-    }
+    if (2 < argc) { threads = atoi( argv[ 2 ] ); }
+    if (threads <= 1) threads = 1;
+    if (1 < argc) { sessions = atoi( argv[ 1 ] ); }
+    if (sessions <= 1) sessions = 1;
+    vector<thread> sessionThreads;
+    for (int i = 0; i < sessions; ++i) sessionThreads.push_back( thread( doMonitoredFileAccess ) );
+    for (int i = 0; i < sessions; ++i) sessionThreads[ i ].join();
 };
 
