@@ -166,7 +166,7 @@ namespace YAM
         void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const override;
 
         void postProcessor(std::shared_ptr<PostProcessor> const& processor);
-        void start() override;
+        void start(PriorityClass prio) override;
         void cancel() override;
 
         void buildFile(SourceFileNode* buildFile);

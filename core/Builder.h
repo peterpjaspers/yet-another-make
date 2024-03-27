@@ -27,20 +27,20 @@ namespace YAM
         // Execute given 'request' asynchronously.
         // Notify completion by calling completor()->Broadcast(result).
         // Take care: completion will be notified in different thread then
-        // the one that called start().
+        // the one that called start(..).
         void start(std::shared_ptr<BuildRequest> request);
 
         // Return whether a build is running.
         bool running();
 
         // Stop a running build.
-        // Completion will be notified as described in start().
+        // Completion will be notified as described in start(..).
         // Stopping a build that is not running or that has already
         // completed is a no-op.
         void stop();
 
         // Return delegate to which clients can add callbacks that will be
-        // executed when build execution completes. See start(). 
+        // executed when build execution completes. See start(..). 
         MulticastDelegate<std::shared_ptr<BuildResult>>& completor();
 
     private:

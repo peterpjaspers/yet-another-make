@@ -125,7 +125,7 @@ namespace
         std::vector<long long> deltas;
         appendToFile(testFile, "");
         auto t0 = lastWriteTime(testFile);
-        for (int i = 0; i < 100; ++i) {
+        for (int i = 0; i < 10000; ++i) {
             appendToFile(testFile, "a");
             auto t = lastWriteTime(testFile);
             auto delta = t - t0;

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Delegates.h"
-#include "Dispatcher.h"
+#include "PriorityDispatcher.h"
 
 #include <chrono>
 #include <thread>
@@ -13,7 +13,7 @@ namespace YAM
     public:
         PeriodicTimer(
             std::chrono::system_clock::duration period,
-            Dispatcher& dispatcher,
+            PriorityDispatcher& dispatcher,
             Delegate<void> const &callback);
 
         ~PeriodicTimer();
@@ -25,7 +25,7 @@ namespace YAM
         void run();
 
         std::chrono::system_clock::duration _period;
-        Dispatcher& _dispatcher;
+        PriorityDispatcher& _dispatcher;
         Delegate<void> _callback;
         std::mutex _mutex;
         std::condition_variable _cond;

@@ -218,8 +218,8 @@ namespace YAM
         return hash;
     }
 
-    void BuildFileCompilerNode::start() {
-        Node::start();
+    void BuildFileCompilerNode::start(PriorityClass prio) {
+        Node::start(prio);
         if (_buildFileParser == nullptr) {
             postCompletion(Node::State::Ok);
         } else {
@@ -230,7 +230,7 @@ namespace YAM
                 getInputs(requisites);
                 auto callback = Delegate<void, Node::State>::CreateLambda(
                     [this](Node::State state) { handleRequisitesCompletion(state); });
-                startNodes(requisites, std::move(callback));
+                startNodes(requisites, std::move(callback), prio);
             }
         }
     }

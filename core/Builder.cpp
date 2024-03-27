@@ -325,7 +325,7 @@ namespace YAM
             logBook.add(scanning);
 
             _dirtyConfigNodes->content(dirtyNodes);
-            _dirtyConfigNodes->start();
+            _dirtyConfigNodes->start(PriorityClass::VeryLow);
         }
     }
 
@@ -346,7 +346,7 @@ namespace YAM
                 logBook.add(scanning);
 
                 _dirtyDirectories->content(prunedDirtyDirs);
-                _dirtyDirectories->start();
+                _dirtyDirectories->start(PriorityClass::VeryLow);
             }
         }
     }
@@ -367,7 +367,7 @@ namespace YAM
                 logBook.add(parsing);
 
                 _dirtyBuildFileParsers->content(dirtyBuildFiles);
-                _dirtyBuildFileParsers->start();
+                _dirtyBuildFileParsers->start(PriorityClass::VeryLow);
             }
         }
     }
@@ -393,7 +393,7 @@ namespace YAM
                 logBook.add(compiling);
 
                 _dirtyBuildFileCompilers->content(dirtyBuildFileCompilers);
-                _dirtyBuildFileCompilers->start();
+                _dirtyBuildFileCompilers->start(PriorityClass::VeryLow);
             }
         }
     }
@@ -431,7 +431,7 @@ namespace YAM
                     std::vector<std::shared_ptr<Node>> dirtyNodes;
                     dirtyNodes.insert(dirtyNodes.end(), dirtyCommands.begin(), dirtyCommands.end());
                     _dirtyCommands->content(dirtyNodes);
-                    _dirtyCommands->start();
+                    _dirtyCommands->start(PriorityClass::VeryLow);
                 }
             }
         }

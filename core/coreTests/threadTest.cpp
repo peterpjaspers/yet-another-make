@@ -1,5 +1,5 @@
 #include "../Delegates.h"
-#include "../Dispatcher.h"
+#include "../PriorityDispatcher.h"
 #include "../Thread.h"
 
 #include "gtest/gtest.h"
@@ -18,13 +18,13 @@ namespace
         auto l1add = [&r1]() { r1 = x + y; };
         auto l2add = [&r2]() { r2 = x + y; };
 
-        Dispatcher q;
+        PriorityDispatcher q(4);
         Thread t1(&q, std::string("t1"));
         Thread t2(&q, std::string("t2"));
 
         q.push(Delegate<void>::CreateLambda(l1add));
         q.push(Delegate<void>::CreateLambda(l2add));
-        q.push(Delegate<void>::CreateRaw(&q, &Dispatcher::stop));
+        q.push(Delegate<void>::CreateRaw(&q, &PriorityDispatcher::stop));
 
         t1.join();
         t2.join();

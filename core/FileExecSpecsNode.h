@@ -60,7 +60,7 @@ namespace YAM
         std::string command(std::filesystem::path const& fileName) const;
 
         //Inherited from Node
-        void start() override;
+        void start(PriorityClass prio) override;
         std::string className() const override { return "FileExecSpecsNode"; }
         void cleanup() override;
 

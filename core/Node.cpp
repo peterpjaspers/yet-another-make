@@ -122,7 +122,7 @@ namespace YAM
         if (0 == _observers.erase(observer)) throw std::runtime_error("Attempt to remove unknown state observer");
     }
 
-    void Node::start() {
+    void Node::start(PriorityClass prio) {
         ASSERT_MAIN_THREAD(_context);
         if (state() != Node::State::Dirty) throw std::runtime_error("Attempt to start while not dirty");
         _context->statistics().registerStarted(this);
@@ -130,9 +130,9 @@ namespace YAM
     }
 
     void Node::startNodes(
-            std::vector<Node*> const& nodes,
-            Delegate<void, Node::State> const& callback,
-            bool nonCancelable
+        std::vector<Node*> const& nodes,
+        Delegate<void, Node::State> const& callback,
+        PriorityClass prio
     ) {
         ASSERT_MAIN_THREAD(_context);
         if (_state != Node::State::Executing) throw std::runtime_error("Attempt to start nodes while not in executing state");
@@ -143,16 +143,15 @@ namespace YAM
             _nodesToExecute.insert(n);
         }
         _callback = callback;
-        _nonCancelable = nonCancelable;
         if (stop) {
             cancel();
         } else {
-            for (auto n : _nodesToExecute) startNode(n);
+            for (auto n : _nodesToExecute) startNode(n, prio);
         }
         if (_nExecutingNodes == 0) _handleNodesCompletion();
     }
 
-    void Node::startNode(Node* node) {
+    void Node::startNode(Node* node, PriorityClass prio) {
 #ifdef _DEBUG
         if (!node->observers().contains(this)) {
             throw std::runtime_error("Started node is not observed");
@@ -165,7 +164,7 @@ namespace YAM
 #ifdef _DEBUG
             _executingNodes.insert(node);
 #endif
-            node->start();
+            node->start(prio);
             break;
         }
         case Node::State::Executing:
@@ -240,7 +239,6 @@ namespace YAM
         } else {
             state = State::Failed;
         }
-        _nonCancelable = false;
         auto d = Delegate<void>::CreateLambda([this, state]()
         {
             _callback.Execute(state);
@@ -275,7 +273,6 @@ namespace YAM
 
     void Node::cancel() {
         if (_state != Node::State::Executing) return;
-        if (_nonCancelable) return;
         if (!_canceling) {
             _canceling = true;
             for (auto p : _nodesToExecute) {

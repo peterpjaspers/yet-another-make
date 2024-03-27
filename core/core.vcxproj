@@ -115,6 +115,8 @@
     <ClInclude Include="FileRepositoryNode.h" />
     <ClInclude Include="BuildStateVersion.h" />
     <ClInclude Include="PeriodicTimer.h" />
+    <ClInclude Include="PriorityClass.h" />
+    <ClInclude Include="PriorityDispatcher.h" />
     <ClInclude Include="RepositoriesNode.h" />
     <ClInclude Include="Glob.h" />
     <ClInclude Include="Globber.h" />
@@ -219,6 +221,7 @@
     <ClCompile Include="FileRepositoryNode.cpp" />
     <ClCompile Include="BuildStateVersion.cpp" />
     <ClCompile Include="PeriodicTimer.cpp" />
+    <ClCompile Include="PriorityDispatcher.cpp" />
     <ClCompile Include="RepositoriesNode.cpp" />
     <ClCompile Include="Glob.cpp" />
     <ClCompile Include="Globber.cpp" />
@@ -254,7 +257,6 @@
     <ClCompile Include="MemoryStream.cpp" />
     <ClCompile Include="ShutdownRequest.cpp" />
     <ClCompile Include="DirectoryNode.cpp" />
-    <ClCompile Include="DispatcherFrame.cpp" />
     <ClCompile Include="ExecutionContext.cpp" />
     <ClCompile Include="ExecutionStatistics.cpp" />
     <ClCompile Include="FileAspect.cpp" />

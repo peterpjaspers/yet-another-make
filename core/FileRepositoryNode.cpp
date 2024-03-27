@@ -243,8 +243,8 @@ namespace YAM
         return XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
     }
 
-    void FileRepositoryNode::start() {
-        Node::start();
+    void FileRepositoryNode::start(PriorityClass prio) {
+        Node::start(prio);
         postCompletion(Node::State::Ok);
     }
 

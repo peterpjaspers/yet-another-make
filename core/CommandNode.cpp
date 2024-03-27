@@ -944,8 +944,8 @@ namespace YAM
     }
 
     // main thread
-    void CommandNode::start() {
-        Node::start();
+    void CommandNode::start(PriorityClass prio) {
+        Node::start(prio);
         std::vector<Node*> requisites;
         for (auto const& ip : _inputProducers) {
             auto const& group = dynamic_pointer_cast<GroupNode>(ip);
@@ -966,7 +966,7 @@ namespace YAM
         auto callback = Delegate<void, Node::State>::CreateLambda(
             [this](Node::State state) { handleRequisitesCompletion(state); }
         );
-        startNodes(requisites, std::move(callback));
+        startNodes(requisites, std::move(callback), prio);
     }
 
     void CommandNode::handleRequisitesCompletion(Node::State state) {
@@ -979,7 +979,7 @@ namespace YAM
             auto d = Delegate<void>::CreateLambda(
                 [this]() { executeScript(); }
             );
-            context()->threadPoolQueue().push(std::move(d));
+            context()->threadPoolQueue().push(std::move(d), PriorityClass::High);
         } else {
             Node::notifyCompletion(state);
         }
@@ -1121,15 +1121,7 @@ namespace YAM
                         [this, sresult](Node::State state) { 
                             handleOutputAndNewInputFilesCompletion(state, sresult); }
                     );
-                    // Make (re-)hashing of file nodes non-cancelable because 
-                    // these operations are queued behind all other command
-                    // nodes. A used canceling the build would cancel all 
-                    // the rehash operations and as a consequence all command
-                    // nodes. As a consequence all already generated would be
-                    // deleted.
-                    // Other approach would be to start these nodes with high
-                    // priority. 
-                    startNodes(rawNodes, std::move(callback), true);
+                    startNodes(rawNodes, std::move(callback), PriorityClass::VeryHigh);
                 } else {
                     result._newState = Node::State::Failed;
                 }

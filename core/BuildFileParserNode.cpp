@@ -227,8 +227,8 @@ namespace YAM
         return dynamic_pointer_cast<DirectoryNode>(node);
     }
 
-    void BuildFileParserNode::start() {
-        Node::start();
+    void BuildFileParserNode::start(PriorityClass prio) {
+        Node::start(prio);
         if (_buildFile == nullptr) {
             postCompletion(Node::State::Ok);
         } else {
@@ -241,7 +241,7 @@ namespace YAM
             auto callback = Delegate<void, Node::State>::CreateLambda(
                 [this](Node::State state) { handleRequisitesCompletion(state); }
             );
-            startNodes(requisites, std::move(callback));
+            startNodes(requisites, std::move(callback), prio);
         }
     }
 
@@ -261,7 +261,7 @@ namespace YAM
                     _parser->process(); 
                      postParseCompletion();
                 });
-                context()->threadPoolQueue().push(parse);
+                context()->threadPoolQueue().push(parse, PriorityClass::High);
             }
         }
     }
@@ -307,7 +307,7 @@ namespace YAM
             auto callback = Delegate<void, Node::State>::CreateLambda(
                 [this](Node::State state) { handleGlobsCompletion(state); }
             );
-            startNodes(globs, std::move(callback));
+            startNodes(globs, std::move(callback), PriorityClass::VeryHigh);
         }
     }
 

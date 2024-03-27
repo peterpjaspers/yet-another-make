@@ -87,8 +87,8 @@ namespace YAM
         return files;
     }
 
-    void GroupNode::start() {
-        Node::start();
+    void GroupNode::start(PriorityClass prio) {
+        Node::start(prio);
         auto callback = Delegate<void, Node::State>::CreateLambda(
             [this](Node::State state) { handleGroupCompletion(state); }
         );
@@ -101,7 +101,7 @@ namespace YAM
                 requisites.push_back(node.get());
             }
         }
-        startNodes(requisites, std::move(callback));
+        startNodes(requisites, std::move(callback), prio);
     }
 
     void GroupNode::handleGroupCompletion(Node::State groupState) {

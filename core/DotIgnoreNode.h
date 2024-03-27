@@ -38,7 +38,7 @@ namespace YAM
         void addPrerequisitesToContext();
 
         void setState(State newState) override;
-        void start() override;
+        void start(PriorityClass prio) override;
 
         // return the hash of the ignore patterns. 
         XXH64_hash_t hash() const { return _hash; }

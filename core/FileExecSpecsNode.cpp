@@ -153,13 +153,13 @@ namespace YAM
         return invokation;
     }
 
-    void FileExecSpecsNode::start() {
-        Node::start();
+    void FileExecSpecsNode::start(PriorityClass prio) {
+        Node::start(prio);
         std::vector<std::shared_ptr<Node>> requisites{ _configFile };
         auto callback = Delegate<void, Node::State>::CreateLambda(
             [this](Node::State state) { handleRequisitesCompletion(state); }
         );
-        Node::startNodes(requisites, callback);
+        startNodes(requisites, callback, prio);
     }
 
     void FileExecSpecsNode::handleRequisitesCompletion(Node::State newState) {

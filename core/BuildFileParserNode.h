@@ -38,7 +38,7 @@ namespace YAM {
 
         // Overrides from Node class
         std::string className() const override { return "BuildFileParserNode"; }
-        void start() override;
+        void start(PriorityClass prio) override;
 
         // Return the hash of the parseTree and of the globs in the parseTree's
         // buildfile dependency and cmd and order-only input sections.

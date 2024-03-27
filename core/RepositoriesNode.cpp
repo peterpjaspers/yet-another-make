@@ -345,8 +345,8 @@ namespace YAM
         }
     }
 
-    void RepositoriesNode::start() {
-        Node::start();
+    void RepositoriesNode::start(PriorityClass prio) {
+        Node::start(prio);
         if (_ignoreConfigFile) {
             postCompletion(Node::State::Ok);
         } else {
@@ -354,7 +354,7 @@ namespace YAM
             auto callback = Delegate<void, Node::State>::CreateLambda(
                 [this](Node::State state) { handleRequisitesCompletion(state); }
             );
-            Node::startNodes(requisites, callback);
+            startNodes(requisites, callback, prio);
         }
     }
 

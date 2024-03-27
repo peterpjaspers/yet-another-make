@@ -3,6 +3,7 @@
 
 #include "Delegates.h"
 #include "IPersistable.h"
+#include "PriorityClass.h"
 
 #include <filesystem>
 #include <functional>
@@ -91,17 +92,17 @@ namespace YAM
         // Pre: state() != Node::State::Deleted
         virtual void setState(State newState);
 
-        // Start asynchronous execution.
+        // Start asynchronous execution with given priority.
         // Sub-classes must override this function as follows:
-        //    void start() override {
-        //       Node::start();
+        //    void start(..) override {
+        //       Node::start(..);
         //       sub-class specific execution logic
         //    }
         // On completion the sub-class must call notifyCompletion when in
         // main thread or call postCompletion when not in main thread.
         //
         // Pre: state() == Node::State::Dirty
-        virtual void start();
+        virtual void start(PriorityClass prio);
 
         // Return delegate to which clients can add callbacks that will be
         // executed when execution of this node completes.
@@ -122,7 +123,7 @@ namespace YAM
         }
 
         // Cancel node execution.
-        // Cancelation is asynchronous: completion as specified by start() 
+        // Cancelation is asynchronous: completion as specified by start(..) 
         // function. 
         // Sub-classes must override this function as follows:
         //    void cancel() override {
@@ -189,17 +190,17 @@ namespace YAM
         void startNodes(
             std::vector<std::shared_ptr<TNode>> const& nodes,
             Delegate<void, Node::State> const& callback,
-            bool nonCancelable = false
+            PriorityClass prio
         ) {
             std::vector<Node*> rawNodes;
             for (auto const& n : nodes) rawNodes.push_back(n.get());
-            startNodes(rawNodes, callback, nonCancelable);
+            startNodes(rawNodes, callback, prio);
         }
 
         void startNodes(
             std::vector<Node*> const& nodes,
-            Delegate<void, Node::State> const& callback,
-            bool nonCancelable = false);
+            Delegate<void, Node::State> const& callback, 
+            PriorityClass prio);
 
         // Push notifyCompletion(newState) to context()->mainThreadQueue()
         // To be called by subclass to notify execution completion from 
@@ -214,14 +215,13 @@ namespace YAM
         void notifyCompletion(Node::State newState);
 
     private:
-        void startNode(Node* node);
+        void startNode(Node* node, PriorityClass prio);
         void _handleNodesCompletion();
 
         ExecutionContext* _context;
         std::filesystem::path _name;
         State _state;
         std::atomic<bool> _canceling;
-        bool _nonCancelable;
 
         // As requested by startNodes(..),
         Delegate<void, Node::State> _callback;

@@ -3,7 +3,7 @@
 
 namespace YAM
 {
-    ThreadPool::ThreadPool(Dispatcher* dispatcher, std::string const& name, std::size_t nThreads)
+    ThreadPool::ThreadPool(PriorityDispatcher* dispatcher, std::string const& name, std::size_t nThreads)
         : _dispatcher(dispatcher)
         , _name(name)
     {
@@ -48,7 +48,7 @@ namespace YAM
     void ThreadPool::join() {
         if (0 < _threads.size()) {
             // Finish all pending work before stopping dispatcher
-            _dispatcher->push(Delegate<void>::CreateRaw(_dispatcher, &Dispatcher::stop));
+            _dispatcher->push(Delegate<void>::CreateRaw(_dispatcher, &PriorityDispatcher::stop), 0);
             _threads.clear(); // join with stopped threads
         }
     }

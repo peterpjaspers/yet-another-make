@@ -288,14 +288,14 @@ namespace YAM
         }
     }
 
-    void DirectoryNode::start() {
-        Node::start();
+    void DirectoryNode::start(PriorityClass prio) {
+        Node::start(prio);
         std::vector<Node*> requisites;
         requisites.push_back(_dotIgnoreNode.get());
         auto callback = Delegate<void, Node::State>::CreateLambda(
             [this](Node::State s) { handleRequisitesCompletion(s); }
         );
-        Node::startNodes(requisites, std::move(callback));
+        startNodes(requisites, std::move(callback), prio);
     }
 
     void DirectoryNode::handleRequisitesCompletion(Node::State state) {
@@ -308,7 +308,7 @@ namespace YAM
             auto d = Delegate<void>::CreateLambda(
                 [this]() { retrieveContentIfNeeded(); }
             );
-            context()->threadPoolQueue().push(std::move(d));
+            context()->threadPoolQueue().push(std::move(d), PriorityClass::High);
         }
     }
 
@@ -370,7 +370,7 @@ namespace YAM
             auto callback = Delegate<void, Node::State>::CreateLambda(
                 [this](Node::State s) { Node::notifyCompletion(s); }
             );
-            Node::startNodes(dirtyChildren, std::move(callback));
+            startNodes(dirtyChildren, std::move(callback), PriorityClass::VeryHigh);
         }
     }
 

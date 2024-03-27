@@ -1,7 +1,7 @@
 #pragma once
 
 #include "NodeSet.h"
-#include "Dispatcher.h"
+#include "PriorityDispatcher.h"
 #include "Thread.h"
 #include "ThreadPool.h"
 #include "FileAspectSet.h"
@@ -28,8 +28,8 @@ namespace YAM
 
         ThreadPool& threadPool();
         Thread& mainThread();
-        Dispatcher& threadPoolQueue();
-        Dispatcher& mainThreadQueue();
+        PriorityDispatcher& threadPoolQueue();
+        PriorityDispatcher& mainThreadQueue();
 
         // Throw an exception when called in other thread than mainThread.
         void assertMainThread();
@@ -84,8 +84,8 @@ namespace YAM
 
 
     private:
-        Dispatcher _mainThreadQueue;
-        Dispatcher _threadPoolQueue;
+        PriorityDispatcher _mainThreadQueue;
+        PriorityDispatcher _threadPoolQueue;
         Thread _mainThread;
         ThreadPool _threadPool;
         ExecutionStatistics _statistics;

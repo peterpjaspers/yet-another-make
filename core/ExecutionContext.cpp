@@ -9,6 +9,8 @@ namespace
 {
     using namespace YAM;
 
+    uint32_t nPriorities() { return 32; }
+
     std::size_t getDefaultPoolSize() {
         static unsigned int n = std::thread::hardware_concurrency();
         return n;
@@ -29,7 +31,9 @@ namespace YAM
 {
 
     ExecutionContext::ExecutionContext()
-        : _mainThread(&_mainThreadQueue, "YAM_main")
+        : _mainThreadQueue(nPriorities())
+        , _threadPoolQueue(nPriorities())
+        , _mainThread(&_mainThreadQueue, "YAM_main")
         , _threadPool(&_threadPoolQueue, "YAM_threadpool", getDefaultPoolSize()) 
         , _logBook(std::make_shared<ConsoleLogBook>())
     {
@@ -48,10 +52,10 @@ namespace YAM
     Thread& ExecutionContext::mainThread() {
         return _mainThread;
     }
-    Dispatcher& ExecutionContext::threadPoolQueue() {
+    PriorityDispatcher& ExecutionContext::threadPoolQueue() {
         return _threadPoolQueue;
     }
-    Dispatcher& ExecutionContext::mainThreadQueue()  {
+    PriorityDispatcher& ExecutionContext::mainThreadQueue()  {
         return _mainThreadQueue;
     }
 

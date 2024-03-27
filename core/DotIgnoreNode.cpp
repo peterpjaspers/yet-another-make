@@ -97,14 +97,14 @@ namespace YAM
         return hash;
     }
 
-    void DotIgnoreNode::start() {
-        Node::start();
+    void DotIgnoreNode::start(PriorityClass prio) {
+        Node::start(prio);
         std::vector<Node*> requisites;
         for (auto const& n : _dotIgnoreFiles) requisites.push_back(n.get());
         auto callback = Delegate<void, Node::State>::CreateLambda(
             [this](Node::State s) { handleRequisiteCompletion(s); }
         );
-        Node::startNodes(requisites, std::move(callback));
+        startNodes(requisites, std::move(callback), prio);
     }
 
     void DotIgnoreNode::handleRequisiteCompletion(Node::State state) {
@@ -117,7 +117,7 @@ namespace YAM
             auto d = Delegate<void>::CreateLambda(
                 [this]() { parseDotIgnoreFiles(); }
             );
-            context()->threadPoolQueue().push(std::move(d));
+            context()->threadPoolQueue().push(std::move(d), PriorityClass::High);
         } else {
             Node::notifyCompletion(state);
         }

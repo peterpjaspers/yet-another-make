@@ -348,6 +348,12 @@
     <ClInclude Include="PeriodicTimer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="PriorityDispatcher.h">
+      <Filter>Header Files\Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="PriorityClass.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -408,9 +414,6 @@
       <Filter>Source Files\LogBook</Filter>
     </ClCompile>
     <ClCompile Include="Dispatcher.cpp">
-      <Filter>Source Files\Thread</Filter>
-    </ClCompile>
-    <ClCompile Include="DispatcherFrame.cpp">
       <Filter>Source Files\Thread</Filter>
     </ClCompile>
     <ClCompile Include="DotIgnoreNode.cpp">
@@ -586,6 +589,9 @@
     </ClCompile>
     <ClCompile Include="PeriodicTimer.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PriorityDispatcher.cpp">
+      <Filter>Source Files\Thread</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

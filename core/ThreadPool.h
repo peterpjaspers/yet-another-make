@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Dispatcher.h"
+#include "PriorityDispatcher.h"
 #include "Thread.h"
 
 #include <vector>
@@ -13,7 +13,7 @@ namespace YAM
     class __declspec(dllexport) ThreadPool
     {
     public:
-        ThreadPool(Dispatcher* dispatcher, std::string const& name, std::size_t nThreads);
+        ThreadPool(PriorityDispatcher* dispatcher, std::string const& name, std::size_t nThreads);
         ~ThreadPool();
 
         // Return the number of threads in the pool.
@@ -49,7 +49,7 @@ namespace YAM
         void join();
 
     private:
-        Dispatcher* _dispatcher;
+        PriorityDispatcher* _dispatcher;
         std::string _name;
         std::vector<std::shared_ptr<Thread>> _threads;
     };

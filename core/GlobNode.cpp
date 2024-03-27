@@ -76,14 +76,14 @@ namespace YAM
         }
     }
 
-    void GlobNode::start() {
-        Node::start();
+    void GlobNode::start(PriorityClass prio) {
+        Node::start(prio);
         auto callback = Delegate<void, Node::State>::CreateLambda(
             [this](Node::State state) { handleInputDirsCompletion(state); }
         );
         std::vector<Node*> inputs;
         for (auto const& n : _inputDirs) inputs.push_back(n.get());
-        Node::startNodes(inputs, callback);
+        startNodes(inputs, callback, prio);
     }
 
     void GlobNode::handleInputDirsCompletion(Node::State state) {
@@ -98,7 +98,7 @@ namespace YAM
             auto d = Delegate<void>::CreateLambda(
                 [this]() { executeGlob(); }
             );
-            context()->threadPoolQueue().push(std::move(d));
+            context()->threadPoolQueue().push(std::move(d), PriorityClass::High);
         }
     }
 

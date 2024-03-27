@@ -46,7 +46,7 @@ namespace YAM
         std::set<std::shared_ptr<FileNode>, Node::CompareName> files() const;
 
         // Override Node
-        void start() override;
+        void start(PriorityClass prio) override;
 
         // Return a hash of the names of the nodes in the group.
         XXH64_hash_t hash() const { return _hash; }

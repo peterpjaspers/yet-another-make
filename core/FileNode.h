@@ -94,7 +94,7 @@ namespace YAM
         // name is the absolute path name of the file associated with this node.
         FileNode(ExecutionContext* context, std::filesystem::path const& name);
 
-        void start() override;
+        void start(PriorityClass prio) override;
 
         // Pre: state() == State::Ok
         // Return the cached last-write-time of the file.

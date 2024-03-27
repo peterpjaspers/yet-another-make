@@ -295,7 +295,7 @@ namespace YAM
         XXH64_hash_t hash() const;
 
         // Inherited from Node
-        void start() override;
+        void start(PriorityClass prio) override;
         std::string className() const override { return "FileRepositoryNode"; }
 
         static void setStreamableType(uint32_t type);

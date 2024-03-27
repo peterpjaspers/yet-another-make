@@ -1,11 +1,12 @@
 #include "PeriodicTimer.h"
+#include "PriorityDispatcher.h"
 
 namespace YAM
 {
 
     PeriodicTimer::PeriodicTimer(
         std::chrono::system_clock::duration period,
-        Dispatcher& dispatcher,
+        PriorityDispatcher& dispatcher,
         Delegate<void> const &callback)
         : _period(period)
         , _dispatcher(dispatcher)

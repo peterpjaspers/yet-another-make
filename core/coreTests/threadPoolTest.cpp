@@ -1,5 +1,5 @@
 #include "../Delegates.h"
-#include "../Dispatcher.h"
+#include "../PriorityDispatcher.h"
 #include "../ThreadPool.h"
 
 #include "gtest/gtest.h"
@@ -29,7 +29,7 @@ namespace
             count++;
         };
 
-        Dispatcher q;
+        PriorityDispatcher q(8);
         ThreadPool pool(&q, "YAM", 4);
 
         for (int i = 0; i < nIterations; ++i) {
@@ -59,7 +59,7 @@ namespace
             count++;
         };
 
-        Dispatcher q;
+        PriorityDispatcher q(8);
         ThreadPool pool(&q, "YAM", 4);
         
         q.suspend();

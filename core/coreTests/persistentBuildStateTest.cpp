@@ -13,6 +13,8 @@
 #include "../FileSystem.h"
 #include "../RegexSet.h"
 #include "../FileAspect.h"
+#include "../Dispatcher.h"
+#include "../PriorityDispatcher.h"
 
 #include "gtest/gtest.h"
 #include <chrono>
@@ -39,7 +41,7 @@ namespace
     // Return whether event was consumed.
     bool consumeFileChangeEvents(
         FileRepositoryNode* sourceFileRepo,
-        Dispatcher& mainThreadQueue,
+        PriorityDispatcher& mainThreadQueue,
         std::initializer_list<std::filesystem::path> paths)
     {
         std::atomic<bool> received = false;

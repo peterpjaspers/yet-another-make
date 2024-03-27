@@ -60,7 +60,7 @@ namespace YAM
 
         std::string className() const override { return "DirectoryNode"; }
 
-        void start() override;
+        void start(PriorityClass prio) override;
 
         // Add the prerequisites (i.e. the DotIgnoreNode and its prerequisites)
         // to the execution context.

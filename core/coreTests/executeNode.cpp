@@ -40,7 +40,7 @@ namespace YAMTest
                 } else {
                     _handles[n] = n->completor().Add(
                         Delegate<void, Node*>::CreateRaw(this, &Executor::_handleNodeCompletion));
-                    if (n->state() == Node::State::Dirty) n->start();
+                    if (n->state() == Node::State::Dirty) n->start(PriorityClass::VeryLow);
                 }
             }
             _nodes[0]->context()->mainThreadQueue().run(&_frame);

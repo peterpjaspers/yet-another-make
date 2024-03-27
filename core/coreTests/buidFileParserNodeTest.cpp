@@ -13,6 +13,7 @@
 #include "../FileSystem.h"
 #include "../RegexSet.h"
 #include "../AcyclicTrail.h"
+#include "../Dispatcher.h"
 
 #include "gtest/gtest.h"
 #include <chrono>

@@ -48,7 +48,7 @@ namespace YAM {
         }
         
         // Inherited from Node
-        void start() override;
+        void start(PriorityClass prio) override;
         void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const override;
         void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const override;
 

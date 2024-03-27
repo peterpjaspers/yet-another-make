@@ -1,16 +1,16 @@
 #include "Thread.h"
-#include "Dispatcher.h"
+#include "PriorityDispatcher.h"
 
 namespace
 {
-    void run(YAM::Dispatcher* dispatcher) {
+    void run(YAM::PriorityDispatcher* dispatcher) {
         dispatcher->run();
     }
 }
 
 namespace YAM
 {
-    Thread::Thread(Dispatcher* dispatcher, std::string const& name)
+    Thread::Thread(PriorityDispatcher* dispatcher, std::string const& name)
         : _dispatcher(dispatcher)
         , _name(name)
         , _thread(&run, _dispatcher)
@@ -26,7 +26,7 @@ namespace YAM
         return _name;
     }
 
-    Dispatcher* Thread::dispatcher() const {
+    PriorityDispatcher* Thread::dispatcher() const {
         return _dispatcher;
     }
 

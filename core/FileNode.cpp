@@ -24,11 +24,11 @@ namespace YAM
         return lwutc;
     }
 
-    void FileNode::start() {
-        Node::start();
+    void FileNode::start(PriorityClass prio) {
+        Node::start(prio);
         context()->statistics().registerSelfExecuted(this);
         auto d = Delegate<void>::CreateLambda([this]() {execute(); });
-        context()->threadPoolQueue().push(std::move(d));
+        context()->threadPoolQueue().push(std::move(d), prio);
     }
 
     void FileNode::execute() {

@@ -37,7 +37,7 @@ namespace YAM
 
         std::vector<std::shared_ptr<Node>> const& matches() const { return _matches; }
 
-        void start() override;
+        void start(PriorityClass prio) override;
 
         // Optional: initialize the glob node by applying pattern() to the 
         // baseDirectory().
