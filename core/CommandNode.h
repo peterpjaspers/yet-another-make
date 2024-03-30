@@ -185,6 +185,7 @@ namespace YAM
         bool restore(void* context, std::unordered_set<IPersistable const*>& restored) override;
 
     protected:
+        void destroy(bool removeFromContext);
         void cleanup() override;
 
     private:

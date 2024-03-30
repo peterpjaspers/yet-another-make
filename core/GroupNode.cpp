@@ -124,10 +124,15 @@ namespace YAM
         std::vector<XXH64_hash_t> hashes;
         for (auto const& n : _content) {
             hashes.push_back(XXH64_string(n->name().string()));
-            // The outputs of a commandnode may have changed.
-            // Therefore include command executionHash.
             auto const& cmd = dynamic_pointer_cast<CommandNode>(n);
-            if (cmd != nullptr) hashes.push_back(cmd->executionHash());
+            if (cmd != nullptr) {
+                std::vector<std::shared_ptr<GeneratedFileNode>> outputs = cmd->detectedOutputs();
+                for (auto const& n : outputs) {
+                    hashes.push_back(XXH64_string(n->name().string()));
+                }
+            } else {
+                //TODO: add ForEachNode
+            }
         }
         XXH64_hash_t hash = XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
         return hash;

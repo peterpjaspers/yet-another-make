@@ -59,6 +59,7 @@ namespace YAM
         bool restore(void* context, std::unordered_set<IPersistable const*>& restored) override;
 
     private:
+        void destroy();
         void cleanup() override;
         std::pair<std::shared_ptr<Globber>, std::string> execute();
         void handleInputDirsCompletion(Node::State state);

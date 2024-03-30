@@ -1,7 +1,83 @@
 #pragma once
 
+#include "GlobNode.h"
+#include "GeneratedFileNode.h"
+#include "CommandNode.h"
+#include "GroupNode.h"
+#include "BuildFileCompilerNode.h"
+
 #include <map>
 #include <filesystem>
+
+namespace
+{
+    using namespace YAM;
+
+    void addNode(std::shared_ptr<BuildFileCompilerNode> compiler, StateObserver* observer) {
+        // owned and added to context by DirectoryNode
+        compiler->addObserver(observer);
+    }
+
+    void addNode(std::shared_ptr<GlobNode> glob, StateObserver* observer) {
+        // A glob node can be shared by multiple compilers.
+        glob->context()->nodes().addIfAbsent(glob);
+        glob->addObserver(observer);
+    }
+
+    void addNode(std::shared_ptr<CommandNode> node, StateObserver* observer) {
+        node->context()->nodes().add(node);
+    }
+    void addNode(std::shared_ptr<GeneratedFileNode> node, StateObserver* observer) {
+        node->context()->nodes().add(node);
+    }
+    void addNode(std::shared_ptr<GroupNode> group, StateObserver* observer) {
+        // A group node can be shared by multiple compilers and can already
+        // have been added to the context by another compiler.
+        group->context()->nodes().addIfAbsent(group);
+    }
+
+    void addNode(std::shared_ptr<Node> node, StateObserver* observer) {
+        auto glob = dynamic_pointer_cast<GlobNode>(node);
+        if (glob != nullptr) addNode(glob, observer);
+        else node->addObserver(observer);
+    }
+
+    void removeNode(std::shared_ptr<BuildFileCompilerNode> compiler, StateObserver* observer) {
+        // owned by DirectoryNode
+        compiler->removeObserver(observer);
+    }
+    void removeNode(std::shared_ptr<GlobNode> glob, StateObserver* observer) {
+        // A glob node can be shared by multiple compilers.
+        glob->removeObserver(observer);
+        if (glob->observers().empty()) {
+            glob->context()->nodes().remove(glob);
+        }
+    }
+    void removeNode(std::shared_ptr<CommandNode> cmd, StateObserver* observer) {
+        ExecutionContext* context = cmd->context();
+        cmd->cmdInputs({});
+        cmd->orderOnlyInputs({});
+        cmd->script("");
+        cmd->workingDirectory(nullptr);
+        cmd->outputFilters({}, {});
+        cmd->context()->nodes().remove(cmd);
+    }
+    void removeNode(std::shared_ptr<GeneratedFileNode> node, StateObserver* observer) {
+        ExecutionContext* context = node->context();
+        node->modified(true);
+        node->context()->nodes().remove(node);
+    }
+    void removeNode(std::shared_ptr<GroupNode> group, StateObserver* observer) {
+        if (group->content().empty() && group->observers().empty()) {
+            group->context()->nodes().remove(group);
+        }
+    }
+    void removeNode(std::shared_ptr<Node> node, StateObserver* observer) {
+        auto glob = dynamic_pointer_cast<GlobNode>(node);
+        if (glob != nullptr) removeNode(glob, observer);
+        else node->removeObserver(observer);
+    }
+}
 
 namespace YAM
 {
@@ -20,5 +96,21 @@ namespace YAM
         for (auto i2 : in2) {
             if (in1.find(i2.first) == in1.end()) onlyIn2.insert(i2);
         }
+    }
+
+    template <class TNode>
+    void updateMap(
+        ExecutionContext* context,
+        StateObserver* observer,
+        std::map<std::filesystem::path, std::shared_ptr<TNode>>& toUpdate,
+        std::map<std::filesystem::path, std::shared_ptr<TNode>> const& newSet
+    ) {
+        std::map<std::filesystem::path, std::shared_ptr<TNode>> kept;
+        std::map<std::filesystem::path, std::shared_ptr<TNode>> added;
+        std::map<std::filesystem::path, std::shared_ptr<TNode>> removed;
+        computeMapsDifference(newSet, toUpdate, kept, added, removed);
+        for (auto const& pair : added) addNode(pair.second, observer);
+        for (auto const& pair : removed) removeNode(pair.second, observer);
+        toUpdate = newSet;
     }
 }

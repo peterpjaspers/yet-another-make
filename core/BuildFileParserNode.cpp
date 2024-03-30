@@ -69,47 +69,6 @@ namespace
             else node->removeObserver(observer);
         }
     }
-
-    void addNode(std::shared_ptr<GlobNode> glob, StateObserver* observer) {
-        // A glob node can be shared by multiple buildfiles and could 
-        // already be present in context. Hence addIfAbsent.
-        glob->context()->nodes().addIfAbsent(glob);
-        glob->addObserver(observer);
-    }
-    void removeNode(std::shared_ptr<GlobNode> glob, StateObserver* observer) {
-        // A glob node can be shared by multiple buildfiles.
-        glob->removeObserver(observer);
-        if (glob->observers().empty()) {
-            glob->context()->nodes().remove(glob);
-        }
-    }
-
-    void addNode(std::shared_ptr<Node> node, StateObserver* observer) {
-        auto glob = dynamic_pointer_cast<GlobNode>(node);
-        if (glob != nullptr) addNode(glob, observer);
-        else node->addObserver(observer);
-    }
-    void removeNode(std::shared_ptr<Node> node, StateObserver* observer) {
-        auto glob = dynamic_pointer_cast<GlobNode>(node);
-        if (glob != nullptr) removeNode(glob, observer);
-        else node->removeObserver(observer);
-    }
-
-    template <class TNode>
-    void updateMap(
-        ExecutionContext* context,
-        StateObserver* observer,
-        std::map<std::filesystem::path, std::shared_ptr<TNode>>& toUpdate,
-        std::map<std::filesystem::path, std::shared_ptr<TNode>> const& newSet
-    ) {
-        std::map<std::filesystem::path, std::shared_ptr<TNode>> kept;
-        std::map<std::filesystem::path, std::shared_ptr<TNode>> added;
-        std::map<std::filesystem::path, std::shared_ptr<TNode>> removed;
-        computeMapsDifference(newSet, toUpdate, kept, added, removed);
-        for (auto const& pair : added) addNode(pair.second, observer);
-        for (auto const& pair : removed) removeNode(pair.second, observer);
-        toUpdate = newSet;
-    }
 }
 
 namespace YAM

@@ -354,6 +354,9 @@
     <ClInclude Include="PriorityClass.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ForEachNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -592,6 +595,9 @@
     </ClCompile>
     <ClCompile Include="PriorityDispatcher.cpp">
       <Filter>Source Files\Thread</Filter>
+    </ClCompile>
+    <ClCompile Include="ForEachNode.cpp">
+      <Filter>Source Files\Node</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

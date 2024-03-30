@@ -406,32 +406,38 @@ namespace YAM
     {}
 
     CommandNode::~CommandNode() {
-        cleanup();
+        destroy(false);
     }
-    
-    // CommandNode is removed from context: clear members variables
-    void CommandNode::cleanup() {
+
+    void CommandNode::destroy(bool removeFromContext) {
         _inputAspectsName.clear();
         _cmdInputs.clear();
         _orderOnlyInputs.clear();
-        for (auto const &producer : _inputProducers) {
+        for (auto const& producer : _inputProducers) {
             producer->removeObserver(this);
         }
         _inputProducers.clear();
         _script.clear();
-        for (auto const &pair : _mandatoryOutputs) {
+        for (auto const& pair : _mandatoryOutputs) {
             pair.second->removeObserver(this);
         }
         _mandatoryOutputs.clear();
         _outputFilters.clear();
         _outputNameFilters.clear();
-        for (auto const &pair : _detectedOptionalOutputs) {
+        for (auto const& pair : _detectedOptionalOutputs) {
             pair.second->removeObserver(this);
-            pair.second->deleteFile(false, true);
-            context()->nodes().remove(pair.second);
+            if (removeFromContext) {
+                pair.second->deleteFile(false, true);
+                context()->nodes().remove(pair.second);
+            }
         }
         _detectedOptionalOutputs.clear();
         clearDetectedInputs();
+    }
+    
+    // CommandNode is removed from context: clear members variables
+    void CommandNode::cleanup() {
+        destroy(true);
     }
 
     void CommandNode::inputAspectsName(std::string const& newName) {

@@ -46,14 +46,18 @@ namespace YAM
     }
 
     GlobNode::~GlobNode() {
-        cleanup();
+        destroy();
     }
 
-    void GlobNode::cleanup() {
+    void GlobNode::destroy() {
         for (auto const& dir : _inputDirs) dir->removeObserver(this);
         _inputDirs.clear();
         _matches.clear();
         _baseDir = nullptr;
+    }
+
+    void GlobNode::cleanup() {
+        destroy();
     }
 
     void GlobNode::baseDirectory(std::shared_ptr<DirectoryNode> const& newBaseDir) {

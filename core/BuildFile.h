@@ -59,6 +59,7 @@ namespace YAM { namespace BuildFile {
 
         void addHashes(std::vector<XXH64_hash_t>& hashes) const override;
         void stream(IStreamer* streamer) override;
+        bool operator==(Output const& rhs) const;
     };
 
     struct __declspec(dllexport) Outputs : public Node {
@@ -66,6 +67,7 @@ namespace YAM { namespace BuildFile {
 
         void addHashes(std::vector<XXH64_hash_t>& hashes) const override;
         void stream(IStreamer* streamer) override;
+        bool operator==(Outputs const& rhs) const;
     };
 
 

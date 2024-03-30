@@ -4,40 +4,37 @@ Bugs
   Reproduce with coreTests EnduranceTest
 
 Features
-- phony rule: Inputs |>|> Group
+- support foreach <group>
   Example: 
-       *.cpp |>|> <sources>
-       foreach <sources> |> cc %f -o %o |> %B.obj
-       *.obj  |>|> <objects>
-       // or: foreach *.cpp |> cc %f -o %o |> %B.obj <objects>
-  Yam invokation:
-      yam <sources> // hash modified files when changed last-write-time
-      yam <objects> // compile all dirty .obj files
-      yam *.obj     // compile all dirty .obj files
+       raw_images.zip |> unzip %f -out rawImages |> rawImages/*.jpeg <raw_images>
+       foreach <raw_images> |> processImage.exe %f -out %o |> processedImages/%b <processed_images>
+       <processed_images> |> zip %f -out %o |> processed_images.zip
 
-  Problem: foreach <sources> is not supported by yam because files in
-  group are only known after execution of its contained command nodes.
-  This would require compiling the foreach after group execution.
-  Possibly allow it for groups that only contain source files, generated
-  files and commands with only mandatory outputs.
+  Currently 'foreach <raw_images>' translates to 1 CommandNode and %f expands
+  to all files in <raw_images>. 
+  Intent here however is to create CommandNode for each file in <raw_images>. 
+  This is currently not supported by yam because files in group are only known
+  after execution of all command nodes that contribute to <group>. So to 
+  support this we must transfer compilation of foreach-file-in-group to the 
+  1 (ForEach)CommandNode created at buildfile compile-time.
+  Also different syntax may be needed to distinguish current foreach from
+  foreach-file-in-group. For now we take foreach to mean for each file in
+  in input group
 
-  Advantage: <objects> content is defined once at buildfile compile time
-  (and when cpp files are added or removed) while *.obj is evaluated each 
-  build again.
-  Advantage: currently supported output groups requires thinking ahead of what
-  groups are needed: for each rule it must be decided whether it adds outputs
-  and to which groups. Changing decisions may require updates of multiple rules
-  in multiple buildfiles. Phony rules can be added at any time without requiring
-  changes in existing rules. Can be added in only 1 buildfile (which then must
-  depend on all buildfiles that produce outputs to be added to group) but
-  preferably phony rule is added to each buildfile that produce outputs to be 
-  added to group.
+  ForEachCommand takes input group(s), command script and outputspecs
+  Instantiates CommandNode for each file in input group(s).
+  Executes these child CommandNodes.
+  Note: At compile-time ForEachCommand is created and added to <processed_images>.
+  GroupNode must include for a ForEachCommand all output files of its child 
+  CommandNodes.  
+
 - buildscope: current implementation only searches for the producers of dirty 
   generated file nodes. Could also search all dirty nodes to allow for example:
       yam *.cpp // hash file nodes
       yam buildfile_yam.txt // compile buildfile, or execute all commands 
                             // produced by buildfile
       yam submodules/<objects> // execute group
+
 - integrate Phil's file access monitor
     - how to deal with input dependencies on non-existing source files
       Note: these source file nodes are NOT in state Deleted. How to GC these
@@ -48,6 +45,7 @@ Features
       last write times match the ones provided by access monitor. If not equal
       then fail the execution and invalidate the execution hash to force command 
       to re-execute at next build. 
+
 - fileaspect configuration
       - hash = last-write-time (e.g. for generated files in cmd executionhash)
       - import lib exports hash (hash i/f of dll)

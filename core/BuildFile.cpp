@@ -140,6 +140,13 @@ namespace YAM {namespace BuildFile {
         if (streamer->reading()) pathType = static_cast<PathType>(ptype);
     }
 
+    bool Output::operator==(Output const& rhs) const {
+        if (ignore != rhs.ignore) return false;
+        if (path != rhs.path) return false;
+        if (pathType != rhs.pathType) return false;
+        return true;
+    }
+
     void Outputs::addHashes(std::vector<XXH64_hash_t>& hashes) const {
         Node::addHashes(hashes);
         for (auto& output : outputs) {
@@ -150,6 +157,10 @@ namespace YAM {namespace BuildFile {
     void Outputs::stream(IStreamer* streamer) {
         Node::stream(streamer);
         streamVector(streamer, outputs);
+    }
+
+    bool Outputs::operator==(Outputs const& rhs) const {
+        return outputs == rhs.outputs;
     }
 
     void Rule::addHashes(std::vector<XXH64_hash_t>& hashes) const {

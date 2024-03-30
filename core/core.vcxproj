@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -109,6 +109,7 @@
     <ClInclude Include="BuildFileDependenciesCompiler.h" />
     <ClInclude Include="BuildOptions.h" />
     <ClInclude Include="BuildScopeFinder.h" />
+    <ClInclude Include="ForEachNode.h" />
     <ClInclude Include="PercentageFlagsCompiler.h" />
     <ClInclude Include="FileExecSpecsNode.h" />
     <ClInclude Include="BuildFileParserNode.h" />
@@ -214,6 +215,7 @@
     <ClCompile Include="BuildFileDependenciesCompiler.cpp" />
     <ClCompile Include="BuildOptions.cpp" />
     <ClCompile Include="BuildScopeFinder.cpp" />
+    <ClCompile Include="ForEachNode.cpp" />
     <ClCompile Include="PercentageFlagsCompiler.cpp" />
     <ClCompile Include="FileExecSpecsNode.cpp" />
     <ClCompile Include="BuildFileParserNode.cpp" />
