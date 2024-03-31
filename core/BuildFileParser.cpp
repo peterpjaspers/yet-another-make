@@ -172,14 +172,11 @@ namespace YAM {
     }
 
     void BuildFileParser::parseInputs(BuildFile::Inputs& inputs) {
-        lookAhead({ glob });
-        if (_lookAhead.spec == glob) {
+        lookAhead({ ignore, glob });
+        if (_lookAhead.spec == glob || _lookAhead.spec == ignore) {
             inputs.line = _tokenizer.tokenStartLine();
             inputs.column = _tokenizer.tokenStartColumn();
-            while (
-                _lookAhead.spec == glob
-                || _lookAhead.spec == ignore
-            ) {
+            while (_lookAhead.spec == glob || _lookAhead.spec == ignore) {
                 BuildFile::Input in;
                 eatInput(in);
                 inputs.inputs.push_back(in);
@@ -242,8 +239,8 @@ namespace YAM {
     }
 
     void BuildFileParser::parseOutputs(BuildFile::Outputs& outputs) {
-        lookAhead({ glob });
-        if (_lookAhead.spec == glob) {
+        lookAhead({ ignore, glob });
+        if (_lookAhead.spec == glob || _lookAhead.spec == ignore) {
             outputs.line = _tokenizer.tokenStartLine();
             outputs.column = _tokenizer.tokenStartColumn();
             while (_lookAhead.spec == glob || _lookAhead.spec == ignore) {
