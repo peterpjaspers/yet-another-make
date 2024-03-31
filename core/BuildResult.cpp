@@ -28,10 +28,8 @@ namespace YAM
     }
 
     void BuildResult::state(State newState) {
-        if (_state != newState) {
-            _state = newState;
-            _endTime = std::chrono::system_clock::now();
-        }
+        _state = newState;
+        _endTime = std::chrono::system_clock::now();
     }
     BuildResult::State BuildResult::state() const {
         return _state;
