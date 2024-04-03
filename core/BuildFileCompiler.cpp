@@ -109,12 +109,12 @@ namespace
     }
 
     std::set<std::shared_ptr<Node>, Node::CompareName> toSet(
-        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const& commands
+        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const& commands,
+        std::map<std::filesystem::path, std::shared_ptr<ForEachNode>> const& forEachNodes
     ) {
         std::set<std::shared_ptr<Node>, Node::CompareName> nodes;
-        for (auto const& pair : commands) {
-            nodes.insert(pair.second);
-        }
+        for (auto const& pair : commands) nodes.insert(pair.second);
+        for (auto const& pair : forEachNodes) nodes.insert(pair.second);
         return nodes;
     }
 
@@ -170,7 +170,7 @@ namespace YAM
         , _oldForEachNodes(forEachNodes)
         , _oldMandatoryOutputs(mandatoryOutputs)
         , _oldOutputGroups(outputGroups)
-        , _oldOutputGroupsContent(contributionToGroups(_oldOutputGroups, toSet(_oldCommands)))
+        , _oldOutputGroupsContent(contributionToGroups(_oldOutputGroups, toSet(_oldCommands, _oldForEachNodes)))
         , _allowedInputs(allowedInputs)
         , _globNameSpace(globNameSpace)
     {

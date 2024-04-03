@@ -62,7 +62,6 @@ namespace
     }
     void removeNode(std::shared_ptr<GeneratedFileNode> node, StateObserver* observer) {
         ExecutionContext* context = node->context();
-        node->modified(true);
         node->context()->nodes().remove(node);
     }
     void removeNode(std::shared_ptr<GroupNode> group, StateObserver* observer) {

@@ -19,6 +19,7 @@ namespace YAM
     {}
 
     void GeneratedFileNode::cleanup() {
+        deleteFile(false, true);
         _producer = nullptr;
     }
 

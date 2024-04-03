@@ -131,6 +131,8 @@ namespace YAM
         _script.clear();
         if (removeFromContext) {
             for (auto const& cmd : _commands) {
+                auto const& outputs = cmd->mandatoryOutputs();
+                for (auto const& pair: outputs) context()->nodes().remove(pair.second);
                 cmd->cmdInputs({});
                 cmd->orderOnlyInputs({});
                 cmd->script("");
@@ -145,13 +147,7 @@ namespace YAM
 
     // ForEachNode is removed from context: clear members variables
     void ForEachNode::cleanup() {
-        _cmdInputs.clear();
-        _orderOnlyInputs.clear();
-        for (auto const& group : _inputGroups) {
-            group->removeObserver(this);
-        }
-        _inputGroups.clear();
-        _script.clear();
+        destroy(true);
     }
 
     void ForEachNode::cmdInputs(std::vector<std::shared_ptr<Node>> const& newInputs) {
