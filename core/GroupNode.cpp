@@ -1,5 +1,6 @@
 #include "GroupNode.h"
 #include "CommandNode.h"
+#include "ForEachNode.h"
 #include "GeneratedFileNode.h"
 #include "ExecutionContext.h"
 #include "IStreamer.h"
@@ -76,10 +77,18 @@ namespace YAM
             auto const& fileNode = dynamic_pointer_cast<FileNode>(node);
             if (fileNode != nullptr) {
                 files.insert(fileNode);
-            }  else {
-                auto const& cmdNode = dynamic_pointer_cast<CommandNode>(node);
-                if (cmdNode != nullptr) {
-                    std::vector<std::shared_ptr<GeneratedFileNode>> outputs = cmdNode->detectedOutputs();
+                continue;
+            }
+            auto const& cmdNode = dynamic_pointer_cast<CommandNode>(node);
+            if (cmdNode != nullptr) {
+                std::vector<std::shared_ptr<GeneratedFileNode>> outputs = cmdNode->detectedOutputs();
+                files.insert(outputs.begin(), outputs.end());
+                continue;
+            }
+            auto const& forEachNode = dynamic_pointer_cast<ForEachNode>(node);
+            if (forEachNode != nullptr) {
+                for (auto const& cmd : forEachNode->commands()) {
+                    std::vector<std::shared_ptr<GeneratedFileNode>> outputs = cmd->detectedOutputs();
                     files.insert(outputs.begin(), outputs.end());
                 }
             }

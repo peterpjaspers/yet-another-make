@@ -92,6 +92,7 @@ namespace YAM
         // Inherited from Node
         void start(PriorityClass prio) override;
 
+        std::vector<std::shared_ptr<CommandNode>> const& commands() const;
         XXH64_hash_t executionHash() const;
 
         static void setStreamableType(uint32_t type);

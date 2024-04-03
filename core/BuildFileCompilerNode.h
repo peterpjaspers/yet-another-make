@@ -15,6 +15,7 @@ namespace YAM {
     class CommandNode;
     class GlobNode;
     class GroupNode;
+    class ForEachNode;
     namespace BuildFile { class File; }
 
     // A BuildFileCompilerNode compiles the parse tree from a buildfile into a
@@ -92,12 +93,14 @@ namespace YAM {
 
         // The commands and generated file nodes compiled from the rules in the buildfile.
         std::map<std::filesystem::path, std::shared_ptr<CommandNode>> _commands;
+        std::map<std::filesystem::path, std::shared_ptr<ForEachNode>> _forEachNodes;
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _outputs;
         std::map<std::filesystem::path, std::shared_ptr<GroupNode>> _outputGroups;
 
-        // For each command the line nr of the rule from which it was compiled.
-        // Ordered as in _commands
-        std::vector<std::size_t> _ruleLineNrs;
+        // For each command/foreach node the line nr of the rule from which it was compiled.
+        // Ordered as in _commands/_forEachNodes
+        std::vector<std::size_t> _cmdRuleLineNrs;
+        std::vector<std::size_t> _forEachRuleLineNrs;
 
         // _executionHash is the hash of the hashes of _buildFileParser, 
         // _depCompilers and _depGlobs. A change in execution requires re-compilation

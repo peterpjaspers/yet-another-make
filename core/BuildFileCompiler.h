@@ -17,6 +17,7 @@ namespace YAM {
     class FileNode;
     class GlobNode;
     class GroupNode;
+    class ForEachNode;
 
     // Compiles the rules in the parse tree of a buildfile into command, 
     // mandatory output, group and input glob nodes. Input globs are the globs
@@ -44,7 +45,8 @@ namespace YAM {
             std::shared_ptr<DirectoryNode> const& baseDir,
             BuildFile::File const& buildFile,
             // Results of previous compilation
-            std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const &commands,
+            std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const& commands,
+            std::map<std::filesystem::path, std::shared_ptr<ForEachNode>> const& forEachNodes,
             std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const &mandatoryOutputs,
             std::map<std::filesystem::path, std::shared_ptr<GroupNode>> const &outputGroups,
             // Generated input files that are allowed to be used as inputs by the
@@ -56,6 +58,9 @@ namespace YAM {
 
         std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const& commands() const {
             return _commands;
+        }
+        std::map<std::filesystem::path, std::shared_ptr<ForEachNode>> const& forEachNodes() const {
+            return _forEachNodes;
         }
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const& mandatoryOutputs() const {
             return _mandatoryOutputs;
@@ -69,8 +74,14 @@ namespace YAM {
 
         // Return for each command the line number of the rule from which it is 
         // derived.
-        std::map<std::shared_ptr<CommandNode>, std::size_t> ruleLineNrs() const {
-            return _ruleLineNrs;
+        std::map<std::shared_ptr<CommandNode>, std::size_t> cmdRuleLineNrs() const {
+            return _cmdRuleLineNrs;
+        }
+
+        // Return for each forEach node the line number of the rule from which it is 
+        // derived.
+        std::map<std::shared_ptr<ForEachNode>, std::size_t> forEachRuleLineNrs() const {
+            return _forEachRuleLineNrs;
         }
 
     private:
@@ -123,12 +134,17 @@ namespace YAM {
 
         void compileOutputGroupContent(
             std::filesystem::path const& groupName,
-            std::shared_ptr<CommandNode> const& cmdNode);
+            std::shared_ptr<Node> const& cmdOrForEachNode);
 
         std::filesystem::path compileOutputPath(
             BuildFile::Output const& output,
             std::vector<std::shared_ptr<Node>> const& cmdInputs,
             std::size_t defaultInputOffset
+        ) const;
+
+        std::filesystem::path compileFirstOutputPath(
+            BuildFile::Outputs const& outputs,
+            std::vector<std::shared_ptr<Node>> const& cmdInputs
         ) const;
 
         std::vector<std::filesystem::path> compileMandatoryOutputPaths(
@@ -155,7 +171,16 @@ namespace YAM {
             BuildFile::Rule const& rule,
             std::filesystem::path const& firstOutputPath);
 
+        std::shared_ptr<ForEachNode> createForEach(
+            BuildFile::Rule const& rule,
+            std::filesystem::path const& firstOutputPath);
+
         void compileCommand(
+            BuildFile::Rule const& rule,
+            std::vector<std::shared_ptr<Node>> const& cmdInputs,
+            std::vector<std::shared_ptr<Node>> const& orderOnlyInputs);
+
+        void compileForEach(
             BuildFile::Rule const& rule,
             std::vector<std::shared_ptr<Node>> const& cmdInputs,
             std::vector<std::shared_ptr<Node>> const& orderOnlyInputs);
@@ -175,21 +200,23 @@ namespace YAM {
 
         // Results of previous compilations.
         std::map<std::filesystem::path, std::shared_ptr<CommandNode>> _oldCommands;
+        std::map<std::filesystem::path, std::shared_ptr<ForEachNode>> _oldForEachNodes;
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _oldMandatoryOutputs;
         std::map<std::filesystem::path, std::shared_ptr<GroupNode>> _oldOutputGroups;
 
-        // Per group the contribution to that group from _oldCommands
+        // Per group the contribution to that group from _oldCommands and _oldForEachNodes
         std::map<std::filesystem::path, std::set<std::shared_ptr<Node>, Node::CompareName>> _oldOutputGroupsContent;
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _allowedInputs;
         
         // Results of this compilation. The globs are the globs found in cmd input
         // and order-only input of rules.
-        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> _commands; 
+        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> _commands;
+        std::map<std::filesystem::path, std::shared_ptr<ForEachNode>> _forEachNodes;
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _mandatoryOutputs;
         std::map<std::filesystem::path, std::shared_ptr<GroupNode>> _outputGroups;
         std::map<std::filesystem::path, std::shared_ptr<GlobNode>> _inputGlobs;
 
-        // Per group the contribution to that group from _commands
+        // Per group the contribution to that group from _commands and _forEachNodes
         // Once all compilation is done _outputGroups is updated from 
         // _oldOutputGroupsContent and _outputGroupsContent.
         // Rationale: only update groups when needed.
@@ -200,11 +227,12 @@ namespace YAM {
 
         // The line nrs of the rules from which the commands were compiled.
         // Ordering is as in _commands.
-        std::map<std::shared_ptr<CommandNode>, std::size_t> _ruleLineNrs;
+        std::map<std::shared_ptr<CommandNode>, std::size_t> _cmdRuleLineNrs;
+        std::map<std::shared_ptr<ForEachNode>, std::size_t> _forEachRuleLineNrs;
 
         // Newly created nodes because existing ones were not found in the 
         // execution context. 
-        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> _newCommands;
+        std::map<std::filesystem::path, std::shared_ptr<Node>> _newCommandsAndForEachNodes;
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _newMandatoryOutputs;
         std::map<std::filesystem::path, std::shared_ptr<GroupNode>> _newOutputGroups;
         std::map<std::filesystem::path, std::shared_ptr<GlobNode>> _newInputGlobs;

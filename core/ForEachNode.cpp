@@ -243,6 +243,10 @@ namespace YAM
         return _ruleLineNr;
     }
 
+    std::vector<std::shared_ptr<CommandNode>> const& ForEachNode::commands() const {
+        return _commands;
+    }
+
     XXH64_hash_t ForEachNode::executionHash() const {
         return _executionHash;
     }
@@ -306,7 +310,12 @@ namespace YAM
                     [this](Node::State state) {
                     handleCommandsCompletion(state); }
                 );
-                startNodes(_commands, std::move(callback), PriorityClass::VeryHigh);
+                std::vector<std::shared_ptr<Node>> observedCmmands;
+                for (auto const& cmd : _commands) {
+                    cmd->addObserver(this);
+                    observedCmmands.push_back(cmd);
+                }
+                startNodes(observedCmmands, std::move(callback), PriorityClass::VeryHigh);
             }
         } 
     }
@@ -320,14 +329,15 @@ namespace YAM
 
         // TODO: remove code duplication with BuildFileCompilerNode.
         //
-        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> oldCommands;
-        std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> oldMandatoryOutputs;
+        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> commands;
+        std::map<std::filesystem::path, std::shared_ptr<ForEachNode>> emptyForEachNodes;
+        std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> mandatoryOutputs;
         std::map<std::filesystem::path, std::shared_ptr<GroupNode>> emptyOutputGroups;
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> allowedInputs;
 
         for (auto const& cmd : _commands) {
-            oldCommands.insert({ cmd->name(), cmd });
-            for (auto const& pair : cmd->mandatoryOutputs()) oldMandatoryOutputs.insert(pair);
+            commands.insert({ cmd->name(), cmd });
+            for (auto const& pair : cmd->mandatoryOutputs()) mandatoryOutputs.insert(pair);
         }
         for (auto const& file : files) {
             auto const& genFile = dynamic_pointer_cast<GeneratedFileNode>(file);
@@ -340,16 +350,15 @@ namespace YAM
                 context(),
                 _workingDir.lock(),
                 rulesFile,
-                oldCommands,
-                oldMandatoryOutputs,
+                commands,
+                emptyForEachNodes,
+                mandatoryOutputs,
                 emptyOutputGroups,
                 allowedInputs);
-            std::map<std::filesystem::path, std::shared_ptr<CommandNode>> newCommands;
-            std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> newMandatoryOutputs;
-            updateMap(context(), this, newCommands, compiler.commands());
-            updateMap(context(), this, newMandatoryOutputs, compiler.mandatoryOutputs());
+            updateMap(context(), this, commands, compiler.commands());
+            updateMap(context(), this, mandatoryOutputs, compiler.mandatoryOutputs());
             _commands.clear();
-            for (auto const& pair : newCommands) {
+            for (auto const& pair : commands) {
                 auto const& cmd = pair.second;
                 cmd->orderOnlyInputs(_orderOnlyInputs);
                 _commands.push_back(cmd);
@@ -368,8 +377,7 @@ namespace YAM
         rule->line = _ruleLineNr;
         rule->forEach = false;
 
-        auto const& repo = inputFile->repository();
-        auto inputPath = repo->relativePathOf(inputFile->name());
+        auto inputPath = std::filesystem::proximate(inputFile->name(), workingDirectory()->name());
         BuildFile::Input input;
         input.line = _ruleLineNr;
         input.exclude = false;
@@ -405,6 +413,9 @@ namespace YAM
     }
 
     void ForEachNode::handleCommandsCompletion(Node::State newState) {
+        for (auto const& cmd : _commands) {
+            cmd->removeObserver(this);
+        }
         modified(true);
         notifyCompletion(newState);
     }
@@ -426,6 +437,7 @@ namespace YAM
         if (streamer->reading()) _workingDir = wdir;
         streamer->stream(_script);
         _outputs.stream(streamer);
+        streamer->streamVector(_commands);
         streamer->stream(_executionHash);
     }
 
@@ -435,6 +447,7 @@ namespace YAM
         _cmdInputs.clear();
         _orderOnlyInputs.clear();
         _outputs.outputs.clear();
+        _commands.clear();
         _inputGroups.clear();
     }
 
@@ -448,7 +461,9 @@ namespace YAM
         }
         auto wdir = _workingDir.lock();
         if (wdir != nullptr) wdir->restore(context, restored);
-
+        for (auto const& cmd : _commands) {
+            cmd->restore(context, restored);
+        }
         updateInputGroups();
         return true;
     }

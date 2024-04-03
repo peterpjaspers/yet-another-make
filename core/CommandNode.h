@@ -87,6 +87,12 @@ namespace YAM
             void stream(IStreamer* streamer);
             static void streamVector(IStreamer* streamer, std::vector<OutputFilter>& filters);
         };
+        struct OutputNameFilter {
+            OutputNameFilter(OutputFilter::Type type, std::filesystem::path const& symPath);
+            OutputFilter::Type _type;
+            std::filesystem::path _symPath; // Symbolic path for workingDir()/_filter.path
+            Glob _glob; // Glob(_symPath);
+        };
 
         class __declspec(dllexport) PostProcessor {
         public:
@@ -133,6 +139,8 @@ namespace YAM
             std::vector<OutputFilter> const& newFilters,
             std::vector<std::shared_ptr<GeneratedFileNode>> const &mandatoryOutputs);
         std::vector<OutputFilter> const& outputFilters() const;
+
+        std::vector<OutputNameFilter> const& outputNameFilters();
 
         // Convenience function in case command only has mandatory outputs.
         // Equivalent to: outputFilters(mandatoryFiltersForOutputs, outputs).
@@ -189,12 +197,6 @@ namespace YAM
         void cleanup() override;
 
     private:
-        struct OutputNameFilter {
-            OutputNameFilter(OutputFilter::Type type, std::filesystem::path const& symPath);
-            OutputFilter::Type _type;
-            std::filesystem::path _symPath; // Symbolic path for workingDir()/_filter.path
-            Glob _glob; // Glob(_symPath);
-        };
 
         struct ExecutionResult {
             MemoryLogBook _log;
@@ -223,7 +225,7 @@ namespace YAM
         void executeScript();
         void handleExecuteScriptCompletion(std::shared_ptr<ExecutionResult> result);
         void handleOutputAndNewInputFilesCompletion(Node::State newState, std::shared_ptr<ExecutionResult> result);
-        std::vector<OutputNameFilter> const& outputNameFilters();
+
         void updateInputProducers();
 
         std::string compileScript(ILogBook& logBook);

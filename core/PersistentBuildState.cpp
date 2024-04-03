@@ -3,6 +3,7 @@
 #include "BuildFileCompilerNode.h"
 #include "BuildFileParserNode.h"
 #include "CommandNode.h"
+#include "ForEachNode.h"
 #include "DirectoryNode.h"
 #include "DotIgnoreNode.h"
 #include "FileExecSpecsNode.h"
@@ -116,13 +117,14 @@ namespace YAM
             DirectoryNode = 4,
             DotIgnoreNode = 5,
             FileExecSpecsNode = 6,
-            GeneratedFileNode = 7,
-            GlobNode = 8,
-            GroupNode = 9,
-            RepositoriesNode = 10,
-            SourceFileNode = 11,
-            FileRepositoryNode = 12,
-            Max = 13
+            ForEachNode = 7,
+            GeneratedFileNode = 8,
+            GlobNode = 9,
+            GroupNode = 10,
+            RepositoriesNode = 11,
+            SourceFileNode = 12,
+            FileRepositoryNode = 13,
+            Max = 14
         };
         std::vector<TypeId> ids;
 
@@ -133,6 +135,7 @@ namespace YAM
             YAM::DirectoryNode::setStreamableType(static_cast<uint32_t>(DirectoryNode));
             YAM::DotIgnoreNode::setStreamableType(static_cast<uint32_t>(DotIgnoreNode));
             YAM::FileExecSpecsNode::setStreamableType(static_cast<uint32_t>(FileExecSpecsNode));
+            YAM::ForEachNode::setStreamableType(static_cast<uint32_t>(ForEachNode));
             YAM::GeneratedFileNode::setStreamableType(static_cast<uint32_t>(GeneratedFileNode));
             YAM::GlobNode::setStreamableType(static_cast<uint32_t>(GlobNode));
             YAM::GroupNode::setStreamableType(static_cast<uint32_t>(GroupNode));
@@ -146,6 +149,7 @@ namespace YAM
             ids.push_back(DirectoryNode);
             ids.push_back(DotIgnoreNode);
             ids.push_back(FileExecSpecsNode);
+            ids.push_back(ForEachNode);
             ids.push_back(GeneratedFileNode);
             ids.push_back(GlobNode);
             ids.push_back(GroupNode);
@@ -169,6 +173,7 @@ namespace YAM
             case TypeId::DirectoryNode: return std::make_shared<YAM::DirectoryNode>();
             case TypeId::DotIgnoreNode: return std::make_shared<YAM::DotIgnoreNode>();
             case TypeId::FileExecSpecsNode: return std::make_shared<YAM::FileExecSpecsNode>();
+            case TypeId::ForEachNode: return std::make_shared<YAM::ForEachNode>();
             case TypeId::GeneratedFileNode: return std::make_shared<YAM::GeneratedFileNode>();
             case TypeId::GlobNode: return std::make_shared<YAM::GlobNode>();
             case TypeId::GroupNode: return std::make_shared<YAM::GroupNode>();

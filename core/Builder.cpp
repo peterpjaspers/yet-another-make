@@ -221,8 +221,8 @@ namespace YAM
         uint32_t nFailures = 0;
         ILogBook& logBook = *(_context.logBook());
         std::vector<std::shared_ptr<GeneratedFileNode>> genFiles;
-        BuildScopeFinder finder;
-        genFiles = finder.findGeneratedFiles(&_context, _context.buildRequest()->options());
+        BuildScopeFinder finder(&_context, _context.buildRequest()->options());
+        genFiles = finder.generatedFiles();
         for (auto const& file : genFiles) {
             if (!file->deleteFile(true, true)) nFailures += 1;
         }
@@ -408,11 +408,11 @@ namespace YAM
              }
              _postCompletion(Node::State::Failed);
         } else {
-            std::vector<std::shared_ptr<CommandNode>> dirtyCommands;
+            std::vector<std::shared_ptr<Node>> dirtyCommands;
             bool finderError = false;
-            BuildScopeFinder finder;
             try {
-                dirtyCommands = finder.findDirtyCommands(&_context, _context.buildRequest()->options());
+                BuildScopeFinder finder(&_context, _context.buildRequest()->options());
+                dirtyCommands = finder.dirtyCommands();
             } catch (std::runtime_error e) {
                 LogRecord error(LogRecord::Aspect::Error, e.what());
                 _context.addToLogBook(error);

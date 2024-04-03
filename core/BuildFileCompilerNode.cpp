@@ -6,6 +6,7 @@
 #include "GeneratedFileNode.h"
 #include "FileRepositoryNode.h"
 #include "CommandNode.h"
+#include "ForEachNode.h"
 #include "GlobNode.h"
 #include "GroupNode.h"
 #include "ExecutionContext.h"
@@ -28,10 +29,11 @@ namespace
 
     uint32_t streamableTypeId = 0;
 
+    template<typename T>
     void updateLineNrs(
         std::vector<std::size_t>& lineNrs, 
-        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const& cmds,
-        std::map<std::shared_ptr<CommandNode>, std::size_t> const& lineNrsMap,
+        std::map<std::filesystem::path, std::shared_ptr<T>> const& cmds,
+        std::map<std::shared_ptr<T>, std::size_t> const& lineNrsMap,
         std::shared_ptr<SourceFileNode> buildFile
     ) {
         lineNrs.clear();
@@ -214,14 +216,17 @@ namespace YAM
                 _buildFileParser->buildFileDirectory(),
                 _buildFileParser->parseTree(),
                 _commands,
+                _forEachNodes,
                 _outputs,
                 _outputGroups,
                 allowedInputs);
             updateMap(context(), this, _commands, compiler.commands());
+            updateMap(context(), this, _forEachNodes, compiler.forEachNodes());
             updateMap(context(), this, _outputGroups, compiler.outputGroups());
             updateMap(context(), this, _outputs, compiler.mandatoryOutputs());
-            updateLineNrs(_ruleLineNrs, _commands, compiler.ruleLineNrs(), _buildFileParser->buildFile());
-   
+            updateLineNrs<CommandNode>(_cmdRuleLineNrs, _commands, compiler.cmdRuleLineNrs(), _buildFileParser->buildFile());
+            updateLineNrs<ForEachNode>(_forEachRuleLineNrs, _forEachNodes, compiler.forEachRuleLineNrs(), _buildFileParser->buildFile());
+
             if (validGeneratedInputs()) {
                 XXH64_hash_t oldHash = _executionHash;
                 _executionHash = computeExecutionHash();
@@ -346,9 +351,11 @@ namespace YAM
         NodeMapStreamer::stream(streamer, _depCompilers);
         NodeMapStreamer::stream(streamer, _depGlobs);
         NodeMapStreamer::stream(streamer, _commands);
+        NodeMapStreamer::stream(streamer, _forEachNodes);
         NodeMapStreamer::stream(streamer, _outputs);
         NodeMapStreamer::stream(streamer, _outputGroups);
-        streamer->streamVector(_ruleLineNrs);
+        streamer->streamVector(_cmdRuleLineNrs);
+        streamer->streamVector(_forEachRuleLineNrs);
         streamer->stream(_executionHash);
     }
 
@@ -360,9 +367,11 @@ namespace YAM
         _depCompilers.clear();
         _depGlobs.clear();
         _commands.clear();
+        _forEachNodes.clear();
         _outputs.clear();
         _outputGroups.clear();
-        _ruleLineNrs.clear();
+        _cmdRuleLineNrs.clear();
+        _forEachRuleLineNrs.clear();
 
     }
     bool BuildFileCompilerNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
@@ -374,6 +383,7 @@ namespace YAM
         NodeMapStreamer::restore(_depCompilers);
         NodeMapStreamer::restore(_depGlobs);
         NodeMapStreamer::restore(_commands);
+        NodeMapStreamer::restore(_forEachNodes);
         NodeMapStreamer::restore(_outputs);
         NodeMapStreamer::restore(_outputGroups);
         for (auto const& i : _depCompilers) {
@@ -391,7 +401,15 @@ namespace YAM
             auto const& cmd = i.second;
             cmd->restore(context, restored);
             cmd->buildFile(_buildFileParser->buildFile().get());
-            cmd->ruleLineNr(_ruleLineNrs[ruleIndex]);
+            cmd->ruleLineNr(_cmdRuleLineNrs[ruleIndex]);
+            ruleIndex++;
+        }
+        ruleIndex = 0;
+        for (auto const& i : _forEachNodes) {
+            auto const& feNode = i.second;
+            feNode->restore(context, restored);
+            feNode->buildFile(_buildFileParser->buildFile().get());
+            feNode->ruleLineNr(_forEachRuleLineNrs[ruleIndex]);
             ruleIndex++;
         }
         return true;

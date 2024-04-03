@@ -561,11 +561,7 @@ namespace YAM
     void CommandNode::updateOutputNameFilters() {
         _outputNameFilters.clear();
         for (auto const& filter : _outputFilters) {
-            auto baseDir = workingDirectory();
-            auto pattern = filter._path;
-            Globber::optimize(context(), baseDir, pattern);
-            auto symPath = baseDir->name() / pattern;
-            _outputNameFilters.push_back(OutputNameFilter(filter._type, symPath));
+            _outputNameFilters.push_back(OutputNameFilter(filter._type, filter._path));
         }
     }
 

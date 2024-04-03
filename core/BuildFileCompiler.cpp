@@ -7,6 +7,7 @@
 #include "GeneratedFileNode.h"
 #include "DirectoryNode.h"
 #include "CommandNode.h"
+#include "ForEachNode.h"
 #include "FileRepositoryNode.h"
 #include "Globber.h"
 #include "Glob.h"
@@ -21,6 +22,14 @@
 namespace
 {
     using namespace YAM;
+
+    bool containsGroup(std::vector<std::shared_ptr<Node>> const& nodes) {
+        for (auto const& n : nodes) {
+            auto const& group = dynamic_pointer_cast<GroupNode>(n);
+            if (group != nullptr) return true;
+        }
+        return false;
+    }
 
     BuildFile::Output findFirstMandatoryOutput(std::vector<CommandNode::OutputFilter> const& filters) {
         BuildFile::Output output;
@@ -43,15 +52,15 @@ namespace
         return std::filesystem::path(baseDir / ss.str());
     }
 
-    std::filesystem::path uniqueCmdName(
+    std::filesystem::path uniqueName(
         std::filesystem::path const& baseDir,
         NodeSet& nodes,
-        std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const& newCommands
+        std::map<std::filesystem::path, std::shared_ptr<Node>> const& newNodes
     ) {
         std::filesystem::path uid = uidPath(baseDir);
         while (
             (nodes.find(uid) != nullptr)
-            && (newCommands.find(uid) != newCommands.end())
+            && (newNodes.find(uid) != newNodes.end())
         ) {
             uid = uidPath(baseDir);
         }
@@ -149,6 +158,7 @@ namespace YAM
             std::shared_ptr<DirectoryNode> const& baseDir,
             BuildFile::File const& buildFile,
             std::map<std::filesystem::path, std::shared_ptr<CommandNode>> const& commands,
+            std::map<std::filesystem::path, std::shared_ptr<ForEachNode>> const& forEachNodes,
             std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const& mandatoryOutputs,
             std::map<std::filesystem::path, std::shared_ptr<GroupNode>> const& outputGroups,
             std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const& allowedInputs,
@@ -157,6 +167,7 @@ namespace YAM
         , _baseDir(baseDir)
         , _buildFile(buildFile.buildFile)
         , _oldCommands(commands)
+        , _oldForEachNodes(forEachNodes)
         , _oldMandatoryOutputs(mandatoryOutputs)
         , _oldOutputGroups(outputGroups)
         , _oldOutputGroupsContent(contributionToGroups(_oldOutputGroups, toSet(_oldCommands)))
@@ -497,6 +508,36 @@ namespace YAM
         return symOutputPath;
     }
 
+    std::filesystem::path BuildFileCompiler::compileFirstOutputPath(
+        BuildFile::Outputs const& outputs,
+        std::vector<std::shared_ptr<Node>> const& cmdInputs
+    ) const {
+        std::filesystem::path firstOutputPath;
+        BuildFile::Output firstOutput;
+        firstOutput.pathType = BuildFile::PathType::Bin;
+        for (auto const& output : outputs.outputs) {
+            if (output.pathType == BuildFile::PathType::Bin) continue;
+            if (output.pathType == BuildFile::PathType::Group) continue;
+            if (output.ignore && firstOutput.pathType == BuildFile::PathType::Bin) {
+                firstOutput = output;
+            } else if (output.pathType == BuildFile::PathType::Path) {
+                firstOutput = output;
+                break;
+            } else if (output.pathType == BuildFile::PathType::Glob) {
+                firstOutput = output;
+            }
+        }
+        if (!firstOutput.path.empty()) {
+            bool hasFlags = PercentageFlagsCompiler::containsFlags(firstOutput.path.string());
+            if (cmdInputs.empty() || !hasFlags) {
+                firstOutputPath = compileOutputPath(firstOutput, cmdInputs, -1);
+            } else {
+                firstOutputPath = compileOutputPath(firstOutput, cmdInputs, 0); \
+            }
+        }
+        return firstOutputPath;
+    }
+
     std::vector<std::filesystem::path> BuildFileCompiler::compileMandatoryOutputPaths(
         BuildFile::Outputs const& outputs,
         std::vector<std::shared_ptr<Node>> const& cmdInputs
@@ -520,9 +561,7 @@ namespace YAM
             }
         }
         return outputPaths;
-
     }
-
 
     CommandNode::OutputFilter BuildFileCompiler::compileOutputFilter(
         BuildFile::Output const& output,
@@ -535,7 +574,11 @@ namespace YAM
                 _buildFile, output, _context,
                  _baseDir, cmdInputs, defaultInputOffset);
             outputPath = flagsCompiler.result();
-            outputPath = std::filesystem::relative(outputPath, _baseDir->name());
+        } else {
+            auto baseDir = _baseDir;
+            auto pattern = output.path;
+            Globber::optimize(_context, baseDir, pattern);
+            outputPath = baseDir->name() / pattern;
         }
         CommandNode::OutputFilter::Type filterType;
         if (output.ignore) filterType = CommandNode::OutputFilter::Type::Ignore;
@@ -592,20 +635,19 @@ namespace YAM
     {
         std::filesystem::path cmdName;
         if (firstOutputPath.empty()) {
-            cmdName = uniqueCmdName(_baseDir->name(), _context->nodes(), _newCommands);
+            cmdName = uniqueName(_baseDir->name(), _context->nodes(), _newCommandsAndForEachNodes);
         } else {
             cmdName = firstOutputPath / "__cmd";
         }
-        std::shared_ptr<CommandNode> cmdNode;
         std::shared_ptr<Node> node = _context->nodes().find(cmdName);
-        cmdNode = dynamic_pointer_cast<CommandNode>(node);
+        auto cmdNode = dynamic_pointer_cast<CommandNode>(node);
         if (node != nullptr && cmdNode == nullptr) {
             throw std::runtime_error("not a command node"); //TODO: better message
         } else if (cmdNode == nullptr) {
             cmdNode = std::make_shared<CommandNode>(_context, cmdName);
-            _newCommands.insert({ cmdName, cmdNode });
+            _newCommandsAndForEachNodes.insert({ cmdName, cmdNode });
         }
-        if (_commands.contains(cmdName)) {
+        if (_commands.contains(cmdName) || _forEachNodes.contains(cmdName)) {
             std::stringstream ss;
             ss << "In rule at line " << rule.line << " in buildfile " << _buildFile.string() << ":" << std::endl;
             ss << "Output file " << cmdName.string()
@@ -624,12 +666,10 @@ namespace YAM
     ) {
         std::vector<CommandNode::OutputFilter> outputFilters = compileOutputFilters(rule.outputs, cmdInputs);
         std::vector<std::filesystem::path> outputPaths = compileMandatoryOutputPaths(rule.outputs, cmdInputs);
-        std::filesystem::path firstOutputPath;
-        if (!outputPaths.empty()) firstOutputPath = outputPaths[0];
-
+        std::filesystem::path firstOutputPath = compileFirstOutputPath(rule.outputs, cmdInputs);
         std::shared_ptr<CommandNode> cmdNode = createCommand(rule, firstOutputPath);
-        std::vector<std::shared_ptr<GeneratedFileNode>> mandatoryOutputs = createGeneratedFileNodes(rule, cmdNode, outputPaths);
-        _ruleLineNrs[cmdNode] = rule.line;
+
+        _cmdRuleLineNrs[cmdNode] = rule.line;
         cmdNode->buildFile(findBuildFileNode(_context, _buildFile));
         cmdNode->ruleLineNr(rule.line);
         cmdNode->workingDirectory(_baseDir);
@@ -638,6 +678,14 @@ namespace YAM
         // Note that the not-compiled script must be used because the content of
         // input groupNodes can only be expanded at cmdNode execution time.
         cmdNode->script(rule.script.script);
+        if (outputFilters != cmdNode->outputFilters()) {
+            // clear filters to release ownership of optional outputs that
+            // may have been converted to mandatory outputs. In that case
+            // createGeneratedFileNodes would fail because mandatory output
+            // would be already owned as optional output.
+            cmdNode->outputFilters({}, {});
+        }
+        std::vector<std::shared_ptr<GeneratedFileNode>> mandatoryOutputs = createGeneratedFileNodes(rule, cmdNode, outputPaths);
         cmdNode->outputFilters(outputFilters, mandatoryOutputs);
 
         // Compile the script to check for syntax errors, ignore the compilation
@@ -662,6 +710,60 @@ namespace YAM
         }
     }
 
+    std::shared_ptr<ForEachNode> BuildFileCompiler::createForEach(
+        BuildFile::Rule const& rule,
+        std::filesystem::path const& firstOutputPath)
+    {
+        std::filesystem::path forEachName;
+        if (firstOutputPath.empty()) {
+            forEachName = uniqueName(_baseDir->name(), _context->nodes(), _newCommandsAndForEachNodes);
+        } else {
+            forEachName = firstOutputPath / "__foreach";
+        }
+        std::shared_ptr<Node> node = _context->nodes().find(forEachName);
+        auto forEachNode = dynamic_pointer_cast<ForEachNode>(node);
+        if (node != nullptr && forEachNode == nullptr) {
+            throw std::runtime_error("not a foreach node"); //TODO: better message
+        } else if (forEachNode == nullptr) {
+            forEachNode = std::make_shared<ForEachNode>(_context, forEachName);
+            _newCommandsAndForEachNodes.insert({ forEachName, forEachNode });
+        }
+        if (_forEachNodes.contains(forEachName) || _commands.contains(forEachName)) {
+            std::stringstream ss;
+            ss << "In rule at line " << rule.line << " in buildfile " << _buildFile.string() << ":" << std::endl;
+            ss << "Output file " << forEachName.string()
+                << " already owned by the rule at line " << forEachNode->ruleLineNr()
+                << " in buildfile " << forEachNode->buildFile()->name() << std::endl;
+            throw std::runtime_error(ss.str());
+        }
+        _forEachNodes.insert({ forEachName, forEachNode });
+        return forEachNode;
+    }
+
+    void BuildFileCompiler::compileForEach(
+        BuildFile::Rule const& rule,
+        std::vector<std::shared_ptr<Node>> const& cmdInputs,
+        std::vector<std::shared_ptr<Node>> const& orderOnlyInputs
+    ) {
+        std::vector<CommandNode::OutputFilter> outputFilters = compileOutputFilters(rule.outputs, cmdInputs);
+        std::vector<std::filesystem::path> outputPaths = compileMandatoryOutputPaths(rule.outputs, cmdInputs);
+        std::filesystem::path firstOutputPath = compileFirstOutputPath(rule.outputs, cmdInputs);
+
+        std::shared_ptr<ForEachNode> forEachNode = createForEach(rule, firstOutputPath);
+        _forEachRuleLineNrs[forEachNode] = rule.line;
+        forEachNode->buildFile(findBuildFileNode(_context, _buildFile));
+        forEachNode->ruleLineNr(rule.line);
+        forEachNode->workingDirectory(_baseDir);
+        forEachNode->cmdInputs(cmdInputs);
+        forEachNode->orderOnlyInputs(orderOnlyInputs);
+        forEachNode->script(rule.script.script);
+        forEachNode->outputs(rule.outputs);
+
+        for (auto const& groupPath : rule.outputGroups) {
+            compileOutputGroupContent(groupPath, forEachNode);
+        }
+    }
+
     std::shared_ptr<GroupNode> BuildFileCompiler::compileOutputGroup(
         std::filesystem::path const& groupPath
     ) {
@@ -682,7 +784,7 @@ namespace YAM
 
     void BuildFileCompiler::compileOutputGroupContent(
         std::filesystem::path const& groupName,
-        std::shared_ptr<CommandNode> const& cmdNode
+        std::shared_ptr<Node> const& cmdOrForEachNode
     ) {
         auto optimizedBaseDir = _baseDir;
         auto optimizedPattern = groupName;
@@ -694,16 +796,20 @@ namespace YAM
             it = _outputGroupsContent.insert({ groupPath, std::set<std::shared_ptr<Node>, Node::CompareName>() }).first;
         }
         auto& content = it->second;
-        content.insert(cmdNode);
+        content.insert(cmdOrForEachNode);
     }
 
     void BuildFileCompiler::compileRule(BuildFile::Rule const& rule) {
         std::vector<std::shared_ptr<Node>> cmdInputs = compileInputs(rule.cmdInputs);
         std::vector<std::shared_ptr<Node>> orderOnlyInputs = compileOrderOnlyInputs(rule.orderOnlyInputs);
         if (rule.forEach) {
-            for (auto const& cmdInput : cmdInputs) {
-                std::vector<std::shared_ptr<Node>> cmdInputs_({ cmdInput });
-                compileCommand(rule, cmdInputs_, orderOnlyInputs);
+            if (containsGroup(cmdInputs)) {
+                compileForEach(rule, cmdInputs, orderOnlyInputs);
+            } else {
+                for (auto const& cmdInput : cmdInputs) {
+                    std::vector<std::shared_ptr<Node>> cmdInputs_({ cmdInput });
+                    compileCommand(rule, cmdInputs_, orderOnlyInputs);
+                }
             }
         } else {
             compileCommand(rule, cmdInputs, orderOnlyInputs);

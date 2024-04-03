@@ -2,6 +2,19 @@ Todo for R 0.1.0
 Bugs
 - fix (header->free == 1)  throw std::string(signature) + " - Accessing freed page.";
   Reproduce with coreTests EnduranceTest
+- rule with optional output gen\foo.lib in newly created directory gen
+  build, delete dir gen, build. 
+  Expected: dir gen re-created and files added
+  Actual: nothing happens
+  Analysis: 
+      - command node only observes generated filenode gen\foo.lib
+      - when deleting gen dir a removed event is generated for gen, not for its
+        contained files. 
+      - DirectoryNode gen is removed recursively. But because it does not contain
+        generated file nodes the gen\foo.lib node is not set Dirty. And as a
+        consequence command node is not notified that its output has changed.
+  Solution: DirectoryNode to also mirror generated file nodes. These are not 
+  visible in dir contents() but are set Dirty when dir is removed.
 
 Features
 - support foreach <group>

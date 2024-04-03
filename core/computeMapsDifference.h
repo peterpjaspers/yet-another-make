@@ -3,6 +3,7 @@
 #include "GlobNode.h"
 #include "GeneratedFileNode.h"
 #include "CommandNode.h"
+#include "ForEachNode.h"
 #include "GroupNode.h"
 #include "BuildFileCompilerNode.h"
 
@@ -17,14 +18,15 @@ namespace
         // owned and added to context by DirectoryNode
         compiler->addObserver(observer);
     }
-
     void addNode(std::shared_ptr<GlobNode> glob, StateObserver* observer) {
         // A glob node can be shared by multiple compilers.
         glob->context()->nodes().addIfAbsent(glob);
         glob->addObserver(observer);
     }
-
     void addNode(std::shared_ptr<CommandNode> node, StateObserver* observer) {
+        node->context()->nodes().add(node);
+    }
+    void addNode(std::shared_ptr<ForEachNode> node, StateObserver* observer) {
         node->context()->nodes().add(node);
     }
     void addNode(std::shared_ptr<GeneratedFileNode> node, StateObserver* observer) {
@@ -35,7 +37,6 @@ namespace
         // have been added to the context by another compiler.
         group->context()->nodes().addIfAbsent(group);
     }
-
     void addNode(std::shared_ptr<Node> node, StateObserver* observer) {
         auto glob = dynamic_pointer_cast<GlobNode>(node);
         if (glob != nullptr) addNode(glob, observer);
@@ -54,13 +55,10 @@ namespace
         }
     }
     void removeNode(std::shared_ptr<CommandNode> cmd, StateObserver* observer) {
-        ExecutionContext* context = cmd->context();
-        cmd->cmdInputs({});
-        cmd->orderOnlyInputs({});
-        cmd->script("");
-        cmd->workingDirectory(nullptr);
-        cmd->outputFilters({}, {});
         cmd->context()->nodes().remove(cmd);
+    }
+    void removeNode(std::shared_ptr<ForEachNode> node, StateObserver* observer) {
+        node->context()->nodes().remove(node);
     }
     void removeNode(std::shared_ptr<GeneratedFileNode> node, StateObserver* observer) {
         ExecutionContext* context = node->context();
