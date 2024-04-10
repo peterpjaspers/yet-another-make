@@ -2,45 +2,10 @@ Todo for R 0.1.0
 Bugs
 - fix (header->free == 1)  throw std::string(signature) + " - Accessing freed page.";
   Reproduce with coreTests EnduranceTest
-- rule with optional output gen\foo.lib in newly created directory gen
-  build, delete dir gen, build. 
-  Expected: dir gen re-created and files added
-  Actual: nothing happens
-  Analysis: 
-      - command node only observes generated filenode gen\foo.lib
-      - when deleting gen dir a removed event is generated for gen, not for its
-        contained files. 
-      - DirectoryNode gen is removed recursively. But because it does not contain
-        generated file nodes the gen\foo.lib node is not set Dirty. And as a
-        consequence command node is not notified that its output has changed.
-  Solution: DirectoryNode to also mirror generated file nodes. These are not 
-  visible in dir contents() but are set Dirty when dir is removed.
 
 Features
-- support foreach <group>
-  Example: 
-       raw_images.zip |> unzip %f -out rawImages |> rawImages/*.jpeg <raw_images>
-       foreach <raw_images> |> processImage.exe %f -out %o |> processedImages/%b <processed_images>
-       <processed_images> |> zip %f -out %o |> processed_images.zip
-
-  Currently 'foreach <raw_images>' translates to 1 CommandNode and %f expands
-  to all files in <raw_images>. 
-  Intent here however is to create CommandNode for each file in <raw_images>. 
-  This is currently not supported by yam because files in group are only known
-  after execution of all command nodes that contribute to <group>. So to 
-  support this we must transfer compilation of foreach-file-in-group to the 
-  1 (ForEach)CommandNode created at buildfile compile-time.
-  Also different syntax may be needed to distinguish current foreach from
-  foreach-file-in-group. For now we take foreach to mean for each file in
-  in input group
-
-  ForEachCommand takes input group(s), command script and outputspecs
-  Instantiates CommandNode for each file in input group(s).
-  Executes these child CommandNodes.
-  Note: At compile-time ForEachCommand is created and added to <processed_images>.
-  GroupNode must include for a ForEachCommand all output files of its child 
-  CommandNodes.  
-
+- multi-repo build: clone repos in subdirs of the yam root dir.
+  Remove relation with .git directory in class DotYamDirectory?
 - buildscope: current implementation only searches for the producers of dirty 
   generated file nodes. Could also search all dirty nodes to allow for example:
       yam *.cpp // hash file nodes
@@ -62,6 +27,8 @@ Features
 - fileaspect configuration
       - hash = last-write-time (e.g. for generated files in cmd executionhash)
       - import lib exports hash (hash i/f of dll)
+- unit-test support
+- packaging support (group containing files-to-be-packaged, buildfile that generates packaging rule)
 - response files
 - xxhash stream
 - build yam with yam
@@ -69,8 +36,17 @@ Features
   xxhash requires license to be part of binary redistribution.
 - license
 - C++20 modules support
-  Allow commands to generated buildfiles.
+  Allow commands to generate buildfiles.
   while (dirty buildfiles found) build();
+  Buildfile that generates two rules:
+      - a rule to parse each C++ file for module imports/exports and store these
+       imports/exports in file.cpp.modules and in group <modules>
+      - <modules> |> generateCompileRules %f %o |> buildfile_yam_cppmodules.txt
+       Where generatedCompileRules creates the compilation rules taking the 
+       module dependency graph into account.
+  yam recognizes this rule (by its output file name) as a rule-producing rule,
+  parses the resulting buildfile_yam_cppmodules.txt into compilation CommandNodes 
+  and executes the commands.
 - end-to-end testing (automated gtest)
 - scalability measurements
 - documentation

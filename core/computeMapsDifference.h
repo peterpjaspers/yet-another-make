@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GlobNode.h"
+#include "DirectoryNode.h"
 #include "GeneratedFileNode.h"
 #include "CommandNode.h"
 #include "ForEachNode.h"
@@ -31,6 +32,7 @@ namespace
     }
     void addNode(std::shared_ptr<GeneratedFileNode> node, StateObserver* observer) {
         node->context()->nodes().add(node);
+        DirectoryNode::addGeneratedFile(node);
     }
     void addNode(std::shared_ptr<GroupNode> group, StateObserver* observer) {
         // A group node can be shared by multiple compilers and can already
@@ -61,7 +63,7 @@ namespace
         node->context()->nodes().remove(node);
     }
     void removeNode(std::shared_ptr<GeneratedFileNode> node, StateObserver* observer) {
-        ExecutionContext* context = node->context();
+        DirectoryNode::removeGeneratedFile(node);
         node->context()->nodes().remove(node);
     }
     void removeNode(std::shared_ptr<GroupNode> group, StateObserver* observer) {

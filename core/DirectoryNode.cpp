@@ -90,6 +90,79 @@ namespace YAM
         _parent = parent;
     }
 
+    // static function
+    std::shared_ptr<DirectoryNode> DirectoryNode::addGeneratedDir(ExecutionContext* context, std::filesystem::path const& symDirPath) {
+        auto dirNode = dynamic_pointer_cast<DirectoryNode>(context->nodes().find(symDirPath));
+        if (dirNode == nullptr) {
+            auto parentDirNode = addGeneratedDir(context, symDirPath.parent_path());
+            dirNode = parentDirNode->_addGeneratedDir(symDirPath);
+            if (dirNode == nullptr) {
+                bool stop = true;
+            }
+        }
+        return dirNode;
+    }
+
+    // static function
+    void DirectoryNode::addGeneratedFile(std::shared_ptr<GeneratedFileNode> const& node) {
+        ExecutionContext* context = node->context();
+        std::filesystem::path parentPath = node->name().parent_path();
+        std::shared_ptr<DirectoryNode> dirNode = addGeneratedDir(context, parentPath);
+        dirNode->_addGeneratedFile(node);
+    }
+
+    // static function
+    void DirectoryNode::removeGeneratedFile(std::shared_ptr<GeneratedFileNode> const& node) {
+        ExecutionContext* context = node->context();
+        std::filesystem::path parentPath = node->name().parent_path();
+        auto dirNode = dynamic_pointer_cast<DirectoryNode>(context->nodes().find(node->name().parent_path()));
+        if (dirNode != nullptr) dirNode->_removeGeneratedFile(node);
+    }
+
+    std::shared_ptr<DirectoryNode> DirectoryNode::_addGeneratedDir(std::filesystem::path const& symGenDirPath) {
+        if (name() != symGenDirPath.parent_path()) {
+            throw std::exception("invalid parent directory");
+        }
+        std::shared_ptr<DirectoryNode> genDir;
+        auto it = _content.find(symGenDirPath);
+        if (it == _content.end()) {
+            std::filesystem::path absGenDirPath = absolutePath() / symGenDirPath.filename();
+            if (std::filesystem::exists(absGenDirPath)) {
+                if (!std::filesystem::is_directory(absGenDirPath)) {
+                    throw std::runtime_error(absGenDirPath.string() + " is not a directory");
+                }
+            } else {
+                std::filesystem::create_directory(absGenDirPath);
+            }
+            genDir = std::make_shared<DirectoryNode>(context(), symGenDirPath, this);
+            context()->nodes().add(genDir);
+            genDir->addObserver(this);
+            genDir->addPrerequisitesToContext();
+            _content.insert({ symGenDirPath, genDir });
+            modified(true);
+        } else {
+            genDir = dynamic_pointer_cast<DirectoryNode>(it->second);
+        }
+        return genDir;
+    }
+
+    void DirectoryNode::_addGeneratedFile(std::shared_ptr<GeneratedFileNode> const& genFile) {
+        if (name() != genFile->name().parent_path()) {
+            throw std::exception("attempt to add generate file to wrong directory");
+        }
+        if (!_generatedContent.contains(genFile->name())) {
+            _generatedContent.insert({ genFile->name(), genFile });
+            modified(true);
+        }
+    }
+
+    void DirectoryNode::_removeGeneratedFile(std::shared_ptr<GeneratedFileNode> const& genFile) {
+        if (_generatedContent.contains(genFile->name())) {
+            _generatedContent.erase(genFile->name());
+            modified(true);
+        }
+    }
+
     void DirectoryNode::getFiles(std::vector<std::shared_ptr<FileNode>>& filesInDir) {
         filesInDir.clear();
         for (auto it = _content.begin(); it != _content.end(); ++it) {
@@ -256,6 +329,10 @@ namespace YAM
             }
         }
         _content.clear();
+        for (auto const& pair : _generatedContent) {
+            pair.second->setState(Node::State::Dirty);
+        }
+        _generatedContent.clear();
         updateBuildFileParserNode();
         if (_buildFileParserNode != nullptr) {
             context()->nodes().remove(_buildFileParserNode);
@@ -455,6 +532,7 @@ namespace YAM
         streamer->stream(_executionHash);
         streamer->stream(_dotIgnoreNode);
         NodeMapStreamer::stream(streamer, _content);
+        NodeMapStreamer::stream(streamer, _generatedContent);
         streamer->stream(_buildFileParserNode);
         streamer->stream(_buildFileCompilerNode);
     }
@@ -468,6 +546,7 @@ namespace YAM
         }
         _dotIgnoreNode = nullptr;
         _content.clear();
+        _generatedContent.clear();
         _parent = nullptr;
     }
 
@@ -484,6 +563,10 @@ namespace YAM
                 dir->addObserver(this);
                 dir->parent(this);
             }
+        }
+        NodeMapStreamer::restore(_generatedContent);
+        for (auto const& p : _content) {
+            p.second->restore(context, restored);
         }
         return true;
     }

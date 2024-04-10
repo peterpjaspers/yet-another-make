@@ -429,6 +429,7 @@ namespace YAM
             if (removeFromContext) {
                 pair.second->deleteFile(false, true);
                 context()->nodes().remove(pair.second);
+                DirectoryNode::removeGeneratedFile(pair.second);
             }
         }
         _detectedOptionalOutputs.clear();
@@ -585,6 +586,7 @@ namespace YAM
         for (auto& n : toRemove) {
             n->deleteFile(false, true);
             n->removeObserver(this);
+            DirectoryNode::removeGeneratedFile(n);
         }
         for (auto& n : toAdd) n->addObserver(this);
         if (!toRemove.empty() || !toAdd.empty()) _mandatoryOutputs = newMandatoryOutputs;
@@ -754,8 +756,8 @@ namespace YAM
         if (changed) modified(true);
     }
 
-    // newOptionals are newly created nodes that werer not added to context.
-    // allOptionals are all found optional outputs, i.e. include newOptionals.
+    // newOptionals are newly created nodes that were not added to context.
+    // allOptionals are all found optional outputs, i.e. includes newOptionals.
     // See findOutputNodes.
     void CommandNode::setDetectedOptionalOutputs(
         std::vector<std::shared_ptr<GeneratedFileNode>> const& allOptionals,
@@ -771,12 +773,16 @@ namespace YAM
         for (auto const &n : toRemove) {
             n->removeObserver(this);
             _detectedOptionalOutputs.erase(n->name());
+            DirectoryNode::removeGeneratedFile(n);
             context()->nodes().remove(n);
         }
         for (auto& n : newOptionals) {
             context()->nodes().add(n);
             _detectedOptionalOutputs.insert({ n->name(), n });
             n->addObserver(this);
+        }
+        for (auto const& output : allOptionals) {
+            DirectoryNode::addGeneratedFile(output);
         }
         bool changed = !toRemove.empty() || !newOptionals.empty();
         if (changed) modified(true);
@@ -978,6 +984,9 @@ namespace YAM
             Node::notifyCompletion(Node::State::Canceled);
         } else if (_executionHash != computeExecutionHash(outputNameFilters())) {
             context()->statistics().registerSelfExecuted(this);
+            for (auto const& pair : _mandatoryOutputs) {
+                DirectoryNode::addGeneratedFile(pair.second);
+            }
             auto d = Delegate<void>::CreateLambda(
                 [this]() { executeScript(); }
             );

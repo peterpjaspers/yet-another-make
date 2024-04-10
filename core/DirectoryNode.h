@@ -16,6 +16,7 @@ namespace YAM
     class FileRepositoryNode;
     class BuildFileParserNode;
     class BuildFileCompilerNode;
+    class GeneratedFileNode;
 
     // Executing a DirectoryNode caches the content of a directory as
     //    - a SourceFileNode for each file in the directory.
@@ -103,6 +104,9 @@ namespace YAM
         // Recursively remove the directory content from context->nodes().
         void clear();
 
+        static void addGeneratedFile(std::shared_ptr<GeneratedFileNode> const& genFile);
+        static void removeGeneratedFile(std::shared_ptr<GeneratedFileNode> const& genFile);
+
         static void setStreamableType(uint32_t type);
         // Inherited from IStreamable
         uint32_t typeId() const override;
@@ -116,6 +120,11 @@ namespace YAM
 
     private:
         void parent(DirectoryNode* parent);
+        static std::shared_ptr<DirectoryNode> addGeneratedDir(ExecutionContext* context, std::filesystem::path const& symDirPath);
+        std::shared_ptr<DirectoryNode> _addGeneratedDir(std::filesystem::path const& symGenDirPath);
+        void _addGeneratedFile(std::shared_ptr<GeneratedFileNode> const& genFile);
+        void _removeGeneratedFile(std::shared_ptr<GeneratedFileNode> const& genFile);
+
         std::shared_ptr<Node> findChild(
             std::shared_ptr<DirectoryNode> directory,
             std::filesystem::path::iterator it,
@@ -160,6 +169,7 @@ namespace YAM
         std::shared_ptr<BuildFileCompilerNode> _buildFileCompilerNode;
         std::chrono::time_point<std::chrono::utc_clock> _lastWriteTime;
         std::map<std::filesystem::path, std::shared_ptr<Node>> _content;
+        std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> _generatedContent;
         XXH64_hash_t _executionHash;
     };
 }
