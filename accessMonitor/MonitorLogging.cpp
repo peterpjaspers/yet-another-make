@@ -1,64 +1,41 @@
 #include "MonitorLogging.h"
 #include "FileNaming.h"
+#include "Process.h"
+#include "Session.h"
+#include "LogFile.h"
 
 #include <map>
+#include <mutex>
 
 using namespace std;
 
-// ToDo: Define debug logs the same as for event logs...
-
 namespace AccessMonitor {
 
-    namespace {
-        // Monitor debug log for each session
-        map<SessionID,Log> debugLogs;
-        // Monitor event logs for each session
-        map<SessionID,Log> eventLogs;
-    }
-
-    void createDebugLog() {
-        static const char* signature = "void createDebugLog()";
-        auto session = CurrentSessionID();
-        if (0 < debugLogs.count( session )) throw string( signature ) + " - Debug log already defined for session";
-        debugLogs[ session ] = Log( "MonitorLog", session, CurrentProcessID(), true );
-    }
-    void closeDebugLog() {
-        debugLog().close();
-        debugLogs.erase( CurrentSessionID() );
-    }
-    Log& debugLog() {
-        static const char* signature = "Log& debugLog()";
-        auto session = CurrentSessionID();
-        if (debugLogs.count( session ) == 0) throw string( signature ) + " - No debug log defined for session";
-        return debugLogs[ session ];
+    LogFile* createDebugLog() { return new LogFile( "MonitorLog", CurrentSessionID(), CurrentProcessID(), true ); }
+    LogFile& debugLog() {
+        static const char* signature = "LogFile& debugLog()";
+        auto log = static_cast<LogFile*>(SessionDebugLog());
+        if (log == nullptr) throw string( signature ) + " - No debug log defined for session";
+        return( *log );
     }
     bool debugLog( const LogAspects aspects ) {
-        if (!SessionDefined()) return false;
-        if (debugLogs.count( CurrentSessionID() ) == 0) return false;
-        return debugLog()( aspects );
+        auto log = SessionDebugLog();
+        if ((log == nullptr) || (!log->valid())) return false;
+        return (*log)( aspects );
     }
     LogRecord& debugRecord() { return debugLog()(); }
 
-    void createEventLog() {
-        static const char* signature = "void eventRecord( SessionID session )";
-        auto session = CurrentSessionID();
-        if (0 < eventLogs.count( session )) throw string( signature ) + " - Event log already defined for session";
-        eventLogs[ session ] = Log( monitorEventsPath( CurrentProcessID() ) );
-    }
-    void closeEventLog() {
-        eventLog().close();
-        eventLogs.erase( CurrentSessionID() );
-    }
+    LogFile* createEventLog() { return new LogFile( monitorEventsPath( CurrentProcessID(), CurrentSessionID() ) ); }
     bool recordingEvents() {
-        if (!SessionDefined()) return false;
-        if (eventLogs.count( CurrentSessionID() ) == 0) return false;
-        return true;
+        auto log = SessionEventLog();
+        if (log == nullptr) return false;
+        return log->valid();
     }
-    Log& eventLog() {
-        static const char* signature = "Log& eventLog()";
-        auto session = CurrentSessionID();
-        if (eventLogs.count( session ) == 0) throw string( signature ) + " - No event log defined for session";
-        return eventLogs[ session ];
+    LogFile& eventLog() {
+        static const char* signature = "LogFile& eventLog()";
+        auto log = SessionEventLog();
+        if (log == nullptr) throw string( signature ) + " - No event log defined for session";
+        return( *log );
     }
     LogRecord& eventRecord() { return eventLog()(); }
 

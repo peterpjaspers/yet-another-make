@@ -1,5 +1,6 @@
 #include "Monitor.h"
-#include "Log.h"
+#include "Session.h"
+#include "LogFile.h"
 #include "FileNaming.h"
 #include "MonitorLogging.h"
 
@@ -9,8 +10,6 @@
 #include <fstream>
 #include <thread>
 #include <cstdlib>
-
-// ToDo: Synchronize with process exit and thread exit (via close handle) prior to stop monitoring 
 
 using namespace AccessMonitor;
 using namespace std;
@@ -58,13 +57,17 @@ void doFileAccess() {
         auto exitCode = system( narrow( command.str() ).c_str() );
     }
     auto sessionDir = uniqueName( L"Session", session );
-    vector<thread> workerThreads;
-    for (int i = 0; i < threads; ++i) {
-        wstringstream subdir;
-        subdir << L"fileAccessTest" << i;
-        workerThreads.push_back( thread( worker, path( "." ) / sessionDir / subdir.str() ) );
+    if (1 < threads) {
+        vector<thread> workerThreads;
+        for (int i = 0; i < threads; ++i) {
+            wstringstream subdir;
+            subdir << L"fileAccessTest" << i;
+            workerThreads.push_back( thread( worker, path( "." ) / sessionDir / subdir.str() ) );
+        }
+        for (int i = 0; i < threads; ++i) workerThreads[ i ].join();
+    } else {
+        worker( path( "." ) / sessionDir / L"fileAccessTest" );
     }
-    for (int i = 0; i < threads; ++i) workerThreads[ i ].join();
 }
 
 void doMonitoredFileAccess() {
@@ -72,8 +75,8 @@ void doMonitoredFileAccess() {
     auto session = CurrentSessionID();
     doFileAccess();
     auto results( stopMonitoring() );
-    // Log results...
-    Log output( L"TestProgramOutput", session  );
+    // LogFile results...
+    LogFile output( L"TestProgramOutput", session  );
     for ( auto access : results ) {
         output() << access.first << L" [ " << access.second.lastWriteTime << L" ] " << modeToString( access.second.mode ) << record;
     }

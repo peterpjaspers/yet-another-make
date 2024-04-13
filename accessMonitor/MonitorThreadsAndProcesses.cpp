@@ -1,5 +1,6 @@
 #include "MonitorThreadsAndProcesses.h"
 #include "Process.h"
+#include "Session.h"
 #include "MonitorLogging.h"
 #include "Inject.h"
 #include "FileNaming.h"
@@ -12,6 +13,7 @@
 
 // ToDo: Add function calling convention to all externals
 // ToDo: Use GetBinaryType to determine whether to inject 32-bit or 64-bit DLL
+// ToDo: Single definition/declaration of accessMonitor.dll file name/path...
 
 using namespace std;
 
@@ -19,26 +21,45 @@ namespace AccessMonitor {
 
     namespace {
 
-        const wstring patchDLLFile( L"C:\\Users\\philv\\Code\\yam\\yet-another-make\\accessMonitor\\patchDLL.dll" );
+        const wstring patchDLLFile( L"C:\\Users\\philv\\Code\\yam\\yet-another-make\\accessMonitor\\accessMonitor.dll" );
 
         void injectProcess( DWORD pid, DWORD tid ) {
-            inject( CurrentSessionID(), GetProcessID( pid ), GetThreadID( tid ), patchDLLFile );
+            ProcessID process = GetProcessID( pid );
+            ThreadID main = GetThreadID( tid );
+            debugRecord() << L"MonitorThreadsAndProcesses - Injecting DLL " << patchDLLFile << " in process " << process << " with main thread " << main << "..." << record;
+            inject( CurrentSessionID(), process, main, patchDLLFile );
         }
 
         inline wostream& debugMessage( const char* function ) {
             return debugRecord() << L"MonitorThreadsAndProcesses - " << function << "( ";
         }
         inline wostream& debugMessage( const char* function, bool success ) {
-            if (!success) debugRecord() << L"MonitorThreadsAndProcesses - " << function << L" failed with  error : " << GetLastErrorString() << record;
+            DWORD errorCOde = GetLastError();
+            if (!success) debugRecord() << L"MonitorThreadsAndProcesses - " << function << L" failed with  error : " << lasErrorString( errorCOde ) << record;
             return debugMessage( function );
         }
         inline wostream& debugMessage( const char* function, HANDLE handle ) {
             return debugMessage( function, (handle != INVALID_HANDLE_VALUE) );
         }
 
+        struct ThreadArguments {
+            LPTHREAD_START_ROUTINE  function;
+            LPVOID                  parameter;
+            SessionID               session;
+            LogFile*                eventLog;
+            LogFile*                debugLog;
+        };
+
+        DWORD threadPatch( void* argument ) {
+            auto args = static_cast<const ThreadArguments*>( argument );
+            AddThreadToSession( args->session, args->eventLog, args->debugLog );
+            auto result = args->function( args-> parameter );
+            RemoveThreadFromSession();
+            LocalFree( argument );
+            return result;
+        }
         typedef HANDLE(*TypeCreateThread)(LPSECURITY_ATTRIBUTES,SIZE_T,LPTHREAD_START_ROUTINE,LPVOID,DWORD,LPDWORD);
         HANDLE PatchCreateThread(
-
             LPSECURITY_ATTRIBUTES   lpThreadAttributes,
             SIZE_T                  dwStackSize,
             LPTHREAD_START_ROUTINE  lpStartAddress,
@@ -48,10 +69,15 @@ namespace AccessMonitor {
         ) {
             TypeCreateThread function = reinterpret_cast<TypeCreateThread>(original( (PatchFunction)PatchCreateThread ));
             bool resume = !(dwCreationFlags & CREATE_SUSPENDED);
-            HANDLE handle = function( lpThreadAttributes, dwStackSize, lpStartAddress, lpParameter, (dwCreationFlags | CREATE_SUSPENDED), lpThreadId );
+            auto args = static_cast<ThreadArguments*>( LocalAlloc( LMEM_FIXED, sizeof( ThreadArguments ) ) );
+            args->function = lpStartAddress;
+            args->parameter = lpParameter;
+            args->session = CurrentSessionID();
+            args->eventLog = SessionEventLog();
+            args->debugLog = SessionDebugLog();
+            HANDLE handle = function( lpThreadAttributes, dwStackSize, threadPatch, args, (dwCreationFlags | CREATE_SUSPENDED), lpThreadId );
             auto thread = GetThreadID( GetThreadID( *lpThreadId ) );
             if (debugLog( PatchExecution )) debugMessage( "CreateThread", handle ) << ", ... ) -> " << thread << record;
-            AddSessionThread( thread, CurrentSessionID() );
             if (resume) ResumeThread( handle );
             return handle;
         }
@@ -62,7 +88,6 @@ namespace AccessMonitor {
             TypeExitThread function = reinterpret_cast<TypeExitThread>(original( (PatchFunction)PatchExitThread ));
             auto thread = CurrentThreadID();
             if (debugLog( PatchExecution )) debugMessage( "ExitThread" ) << dwExitCode << " ) on "  << thread << record;
-            RemoveSessionThread( thread );
             function( dwExitCode );
         }
         typedef BOOL(*TypeTerminateThread)(HANDLE,DWORD);
@@ -73,7 +98,6 @@ namespace AccessMonitor {
             TypeTerminateThread function = reinterpret_cast<TypeTerminateThread>(original( (PatchFunction)PatchTerminateThread ));
             auto thread = GetThreadID( GetThreadId( hThread ) );
             if (debugLog( PatchExecution )) debugMessage( "TerminateThread" ) << thread << ", "  << dwExitCode << " )" << record;
-            RemoveSessionThread( thread );
             return function( hThread, dwExitCode );
         }
         typedef BOOL(*TypeCreateProcessA)(LPCSTR,LPSTR,LPSECURITY_ATTRIBUTES,LPSECURITY_ATTRIBUTES,BOOL,DWORD,LPVOID,LPCSTR,LPSTARTUPINFOA,LPPROCESS_INFORMATION);
@@ -242,6 +266,42 @@ namespace AccessMonitor {
             SetLastError( error );
             return function( handle, exitCode );
         }
+        typedef HMODULE(*TypeLoadLibraryA)(LPCSTR);
+        HMODULE PatchLoadLibraryA(
+            LPCSTR lpLibFileName
+        ) {
+            auto function = reinterpret_cast<TypeLoadLibraryA>(original( (PatchFunction)PatchLoadLibraryA));
+            ThreadID thread = GetThreadID( GetCurrentThreadId() );
+            return function( lpLibFileName );
+        }
+        typedef HMODULE(*TypeLoadLibraryW)(LPCWSTR);
+        HMODULE PatchLoadLibraryW(
+            LPCWSTR lpLibFileName
+        ) {
+            auto function = reinterpret_cast<TypeLoadLibraryW>(original( (PatchFunction)PatchLoadLibraryW));
+            ThreadID thread = GetThreadID( GetCurrentThreadId() );
+            return function( lpLibFileName );
+        }
+        typedef HMODULE(*TypeLoadLibraryExA)(LPCSTR,HANDLE,DWORD);
+        HMODULE PatchLoadLibraryExA(
+            LPCSTR lpLibFileName,
+            HANDLE hFile,
+            DWORD  dwFlags
+        ) {
+            auto function = reinterpret_cast<TypeLoadLibraryExA>(original( (PatchFunction)PatchLoadLibraryExA));
+            ThreadID thread = GetThreadID( GetCurrentThreadId() );
+            return function( lpLibFileName, hFile, dwFlags );
+        }
+        typedef HMODULE(*TypeLoadLibraryExW)(LPCWSTR,HANDLE,DWORD);
+        HMODULE PatchLoadLibraryExW(
+            LPCWSTR lpLibFileName,
+            HANDLE hFile,
+            DWORD  dwFlags
+        ) {
+            auto function = reinterpret_cast<TypeLoadLibraryExW>(original( (PatchFunction)PatchLoadLibraryExW));
+            ThreadID thread = GetThreadID( GetCurrentThreadId() );
+            return function( lpLibFileName, hFile, dwFlags );
+        }
 
    } // namespace (anonymous)
 
@@ -257,6 +317,10 @@ namespace AccessMonitor {
         registerPatch( "CreateProcessWithTokenW", (PatchFunction)PatchCreateProcessWithTokenW );
         registerPatch( "ExitProcess", (PatchFunction)PatchExitProcess );
         registerPatch( "TerminateProcess", (PatchFunction)PatchTerminateProcess );
+        registerPatch( "LoadLibraryA", (PatchFunction)PatchLoadLibraryA );
+        registerPatch( "LoadLibraryW", (PatchFunction)PatchLoadLibraryW );
+        registerPatch( "LoadLibraryExA", (PatchFunction)PatchLoadLibraryExA );
+        registerPatch( "LoadLibraryExW", (PatchFunction)PatchLoadLibraryExW );
     }
     void unregisterProcessCreation() {
         unregisterPatch( "CreateThread" );
@@ -270,5 +334,9 @@ namespace AccessMonitor {
         unregisterPatch( "CreateProcessWithTokenW" );
         unregisterPatch( "ExitProcess" );
         unregisterPatch( "TerminateProcess" );
+        unregisterPatch( "LoadLibraryA" );
+        unregisterPatch( "LoadLibraryW" );
+        unregisterPatch( "LoadLibraryExA" );
+        unregisterPatch( "LoadLibraryExW" );
     }  
 } // namespace AccessMonitor

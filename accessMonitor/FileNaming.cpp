@@ -34,8 +34,8 @@ namespace AccessMonitor {
         return path( temp_directory_path() / dataDirectory / uniqueName( L"Session", session ) );
     }
     // Return path to monitor events for this process
-    path monitorEventsPath( const ProcessID process ) {
-        return sessionDataPath( CurrentSessionID() ) / uniqueName( L"Monitor_Events", process, L"log" );
+    path monitorEventsPath( const ProcessID process, const SessionID session ) {
+        return sessionDataPath( session ) / uniqueName( L"Monitor_Events", process, L"log" );
     }
     bool remoteSession() { return exists( sessionInfoPath( CurrentProcessID() ) ); }
     // Record session ID and main thread ID of a (remote) process

@@ -1,21 +1,19 @@
 #ifndef ACCESS_MONITOR_MONITOR_LOGGING_H
 #define ACCESS_MONITOR_MONITOR_LOGGING_H
 
-#include "Log.h"
+#include "LogFile.h"
 
 namespace AccessMonitor {
 
     static const unsigned long MaxFileName = 1024;
     
-    void createDebugLog();
-    void closeDebugLog();
-    Log& debugLog();
+    LogFile* createDebugLog();
+    LogFile& debugLog();
     bool debugLog( const LogAspects aspects );
     LogRecord& debugRecord();
 
-    void createEventLog();
-    void closeEventLog();
-    Log& eventLog();
+    LogFile* createEventLog();
+    LogFile& eventLog();
     bool recordingEvents();
     LogRecord& eventRecord();
 

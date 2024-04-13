@@ -1,6 +1,7 @@
 #include "Monitor.h"
 #include "MonitorLogging.h"
 #include "Process.h"
+#include "Session.h"
 #include "FileNaming.h"
 #include "MonitorFiles.h"
 #include "MonitorThreadsAndProcesses.h"
@@ -9,39 +10,25 @@
 #include <windows.h>
 #include <fstream>
 #include <filesystem>
-#include <set>
-#include <mutex>
 
 using namespace std;
 using namespace std::filesystem;
+
+// ToDo: Clean-up Session ID files (created when injecting patch DLL in spawned process).
 
 namespace AccessMonitor {
 
     namespace {
 
         // Create data directory for a session
-        void createSessionData( const SessionID session ) {
-            static const char* signature = "void createSessionData( const SessionID session )";
+        void createSessionDirectory( const SessionID session ) {
             const path sessionData( sessionDataPath( session ) );
             if (exists( sessionData )) {
                 // Session directory already exists, presumably due to a previous session 
-                // with the same ID that terminated abnormally (e.g., crashed or was killed).
                 // Remove all data session left behind...
                 remove_all( sessionData );
             }
             create_directory( sessionData );
-        }
-
-        // Delete all data associated with a session.
-        // Fails if session directory exists
-        void removeSessionData( const SessionID session ) {
-            static const char* signature = "void removeSessionData( const SessionID session )";
-            const path sessionData( sessionDataPath( session ) );
-            if (!exists( sessionData )) throw string( signature ) + " - Session data directory does not exist!";
-            remove_all( sessionData );
-            // Remove (remote) session ID files associated with a session
-            // ToDo: This does not work, ID file has process ID of remote process, not current process
-            remove( sessionInfoPath( CurrentProcessID() ) );
         }
 
         // ToDo: Access mode merge logic depending on event order
@@ -75,30 +62,24 @@ namespace AccessMonitor {
         }
     }
 
-    // ToDo: Single definition/declaration of patchDLL.dll file name/path...
-    // ToDo: rename patchDLL.dll to accessMonitor.dll
-
     void startMonitoring() {
         SessionID session = CreateSession();
-        createDebugLog();
+        SessionDebugLog( createDebugLog() );
         debugLog().enable( PatchedFunction | ParseLibrary | PatchExecution | FileAccesses | WriteTime );
         debugRecord() << "Start monitoring session " << session << "..." << record;
-        SetSessionState( SessionUpdating );
-        createSessionData( session );
-        createEventLog();
-        SetSessionState( SessionActive );
+        createSessionDirectory( session );
+        SessionEventLog( createEventLog() );
         patchProcess();
     }
 
     MonitorEvents stopMonitoring() {
         auto session = CurrentSessionID();
         debugRecord() << "Stop monitoring session " << session << "..." << record;
+        SessionEventLogClose();
         unpatchProcess();
-        closeEventLog();
-        closeDebugLog();
-        auto events = collectMonitorEvents( session );
+        SessionDebugLogClose();
         RemoveSession();
-        removeSessionData( session );
+        auto events = collectMonitorEvents( session );
         return events;
     }
 

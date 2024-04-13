@@ -12,7 +12,7 @@ namespace AccessMonitor {
     std::wstring uniqueName( const std::wstring& name, unsigned long code1,  unsigned long code2,const std::wstring& extension = L"" );
     std::filesystem::path sessionInfoPath( const ProcessID process );
     std::filesystem::path sessionDataPath( const SessionID session );
-    std::filesystem::path monitorEventsPath( const ProcessID process );
+    std::filesystem::path monitorEventsPath( const ProcessID process, const SessionID session );
 
     // Test if we are executing in a remote session process.
     // Returns true if remote, else false.

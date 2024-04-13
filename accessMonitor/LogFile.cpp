@@ -1,17 +1,17 @@
-#include "Log.h"
-#include "Process.h"
+#include "LogFile.h"
 
 #include <fstream>
 #include <iostream>
-#include <chrono>
 #include <clocale>
 #include <codecvt>
 #include <cstdlib>
+#include <windows.h>
 
 using namespace std;
 using namespace std::filesystem;
 
 // ToDo: Conditionally compile logging code while compiling in debug controlled via NDEBUG
+// ToDo: Free (delete) LogRecord for each thread.
 
 namespace AccessMonitor {
 
@@ -30,57 +30,37 @@ namespace AccessMonitor {
 
     }
     
-    Log::Log( const path& file, bool time, bool interval ) : 
-        logTime( time ), logInterval( interval ), previousTime( chrono::system_clock::now() )
+    LogFile::LogFile( const path& file, bool time, bool interval ) : 
+        enabledAspects( 0 ), logTime( time ), logInterval( interval ), previousTime( chrono::system_clock::now() )
     {
+        const char* signature = "LogFile( const path& file, bool time, bool interval )";
         logFile = new wofstream( file );
-        // static uint8_t UTF16BOMCodes[ 2 ] = { 0xFE, 0xFF };
-        // static wchar_t* UTF16BOM = reinterpret_cast<wchar_t*>( &UTF16BOMCodes[ 0 ] );
-        // *logFile << UTF16BOM;
+        tlsRecordIndex = TlsAlloc();
+        if (tlsRecordIndex == TLS_OUT_OF_INDEXES) throw string( signature ) + " - Could not allocate thread local storage!";
         logMutex = new mutex;
-        logRecords = new map<ThreadID,LogRecord*>;
-
     }
 
-    Log::Log( const std::filesystem::path& file, const unsigned long code, bool time, bool interval ) :
-        Log( uniqueLogFileName( file.c_str(), code ), time, interval )
+    LogFile::LogFile( const std::filesystem::path& file, const unsigned long code, bool time, bool interval ) :
+        LogFile( uniqueLogFileName( file.c_str(), code ), time, interval )
     {}
-    Log::Log( const std::filesystem::path& file, const unsigned long code1, const unsigned long code2, bool time, bool interval ) :
-        Log( uniqueLogFileName( file.c_str(), code1, code2 ), time, interval )
+    LogFile::LogFile( const std::filesystem::path& file, const unsigned long code1, const unsigned long code2, bool time, bool interval ) :
+        LogFile( uniqueLogFileName( file.c_str(), code1, code2 ), time, interval )
     {}
 
-    Log::~Log() { close(); }
+    LogFile::~LogFile() { close(); }
 
-    void Log::close() {
+    void LogFile::close() {
         if (logFile != nullptr) { logFile->close(); delete( logFile ); logFile = nullptr; }
         if (logMutex != nullptr) { delete( logMutex ); logMutex = nullptr; }
-        if (logRecords != nullptr) {
-            for ( auto record : *logRecords ) { delete record.second; }
-            delete logRecords; logRecords = nullptr;
-        }
-    }
-
-    Log& Log::operator=( Log&& other ) {
-        logFile = other.logFile;
-        logMutex = other.logMutex;
-        logRecords = other.logRecords;
-        enabledAspects = other.enabledAspects;
-        logTime = other.logTime;
-        logInterval = other.logInterval;
-        previousTime = other.previousTime;
-        other.logFile = nullptr;
-        other.logMutex = nullptr;
-        other.logRecords = nullptr;
-        return *this;
     }
 
     // Return logging stream on enabled log.
-    LogRecord& Log::operator()() {
-        static const char* signature = "LogRecord& Log::operator()() const";
-        LogRecord* record = (*logRecords)[ CurrentThreadID() ];
+    LogRecord& LogFile::operator()() {
+        static const char* signature = "LogRecord& LogFile::operator()()";
+        LogRecord* record = static_cast<LogRecord*>( TlsGetValue( tlsRecordIndex ) );
         if (record == nullptr) {
             record = new LogRecord( *this );
-            (*logRecords)[ CurrentThreadID() ] = record;
+            TlsSetValue( tlsRecordIndex, record );
         }
         if (logTime || logInterval) {
             auto time = chrono::system_clock::now();
@@ -92,7 +72,7 @@ namespace AccessMonitor {
         return( *record );
     }
 
-    void Log::record( const wstring& string ) {
+    void LogFile::record( const wstring& string ) {
         const lock_guard<mutex> lock( *logMutex ); 
         *logFile << string << flush;
     }
@@ -120,25 +100,22 @@ namespace AccessMonitor {
         return utf16conv.to_bytes( string );
     }
 
-    wstring GetLastErrorString() {
-        DWORD errorMessageID = GetLastError();
-        if(errorMessageID == 0) return L"";
-        LPWSTR messageBuffer = nullptr;
+    wstring lasErrorString( unsigned int errorCode ) {
+        LPWSTR buffer = nullptr;
         size_t size =
             FormatMessageW(
                 (FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS),
                 NULL,
-                errorMessageID,
+                errorCode,
                 MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ),
-                (LPWSTR)&messageBuffer,
+                (LPWSTR)&buffer,
                 0,
                 NULL
             );
-        wstring message( messageBuffer, size );
-        LocalFree(messageBuffer);
+        wstring message( buffer, size );
+        LocalFree(buffer);
         if (message.back() == '\n') message.pop_back();
         return message;
     }
-
 
 } // namespace AccessMonitor

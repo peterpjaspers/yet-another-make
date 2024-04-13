@@ -1,5 +1,6 @@
 #include "Process.h"
 #include "PatchProcess.h"
+#include "Session.h"
 #include "FileNaming.h"
 #include "MonitorLogging.h"
 
@@ -18,28 +19,22 @@ namespace {
         SessionID session;
         ThreadID mainThread; // Main thread ID of (remote) process
         retrieveSessionInfo( process, session, mainThread );
-        ThreadID monitorThread = CurrentThreadID();
-        // Simply add monitor thread and main thread to session adminstration, session was created by ancestor process
-        AddSessionThread( monitorThread, session );
-        AddSessionThread( mainThread, session );
-        createEventLog();
-        createDebugLog();
+        CreateRemoteSession( session, process, mainThread );
+        SessionDebugLog( createDebugLog() );
+        SessionEventLog( createEventLog() );
         debugLog().enable( PatchedFunction | ParseLibrary | PatchExecution | FileAccesses );
-        debugRecord() << "Start monitoring in process " << process << "..." << dec << record;
-        SetSessionState( SessionActive );
+        debugRecord() << "Start monitoring session " << session << " in process " << process << "..." << dec << record;
         patchProcess();
         auto requestExit = AccessEvent( "RequestExit", session, process );
         EventSignal( "ProcessPatched", session, process ); // Signal (parent) process that monitoring has started
         EventWait( requestExit ); // Wait for process to (request) exit before exitting monitor thread
         ReleaseEvent( requestExit );
-        debugRecord() << "Stop monitoring in process " << process << "..." << dec << record;
+        debugRecord() << "Stop monitoring session " << session << " in process " << process << "..." << dec << record;
         unpatchProcess();
         remove( sessionInfoPath( process ) );
-        closeEventLog();
-        closeDebugLog();
+        SessionEventLogClose();
+        SessionDebugLogClose();
         EventSignal( "ExitProcess", session, process ); // Signal process that it may exit
-        RemoveSessionThread( monitorThread );
-        RemoveSessionThread( mainThread );
         return ERROR_SUCCESS;
     }
 
