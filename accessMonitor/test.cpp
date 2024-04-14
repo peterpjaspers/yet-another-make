@@ -51,7 +51,7 @@ void doFileAccess() {
         command
             << L"C:\\Users\\philv\\Code\\yam\\yet-another-make\\accessMonitor\\remoteTest.exe"
             << L" " 
-            << ((threads) ? L"true" : L"false" )
+            << threads
             << L" "
             << uniqueName( L"RemoteSession", session );
         auto exitCode = system( narrow( command.str() ).c_str() );

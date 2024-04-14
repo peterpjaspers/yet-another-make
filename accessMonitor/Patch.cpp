@@ -61,7 +61,6 @@ namespace AccessMonitor {
                 // Restore to original only if function was not re-patched by some other party
                 if (function == *patchData.address) {
                     patchImportEntry( patchData.address, patchData.original );
-                    patchData.original = nullptr;
                     return true;
                 } else {
                     if (debugLog( PatchedFunction )) { debugRecord() << L"      Function in " << widen( *patchData.library ) << L" was repatched!" << record; }

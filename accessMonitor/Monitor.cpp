@@ -76,10 +76,10 @@ namespace AccessMonitor {
         auto session = CurrentSessionID();
         debugRecord() << "Stop monitoring session " << session << "..." << record;
         SessionEventLogClose();
+        auto events = collectMonitorEvents( session );
         unpatchProcess();
         SessionDebugLogClose();
         RemoveSession();
-        auto events = collectMonitorEvents( session );
         return events;
     }
 
