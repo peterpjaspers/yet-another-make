@@ -31,8 +31,24 @@ namespace AccessMonitor {
             create_directory( sessionData );
         }
 
-        // ToDo: Access mode merge logic depending on event order
-        // Collect events from monitor event files in a session
+        // Collect events from monitor event files in a session.
+        //
+        // Multiple monitor events on the same file are collapsed to a
+        // single monitor event.
+        //
+        // Event file access modes are collapsed in the following manner:
+        //
+        //         None   Read   Write  Delete
+        // None    None   Read   Write  Delete
+        // Read    Read   Read   Write  Delete
+        // Write   Write  write  write  Delete
+        // Delete  Delete Delete Delete Delete
+        //
+        // where the top row indicates the previous collapsed mode state
+        // and the left row the next event mode.
+        //
+        // Last write time is collapsed to the lastest last write time.
+        //
         MonitorEvents collectMonitorEvents( const SessionID session ) {
             const path sessionData( sessionDataPath( session ) );
             MonitorEvents collected;
@@ -49,7 +65,10 @@ namespace AccessMonitor {
                         if (0 < collected.count( filePath )) {
                             auto access = collected[ filePath ];
                             if (access.lastWriteTime < lastWriteTime) access.lastWriteTime = lastWriteTime;
-                            access.mode |= stringToMode( accessMode );
+                            auto mode = stringToMode( accessMode );
+                            if ((mode & AccessDelete) != 0) access.mode = AccessDelete;
+                            else if (((mode & AccessWrite) != 0) && ((access.mode & AccessDelete) == 0)) access.mode = AccessWrite;
+                            else if (((mode & AccessRead) != 0) && ((access.mode & AccessDelete) == 0) && ((access.mode & AccessWrite) == 0)) access.mode = AccessRead;
                             collected[ filePath ] = access;
                         } else {
                             collected[ filePath ] = FileAccess( stringToMode( accessMode ), lastWriteTime );

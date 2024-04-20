@@ -13,7 +13,6 @@ namespace AccessMonitor {
     static const FileAccessMode AccessRead = (1 << 1);
     static const FileAccessMode AccessWrite = (1 << 2);
     static const FileAccessMode AccessDelete = (1 << 3);
-    static const FileAccessMode AccessVariable = (1 << 4);
 
     struct FileAccess {
         FileAccessMode  mode;
