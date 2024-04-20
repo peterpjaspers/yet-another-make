@@ -41,7 +41,7 @@ namespace AccessMonitor {
         //         None   Read   Write  Delete
         // None    None   Read   Write  Delete
         // Read    Read   Read   Write  Delete
-        // Write   Write  write  write  Delete
+        // Write   Write  Write  Write  Write
         // Delete  Delete Delete Delete Delete
         //
         // where the top row indicates the previous collapsed mode state
@@ -67,7 +67,7 @@ namespace AccessMonitor {
                             if (access.lastWriteTime < lastWriteTime) access.lastWriteTime = lastWriteTime;
                             auto mode = stringToMode( accessMode );
                             if ((mode & AccessDelete) != 0) access.mode = AccessDelete;
-                            else if (((mode & AccessWrite) != 0) && ((access.mode & AccessDelete) == 0)) access.mode = AccessWrite;
+                            else if ((mode & AccessWrite) != 0) access.mode = AccessWrite;
                             else if (((mode & AccessRead) != 0) && ((access.mode & AccessDelete) == 0) && ((access.mode & AccessWrite) == 0)) access.mode = AccessRead;
                             collected[ filePath ] = access;
                         } else {
