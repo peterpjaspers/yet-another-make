@@ -15,8 +15,9 @@ namespace AccessMonitor {
     static const FileAccessMode AccessDelete = (1 << 3);
 
     struct FileAccess {
-        FileAccessMode  mode;
-        FileTime        lastWriteTime;
+        FileAccessMode  mode;           // Collapsed file access mode
+        FileAccessMode  modes;          // All access modes to file
+        FileTime        lastWriteTime;  // Last write time on file
         FileAccess();
         FileAccess( const FileAccessMode& mode, const FileTime& time );
     };

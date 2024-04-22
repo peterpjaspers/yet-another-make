@@ -63,13 +63,13 @@ namespace AccessMonitor {
                     eventFile >> ws >> accessMode >> ws;
                     if (eventFile.good()) {
                         if (0 < collected.count( filePath )) {
-                            auto access = collected[ filePath ];
+                            auto& access = collected[ filePath ];
                             if (access.lastWriteTime < lastWriteTime) access.lastWriteTime = lastWriteTime;
                             auto mode = stringToMode( accessMode );
                             if ((mode & AccessDelete) != 0) access.mode = AccessDelete;
                             else if ((mode & AccessWrite) != 0) access.mode = AccessWrite;
                             else if (((mode & AccessRead) != 0) && ((access.mode & AccessDelete) == 0) && ((access.mode & AccessWrite) == 0)) access.mode = AccessRead;
-                            collected[ filePath ] = access;
+                            access.modes |= mode;
                         } else {
                             collected[ filePath ] = FileAccess( stringToMode( accessMode ), lastWriteTime );
                         }

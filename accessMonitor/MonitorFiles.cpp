@@ -18,9 +18,8 @@ using namespace std::filesystem;
 
 // ToDo: Add function calling convention to all externals
 // ToDo: Last write time on directories
-
-// ToDo: Decide whether or not to track following Windows features:
-// Iterate over all hard links to a file: Do we kneed to track this? (FindFirstFileName, FindFirstFileNameTransacted)
+// ToDo: Implenent for Linux and MacOS, current implementation is Windows only...
+// ToDo: Discuss what to do with calls that fail; i.e., should file access be recorded or not?
 
 namespace AccessMonitor {
 
@@ -460,7 +459,6 @@ namespace AccessMonitor {
             BOOL moved = function( existingFileName, newFileName, lpProgressRoutine, lpData, dwFlags );
             if (debugLog( PatchExecution )) debugMessage( "MoveFileWithProgressA", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
             fileAccess( newFileName, AccessWrite );
-            // ToDo: Record last write time on newFileName (wait until copy coplete!)
             return moved;
         }
         typedef BOOL(*TypeMoveFileWithProgressW)(LPCWSTR,LPCWSTR,LPPROGRESS_ROUTINE,LPVOID,DWORD);
@@ -476,7 +474,6 @@ namespace AccessMonitor {
             BOOL moved = function( existingFileName, newFileName, lpProgressRoutine, lpData, dwFlags );
             if (debugLog( PatchExecution )) debugMessage( "MoveFileWithProgressW", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
             fileAccess( newFileName, AccessWrite );
-            // ToDo: Record last write time on newFileName (wait until copy complete!)
             return moved;
         }
         typedef BOOL(*TypeMoveFileWithProgressTransactedA)(LPCSTR,LPCSTR,LPPROGRESS_ROUTINE,LPVOID,DWORD,HANDLE);
@@ -798,7 +795,7 @@ namespace AccessMonitor {
         typedef BOOL(*TypeCloseHandle)(HANDLE);
         BOOL PatchCloseHandle( HANDLE handle ) {
             auto function = reinterpret_cast<TypeCloseHandle>(original( (PatchFunction)PatchCloseHandle ));
-            // Record last write time when closing file opened for write
+            // Record last write time when closing file opened for write (also for WithProgress calls)
             wstring fileName = fileAccess( handle );
             if  (fileName != L"") {
                 if (debugLog( PatchExecution )) debugMessage( "CloseHandle" ) << handleCode( handle ) << L" ) on " << fileName.c_str() << record;

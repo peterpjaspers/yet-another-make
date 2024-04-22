@@ -5,8 +5,8 @@ using namespace std::chrono;
 
 namespace AccessMonitor {
 
-    FileAccess::FileAccess() : mode( AccessNone ) {}
-    FileAccess::FileAccess( const FileAccessMode& accessMode, const FileTime& time ) : mode( accessMode), lastWriteTime( time ) {}
+    FileAccess::FileAccess() : mode( AccessNone ), modes( AccessNone ) {}
+    FileAccess::FileAccess( const FileAccessMode& accessMode, const FileTime& time ) : mode( accessMode), modes( accessMode), lastWriteTime( time ) {}
 
     wstring modeToString( FileAccessMode mode ) {
         auto string = wstring( L"" );

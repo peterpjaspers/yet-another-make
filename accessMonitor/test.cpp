@@ -11,6 +11,9 @@
 #include <thread>
 #include <cstdlib>
 
+// ToDo: Understand why we get access denied errors on files when running with large (>20) number of sessions and (or?)
+//       large (>100) number of threads.
+
 using namespace AccessMonitor;
 using namespace std;
 using namespace std::filesystem;
@@ -20,28 +23,41 @@ static int threads = 1;
 static bool remoteProcess = false;
 
 void worker( const path directoryPath ) {
-    current_path( temp_directory_path() );
-    debugRecord() << "std::filesystem::create_directories( " << directoryPath << " )" << record;
-    create_directories( directoryPath );
-    debugRecord() << "std::ofstream( " << (directoryPath / "junk.txt").c_str() << " )" << record;
-    ofstream file( directoryPath / "junk.txt" );
-    file << "Hello world!\n";
-    file.close();
-    this_thread::sleep_for(chrono::milliseconds(rand() % 17));;
-    debugRecord() << "std::ofstream( " << (directoryPath / "moreJunk.txt").c_str() << " )" << record;
-    ofstream anotherFile( directoryPath / "moreJunk.txt" );
-    anotherFile << "Hello again!\n";
-    anotherFile.close();
-    debugRecord() << "Determine canonical path of " << (directoryPath / "morejunk.txt").c_str() << record;
-    auto canon = canonical( directoryPath / "morejunk.txt" );
-    debugRecord() << "Canaonical path is " << canon.c_str() << record;
-    CopyFileW( (directoryPath / "moreJunk.txt").c_str(), (directoryPath / "evenMoreJunk.txt").c_str(), false );
-    debugRecord() << "std::filesystem::remove( " << (directoryPath / "junk.txt").c_str() << " )" << record;
-    remove( directoryPath / "junk.txt" );
-    debugRecord() << "std::filesystem::rename( " << (directoryPath / "moreJunk.txt").c_str() << ", " << (directoryPath / "yetMorejunk.txt").c_str() << " )" << record;
-    rename( directoryPath / "moreJunk.txt", directoryPath / "yetMoreJunk.txt" );
-    debugRecord() << "std::filesystem::remove_all( " << directoryPath << " )" << record;
-    remove_all( directoryPath );
+    try {
+        current_path( temp_directory_path() );
+        debugRecord() << "std::filesystem::create_directories( " << directoryPath << " )" << record;
+        create_directories( directoryPath );
+        debugRecord() << "std::ofstream( " << (directoryPath / "junk.txt").c_str() << " )" << record;
+        ofstream file( directoryPath / "junk.txt" );
+        file << "Hello world!\n";
+        file.close();
+        this_thread::sleep_for(chrono::milliseconds(rand() % 17));;
+        debugRecord() << "std::ofstream( " << (directoryPath / "moreJunk.txt").c_str() << " )" << record;
+        ofstream anotherFile( directoryPath / "moreJunk.txt" );
+        anotherFile << "Hello again!\n";
+        anotherFile.close();
+        debugRecord() << "Determine canonical path of " << (directoryPath / "morejunk.txt").c_str() << record;
+        auto canon = canonical( directoryPath / "morejunk.txt" );
+        debugRecord() << "Canaonical path is " << canon.c_str() << record;
+        CopyFileW( (directoryPath / "moreJunk.txt").c_str(), (directoryPath / "evenMoreJunk.txt").c_str(), false );
+        debugRecord() << "std::filesystem::remove( " << (directoryPath / "junk.txt").c_str() << " )" << record;
+        remove( directoryPath / "junk.txt" );
+        debugRecord() << "std::filesystem::rename( " << (directoryPath / "moreJunk.txt").c_str() << ", " << (directoryPath / "yetMorejunk.txt").c_str() << " )" << record;
+        rename( directoryPath / "moreJunk.txt", directoryPath / "yetMoreJunk.txt" );
+        debugRecord() << "std::filesystem::remove_all( " << directoryPath << " )" << record;
+        remove_all( directoryPath );
+        debugRecord() << "std::filesystem::create_directories( " << directoryPath << " )" << record;
+        create_directories( directoryPath );
+        file = ofstream( directoryPath / "junk.txt" );
+        file << "Hello world!\n";
+        file.close();
+    }
+    catch (filesystem_error const& exception) {
+        debugRecord() << "Exception  " << exception.what() << "!" << record;
+    }
+    catch (...) {
+        debugRecord() << "Exception!" << record;
+    }
 }
 
 void doFileAccess() {
@@ -78,7 +94,7 @@ void doMonitoredFileAccess() {
     // LogFile results...
     LogFile output( L"TestProgramOutput", session  );
     for ( auto access : results ) {
-        output() << access.first << L" [ " << access.second.lastWriteTime << L" ] " << modeToString( access.second.mode ) << record;
+        output() << access.first << L" [ " << access.second.lastWriteTime << L" ] " << modeToString( access.second.modes ) << " : " << modeToString( access.second.mode ) << record;
     }
     output.close();
 
