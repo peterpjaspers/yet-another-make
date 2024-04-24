@@ -400,6 +400,4 @@ FodyWeavers.xsd
 *.exe
 *.bt
 *.txt
-accessMonitor/testDLL.cpp
-accessMonitor/patchDLL.dll
 accessMonitor/accessMonitor.dll

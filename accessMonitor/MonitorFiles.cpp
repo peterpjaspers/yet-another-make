@@ -17,9 +17,7 @@ using namespace std::filesystem;
 // Lempel-Ziv (LZ) functions are not implemented.
 
 // ToDo: Add function calling convention to all externals
-// ToDo: Last write time on directories
 // ToDo: Implenent for Linux and MacOS, current implementation is Windows only...
-// ToDo: Discuss what to do with calls that fail; i.e., should file access be recorded or not?
 
 namespace AccessMonitor {
 
