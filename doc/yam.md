@@ -1,13 +1,13 @@
 # What is Yam?
 
-Yam (Yet another make) is a software build system. It is intended to be used by
-software developers to automate the build of their software.  
+Yam (Yet another make) is a software build system. It is intended for
+software developers to automate software builds.  
 Wikipedia: In software development, a build is the process of converting source
 code files into standalone software artifact(s) that can be run on a computer,
 or the result of doing so.
 
 Yam is a general purpose file-based build system: it executes user-defined
-commands in a user-defined order. A command transforms input files into output
+commands in a user-defined order where each command transforms input files to output
 files. Output files of one command can be used as input files of other commands.
 Yam is fully ignorant of how commands produce output files. This makes Yam
 suitable for other usages than just software builds. For example you can define
@@ -31,17 +31,17 @@ only a subset of these problems.
 - **No more waiting for the build system to figure out which files to rebuild**  
   For the typical way-of-working in which you modify only a few files in-between
   two builds it will take Yam, independent of the number of files in your
-  repository, less than 10 milliseconds to figure out which files to rebuild.
+  repository, less than 10 milliseconds to determine which files to rebuild.
   Many build systems scan the entire source file repository to find the files
-  that were modified since the previous build. This takes time proportional to
-  the number of files in the repository. For large repositories this scan time
-  may become larger than the time needed to rebuild the modified files.
+  that were modified since the previous build. This requires time proportional to
+  the number of files in the repository. For large repositories this can easily exceed
+  the time needed to rebuild the modified files.
   Yam takes a different approach to discover modified files: it continuously
   monitors the file system for changes. When you start a build Yam already knows
   what files need to be rebuild.
 
 - **No more waiting for a build to finish while the CPU load is only a few percent**  
-  Yam parallelizes the execution of commands that do not depend on each other.
+  Yam parallelizes the execution of commands that do not depend on each other output files.
   By default it does so using all available local CPU cores.
 
 - **No more starting the build in a sub-directory to make it go faster**  
@@ -67,11 +67,10 @@ only a subset of these problems.
   dlls, recursively up to the executables that use them.  
   Not Yam. Yam can be setup to only relink dependent dlls when the interface of
   the modified dll has changed.
+- **No more forgetting about a dependency you needed to build resulting in inconsistent binaries and wasted time debugging**
 
 ## Ease of use
 
-- **No more figuring out what directories to build based on the change you made**
-- **No more forgetting about a dependency you needed to build resulting in inconsistent binaries and wasted time debugging**
 - **No more clean rebuilds after you changed some of your build commands**
 - **No more clean rebuilds after you renamed/moved files or directories**
 - **No more clean rebuilds after you checked-out another git branch in your worktree**
@@ -90,7 +89,7 @@ only a subset of these problems.
   then Yam demands that you declare C to be dependent on F in order to guarantee
   proper build order of P before C. Yam will tell you when you failed to do so.
 
-## Correct, deterministic and hermetic
+## Correct, reproducible deterministic and hermetic
 
 Deterministic implies that a build with the same input files and commands give
 the same output files on the same machine. Hermetic implies that unexpectedly
@@ -136,7 +135,7 @@ machines/environments.
 
 Yam does not support distributed build and distributed build cache. This makes
 Yam not suitable for building huge repositories that are maintained by hundreds
-or thousands of engineers, like the ones in Google, Microsoft, Amazon, Facebook.
+or thousands of engineers, like those at Google, Microsoft, Amazon, Facebook.
 
 # A short history of Yam
 
@@ -162,7 +161,7 @@ command execution takes from a few seconds to a few minutes. The CI
 (Continuous Integration) pipeline performed incremental builds on Pull requests
 and full builds during nights. A full CI build was performed on a 10-core
 computer in 1.5-2 hours. Adding more cores did not further reduce build time due
-to the serialization inherent in the command dependency graph.
+to the serialization inherent in archive source files.
 The new build system was not suited to be open-sourced because it required a
 very specific directory structure and expensive third-party software. A few
 years later the authors retired and decided to use their build system experiences
@@ -279,6 +278,7 @@ Build execution time is determined by the following factors:
   - The number of available processor cores
 - The computer hardware, speed of I/O system
 - The overhead of the build system
+    - Determine minimum set of commands to be up-to-date
 
 The first three factors are not determined by the build system.
 Build system overhead consists of:
@@ -291,7 +291,7 @@ Build system overhead consists of:
 - Time needed to parallelize command execution
 - Time needed to monitor command execution and update the dependency graph
 
-# Comparison of tup and yam
+# Some differneces between Tup and Yam
 
 TODO: build language comparison
 TODO: run-script
