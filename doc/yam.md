@@ -7,67 +7,174 @@ code files into standalone software artifact(s) that can be run on a computer,
 or the result of doing so.
 
 Yam is a general purpose file-based build system: it executes user-defined
-commands in a user-defined order where each command transforms input files to output
-files. Output files of one command can be used as input files of other commands.
-Yam is fully ignorant of how commands produce output files. This makes Yam
-suitable for other usages than just software builds. For example you can define
+commands where each command transforms input files to output files. Output 
+files of one command can be used as input files of other commands. A command
+is a script in Windows `cmd.exe` shell syntax.
+
+Yam is fully ignorant of how commands produce output files. This makes
+Yam suitable for other usages than just software builds. For example you can define
 commands to run unit tests, to convert MS Word documents into PDF documents, to
 transform a zip file with raw images into a zip file with processed images.
 
 Yam pays tribute to the [tup](https://gittup.org/tup/index.html) build system
-from which it re-used many concepts.
-See [Comparison of tup and yam](#comparison-of-tup-and-yam) for a comparison of
-Yam and tup.
+from which it re-used many concepts.  
+See [Some differences between Tup and Yam](#some-differences-between-tup-and-yam) .
 
 Yam runs on the Windows operating system. Future versions will also support Linux.
 
 # Why use Yam?
 
-Yam solves a comprehensive set of problems. Most other build systems often address
-only a subset of these problems.
+This section discusses how Yam addresses problems related to performance, 
+correctness, reproducability and ease-of-use. Most build systems often address
+only a subset of these problems or address them with less rigour than Yam does.
 
 ## Performance
 
-- **No more waiting for the build system to figure out which files to rebuild**  
-  For the typical way-of-working in which you modify only a few files in-between
-  two builds it will take Yam, independent of the number of files in your
-  repository, less than 10 milliseconds to determine which files to rebuild.
-  Many build systems scan the entire source file repository to find the files
-  that were modified since the previous build. This requires time proportional to
-  the number of files in the repository. For large repositories this can easily exceed
-  the time needed to rebuild the modified files.
-  Yam takes a different approach to discover modified files: it continuously
-  monitors the file system for changes. When you start a build Yam already knows
-  what files need to be rebuild.
+### Long time between start of build and start of command execution  
+Build systems only re-execute commands that are out-dated. A command is 
+out-dated when its input files were modified since the previous build.
+To find these files many build systems scan the entire source file repository.
+This requires time proportional to the number of files in the repository.
+The scan time is perceived as the time between start of build and start of 
+command execution. For large repositories this can exceed the time needed to
+execute the out-dated command(s). E.g. the build system takes 10 seconds to 
+start a 1 second compilation.  
+Yam takes a different approach to discover modified files: it continuously
+monitors the file system for changes. When you start a build Yam already knows
+which files were modified, and hence which commands to re-execute.
 
-- **No more waiting for a build to finish while the CPU load is only a few percent**  
-  Yam parallelizes the execution of commands that do not depend on each other output files.
-  By default it does so using all available local CPU cores.
+*For the typical way-of-working in which you modify only a few files in-between
+two builds it will take Yam, independent of the number of files in your 
+repository, less than 10 milliseconds to determine which commands to
+re-execute.*
 
-- **No more starting the build in a sub-directory to make it go faster**  
-  Yam does not care where you start the build. It will always build all out-dated
-  output files. Unless you tell Yam, using command line options, to only build a
-  subset.
-- **No more recompilation after changing a comment**  
-  Ever changed a comment in a C/C++ header file that is included by hundreds of
-  cpp files? Most build systems will recompile all these cpp files, even though
-  comment changes do not affect the compilation results.  
-  Not Yam. Yam can be setup to ignore changes in comments, thus allowing you to
-  improve comments without fear of long builds.
-- **No more recompilation after undoing edits**  
-  Ever modified and saved a C/C++ header file that is included by hundreds of
-  C/C++cpp files, then changed your mind, undid the changes and start a build?
-  Most build systems will recompile all the cpp files.  
-  Not Yam. A change in a file's last-write-time is a signal to Yam to verify
-  whether its content has changed. Rebuilds only happen on content changes.
-- **No more tens or more of relinking dlls after changing an implementation detail**  
-  Ever modified an implementation detail in a dynamic load library (dll) in a
-  large repository where a large number of dlls depend on the changed one, either
-  directly or indirectly via other dlls? Most build systems will relink all these
-  dlls, recursively up to the executables that use them.  
-  Not Yam. Yam can be setup to only relink dependent dlls when the interface of
-  the modified dll has changed.
-- **No more forgetting about a dependency you needed to build resulting in inconsistent binaries and wasted time debugging**
+*Long times between start of build and start of command execution tempt
+engineers to outsmart the build system by only building the output files that
+they thought were impacted by their source code changes. This frequently 
+results in mistakes and lots of wasted time in debugging.*
+
+### Long build time due to under-utilization of CPU cores 
+Yam parallellizes the execution of commands that do not depend on each others
+output files. E.g. C++ compile commands execute in parallel, a link command 
+executes after the compile commands that produce its input object files. 
+Commands that can be executed parallel are queued to a thread pool. By default
+the thread pool size is equal to the number of CPU cores.
+Yam thus ensures 100% CPU utilization as long as sufficient commands can execute 
+parallel.
+
+*Input-output dependencies between commands limit parallelization.
+This is outside control of the build system.*
+
+### Long build time due to unnecessary command re-execution
+To avoid unnecessary command re-execution Yam can be setup to only re-execute a
+command when relevant aspects of the command's input files change. Examples:
+
+- Unnecessary recompilation after changing comments  
+Assume you change a comment in a C/C++ header file that is included by hundreds
+of cpp files and start a build. Most build systems will recompile all these cpp 
+files, even though comment changes do not affect the resulting object files.  
+Not so in Yam. Yam can be setup to only re-execute a compile command when the 
+non-comment sections of the command's input files change. This allows you to 
+improve comments without the cost of long builds. 
+
+- Unnecessary recompilation after undoing edits  
+Assume you modify and save a C/C++ header file that is included by hundreds of
+C/C++cp files, then change your mind, undo the changes and start a build.
+Most build systems will recompile all the cpp files because their 
+last-write-times have changed.  
+Not so in Yam. By default a change in a file's last-write-time is a signal to
+Yam to verify whether (aspects of) its content has changed. Rebuilds only happen
+on content changes.
+
+- Unnecessary relinking after changing a dynamic load library
+Assume you modify an implementation detail in a C++ file that is linked into a
+dynamic load library (dll). Assume that a large number of dlls and/or 
+executables depend on the changed dll, either directly or indirectly via other
+dlls. Most build systems will relink all these dlls, recursively up to the 
+executables that use them.  
+Not so in Yam: Yam can be setup to only re-execute a link command a dll when 
+the interface aspect of the command's input dlls change.
+
+
+## Correctness
+This section discusses various aspects of build correctness.  
+
+### Failure to re-execute a command
+Yam re-executes a command when one or more of the following is true:
+- Relevant aspects of the command's input files have changed.
+- The command script has changed.  
+- The command output files have been tampered with.
+
+Note: Yam does not re-execute commands when environment variables change. 
+This is not needed because Yam executes commands in a cmd shell with an 
+empty environment. Commands can only use environment variables that are set 
+in the command script itself. E.g. the command script can set the PATH
+variable. The PATH setting is only visible for the command that set it.
+
+Yam must know all input files of a command. Yam requires the user to specify
+all input files that are outputs files of other commands. Yam however does 
+not require the user to specify all input source files. E.g. for a C++ 
+compilation the user only specifies the cpp file to be compiled. It is not
+needed to list all header files included by that cpp file because Yam 
+discovers all input and output files of a command by monitoring the 
+command's file accesses.
+
+Yam only determines whether (aspects of) file content changed when a file's
+last-write-time has changed. The probability of failure to re-execute a 
+command therefore depends on the last-write-time resolution.  
+Note: Yam only looks at a change in last-write-time. Yam does not care whether
+the change is an increase or decrease.
+
+*Some older build systems like `Make` only re-execute a command when an output
+file is older than its input files. This results in out-dated output when 
+changing the command. When undoing file changes by resetting it to its 
+committed version the version management systems may reset the file's 
+last-write-time to the one of the committed version. In this case the time
+decreases and `Make` sees no reason to re-execute the command.*
+
+### Missing, unexpected and stale output files
+Stale output files are output files of deleted commands or of commands 
+that were modified to no longer output these files. Stale output files can lead
+to errors. E.g. a test script tests output file oldProgram.exe. The command that 
+produces oldProgram.exe is now changed to produce newProgram.exe. The user
+forgets to update the test script. If the stale oldProgram.exe is not deleted
+then the test script continues to pass the test.
+Unexpected output files may also cause problems, e.g. excessive diskspace usage.
+
+Yam avoids such errors by: 
+- requiring the user to declare the output files of a command.  
+Output files can be mandatory, optional or to-be-ignored. Globs can be used to 
+define optional and to-be-ignored files.
+- failing the build when not all mandatory outputs are updated by the command.
+- failing the build when the command writes files that are not declared as 
+optional or to-be-ignored. 
+- deleting to-be-ignored output files.
+- deleting stale output files.
+
+Note: Yam discovers all input and output files of by monitoring the command's 
+file accesses. This allows Yam to compare previous outputs with current outputs
+and to compare actual outputs with declared outputs.
+
+### Wrong build order
+Assume command P produces file F and command C reads F. For C to produce
+up-to-date output it must use the latest version of F. Hence C must be executed
+after P.  
+Yam deduces build order by requiring the user to specify all input files that
+are produced by other commands. Yam will fail the build if the user fails to do 
+so. Yam can do so because it monitors the command's file accesses.
+
+### Build commands that are not parallel-safe
+Yam fails the build when multiple commands write to the same file. 
+To reduce the likelihood of commands accessing the same temporary files Yam
+will create for each command a unique temporary directory. Yam passes this 
+directory to the cmd shell via the environment variable `TEMP`. The temporary
+directory is deleted when the command completes.
+  
+### Commands that update source files
+Yam considers all files that are not declared as output files to be source
+files. Yam fails the build when a command writes to a source file.  
+Note: a file that contains code generated by a command, e.g. from an IDL
+file, is an output file, ***not*** a source file.
 
 ## Ease of use
 
@@ -89,9 +196,10 @@ only a subset of these problems.
   then Yam demands that you declare C to be dependent on F in order to guarantee
   proper build order of P before C. Yam will tell you when you failed to do so.
 
-## Correct, reproducible deterministic and hermetic
+## Reproducability, deterministic and hermetic
 
-Deterministic implies that a build with the same input files and commands give
+A reproducable, also known as deterministic, build implies that a build with the
+same input files and commands give
 the same output files on the same machine. Hermetic implies that unexpectedly
 different input files are not possible, and builds are deterministic across
 machines/environments.
@@ -291,7 +399,7 @@ Build system overhead consists of:
 - Time needed to parallelize command execution
 - Time needed to monitor command execution and update the dependency graph
 
-# Some differneces between Tup and Yam
+# Some differences between Tup and Yam
 
 TODO: build language comparison
 TODO: run-script

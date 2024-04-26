@@ -122,16 +122,24 @@ namespace
         Driver driver;
         std::filesystem::path testFile(driver.repoDir / "text.txt");
 
-        std::vector<long long> deltas;
+        std::vector<long long> lwtDeltas;
+        std::vector<long long> tDeltas;
+
         appendToFile(testFile, "");
-        auto t0 = lastWriteTime(testFile);
+        auto t0 = std::chrono::system_clock::now();
+        auto lwt0 = lastWriteTime(testFile);
         for (int i = 0; i < 10000; ++i) {
             appendToFile(testFile, "a");
-            auto t = lastWriteTime(testFile);
-            auto delta = t - t0;
-            auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(delta).count();
-            deltas.push_back(ns);
+            auto t = std::chrono::system_clock::now();
+            auto tDelta = t - t0;
+            auto tns = std::chrono::duration_cast<std::chrono::nanoseconds>(tDelta).count();
+            tDeltas.push_back(tns);
             t0 = t;
+            auto lwt = lastWriteTime(testFile);
+            auto lwtDelta = lwt - lwt0;
+            auto lwtns = std::chrono::duration_cast<std::chrono::nanoseconds>(lwtDelta).count();
+            lwtDeltas.push_back(lwtns);
+            lwt0 = lwt;
         }
     }
 }
