@@ -34,7 +34,7 @@ namespace BTree {
         // Condition indicating that this page pool is persistent.
         // Used to derive page update mode.
         inline bool persistent() const { return true; };
-        inline uint32_t sizeRecover() const { return recoverPages.size(); };
+        inline uint32_t sizeRecover() const { return static_cast<uint32_t>(recoverPages.size()); };
         // Mark a page as pending recovery.
         // Frees the page if reuse is enabled.
         void recover( const PageHeader& page, bool reuse = true );

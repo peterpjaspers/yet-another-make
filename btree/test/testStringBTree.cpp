@@ -4,12 +4,14 @@
 #include "PersistentPagePool.h"
 #include <iostream>
 #include <fstream>
+#include <filesystem>
 #include <random>
 #include <map>
 #include <algorithm>
 
 using namespace BTree;
 using namespace std;
+using namespace std::filesystem;
 
 const int BTreePageSize = 4096;
 const int ValueCount = 10000;
@@ -67,8 +69,8 @@ PagePool* createPagePool( bool persistent, string path, PageSize pageSize ) {
 
 int main(int argc, char* argv[]) {
     ofstream stream;
-    system( "RMDIR /S /Q testStringBTree" );
-    system( "MKDIR testStringBTree" );
+    remove_all( "testStringBTree" );
+    create_directory( "testStringBTree ");
     int errors = 0;
     // String2String test
     stream.open( "testStringBTree\\log.txt" );
@@ -112,9 +114,11 @@ int main(int argc, char* argv[]) {
     }
     catch ( string message ) {
         stream << message << "!\n";
+        errors += 1;
     }
     catch (...) {
         stream << "Exception!\n";
+        errors += 1;
     }
     stream << "Done...\n";
     // String2Value test - scalar value
@@ -158,9 +162,11 @@ int main(int argc, char* argv[]) {
     }
     catch ( string message ) {
         stream << message << "!\n";
+        errors += 1;
     }
     catch (...) {
         stream << "Exception!\n";
+        errors += 1;
     }
     stream << "Done...\n";
     // String2Value test - array value
@@ -209,9 +215,11 @@ int main(int argc, char* argv[]) {
     }
     catch ( string message ) {
         stream << message << "!\n";
+        errors += 1;
     }
     catch (...) {
         stream << "Exception!\n";
+        errors += 1;
     }
     stream << "Done...\n";
     // Value2String test - scalar keys
@@ -256,9 +264,11 @@ int main(int argc, char* argv[]) {
     }
     catch ( string message ) {
         stream << message << "!\n";
+        errors += 1;
     }
     catch (...) {
         stream << "Exception!\n";
+        errors += 1;
     }
     stream << "Done...\n";
     // Value2String test - array keys
@@ -301,9 +311,11 @@ int main(int argc, char* argv[]) {
     }
     catch ( string message ) {
         stream << message << "!\n";
+        errors += 1;
     }
     catch (...) {
         stream << "Exception!\n";
+        errors += 1;
     }
     if (0 < errors) {
         stream << "\n\n" << errors << " errors detected.";
@@ -311,4 +323,5 @@ int main(int argc, char* argv[]) {
         stream << "\n\nNo errors detected.\n";
     }
     stream.close();
-};
+    return( errors );
+}

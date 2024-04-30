@@ -4,12 +4,14 @@
 #include <set>
 #include <iostream>
 #include <fstream>
+#include <filesystem>
 #include <random>
 #include <algorithm>
 #include <chrono>
 
 using namespace BTree;
 using namespace std;
+using namespace std::filesystem;
 
 // Test program to measure BTree performance.
 // ToDo: Benchmark against std::map performance (both memory usage and speed) with default allocator
@@ -281,7 +283,9 @@ public:
         auto calibration = calibrate( iterations, keys, values );
         double overhead = calibration.first;
         log.precision( 3 );
-        log << "Calibration time " << overhead << " usec with " << iterations << " iterations (" << calibration.second << ").\n";
+        log << "Calibration time " << overhead << " usec with " << iterations << " iterations";
+        if (calibration.second < iterations) log << " (" << (iterations - calibration.second) << " misses)";
+        log << ".\n";
         tree->clearStatistics();
         auto entryInsert = insert( iterations, keys, values );
         log.precision( 3 );
@@ -312,8 +316,8 @@ public:
 };
 
 int main(int argc, char* argv[]) {
-    system( "RMDIR /S /Q testBTreePerformance" );
-    system( "MKDIR testBTreePerformance" );
+    remove_all( "testBTreePerformance" );
+    create_directory( "testBTreePerformance ");
     int errors = 0;
     ofstream log;
     log.open( "testBTreePerformance\\log.txt" );

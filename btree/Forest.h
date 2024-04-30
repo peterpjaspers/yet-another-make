@@ -3,6 +3,7 @@
 
 #include "TreeBase.h"
 #include "BTree.h"
+#include "StreamingBTree.h"
 #include <map>
 
 namespace BTree {
@@ -16,12 +17,14 @@ namespace BTree {
     // Each B-Tree can have its own key and value class template values
     // allowing a hetrogeneous collection of B-Trees to reside in the Forest.
     //
-    // B-Trees in a Forest are created by plating them in the Forest. See "plant" method.
+    // B-Trees in a Forest are created by planting them in the Forest.
+    // See "plant" method.
     //
-    // To recover a B-Tree from a persistent store, each B-Tree is associated
-    // with an (integer) TreeIndex which a application can use to access a Forest
+    // To recover a B-Tree from persistent store, each B-Tree is associated with
+    // an (integer) TreeIndex that an application can use to access it in a Forest
     // created/restored from persistent storage. The TreeIndex is generated when a
-    // B-Tree is first planted in the Forest. See "access" method.
+    // B-Tree is first planted in the Forest.
+    // See "access" method.
     //
     // The application must supply the proper key and value class template (and optional
     // key compare) arguments when accessing a B-Tree in a Forest. Behaviour is undefined
@@ -39,17 +42,16 @@ namespace BTree {
         ~Forest() { for ( auto tree : trees ) delete tree.second; }
         // Plant a B-Tree in the Forest with key and value class template arguments and
         // an optional key comparison function. The created B-Tree shares the PagePool
-        // and page UpdateMode with all other B-Trees in the Forest
-        // ToDo; plant with user defined index...
+        // and page UpdateMode with all other B-Trees in the Forest.
         template< class K, class V, std::enable_if_t<(S<K>),bool> = true >
         std::pair< Tree<K,V>*, TreeIndex > plant( typename Tree<K,V>::ScalarKeyCompare compareKey = defaultCompareScalar<K> ) {
             TreeIndex index = uniqueIndex();
-            return{ plant<K,V>( uniqueIndex(), compareKey ), index };
+            return{ plant<K,V>( index, compareKey ), index };
         }
         template< class K, class V, std::enable_if_t<(A<K>),bool> = true >
         std::pair< Tree<K,V>*, TreeIndex > plant( typename Tree<K,V>::ArrayKeyCompare compareKey = defaultCompareArray<B<K>> ) {
             TreeIndex index = uniqueIndex();
-            return{ plant<K,V>( uniqueIndex(), compareKey ), index };
+            return{ plant<K,V>( index, compareKey ), index };
         }
         template< class K, class V, std::enable_if_t<(S<K>),bool> = true >
         Tree<K,V>* plant( TreeIndex index, typename Tree<K,V>::ScalarKeyCompare compareKey = defaultCompareScalar<K> ) {
@@ -69,10 +71,11 @@ namespace BTree {
             Tree<TreeIndex,PageLink>::insert( index, tree->root->page );
             return tree;
         }
+      
         template< class K, class V >
         std::pair< Tree<K,V>*, TreeIndex > plant( const Tree<K,V>& source ) {
             TreeIndex index = uniqueIndex();
-            return{ plant<K,V>( uniqueIndex(), source ), index };
+            return{ plant<K,V>( index, source ), index };
         }
         template< class K, class V >
         Tree<K,V>* plant( TreeIndex index, const Tree<K,V>& source ) {
@@ -84,6 +87,22 @@ namespace BTree {
             Tree<TreeIndex,PageLink>::insert( index, tree->root->page );
             return tree;
         }
+
+        template< class K >
+        std::pair< StreamingTree<K>*, TreeIndex > plantStreamingTree() {
+            TreeIndex index = uniqueIndex();
+            return{ plantStreamingTree<K>(index), index };
+        }
+        template< class K >
+        StreamingTree<K>* plantStreamingTree( TreeIndex index ) {
+            static const char* signature = "StreamingTree<K>* Forest::plantStreamingTree( TreeIndex )";
+            if (contains(index)) throw std::string(signature) + " - TreeIndex already in use";
+            StreamingTree<K>* tree = new StreamingTree<K>( pool, mode, nullptr );
+            trees[ index ] = tree;
+            Tree<TreeIndex,PageLink>::insert( index, tree->root->page );
+            return tree;
+        }
+
         // Access a B-Tree in the Forest via its TreeIndex obtained when the B-Tree was planted.
         // The key and value class template arguments (and optional key compae function) must match
         // those used to plant the B-Tree.
@@ -91,7 +110,7 @@ namespace BTree {
         Tree<K,V>* access( TreeIndex index, typename Tree<K,V>::ScalarKeyCompare compareKey = defaultCompareScalar<B<K>> ) {
             static const char* signature = "Tree<K,V>* Forest::access( TreeIndex, typename Tree<K,V>::ScalarKeyCompare compareKey )";
             if (0 < trees.count( index )) return reinterpret_cast<Tree<K,V>*>( const_cast<TreeBase*>( trees[ index ] ) );
-            if (!contains( index )) throw std::string( signature ) + " - Tree not in Forest";
+            if (!contains( index )) throw std::string( signature ) + " - Tree<K,V> not in Forest";
             PageLink link = retrieve( index );
             PageHeader* rootPage = pool.reference( link );
             Tree<K,V>* tree = new Tree<K,V>( pool, compareKey, mode, rootPage );
@@ -102,13 +121,25 @@ namespace BTree {
         Tree<K,V>* access( TreeIndex index, typename Tree<K,V>::ArrayKeyCompare compareKey = defaultCompareArray<B<K>> ) {
             static const char* signature = "Tree<K,V>* Forest::access( TreeIndex, typename Tree<K,V>::ArrayKeyCompare compareKey )";
             if (0 < trees.count( index )) return reinterpret_cast<Tree<K,V>*>( const_cast<TreeBase*>( trees[ index ] ) );
-            if (!contains( index )) throw std::string( signature ) + " - Tree not in Forest";
+            if (!contains( index )) throw std::string( signature ) + " - Tree<K,V> not in Forest";
             PageLink link = retrieve( index );
             PageHeader* rootPage = pool.reference( link );
             Tree<K,V>* tree = new Tree<K,V>( pool, compareKey, mode, rootPage );
             trees[ index ] = tree;
             return( tree );
         }
+        template< class K >
+        StreamingTree<K>* accessStreamingTree(TreeIndex index) {
+            static const char* signature = "StreamingTree<K>* Forest::plantStreamingTree( TreeIndex )";
+            if (0 < trees.count(index)) return reinterpret_cast<StreamingTree<K>*>(const_cast<TreeBase*>(trees[index]));
+            if (!contains(index)) throw std::string(signature) + " - StreamingTree<K> not in Forest";
+            PageLink link = retrieve(index);
+            PageHeader* rootPage = pool.reference(link);
+            StreamingTree<K>* tree = new StreamingTree<K>( pool, mode, rootPage );
+            trees[index] = tree;
+            return(tree);
+        }
+
         // Commit modifications to all B-Trees in the Forest.
         // The commit is atomic for the entire Forest.
         void commit() {
@@ -129,7 +160,7 @@ namespace BTree {
         using Tree< TreeIndex, PageLink >::replace;
         using Tree< TreeIndex, PageLink >::erase;
         // Generate a unique TreeIndex for a user
-        TreeIndex uniqueIndex() { return ((1 << 31) + trees.size()); }
+        TreeIndex uniqueIndex() { return static_cast<TreeIndex>((1 << 31) + trees.size()); }
     }; // class Forest
 
     inline std::ostream & operator<<( std::ostream & o, const Forest& tree ) { tree.stream( o ); return o; }

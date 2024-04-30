@@ -29,7 +29,7 @@ namespace BTree {
         static const char* signature( "PageHeader* PagePool::allocate()" );
         if (freePages.empty()) {
             // No recycled pages available, allocate additional page and add it in the pool...
-            PageLink link = PageLink( pages.size() );
+            PageLink link = PageLink( static_cast<unsigned int>(pages.size()) );
             PageHeader* header = reinterpret_cast<PageHeader*>( malloc( capacity ) );
             if (header == nullptr) throw string( signature ) + " - Page allocation failed";
             pages.push_back( header );

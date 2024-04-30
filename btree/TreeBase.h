@@ -48,8 +48,8 @@ namespace BTree {
         PagePool& pool;                 // The PagePool in which this B-Tree resides
         PageHeader* root;               // The root Page of the B-Tree
         UpdateMode mode;                // The Page update mnode to be enforced
-        TreeIndex index;                // The index of the B-Tree in a forest (if not free standing)
-        mutable BTreeStatistics* stats; // The B-Tree statistics function counters
+        TreeIndex index;                // The index of the B-Tree in a forest (free standing by default)
+        mutable BTreeStatistics* stats; // The B-Tree statistics function counters (null by default)
         TreeBase( PagePool& pagePool, PageHeader* page, UpdateMode updateMode );
         UpdateMode deriveMode( UpdateMode mode, PagePool& pool );
         virtual void recoverTree( PageLink link ) = 0;

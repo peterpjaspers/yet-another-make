@@ -2,10 +2,12 @@
 #include "PagePool.h"
 #include <iostream>
 #include <fstream>
+#include <filesystem>
 #include <random>
 
 using namespace BTree;
 using namespace std;
+using namespace std::filesystem;
 
 // ToDo: Test values using C++ map administration
 const int BTreePageSize = 128;
@@ -28,8 +30,8 @@ string generateString() {
 inline uint32_t generateUint32() { return (gen32() % 10000000); }
 
 int main(int argc, char* argv[]) {
-    system( "RMDIR /S /Q testBTreeIterator" );
-    system( "MKDIR testBTreeIterator" );
+    remove_all( "testBTreeIterator" );
+    create_directory( "testBTreeIterator ");
     ofstream log;
     int errorCount = 0;
     // Value2String test - scalar keys

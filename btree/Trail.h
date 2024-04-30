@@ -5,6 +5,8 @@
 #include "PagePool.h"
 #include "TreeBase.h"
 
+#include <array>
+
 namespace BTree {
 
     // A Trail maintains a path through a B-tree.

@@ -24,8 +24,8 @@ namespace BTree {
 
     template< class K, class V, class T > class TreeIterator;
 
-    static const float LowPageThreshold = 0.4;
-    static const float HighPageThreshold = 0.9;
+    static const float LowPageThreshold = 0.4f;
+    static const float HighPageThreshold = 0.9f;
 
     // B-Tree with template arguments for key (K) and value (V).
     //
@@ -38,8 +38,8 @@ namespace BTree {
     //   Tree< int, char[] > - maps integer keys to C-string values.
     //   Tree< char[], uint16_t[] > - maps C-string keys to arrays of 16-bit unsigned integers.
     //
-    // Performance cost of an operation on the B-Tree is typically O(logN(n)) where N is the
-    // average number of entries stored in a Page and n is the total number of entries in.
+    // Performance cost of an operation on the B-Tree is typically O(logN(n)*log(N)) where N is the
+    // average number of entries stored in a Page and n is the total number of entries.
     //
     template< class K, class V > class Tree : public TreeBase {
     private:
@@ -72,7 +72,7 @@ namespace BTree {
         ~Tree() { pool.recover(); freeAll( *root, true ); }
         // Insert a key-value entry in the B-Tree.
         // Returns true if the value was inserted, false if the key was already present.
-        // O(log(n)) complexity.
+        // O(logN(n)*log(N)) complexity.
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&S<VT>),bool> = true >
         bool insert( const K& key, const V& value ) {
             Trail trail( *this );
@@ -168,7 +168,7 @@ namespace BTree {
 
         // Replace a value for a key in the B-Tree.
         // Returns true if the value was replaced, false if the key was not present.
-        // O(log(n)) complexity.
+        // O(logN(n)*log(N)) complexity.
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&S<VT>),bool> = true >
         bool replace( const K& key, const V& value ) {
             Trail trail( *this );
@@ -260,7 +260,7 @@ namespace BTree {
 
         // Return value a particular key.
         // Throws an exception if key was not found.
-        // O(log(n)) complexity.
+        // O(logN(n)*log(N)) complexity.
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&S<VT>),bool> = true >
         const VT& retrieve( const KT& key) const {
             static const char* signature = "const V& Tree<K,V>::retrieve( const K& key) const";
@@ -304,7 +304,7 @@ namespace BTree {
 
         // Remove a key-value pair.
         // Returns true if key-value pair was removed, false if key-value pair was not found.
-        // O(log(n)) complexity.
+        // O(logN(n)*log(N)) complexity.
         template< class KT = K, std::enable_if_t<(S<KT>),bool> = true >
         bool erase( const KT& key ) {
             Trail trail( *this );
@@ -408,7 +408,7 @@ namespace BTree {
             root = page;
         }
         // Empty the B-Tree
-        // O(n) complexity.
+        // O(logN(n)) complexity.
         void clear() {
             freeAll( *root, true );
             rootUpdate( &allocateLeaf()->header );
@@ -417,16 +417,16 @@ namespace BTree {
         // O(1) complexity.
         bool empty() { return ((root->count == 0) && (root->split == 0)); }
         // Assign content of B-Tree
-        // O(n log(n)) complexity.
+        // O(n*logN(n)) complexity.
         void assign( const Tree<K,V>& tree ) {
             clear();
             for ( auto src : tree ) insert( src.first, src.second );
         }
         // Return the number of key-value entries in the B-tree.
-        // O(n) complexity.
+        // O(logN(n)) complexity.
         size_t size() const { return( pageCount( *root ) ); }
         // Test if the B-Tree contains a particular key.
-        // O(log(n)) complexity.
+        // O(logN(n)*log(N)) complexity.
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>),bool> = true >
         bool contains( const KT& key ) const {
             Trail trail( *this );
@@ -787,18 +787,17 @@ namespace BTree {
                 // Look for sufficient room to left and/or right.
                 // Must be able to shift at least one key-value to left or right
                 // If there is room try to balance available room over all three pages.
-                PageSize leftRoom = 0;
-                PageSize rightRoom = 0;
                 auto leftTrail = Trail( trail );
                 auto leftPage = previousPage<VT>( leftTrail );
-                if (leftPage) leftRoom = (pool.pageCapacity() - leftPage->filling());
+                if (leftPage) {
+                    auto ancestor = node( trail, trail.match() );
+                    PageSize leftRoom = (pool.pageCapacity() - leftPage->filling());
+                }
                 auto rightTrail = Trail( trail );
                 auto rightPage = nextPage<VT>( rightTrail );
-                if (rightPage) rightRoom = (pool.pageCapacity() - rightPage->filling());
-                if (amount < (leftRoom + rightRoom)) {
-                    // Shifting left and/or right may create sufficient room
+                if (rightPage) {
+                    PageSize rightRoom = (pool.pageCapacity() - rightPage->filling());
                 }
-
 */
                 grow<VT>( trail );
             }
@@ -938,7 +937,7 @@ namespace BTree {
                 }
                 recoverUpdatedPage( parent->header, parentCopy->header );
             } else {
-                // Need to reserve additional room in ancestor node to accomodate increased key size
+                // Need to allocate additional room in ancestor node to accomodate increased key size
                 while (!ancestor->entryFit( src.keySize( index ) )) {
                     grow<PageLink>( trail.popToMatch() );
                     lookUp<KT>( src.key( index ), src.keySize( index ), trail.clear(), src.header.depth );
@@ -1159,7 +1158,7 @@ namespace BTree {
                     if (0 < rightSplitKeySize) rightFill += (rightSplitKeySize + rightPage->splitValueSize());
                     rightFill += page->filling();
                 }
-                PageSize threshold = (HighPageThreshold * page->header.capacity);
+                PageSize threshold = static_cast<PageSize>(HighPageThreshold * page->header.capacity);
                 if ((leftFill < rightFill) && (leftFill < threshold)) {
                     mergePage<KT,VT>( leftTrail, pageTrail ); // Shift content of this page to left page
                 } else if (rightFill < threshold) {

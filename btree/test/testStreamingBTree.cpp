@@ -3,9 +3,11 @@
 #include "PersistentPagePool.h"
 #include <iostream>
 #include <fstream>
+#include <filesystem>
 
 using namespace BTree;
 using namespace std;
+using namespace std::filesystem;
 
 const int BTreePageSize = 4096;
 const int ValueBlockSize = 128;
@@ -30,14 +32,14 @@ struct Object {
     Object() = delete;
     Object( uint64_t x ) {
         b = ((x & 1) == 0) ? true : false;
-        f = x;
-        d = x;
+        f = static_cast<float>(x);
+        d = static_cast<double>(x);
         u8 = (x % (static_cast<uint64_t>( 1 ) << 8));
-        i8 = ((x & (static_cast<uint64_t>( 1 ) << 8)) - (static_cast<uint64_t>( 1 ) << 7));
+        i8 = static_cast<int8_t>((x & (static_cast<uint64_t>( 1 ) << 8)) - (static_cast<uint64_t>( 1 ) << 7));
         u16 = (x % (static_cast<uint64_t>( 1 ) << 16));
-        i16 = ((x & (static_cast<uint64_t>( 1 ) << 16)) - (static_cast<uint64_t>( 1 ) << 15));
+        i16 = static_cast<int16_t>((x & (static_cast<uint64_t>( 1 ) << 16)) - (static_cast<uint64_t>( 1 ) << 15));
         u32 = (x % (static_cast<uint64_t>( 1 ) << 32));
-        i32 = ((x & (static_cast<uint64_t>( 1 ) << 32)) - (static_cast<uint64_t>( 1 ) << 31));
+        i32 = static_cast<int32_t>((x & (static_cast<uint64_t>( 1 ) << 32)) - (static_cast<uint64_t>( 1 ) << 31));
         u64 = x;
         i64 = (x - (static_cast<uint64_t>( 1 ) << 63));
         for (int i = 0; i < ArraySize; i++) u8Array[i] = (i * x) % 256;
@@ -92,8 +94,8 @@ const uint32_t KeyCount = 3;
 uint32_t keys[ KeyCount ] = { 47, 37, 137 };
 
 int main(int argc, char* argv[]) {
-    system( "RMDIR /S /Q testStreamingBTree" );
-    system( "MKDIR testStreamingBTree" );
+    remove_all( "testStreamingBTree" );
+    create_directory( "testStreamingBTree ");
     ofstream log;
     log.open( "testStreamingBTree\\log.txt" );
     uint32_t errors = 0;
@@ -161,4 +163,4 @@ int main(int argc, char* argv[]) {
     }
     log.close();
     exit( errors );
-};
+}

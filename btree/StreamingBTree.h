@@ -107,6 +107,13 @@ namespace BTree {
             o << "Streaming BTree\n";
             Tree<StreamKey<K>,uint8_t[]>::stream( o );
         }
+    public:
+        // ToDo: Restrict access to this constructor. Only to be used by Forest...
+        StreamingTree( PagePool& pool, UpdateMode mode, PageHeader* pageRoot ) :
+            Tree<StreamKey<K>,uint8_t[]>( pool, compareStreamKey<K>, mode, pageRoot ),
+            reader( *this ),
+            writer( *this, Page<StreamKey<K>,uint8_t,false,true>::optimalBlockSize( pool.pageCapacity() ) )
+        {};
     }; // template< class K > class StreamingTree
 
     template< class K >

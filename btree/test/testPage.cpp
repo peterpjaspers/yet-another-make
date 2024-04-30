@@ -4,11 +4,13 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <filesystem>
 #include <random>
 #include <algorithm>
 
-using namespace std;
 using namespace BTree;
+using namespace std;
+using namespace std::filesystem;
 
 const int PageCapacity = 4096;
 const int MinArray = 2; // Value must be greater than 1 as vector of length 1 is assumed to be a scalar
@@ -1012,8 +1014,8 @@ uint32_t doTest( ofstream& log ) {
 }
 
 int main(int argc, char* argv[]) {
-    system( "RMDIR /S /Q testPage" );
-    system( "MKDIR testPage" );
+    remove_all( "testPage" );
+    create_directory( "testPage ");
     ofstream log;
     log.open( "testPage\\logPage.txt" );
     uint32_t errorCount = 0;

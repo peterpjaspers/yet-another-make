@@ -2,12 +2,14 @@
 #include "PersistentPagePool.h"
 #include <iostream>
 #include <fstream>
+#include <filesystem>
 #include <random>
 #include <map>
 #include <algorithm>
 
 using namespace BTree;
 using namespace std;
+using namespace std::filesystem;
 
 const int BTreePageSize = 512;
 const int MinString = 2;
@@ -43,11 +45,13 @@ Forest* forest;
 Tree<uint32_t,uint32_t>* uint32uint32Tree;
 Tree<uint32_t,uint16_t[]>* uint32uint16ArrayTree;
 Tree<uint16_t[],uint32_t>* uint16Arrayuint32Tree;
-Tree<uint16_t[],uint16_t[]>* uint16Arrayuint16ArrayTree;
+Tree<uint16_t[], uint16_t[]>* uint16Arrayuint16ArrayTree;
+StreamingTree<uint32_t>* uint32StreamingTree;
 TreeIndex uint32uint32Index;
 TreeIndex uint32uint16ArrayIndex;
 TreeIndex uint16Arrayuint32Index;
 TreeIndex uint16Arrayuint16ArrayIndex;
+TreeIndex uint32StreamingIndex;
 
 void addEntry( Tree<uint32_t,uint32_t>* tree ) {
     uint32_t key = generateUint32();
@@ -59,26 +63,38 @@ void addEntry( Tree<uint32_t,uint16_t[]>* tree ) {
     uint32_t key = generateUint32();
     vector<uint16_t> value = generateUint16Array();
     while (tree->contains( key )) key = generateUint32();
-    tree->insert( key, value.data(), value.size() );
+    tree->insert( key, value.data(), static_cast<PageSize>(value.size()) );
 }
 void addEntry( Tree<uint16_t[],uint32_t>* tree ) {
     vector<uint16_t> key = generateUint16Array();
     uint32_t value = generateUint32();
-    while (tree->contains( key.data(), key.size() )) key = generateUint16Array();
-    tree->insert( key.data(), key.size(), value );
+    while (tree->contains( key.data(), static_cast<PageSize>(key.size()) )) key = generateUint16Array();
+    tree->insert( key.data(), static_cast<PageSize>(key.size()), value );
 }
-void addEntry( Tree<uint16_t[],uint16_t[]>* tree ) {
+void addEntry(Tree<uint16_t[], uint16_t[]>* tree) {
     vector<uint16_t> key = generateUint16Array();
     vector<uint16_t> value = generateUint16Array();
-    while (tree->contains( key.data(), key.size() )) key = generateUint16Array();
-    tree->insert( key.data(), key.size(), value.data(), value.size() );
+    while (tree->contains(key.data(), static_cast<PageSize>(key.size()))) key = generateUint16Array();
+    tree->insert(key.data(), static_cast<PageSize>(key.size()), value.data(), static_cast<PageSize>(value.size()));
 }
+void addEntry(StreamingTree<uint32_t>* tree) {
+    uint32_t key = generateUint32();
+    vector<uint16_t> value = generateUint16Array();
+    while (tree->contains(key)) key = generateUint32();
+    ValueWriter<uint32_t>& writer = tree->insert(key);
+    uint32_t cnt = static_cast<uint32_t>(value.size());
+    writer.stream(cnt);
+    for (uint32_t i = 0; i < cnt; i++) writer.stream(value[i]);
+    writer.close();
+}
+
 void populateTrees( int count ) {
     // Populate B-Trees
     for (int i = 0; i < count; i++) addEntry( uint32uint32Tree );
     for (int i = 0; i < count; i++) addEntry( uint32uint16ArrayTree );
     for (int i = 0; i < count; i++) addEntry( uint16Arrayuint32Tree );
     for (int i = 0; i < count; i++) addEntry( uint16Arrayuint16ArrayTree );
+    for (int i = 0; i < count; i++) addEntry( uint32StreamingTree );
 }
 void streamTrees( ofstream& log, string title ) {
     log
@@ -91,7 +107,9 @@ void streamTrees( ofstream& log, string title ) {
         << "[ Uint16 ] -> Uint32 B-Tree " << uint16Arrayuint32Index << " in forest...\n"
         << *uint16Arrayuint32Tree
         << "[ Uint16 ] -> [ Uint16 ] B-Tree " << uint16Arrayuint16ArrayIndex << " in forest...\n"
-        << *uint16Arrayuint16ArrayTree;
+        << *uint16Arrayuint16ArrayTree
+        << "[ Uint32 ] StreamingTree " << uint32StreamingIndex << " in forest...\n"
+        << *uint32StreamingTree;
 }
 int validateTrees( ofstream& log, int count ) {
     int errors = 0;
@@ -107,8 +125,12 @@ int validateTrees( ofstream& log, int count ) {
         log << "Tree<uint16_t[],uint32_t> " << uint16Arrayuint32Index << " has incorrect size!\n";
         errors += 1;
     }
-    if (uint16Arrayuint16ArrayTree->size() != (count + ValueCount) ) {
+    if (uint16Arrayuint16ArrayTree->size() != (count + ValueCount)) {
         log << "Tree<uint16_t[],uint16_t[]> " << uint16Arrayuint16ArrayIndex << " has incorrect size!\n";
+        errors += 1;
+    }
+    if (uint32StreamingTree->size() != count) {
+        log << "StreamingTree<uint32_t> " << uint32StreamingIndex << " has incorrect size!\n";
         errors += 1;
     }
     return errors;
@@ -116,8 +138,8 @@ int validateTrees( ofstream& log, int count ) {
 
 int main(int argc, char* argv[]) {
     ofstream log;
-    system( "RMDIR /S /Q testBTreeForest" );
-    system( "MKDIR testBTreeForest" );
+    remove_all( "testBTreeForest" );
+    create_directory( "testBTreeForest ");
     log.open( "testBTreeForest\\logBTreeForest.txt" );
     int errorCount = 0;
     try {
@@ -137,6 +159,10 @@ int main(int argc, char* argv[]) {
         for (int i = 0; i < ValueCount; i++) addEntry( &u16Au16A );
         uint16Arrayuint16ArrayIndex = 47;
         uint16Arrayuint16ArrayTree = forest->plant<uint16_t[],uint16_t[]>( uint16Arrayuint16ArrayIndex, u16Au16A );
+        auto tree5 = forest->plantStreamingTree<uint32_t>();
+        uint32StreamingTree = tree5.first;
+        uint32StreamingIndex = tree5.second;
+
         streamTrees( log, "Populated forest with empty trees" );
         log << "Commit initial forest...\n";
         forest->commit();
@@ -171,9 +197,11 @@ int main(int argc, char* argv[]) {
         uint32uint32Tree = forest->access<uint32_t,uint32_t>( uint32uint32Index );
         uint32uint16ArrayTree = forest->access<uint32_t,uint16_t[]>( uint32uint16ArrayIndex );
         uint16Arrayuint32Tree = forest->access<uint16_t[],uint32_t>( uint16Arrayuint32Index );
-        uint16Arrayuint16ArrayTree = forest->access<uint16_t[],uint16_t[]>( uint16Arrayuint16ArrayIndex );
+        uint16Arrayuint16ArrayTree = forest->access<uint16_t[], uint16_t[]>( uint16Arrayuint16ArrayIndex );
+        uint32StreamingTree = forest->accessStreamingTree<uint32_t>( uint32StreamingIndex );
         streamTrees( log, "Forest recovered to populated trees from persistent store" );
         errorCount += validateTrees( log, ValueCount );
+        delete forest;
     }
     catch ( string message ) {
         log << message << "!\n";
