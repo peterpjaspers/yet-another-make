@@ -1,3 +1,35 @@
+- [What is Yam?](#what-is-yam)
+- [When to use Yam?](#when-to-use-yam)
+- [When not to use Yam?](#when-not-to-use-yam)
+- [Concepts](#concepts)
+  - [Build commands, build rules](#build-commands-build-rules)
+  - [Build files](#build-files)
+  - [Directed Acyclic Graph](#directed-acyclic-graph)
+  - [File aspect hash](#file-aspect-hash)
+  - [File last-write-time](#file-last-write-time)
+  - [Incremental build](#incremental-build)
+  - [Ensuring build correctness through file access monitoring](#ensuring-build-correctness-through-file-access-monitoring)
+  - [Build state](#build-state)
+  - [Yam server](#yam-server)
+  - [File change monitoring](#file-change-monitoring)
+- [Claims](#claims)
+  - [Quick edit-compile-test cycle](#quick-edit-compile-test-cycle)
+    - [Long time between start of build and start of command execution](#long-time-between-start-of-build-and-start-of-command-execution)
+    - [Long build time due to under-utilization of CPU cores](#long-build-time-due-to-under-utilization-of-cpu-cores)
+    - [Long build time due to unnecessary command re-execution](#long-build-time-due-to-unnecessary-command-re-execution)
+  - [Correctness](#correctness)
+    - [Failure to re-execute a command](#failure-to-re-execute-a-command)
+    - [Missing, unexpected and stale output files](#missing-unexpected-and-stale-output-files)
+    - [Wrong build order](#wrong-build-order)
+    - [Build commands that are not parallel-safe](#build-commands-that-are-not-parallel-safe)
+    - [Commands that update source files](#commands-that-update-source-files)
+  - [Ease of use](#ease-of-use)
+  - [Reproducability, deterministic and hermetic](#reproducability-deterministic-and-hermetic)
+  - [Build language](#build-language)
+- [Some differences between Tup and Yam](#some-differences-between-tup-and-yam)
+- [A short history of Yam](#a-short-history-of-yam)
+
+
 # What is Yam?
 
 Yam (Yet another make) is a software build tool. It is intended for
@@ -25,7 +57,7 @@ Yam runs on the Windows operating system. Future versions will also support Linu
 # When to use Yam?
 Consider using Yam when you want: 
 - a quick edit-compile-test cycle, also for large (>10,000 files) repositories.
-- correct incremental builds, such that you never need to run clean builds.
+- correct incremental builds (or: no need to ever run clean builds).
 - reproducable builds.
 - obsolete output files to be deleted automatically.
 - to write build rules/commands in a simple out-of-the-box language, and/or...
@@ -48,24 +80,23 @@ repositories. Its initial build however would take an excessive amount of time.
 TODO: consider preparing Yam for integration with IncrediBuild.
 
 
-# Core concepts
+# Concepts
 
 ## Build commands, build rules
-
-Yam executes commands. Commands are derived from build rules.
+Yam executes commands. The user specifies these commands by means of build rules.
 There are two types of build rules:
 
 ```
-inputFiles |> command |> outputFiles
-foreach inputFiles |> command |> outputFiles
+inputFiles |> command script |> outputFiles
+foreach inputFiles |> command script |> outputFiles
 ```
 
-`inputFiles` and `outputFiles` are lists of 0, 1 or more files.
+`inputFiles` and `outputFiles` are file lists.
 `command` is a script written in Windows `cmd.exe` shell syntax that derives
 output files from input files. Output files are generated files. Input files
 are generated files or source files.
 
-The first rule defines one command that transforms the set of input files 
+The first rule defines one command that transforms the set of input files
 into the output files. E.g. link the input object files into a library.
 The second rule defines multiple commands, one for each file in inputFiles.
 E.g. compile each file in inputFiles.
@@ -73,22 +104,21 @@ E.g. compile each file in inputFiles.
 See [Buildfile syntax]() for details.
 
 ## Build files
-
 Build rules are stored in build files. 
-Yam recognizes a build file by its name format: `buildfile_yam[post][ext]`
+Yam recognizes a build file by its name: `buildfile_yam[post][ext]`
 where [post] is a user-defined postfix and [ext] is the file extension.
 Build files with extension `.txt` contain build rules in [Buildfile syntax]().
-Build files with other extensions, e.g. `.py`, are executable files that
-output build rules to `stdout`. 
+Build files with other extensions are executable files that output build rules.
+E.g. Yam will execute `buildfile_yam.py` by invoking the Python interpreter and
+Yam will parse the output as if it had been stored in `buildfile_yam.txt`.
+
 Each directory in the repository contains 0 or 1 build file.
 
-
 ## Directed Acyclic Graph
-
 Yam uses the build rules to create a Directed Acyclic Graph (DAG). The nodes
 (vertices) in the DAG represent source files, commands and generated files.
-Edges represent the relations between input files and commands and between
-commands and their output files.
+Edges represent the dependencies of commands on their input files and of the 
+relation between commands and their output files.
 Example of a graph that compiles C++ files and links them into a library.
 
 ```
@@ -102,122 +132,128 @@ executing the link-library command.
 Yam parallellizes the execution of commands that do not depend on each others
 output files. E.g. Yam executes the compilation commands in parallel
 
-## File last-write-time, file hash
+## File aspect hash
+Yam computes for each file a hash of its content. The hash values are stored
+in the file nodes of the DAG. Commands that depend on files whose hash have
+changed since the previous build are re-executed.
 
-Yam retrieves for each input/output file used/produced by the build its
-last-write-time and computes a hash of its content.
-
-Last-write-time and hash are stored in a file node in the DAG.
-At the next build Yam re-computes the hashes of files whose
-last-write-time has changed since the previous build.
-
-Commands that depend on a file are re-executed when the file's hash
-has changed.
-
-Note: the resolution of last-write-time is important. A rapid succession
-of write operations may not result in an update of last-write-time. As a
-consequence Yam will not re-compute the file hash and will not
-re-execute commands that depend on the modified file.
-Do not confuse precision and resolution. E.g. the NTFS filesystem has a
-last-write-time precision of 100 ns while the resolution on the author's
-computer is measured to be 10 times the precision, i.e. 1 ms.
-
-## File aspect hashes
-
-Sometimes a command's output only depends on certain aspects of an input file.
-E.g. a compilation command only depends on the code sections. Changes to 
-comments in a source file do not impact the resulting object file.
+Sometimes a command's output only depends on a specific aspect of an input 
+file. E.g. an object file only depends on code, not on comments.
 E.g. a library or executable that uses a Windows dll (dynamic load library) 
-only depends on the interface of that dll. Changes in a dynamic load library 
-that do not affect its interface do not impact libraries and executables that 
-are linked against (the import library of) that dll.
+only depends on the dll interface, not on its implementation details. 
 
 In such cases unnecessary command re-execution can be avoided by using a
-hash of the relevant aspect of the input file. Yam supports this by allowing
-you to configure:
+hash of the relevant aspect of the input file instead of using a hash of the
+entire file content. Yam supports this by allowing you to configure:
 - for each file aspect: the function that computes the file aspect hash.
 - for each input file type: the aspect hashes to be computed for files of that
   type.
 - for each command: the relevant aspects of its input files.
 
+## File last-write-time
+To minimize overhead Yam only re-computes hashes when a file's last-write-time
+has changed. This poses a risk: a rapid succession of write operations may not 
+result in an update of a file's last-write-time. As a consequence Yam will not
+re-compute the file hash, hence will not detect that the file was modified, 
+hence will not re-execute impacted commands.
+The higher the last-write-time resolution the lower the likelihood of this
+error to occur.
+ 
+Note: Windows [File time](https://learn.microsoft.com/en-us/windows/win32/sysinfo/file-times) has 100 ns precision. File time resolution however is typically (much)
+lower. E.g. the last-write-time resolution on the author's computer was measured
+to be 1 ms.
 
 ## Incremental build
-
-Yam re-executes a command when one or more of the following has changed 
-since the previous build:
-- Relevant aspect hashes of the command's input files.  
-- Command's output files.
-  E.g. the user deleted output files (which he/she is not supposed to do).
+A Yam build is always an incremental build: Yam only re-executes a command when
+its output files do not exist or are no longer valid. A command's output files 
+become invalid when one or more of the following have changed since the 
+previous build:
+- Relevant aspect hashes of the command's input files.
+- Entire-file aspect hashes of the command's output files.  
+  This happens when the user tampers with output files, e.g. deletes them.
 - Command script.  
   E.g. the user modified a compilation option in a build rule.
 
-An aspect of an input file of a command is relevant to that command when 
-changes in the input aspect invalidate the command's output file. 
-E.g. a change in the code-aspect of a header file invalidates all object 
-files that depend on that header file. 
-A command can be configured with its relevant aspects.
-By default the relevant aspect is entire-file.
+## Ensuring build correctness through file access monitoring
+Yam must know all input and output files of a command to ensure correct 
+build ordering and correct re-execution of commands that depend on
+modified input files or tampered-with output files.
 
-The use of file aspect hashes avoids command re-execution in cases where a
-file's last-write-time changes while the file aspect hash remains unchanged.
-E.g. a source file was edited, saved and then restored to its state before
-the edits. This file will have an unchanged hash and will therefore not
-cause a compilation command to be re-executed.
-E.g. a compilation command that uses the default entire-file aspect
-will re-execute when the user only edits comments in its input files.
-The hash of the resulting object file however will not change (assuming a 
-deterministic compiler). Link command that link the object file will 
-therefore not be re-executed.
+To ensure proper build order Yam requires the user to specify for each command
+all of its output files and all of its generated input files, i.e. input file 
+that are produced by other commands.    
+Yam does not require the user to specify all of its input source files.
+E.g. for a C++ compilation the user only specifies the cpp file to be compiled. 
+It is not needed to list all header files included by that cpp file.
 
-## File access monitoring
-For a correct incremental build Yam must know all input files of a command.
-Yam cannot rely on the input files specified in the build rules:
-- Yam does not require the user to specify all input source files. 
-E.g. for a C++ compilation the user only specifies the cpp file to be compiled.
-It is not needed to list all header files included by that cpp file. This
-would be redundant information, a maintenance nightmare and error prone.
-- Yam does require the user to specify all generated input files, i.e. files
-produced by other rules. This is needed to ensure proper build order.
-
-This is prone to user errors. Example:
+Yam can hence not rely on the input and output files specified in the build rules
+because these specifications are incomplete and prone to user error.  
+Example of user error:
 ```
-foreach a.cpp b.cpp |> gcc %f -o %o |> %B.obj
-|> link a.obj b.obj -out %o |> my.lib
+foreach a.cpp b.cpp |> compile %f -o %o |> %B.obj
+                    |> link a.obj b.obj -out %o |> my.lib
 ```
+Note: %f is replaced by the input file name, %o by the output file name.  
 The link rule does not specify inputs `a.obj` and `b.obj` while these files
-will be read by the link command. Yam will execute the compile and link rules 
-in parallel which results in undefined content of `my.lib`.
+will be read by the link command. As a consequence Yam will execute the compile
+and link rules in parallel which results in undefined content of `my.lib`.
 Correct link rules are:
 ```
 a.obj b.obj |> link %f -out %o |> my.lib
-*.obj |> link %f -out %o |> another.lib
+*.obj       |> link %f -out %o |> another.lib
 ```
 
 Yam solves these issues by monitoring the file accesses made by the command.
-GA HIER VERDER
-
-
-
-## File change monitoring
+Yam thus discovers all actual input and output files of the command.
+This allows Yam to detect the following errors in build rules and command 
+scripts:
+- Wrong build order, due to incomplete input specification.
+- Unknown output files, due to error in command script or output specification.
+- Too few output files, due to error in command script or output specification.
+- Multiple commands that write the same file.
 
 ## Build state
+The build state is the DAG as derived from the build rules augmented with the 
+input and output file nodes for the files found by file access monitoring of 
+the commands. The build state is stored in a single file.
+
+## Yam server
+Yam always reads the entire build state into memory. This takes time 
+proportional to the size of repository. Yam therefore uses a client-server 
+design. The server caches the build state and performs builds on request of 
+the client.
+
+## File change monitoring
+The Yam server continously monitors the repository for file changes. 
+On receipt of a file change notification the associated file node and the
+command nodes that depend on the file are marked dirty. When the next build
+is started Yam knows what to do: re-compute the hashes of dirty files and 
+re-execute dirty commands when relevant hashes have changed.
 
 # Claims
 
-## Performance
+- a quick edit-compile-test cycle, also for large (>10,000 files) repositories.
+- correct incremental builds (or: no need to ever run clean builds).
+- reproducable builds.
+- obsolete output files to be deleted automatically.
+- to write build rules/commands in a simple out-of-the-box language, and/or...
+- ...when you wnat to write build rules in a language of your choice.
+- ease-of-use.
+
+## Quick edit-compile-test cycle
+Typical problems that slow down the edit-compile-test cycle are:
 
 ### Long time between start of build and start of command execution  
 Build tools only re-execute commands that are out-dated. A command is 
 out-dated when its input files were modified since the previous build.
-To find these files many build tools scan the entire source file repository
+To find these files most build tools scan the entire file repository
 which requires time proportional to the number of files in the repository.
 This scan time is perceived as the time between start of build and start of 
 command execution. For large repositories this can exceed the time needed to
 execute the out-dated command(s). E.g. the build tool may take 10 seconds to 
 start a 1 second compilation.  
-Yam takes a different approach to discover modified files: it continuously
-monitors the file system for changes. When you start a build Yam already knows
-which files were modified, and hence which commands to re-execute.
+Yam does not have this problem because the Yam server continuously
+monitors the file system for changes.
 
 *For the typical way-of-working in which you modify only a few files in-between
 two builds it will take Yam, independent of the number of files in your 
@@ -414,7 +450,6 @@ machines/environments.
   way as it would parse the content of a Yam build file.
 
 # Some differences between Tup and Yam
-
 TODO: build language comparison
 TODO: run-script
 TODO: no %<group>, instead input <group> always treated as list of files
@@ -460,9 +495,7 @@ foreach <images> |> smooth %f -out %o |> smoothed/%B.%e <smoothed>
 <smoothed> |> zip %f -out %o |> smoothedImages.zip
 ```
 
-
 # A short history of Yam
-
 The creators of Yam worked in a company that used the ClearCase version
 management system to manage a ~50,000 file repository containing ~8,000,000
 lines of code (C++, C# and many other file types). This repository was actively
