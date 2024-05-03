@@ -2,6 +2,16 @@ Todo for R 0.1.0
 Bugs
 - fix (header->free == 1)  throw std::string(signature) + " - Accessing freed page.";
   Reproduce with coreTests EnduranceTest
+- create test_yam dir and build it. Then rename dir project to project1 and run yam.
+  Expected result: build passes, actual result: build fails because stale output
+  files in dir project1.
+  This problem can be solved when yamServer was observing the repository when the 
+  renaming took place. It is not easy though.
+  Else it is alpha build: Yam will remove mirror of project and add mirror of
+  project1 and will see no relation between these 2 events. Perhaps heuristics
+  can be used to detect that project1 is a rename of project. In that case
+  Yam can delete the stale output files. Should only be deleted on user confirm.
+  Try to solve this or accept and explain in the manual?
 
 Features
 - multi-repo build: clone repos in subdirs of the yam root dir.

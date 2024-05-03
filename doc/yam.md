@@ -4,30 +4,41 @@
 - [Concepts](#concepts)
   - [Build commands, build rules](#build-commands-build-rules)
   - [Build files](#build-files)
+  - [Yam file repository](#yam-file-repository)
+  - [Multi repository build](#multi-repository-build)
   - [Directed Acyclic Graph](#directed-acyclic-graph)
   - [File aspect hash](#file-aspect-hash)
   - [File last-write-time](#file-last-write-time)
   - [Incremental build](#incremental-build)
-  - [Ensuring build correctness through file access monitoring](#ensuring-build-correctness-through-file-access-monitoring)
+  - [File access monitoring](#file-access-monitoring)
+  - [Stale output files](#stale-output-files)
   - [Build state](#build-state)
   - [Yam server](#yam-server)
   - [File change monitoring](#file-change-monitoring)
 - [Claims](#claims)
   - [Quick edit-compile-test cycle](#quick-edit-compile-test-cycle)
-    - [Long time between start of build and start of command execution](#long-time-between-start-of-build-and-start-of-command-execution)
-    - [Long build time due to under-utilization of CPU cores](#long-build-time-due-to-under-utilization-of-cpu-cores)
-    - [Long build time due to unnecessary command re-execution](#long-build-time-due-to-unnecessary-command-re-execution)
-  - [Correctness](#correctness)
+    - [No slow build due to finding modified files](#no-slow-build-due-to-finding-modified-files)
+    - [No slow build due to under-utilization of CPU cores](#no-slow-build-due-to-under-utilization-of-cpu-cores)
+    - [No slow build due to unnecessary command re-execution](#no-slow-build-due-to-unnecessary-command-re-execution)
+  - [Correct incremental build](#correct-incremental-build)
     - [Failure to re-execute a command](#failure-to-re-execute-a-command)
     - [Missing, unexpected and stale output files](#missing-unexpected-and-stale-output-files)
     - [Wrong build order](#wrong-build-order)
     - [Build commands that are not parallel-safe](#build-commands-that-are-not-parallel-safe)
     - [Commands that update source files](#commands-that-update-source-files)
-  - [Ease of use](#ease-of-use)
+  - [Reproducable builds](#reproducable-builds)
+  - [Automatic deletion of obsolete output files](#automatic-deletion-of-obsolete-output-files)
+  - [Write rules in a simple build language](#write-rules-in-a-simple-build-language)
+  - [Write rules in a build language of your choice](#write-rules-in-a-build-language-of-your-choice)
+  - [Ease-of-use](#ease-of-use)
+    - [Scalability](#scalability)
+    - [Correctness](#correctness)
   - [Reproducability, deterministic and hermetic](#reproducability-deterministic-and-hermetic)
   - [Build language](#build-language)
 - [Some differences between Tup and Yam](#some-differences-between-tup-and-yam)
 - [A short history of Yam](#a-short-history-of-yam)
+
+
 
 
 # What is Yam?
@@ -59,9 +70,10 @@ Consider using Yam when you want:
 - a quick edit-compile-test cycle, also for large (>10,000 files) repositories.
 - correct incremental builds (or: no need to ever run clean builds).
 - reproducable builds.
+- to use C++ modules.
 - obsolete output files to be deleted automatically.
-- to write build rules/commands in a simple out-of-the-box language, and/or...
-- ...when you wnat to write build rules in a language of your choice.
+- to write build rules in a simple out-of-the-box language.
+- to write build rules in a language of your choice.
 - ease-of-use.
 
 Chapter [Claims]() explains how Yam fulfills these claims by describing how
@@ -70,21 +82,24 @@ reproducability, build language and ease-of-use.
 The [Claims]() chapter is best read after reading chapter [Concepts]().
 
 # When not to use Yam?
-Yam can only parallelize a build using local CPU cores. This makes Yam not
-suited for building huge (>100,000 files) repositories that are maintained by
-hundreds or thousands of engineers, like those at Google, Microsoft, Amazon.
+Yam parallelizes a build using local CPU cores. It cannot distribute the build
+across cores on multiple computers. This limits the degree of parallization.  
+This makes Yam not suited for building huge repositories like those at 
+Google, Microsoft, Amazon. 
 
-Yam would still provide a quick edit-compile-test cycle for such large
-repositories. Its initial build however would take an excessive amount of time.
+For huge repositories Yam would still provide a quick edit-compile-test 
+cycle for the typical use case in which only a few files are modified in 
+between builds. Yam however would take excessive amounts for builds when huge
+amounts of commands need to be re-executed, e.g. in the very first build.
 
-TODO: consider preparing Yam for integration with IncrediBuild.
-
+[A short history of Yam](#a-short-history-of-yam) gives an idea of build times
+in a reasonably large repository.
 
 # Concepts
 
 ## Build commands, build rules
-Yam executes commands. The user specifies these commands by means of build rules.
-There are two types of build rules:
+Yam executes commands. The user specifies these commands by means of build 
+rules. There are two types of build rules:
 
 ```
 inputFiles |> command script |> outputFiles
@@ -104,16 +119,71 @@ E.g. compile each file in inputFiles.
 See [Buildfile syntax]() for details.
 
 ## Build files
-Build rules are stored in build files. 
+Build rules are stored in build files.
+Each directory in the repository contains 0 or 1 build file.
 Yam recognizes a build file by its name: `buildfile_yam[post][ext]`
-where [post] is a user-defined postfix and [ext] is the file extension.
+where `[post]` is a user-defined postfix and `[ext]` is the file extension.
 Build files with extension `.txt` contain build rules in [Buildfile syntax]().
 Build files with other extensions are executable files that output build rules.
 E.g. Yam will execute `buildfile_yam.py` by invoking the Python interpreter and
 Yam will parse the output as if it had been stored in `buildfile_yam.txt`.
 
-Each directory in the repository contains 0 or 1 build file.
 
+## Yam file repository
+A Yam file repository, or file repository, is a directory tree from which
+Yam reads build files and source files and/or into which Yam writes output 
+files.
+
+The first time you run Yam in a directory it will create a hidden directory 
+that marks the root of a Yam file repository. Yam will then scan the entire 
+directory tree for build files. The build files dictate where Yam reads 
+source files and where Yam writes output files.
+A repository in which you start a build is called the home repository of
+that build.
+
+Builds often read source files outside the home repository. E.g. C++ std
+library files are typically not stored in the home repository.
+Build files may specify output files outside the home repository, e.g.
+to avoid the home repository to become cluttered with output files.
+
+Yam requires the user to declare all file repositories from which files
+are read and/or into which files are written. For each of these repositories
+you must specify whether it is to be build, tracked or ignored:
+- A to-be-build repository is treated as if it had been a subdirectory tree
+of the home repository, i.e. it will process build files, monitor the tree for
+changes and register dependencies on files in the tree in the build state.
+- A to-be-tracked repository is treated as if it had been a subdirectory tree
+of the home repository except that Yam will not process build files in that
+tree.
+- A to-be-ignored repository will ignore all changes in that repository, i.e.
+commands in the home repository that depend on files in a to-be-ignored
+repository will not be re-executed when these files change. This repository
+type is used for repositories that are guaranteed to be read-only. E.g. the
+Windows include file tree.
+Using to-be-ignored repositories reduces resource usage because Yam does not
+need to keep track of dependencies and does not need to monitor the 
+repository for changes.
+
+Yam will fail a build when a command accesses files that are not in the 
+declared file repositories.
+
+## Multi repository build
+Many organizations use a multi-repository setup to store their software.
+E.g. an organization stores software that is reused by multiple applications
+in a platform repository. Each application is stored in an application 
+repository that depends in (a specific version of) the platform repository.
+When using git modules the platform shows itself as a subdirectory of the
+repository directory. Building the application repository will build both
+platform and application software without requiring any special support
+from the build tool.
+
+Junctions could be an alternative for git modules: the application repository
+then contains a junction to the platform repository.  
+Unfortunately Yam does not support the use of junctions.
+
+Yam however does support multi-repository builds by allowing you to specify
+a dependent repository as to-be-build.
+ 
 ## Directed Acyclic Graph
 Yam uses the build rules to create a Directed Acyclic Graph (DAG). The nodes
 (vertices) in the DAG represent source files, commands and generated files.
@@ -174,7 +244,17 @@ previous build:
 - Command script.  
   E.g. the user modified a compilation option in a build rule.
 
-## Ensuring build correctness through file access monitoring
+Yam does not re-execute commands when environment variables change.
+This is not needed because commands do not inherit the environment of the
+shell from wich Yam is started.
+
+To ensure build correctness Yam must know:
+- All input and output files of a command.  
+  Yam achieves this through [File access monitoring](#file-access-monitoring).
+- Which files were modified since the previous build.  
+  Yam achieves this through [File change monitoring](#file-change-monitoring).
+
+## File access monitoring
 Yam must know all input and output files of a command to ensure correct 
 build ordering and correct re-execution of commands that depend on
 modified input files or tampered-with output files.
@@ -211,6 +291,25 @@ scripts:
 - Unknown output files, due to error in command script or output specification.
 - Too few output files, due to error in command script or output specification.
 - Multiple commands that write the same file.
+- Commands that write source files.
+
+These errors are caused by user errors in build rule specification and
+commands that are not parallel-safe.
+
+## Stale output files
+Yam deletes stale output files when:
+- Output files in a build rule specification are renamed or removed.
+- Source files are renamed/moved or deleted.
+
+Example:
+Assume files `foo.cpp` and `bar.cpp` and rule  `foreach *.cpp |> compile %f -o %o |> %B.obj`  
+A build will produce files `foo.obj` and `bar.obj`.  
+When you:
+- Delete `bar.cop`, Yam will delete `bar.obj`.  
+- Rename `foo.cpp` to `main.cpp`, Yam will delete `foo.obj` and produce `main.obj`. 
+- Rename in rule  `%B.obj` into `bin/%B.obj`, Yam will delete  `foo.obj` and  `bar.obj`
+and produce `bin/foo.obj` and  `bin/bar.obj`
+  
 
 ## Build state
 The build state is the DAG as derived from the build rules augmented with the 
@@ -228,87 +327,50 @@ The Yam server continously monitors the repository for file changes.
 On receipt of a file change notification the associated file node and the
 command nodes that depend on the file are marked dirty. When the next build
 is started Yam knows what to do: re-compute the hashes of dirty files and 
-re-execute dirty commands when relevant hashes have changed.
+re-execute dirty commands when relevant hashes have changed.  
 
 # Claims
 
-- a quick edit-compile-test cycle, also for large (>10,000 files) repositories.
-- correct incremental builds (or: no need to ever run clean builds).
-- reproducable builds.
-- obsolete output files to be deleted automatically.
-- to write build rules/commands in a simple out-of-the-box language, and/or...
-- ...when you wnat to write build rules in a language of your choice.
-- ease-of-use.
-
 ## Quick edit-compile-test cycle
-Typical problems that slow down the edit-compile-test cycle are:
+This section discusses how Yam avoids some common causes of slow builds. 
 
-### Long time between start of build and start of command execution  
-Build tools only re-execute commands that are out-dated. A command is 
-out-dated when its input files were modified since the previous build.
-To find these files most build tools scan the entire file repository
-which requires time proportional to the number of files in the repository.
-This scan time is perceived as the time between start of build and start of 
-command execution. For large repositories this can exceed the time needed to
-execute the out-dated command(s). E.g. the build tool may take 10 seconds to 
-start a 1 second compilation.  
-Yam does not have this problem because the Yam server continuously
-monitors the file system for changes.
+### No slow build due to finding modified files  
+Most build tools scan the entire file repository to find files modified since
+the previous build. This requires time proportional to the number of files in 
+the repository. The scan time is perceived as the time between start of build 
+and start of command execution. For large repositories this can exceed the time 
+needed to execute the out-dated command(s). E.g. the build tool may take 10 
+seconds to start a 1 second compilation.  
+Yam does not have this problem because it continuously monitors the file 
+system for changes.
 
 *For the typical way-of-working in which you modify only a few files in-between
 two builds it will take Yam, independent of the number of files in your 
 repository, less than 10 milliseconds to determine which commands to
 re-execute.*
 
-*Long times between start of build and start of command execution tempt
-engineers to outsmart the build tool by only building the output files that
-they thought were impacted by their source code changes. This frequently 
-results in mistakes and lots of wasted time in debugging.*
-
-### Long build time due to under-utilization of CPU cores 
+### No slow build due to under-utilization of CPU cores 
 Yam parallelizes the execution of commands that do not depend on each others
-output files. E.g. C++ compile commands execute in parallel while a link 
-command executes after the compile commands that produce its input object 
-files. Commands that can be executed in parallel are queued to a thread pool.
-By default the thread pool size is equal to the number of CPU cores. This 
-ensures 100% CPU utilization as long as the thread pool queue is not empty.
+output files. Commands that can be executed in parallel are queued to a 
+thread pool. By default the thread pool size is equal to the number of CPU
+cores. This ensures 100% CPU utilization as long as the thread pool queue  
+contains sufficient commands. Note that command dependencies limit
+parallelization.
 
-*Input-output dependencies between commands limit parallelization.
-This is outside control of the build tool.*
+### No slow build due to unnecessary command re-execution
+Yam minimizes unnecessary command re-executions through the use of 
+[file aspect hashes](#file-aspect-hash).
 
-### Long build time due to unnecessary command re-execution
-To avoid unnecessary command re-execution Yam can be setup to only re-execute a
-command when relevant aspects of the command's input files change. Examples:
+## Correct incremental build
+Section [Incremental Build](#incremental-build) explains how Yam achieves
+correct builds.
 
-- Unnecessary recompilation after changing comments  
-Assume you change a comment in a C/C++ header file that is included by hundreds
-of cpp files and start a build. Most build tools will recompile all these cpp 
-files, even though comment changes do not affect the resulting object files.  
-Not so in Yam. Yam can be setup to only re-execute a compile command when the 
-non-comment sections of the command's input files change. This allows you to 
-improve comments without the cost of long builds. 
-
-- Unnecessary recompilation after undoing edits  
-Assume you modify and save a C/C++ header file that is included by hundreds of
-C/C++cp files, then change your mind, undo the changes and start a build.
-Most build tools will recompile all the cpp files because their 
-last-write-times have changed.  
-Not so in Yam. By default a change in a file's last-write-time is a signal to
-Yam to verify whether (aspects of) its content has changed. Rebuilds only happen
-on content changes.
-
-- Unnecessary relinking after changing a dynamic load library
-Assume you modify an implementation detail in a C++ file that is linked into a
-dynamic load library (dll). Assume that a large number of dlls and/or 
-executables depend on the changed dll, either directly or indirectly via other
-dlls. Most build tools will relink all these dlls, recursively up to the 
-executables that use them.  
-Not so in Yam: Yam can be setup to only re-execute a link command a dll when 
-the interface aspect of the command's input dlls change.
-
-
-## Correctness
-
+Typical causes of incorrect incremental build are:
+- Failure to re-execute a command while its outputs were invalidated.
+- Wrong build order.
+- Commands that are not parallel-safe.
+- Failure to delete stale output files.
+  
 ### Failure to re-execute a command
 Yam re-executes a command when one or more of the following is true:
 - Relevant aspects of the command's input files have changed.
@@ -386,25 +448,75 @@ files. Yam fails the build when a command writes to a source file.
 Note: a file that contains code generated by a command, e.g. from an IDL
 file, is an output file, ***not*** a source file.
 
-## Ease of use
+## Reproducable builds
+Yam helps making builds reproducable by:
+- Requiring you to specify all repositories from/to which Yam is allowed to 
+read/write files.  
+- Executing build commands with an empty environment.  
+The shell that executes the command does not inherit the environment
+variables of the shell in which Yam is started.
 
-- **No more clean rebuilds after you changed some of your build commands**
-- **No more clean rebuilds after you renamed/moved files or directories**
-- **No more clean rebuilds after you checked-out another git branch in your worktree**
-- **No more clean rebuilds at all**  
-  Developers and Continuous Integration engineers can confidently rely on
-  incremental builds
-- **No more manual deletion of stale build results**  
-  You removed a build command that produced some file X? Yam will delete X.
-  You renamed the output of a build command from X to Y? Yam will delete X
-  and create Y.
+## Automatic deletion of obsolete output files
+You removed a build command that produced some file X? Yam will delete X.
+You renamed the output of a build command from X to Y? Yam will delete X
+and create Y.
+You renamed/moved a directory? 
 
-- **No more hard-to-reproduce build errors because your build commands are not parallel-safe**  
-  Yam fails the build when multiple build commands attempt to update the same
-  output file. And Yam will tell you who the culprits are.  
-  When a build command C depends on an output file F produced by build command P
-  then Yam demands that you declare C to be dependent on F in order to guarantee
-  proper build order of P before C. Yam will tell you when you failed to do so.
+## Write rules in a simple build language
+## Write rules in a build language of your choice
+
+## Ease-of-use
+From [Build System Rules and Algorithms](https://gittup.org/tup/build_system_rules_and_algorithms.pdf):  
+Any build system must abide by the following rules:
+1. Scalability: Given an already up-to-date system, applying a change to the
+system and building it should take time that is proportionate to the
+changes required to bring the system up to date.
+2. Correctness: Given an up-to-date system in state X, applying change A
+and updating the system may result in state Y. Undoing change A and
+performing an update must return the system to state X.
+3. Usability: There must not be different ways of building the system that
+the user must remember in order to accommodate rules 1) or 2).
+There should only one way to obtain a correct build: run the build tool.
+
+Yam adheres to all of these rules, many other build tools do not.
+
+This section describes violations of rules 1) and 2) that force the 
+user to use different ways of building the system than just running the build tool, thus violating rule 3).
+
+### Scalability
+Many build tools scan the entire repository to find files modified since
+the previous build, thus violating rule 1). This tempts engineers to outsmart 
+the build tool by only  building the output files that they thought were 
+impacted by their source code changes. This frequently results in mistakes
+and lots of wasted time in debugging.
+No need for this in Yam: simply run yam. 
+See section [File change monitoring ](#file-change-monitoring).
+
+### Correctness  
+Section [Correct incremental build](#correct-incremental-build) explains how 
+Yam ensures correct build results.
+
+Incorrect build outputs caused by not parallel-safe commands are sometimes 
+only detected after lots of wasted time in debugging. Users recover by running
+an, often time-consuming, clean build.
+No need for this in Yam: simply run yam.
+
+`Make` build tool does not re-execute commands when the command has changed.
+The user must be aware of this and run a clean build after command
+changes. 
+No need for this in Yam: simply run yam.
+
+Some build tools do not properly handle renaming of files.
+This results in stale output files. This requires the user to manually
+delete these files and run a clean build.  
+No need for this in Yam: simply run yam.
+
+`Make` build tool only re-execute commands when input files are newer
+than the output files. Replacing the content of your worktree with an older
+version of your repository may result in file times to become older.
+This requires the user to run a clean build.
+Yam's use of last-write-time and file hashes avoids such problems.
+No need for this in Yam: simply run yam.
 
 ## Reproducability, deterministic and hermetic
 
