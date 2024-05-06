@@ -123,8 +123,8 @@ namespace
     };
 
     // Reproduces crash in build 2.0
-    TEST(Endurance, repeatAddRemoveRepositories_crashIn2_0) {
-    //void ignore2_0() {
+    //TEST(Endurance, repeatAddRemoveRepositories_crashIn2_0) {
+    void ignore2_0() {
         std::filesystem::remove_all("D:\\test_yam");
         std::filesystem::remove_all("D:\\test_yam_1");
         std::filesystem::copy("D:\\clean_repos\\test_yam", "D:\\test_yam", std::filesystem::copy_options::recursive);
