@@ -1,4 +1,6 @@
 #include "Dispatcher.h"
+#include "DispatcherFrame.h"
+
 
 namespace YAM
 {
@@ -6,6 +8,14 @@ namespace YAM
         : _suspended(false)
         , _stopped(false)
     {}
+
+    void Dispatcher::push(Delegate<void> & action) {
+        {
+            std::lock_guard lk(_mtx);
+            _queue.push(action);
+        }
+        _cv.notify_one();
+    }
 
     void Dispatcher::push(Delegate<void>&& action) {
         {
@@ -76,5 +86,18 @@ namespace YAM
     bool Dispatcher::stopped() {
         std::lock_guard lk(_mtx);
         return _stopped;
+    }
+
+    void Dispatcher::popAndExecute() {
+        Delegate<void> d = pop();
+        if (d.IsBound()) d.Execute();
+    }
+
+    void Dispatcher::run() {
+        while (!stopped()) popAndExecute();
+    }
+
+    void Dispatcher::run(IDispatcherFrame* frame) {
+        while (!frame->stopped() && !stopped()) popAndExecute();
     }
 }

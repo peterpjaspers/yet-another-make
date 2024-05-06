@@ -1,0 +1,325 @@
+- Scalable performance
+YAM delegates self-execution of a node to a thread pool.
+By default the pool contains 1 thread per processor core.
+Assume build time T when using 1 core, then ideally build time becomes T/N 
+when using N cores. In practive this cannot be achieved for several reasons:
+	- serialization inherent in build graph. E.g. link after compilation.
+	- serialization in YAM implementation
+	- compute platform limitations (I/O, OS overhead)
+
+- Concurrent access to shared data
+Node::selfExecute may access (read+write) 
+	- its own member variables
+	- members variables of other nodes, e.g. CommandNode rehashes its output
+	  file nodes after completion of its command script.
+	- its execution context, e.g.:
+		- DirectoryNode adds/removes directory and file nodes
+		- BuildFileProcessorNode adds/removes/updates command nodes
+		- CommandNode finds file nodes associated with the files read by its
+		  command script
+
+At first glance there is no harm in a node updating its own member variables 
+because other nodes in other threads will not access this data during execution
+of that node. This however is not true for a thread that stores nodes to 
+persistent storage. 
+
+There are 3 design options to eliminate concurrent access to shared data:
+	A- access shared data in critical section
+	B- access shared data only from main thread
+	C- others than node X only read node X execution results iff:
+	     - read in main thread
+	     - node is X is not Executing
+	   X is allowed to read/modify its execution results in threadpool context.
+	   When X is stored, i.e. when it is streamed, while it is Executing
+	   it must only stream member variables that are not execution
+	   results. Note: this implies that also node state must be streamed.
+	   
+
+YAM implements option B: only access shared data in main thread.
+Both threading design options impact the scalability of YAM because they limit
+the amount of parallellizable code, see Amdahl's law.
+
+- Scalability analysis
+Performance on  Intel(R) Core(TM) i5-4210M CPU@ 2.60GHz, Windows 10, 16 GB
+std::unordered_set<std::shared_ptr<Node>>:
+	- Add: 600 ns
+	- Find: 320 ns
+	- Erase: 500 ns
+
+A YAM build is performed in 3 stages:
+	1- Mirror the source file repository in a tree of directory and file nodes
+	   and compute the hashes of directories and files.
+	   Rationale: see design_whenToAddSourceFileNodesToGraph.txt
+	2- Process build files to add/remove/update command nodes
+	3- Execute command nodes
+
+Executing these stages sequentially impacts scalability (Amdahl's law).
+E.g. changing a small include file (fast rehash) that triggers many 
+re-compilations and changing a large file (slow rehash) that triggers no
+re-executions. The slow rehash of the large file has a considerable impact
+on scalability. This can be mitigated when for each command all input files
+are declared in advance (as is done in Bazel). In that case hashing the files
+can become part of stage 3 (via Node preRequisites execution). Note that
+re-reading/re-hashing directories must still be done in stage 1.
+A hybrid form can be used: in build file specify the include directories on
+which an object file is allowed to depend but register in the compilation
+command node only the actually used include files.
+
+Stage 2 and 3 can be executed in parallel, see MIRO board.
+YAM has choosen sequential execution of stage 2 and 3 because:
+    - Often there will be no modified build files.
+	- Executing stage 3 after completion of stage 2 improves scalability of 
+      stage 3 as will be shown below. 
+
+1- Mirror the source file repository in a tree of directory and file nodes
+Directory retrieval and new dir/file node creation is done in threadpool context
+as is rehashing of dir/file content. Adding/removing nodes to/from execution 
+context is done in main thread. This stage therefore fully adheres to MT-design 
+option B. 
+
+2- Process build files to add/remove/update command nodes
+Parsing the build files is done in threadpool context. Adding/removing/updating
+command nodes is done in main thread. This stage therefore fully adheres to MT-design 
+option B. 
+
+3- Execute command nodes
+Executing the command script in done in threadpool. This produces the list of
+files read by the script. For each file in this list the command node looks-up 
+the associated file node in ExecutionContext::nodes() and adds the found file
+node to its set of input file nodes. According to option B this should be done
+in main thread. However, during stage 3 no changes are made to the set of nodes.
+Therefore it safe to do the look-ups in threadpool context. This moves 320 ns
+per lookup from main to threadpool thread, thus improving scalability.
+E.g. assume a compile node with:
+	 - 1 second compilation time
+	 - lookup 1000 input file nodes => 320 us 
+	 - node storage time => 1 us (negligable wrt 320 us)
+Speedup when using 1024 threads with input file node lookup in
+	- main thread: 771
+	- thread pool: 1023
+	
+In addition to these look-ups the command node must remove itself from the
+dependants of input file nodes that were no longer detected as input files
+and add itself to the dependants of newly detected input file nodes.
+Given option B this must be done in main thread. A simple implementation
+looks like:
+        if (_inputs != newInputs) { // vector => O(N^2)
+            for (auto i : _inputs) i->removeDependant(this); // set => O(N)
+            _inputs = newInputs; O(N)
+            for (auto i : _inputs) i->addDependant(this); // set => O(N)
+        }
+Time needed will be approximately twice lookup time of input file nodes, 
+e.g. 500 us. This reduces scalability considerably: speedup when using 1024 
+cores with input file node lookup in thread pool and updating dependants in
+main thread drops from 1023 to 677.
+In a clean build there will be no dependant removals, assume time drops to 
+e.g. 250 ns. Speedup for 1024 cores in that case: 815
+
+The change in set of input files will often be small, certainly in a C++ code
+base. YAM uses this to reduce the overhead of updating dependants:
+    - std::set<std::shared_ptr<FileNode>> _inputs; (iso vector)
+	- compute, in thread pool, the difference between old and new input set
+	- in main thread: 
+		for (auto removed : removedInputs) {
+		    removed->removeDependant(this); 
+			_inputs.remove(removed);
+		}
+		for (auto added : addedInputs) {
+		    added->addDependant(this); 
+			_inputs.add(added);
+	    }
+Note: the number of node re-executions in many typical development scenarios 
+will be small, thus limiting the effect of above optimization. 
+
+
+12 juli 2023
+Discussion with Phil after having read Buck2, DICE and Bazel documentation.
+Phil is charmed by the Buck2/DICE approach and proposes a different threading
+design:
+- a node can be executed in any thread T:
+    - node prerequisites execution: future = asycn(lambda) patterns
+      Synchronize: result = future.get()
+    - node self-execution in T
+
+Rationale: the previous design no longer scales when the main thread is
+100% loaded. Distributing (parallelizing) the main thread work over multiple
+threads will improve scalability.
+
++----Deadlock
+The async operation queues the lambda to a thread pool.
+Deadlock may occur when the number of threads in the pool is limited:
+	- nodes with prerequisites will block on preqrequisite completion
+	- deadlock occurs when the size of path from root node to leaves 
+	  (the file ndoes) is larger than the threadpool size.
+This can be avoided by adding threads to the pool when the length of a
+prerequisite path exceeds the pool size.
+
++----Many threads needed => excessive resource usage
+
++----Scalability
+Previous design:
+The work done in the main thread is the work that would otherwise require
+MT-safe access to individual nodes and to the NodeSet (the map in which all
+nodes are registered).
+
+The multi-phase build (1-mirror repo, 2-process buildfiles, 3-execute commands)
+ensures that in phase 3 no additions/removals to the NodeSet occur. This
+allows commands to query the NodeSet (without locking overhead) to determine
+the set of input/output nodes of the command in threadpool context, thus 
+reducing the time spent in not-parallized code, thus increasing scalability.
+
+New design proposal:
+	- Get rid of repo mirror, see design_getRidOfRepoMirroring.txt
+	- all node execution in threadpool
+	  This requires MT-safe access to nodes and NodeSet.
+	- parallel execution of build phases.
+	  See MIRO board for parallel buildfile and command execution.
+	- postrequisites not only for directory nodes but also for command nodes
+	  I.e. command node execution may create more nodes.
+	  This can be used in langages where source code imports modules/files 
+	  that have to be compiled before use. Alternatives:
+	  - parse source code (recursively) in build file and create commands
+	    This is least disruptive for YAM design
+	  - parse source code (non-recursive) in command execution and create
+	    command nodes for direct dependencies. These dependencies can again
+		do same thing. This requires an API to enable command script to create
+		command nodes at runtime.
+	    For parallel buildfile and command execution first all the commands owned
+	    by changed buildfiles are suspended. This must be generalized to suspending 
+	    nodes created by dirty nodes. When a dirty node creator is executed it
+	    updates its created nodes and then resumes them.
+	    Once a node is resumed it continues execution (when it was requested to do so).	  
+		After discussion with Phil dd 19-Jul-2023 we accepted first alternative.
+
+	  Buildstate storage is bound to a single thread due to streaming btree.
+	  TODO: investigate how to store buildstate.
+	  TODO: investigate how to retrieve subgraphs from persistent buildstate.
+	  TODO: only parse modified buildfiles related to build scope, build scope
+	  being the set of output files to build.
+	  I.e. do not do more than what the user asked for. This requires being able
+	  to relate an output file directly to buildfile. This can only be done by
+	  using strict conventions. E.g. A\B\C\buildfile.yam defines output files in
+	  A\B\C\yamout
+  
+
+Nodes A and B both have node C as prerequisite, hence both A and B need to execute C.
+Nodes A and B execute in different threads. 
+C must execute in different thread than A and B.
+Overhead must be minimal in case C is already queued for executing or already executed.
+
+class Node {
+    void execute() {
+        std::lock lock(_mtx);
+        if (state == dirty) { 
+            std::vector<std::future> preqFutures;
+            std::vector<Node*> queued;
+            for (auto prereq : prerequisites() 
+                prereq->lock([]() { 
+                    if (!_context->cancel() && prereq->state() == Dirty && !prereq->queued()) {
+                        prereq->queued(true);
+						queued.push_back(prereq);
+                        preqFutures.push_back(async prereq->execute(cancel));
+				    }
+				});
+            }
+            for (auto f in preqFutures) f.get();
+            for (auto prereq : queued) prereq->lock([]() { prereq->queued(false); } });
+            if (!_context->cancel() && pendingSelfExecution) state = selfExecute();
+            else state = _context->cancel() ? Cancelled : Ok;
+        }
+		return state;
+	}
+	
+    std::atomic<std::shared_ptr<IMonitoredProcess>> _scriptExecutor;
+	void selfExecute() {
+        auto executor = std::make_shared<MonitoredProcess>(
+            cmdExe,
+            std::string("/c ") + scriptFilePath.string(),
+            env);
+        _scriptExecutor = executor;
+        MonitoredProcessResult result = executor->wait();
+        _scriptExecutor.store(nullptr);
+    }
+
+	void cancel() {
+        for (auto prereq : prerequisites()) prereq->cancel();
+        std::shared_ptr<IMonitoredProcess> executor = _scriptExecutor.load();
+        if (executor != nullptr) executor->terminate();
+	}
+}
+
+class Builder {
+    std::vector<Node*> _buildScope;
+
+    void build() {
+        std::vector<Node*> queued;
+        std::vector<std::future> futures;
+        for (auto node : _buildScope) {
+            node->lock([]() { 
+                if (!_context->cancel() && node->state() == Dirty !prereq->queued()) {
+                    prereq->queued(true);
+                    futures.push_back(async node->execute(cancel));
+                }
+            })
+        }
+        for (auto f : futures) f.get();
+        for (auto prereq : queued) prereq->lock([]() { prereq->queued(false); } });
+	}
+
+	void cancelBuild() {
+		_context->cancel(true);
+		for (auto node : _buildScope) node->cancel();
+	}
+}
+
+The above code has serious disadvantages:
+- no control on the number of threads used by yam
+- deadlock when number of threads is too small
+  (all threads in threadpool used by nodes waiting for prerequisites).
+
+The deadlock can only be avoided by:
+- increasing threadpool size
+  This can be counter-productive for scalability: too many context switches
+- only queue nodes to threadpool that are ready to self-execute
+  This can be achieved as in current design. An alternative is to first
+  sort the nodes, e.g. see https://stackoverflow.com/questions/63354899/parallel-execution-of-directed-acyclic-graph-of-tasks
+  In this solution the thread that completes a prerequisite of a node will
+  perform the completeness-check:
+      - decrement count of in-progress prerequisites
+	  - test count for 0
+	  - if 0: post selfExecute to threadpool
+  This approach spares posting the (cheap) completeness-check to the main thread.
+  Because posting is a serializing action this approach will increase scalability.
+  Hmm: the previous sentence makes no sense: all serialization decreases scalability.
+  It is dubious however whether this will result in a significant improvement
+  because the other serializing actions take-up much more time:
+	- finding nodes associated with the found file dependencies
+	  In current implementation this is done in threadpool context. 
+	  But when parallelizing buildfile processing with command execution
+	  then new nodes can be created during command execution and adding
+	  and finding nodes must be moved into critical sections.
+	- updating the dependants of the input and command nodes.
+	  This must be done in critical section because many commands
+	  can depend on the same node. E.g. the dependents of an include file
+	  node are all the compilation commands that read that include file.
+
+Note that this advantage can also be achieved in the current design by executing the 
+handlePre/PostRequisiteCompletion callbacks in threadpool context.
+In current implementation this requires the node to be locked due to use of unordered_sets
+Node::_executingPre/Postrequisites. This can be avoided by only maintaining 
+_nrOfExecutingPre/Postrequisites in std::atomic<unsigned int>.
+
+NB: the callbacks are currently made as last statements in notifyCompletion which 
+executes in main thread. This routine updates multiple member fields and also the 
+node state. Is it possible to start() node execution in thread A (main) and 
+notifyCompletion() from thread B (threadpool) ?
+Yes, this is possible but requires critical sections as illustrated by this example:
+	nodes A and B share same prerequiste C.
+	node A is started and starts C. Before/during start of node B node C completes 
+	and calls-back on A and B from threadpool context. Current code is not MT-safe
+	and outcome is undefined. 
+
+The current implementation fixes this race-condition by doing the callbacks
+in mainthread. In the example this means that callback from C to B is done
+once main thread is idle, which is after B has started.
+

@@ -1,136 +1,94 @@
-Todo
--ExecutionContext
-  To avoid singletons a context object is passed to Node constructor.
-  It provides access to:
-	- command line options
-	- logBook
-	- cancel multicastdelegate
-- Command node:
-    - file dependency detection as responsibility of the script
-        - define dependency detection interface that supports implementation by
-          hooking dll-injection techniques as well as by filesystem filter driver.
-          In the latter case one needs to keep track of both file access and process
-          creation/destruction. The latter to build a process tree needed to trace-back
-          fileaccess by some pid to the pid of the top-level build command.
-        - script communicates file dependencies via stdout to YAM or 
-          via files (as MS filetracker)
-        - YAM provides file dependency detection support a la MS filetracker
-          Consider reuse of tup dependency detector
-    - integrate file dependency detector (from tup dllinject or MSBuild tracker.exe)
-    - handle the race-conditions described in the last 2 notes in the description of
-      FileNode.h
-    - distinguish between modifications caused by user editing source files and tampering
-      (e.g. deleting) with generated files.
-      Note: not doing 
-- build state storage
-    - implement streaming btree (provides streaming of value types into btree via ValueStreamer i/f)
-    - implement ObjectStreamer (streams C++ objects to/from ValueStreamer)
-    - implement BuildStateStreamer (streams YAM buildstate)
-- winkin (build cache)
-    - a generated file can be winkedin when its inputs are identical to their in the worktree
-      running the build that wants to generate the file. Identical means that the input file
-      aspect hashes in cache and worktree are identical.
-      A problem is that some tools, e.g. the MS compilers and linkers, are not deterministic. 
-      I.e. running these tools twice on identical inputs produces outputs that are functional 
-      but not binary identical. This non-determinism does not matter when the non-deterministic
-      parts can be excluded from the file aspect hashes. Builds (and winkin) will be sub-optimal
-      when that is not possible.
-      Example: assume the hash of object files does not exclude the non-deterministic part.
-      Assume cache contains: P.exe linked from A.dll-import.lib, linked from O1.obj and O2.obj, 
-      compiled from sources C1.cpp and C2.cpp respectively with versions V1 and V2 respectively
-      compiled at time T1 and T2 respectively.
-      Worktree contains the same source file versions. C1.cpp is not yet compiled, C2.cpp was 
-      compiled at time T0 (!=T2), before C2.obj entered the cache. The cached and worktree C2.obj 
-      files are NOT identical and neither are their aspect hashes. This causes A.dll-import.lib
-      to be re-linked unnecessarily.
-      A work-around is to only consider the hashes of the input source files (recursively). 
-      In this example A.dll-import.lib can then be winkedin.
-      Note: in practice linking the import lib is a side-effect of linking the dll. However, when
-      linking the import lib seperately one would ideally use an input aspect for object files
-      that only includes interface aspects of the object file. This requires in-depth knowledge
-      of object file formats and how object file content affects the import lib file.
+Todo for R 0.1.0
+Bugs
+- fix (header->free == 1)  throw std::string(signature) + " - Accessing freed page.";
+  Reproduce with coreTests EnduranceTest
+- create test_yam dir and build it. Then rename dir project to project1 and run yam.
+  Expected result: build passes, actual result: build fails because stale output
+  files in dir project1.
+  This problem can be solved when yamServer was observing the repository when the 
+  renaming took place. It is not easy though.
+  Else it is alpha build: Yam will remove mirror of project and add mirror of
+  project1 and will see no relation between these 2 events. Perhaps heuristics
+  can be used to detect that project1 is a rename of project. In that case
+  Yam can delete the stale output files. Should only be deleted on user confirm.
+  Try to solve this or accept and explain in the manual?
+
+Features
+- multi-repo build: clone repos in subdirs of the yam root dir.
+  Remove relation with .git directory in class DotYamDirectory?
+- buildscope: current implementation only searches for the producers of dirty 
+  generated file nodes. Could also search all dirty nodes to allow for example:
+      yam *.cpp // hash file nodes
+      yam buildfile_yam.txt // compile buildfile, or execute all commands 
+                            // produced by buildfile
+      yam submodules/<objects> // execute group
+
+- integrate Phil's file access monitor
+    - how to deal with input dependencies on non-existing source files
+      Note: these source file nodes are NOT in state Deleted. How to GC these
+      nodes when no longer refd => GC sweep over context to remove node with
+      use_count 1. delete when not observed
+    - directory enumeration
+    - After execution (hashing) of detected input and output files: check whether
+      last write times match the ones provided by access monitor. If not equal
+      then fail the execution and invalidate the execution hash to force command 
+      to re-execute at next build. 
+
+- fileaspect configuration
+      - hash = last-write-time (e.g. for generated files in cmd executionhash)
+      - import lib exports hash (hash i/f of dll)
+- unit-test support
+- packaging support (group containing files-to-be-packaged, buildfile that generates packaging rule)
+- response files
+- xxhash stream
+- build yam with yam
+- deal with dependencies on gtest, boost, xxhash
+  xxhash requires license to be part of binary redistribution.
+- license
+- C++20 modules support
+  Allow commands to generate buildfiles.
+  while (dirty buildfiles found) build();
+  Buildfile that generates two rules:
+      - a rule to parse each C++ file for module imports/exports and store these
+       imports/exports in file.cpp.modules and in group <modules>
+      - <modules> |> generateCompileRules %f %o |> buildfile_yam_cppmodules.txt
+       Where generatedCompileRules creates the compilation rules taking the 
+       module dependency graph into account.
+  yam recognizes this rule (by its output file name) as a rule-producing rule,
+  parses the resulting buildfile_yam_cppmodules.txt into compilation CommandNodes 
+  and executes the commands.
+- end-to-end testing (automated gtest)
+- scalability measurements
+- documentation
+- inform Mike Shal
+
+Out-of-scope:
+- distributed build
+- build cache (read MS buildXL section on caching!)
+- btree/page caching
+- tup-compatible syntax
+- variants (tup variants, MR build configurations)
+  Requires syntax for variables
+- buildstate export to e.g. Jason or XML or to some graph format.
+  Export verbose or compact.
+  Verbose: references to nodes are path names
+  Compact: each node has a unique id, references to nodes are ids.
+
+Ideas:
+- yam creates group hierachy of output files. Hierarchy
+  mirrors the directory tree in which outputs are stored.
+  E.g. outputs are a/O1, a/O2, a/b/c/O3. 
+  Output groups <a> contains O1, O2 and <b>, <b> contains <c>, 
+  <c> contains O3.
+  yam <b>/** builds all outputs in <b> recursively. Same would happen
+  for yam b/**. 
+  <b>/** is kind of O(N) where N is nr of elements below <b>
+  b/** is O(N), where N is nr of dirty generated file nodes in buildstate.
+  yam <b>/<c>/O3 is O(N) where N is nr of elements in <b> and in <c>
 
 
-- build file format (follow tup, follow mrmake, something completely different?)
-    - decide
-    - implement parsers and DAG updater
 
-Done
-- ExecutionContext
-  To avoid singletons a context object is passed to Node constructor.
-  It provides access to:
-	- node repository (renamed from Graph)
-	- main thread and thread pool and their dispatchers
-	- file aspect hasher configuration
-- filenode, sourcefile, generatedfile (output file of command node)
-- Process class => boost process
-- file aspect hashes
-    - FileNode::_hashes (std::map<aspectName => XXH64_hash_t)
-      _hashes is populated when node is created and updated when context.filehashers changes
-      and file name matches one of filehashes patterns.
-      Note: it is more attractive to only add aspects to filenode that are actually used.
-      With this approach it may happen that hashes are computed that are never used.
-      Unfortunately this is not possible because it cannot be known in advance which commands
-      will use a file as input.
-    - CommandNode::_inputAspects (std::vector<{fileNamePattern, aspectName}>)
-
-
-  In our latest discussion we stated that all inputs and outputs must be modeled as nodes.
-  This would allow us to compute executionHash in Node class (instead of making it a
-  sub-class responsibility).
-  
-  Analysis:
-  In its simplest form command node class needs a member field: string _script;
-  Command node executionHash = hash(hash(_script), hash(input files), hash(output files))
-
-  Modeling the script as a node (holding the script string) incurs overhead: 
-	- memory: for each command node also a script node
-	- threadpool: script node execution will hash the script text in thread pool.
-          Hashing the script text is very fast. The overhead of posting this operation
-          is probably larger than the hashing itself.
-  
-  To avoid this overhead I propose the following implementation:
-
-  Node class has (a.o.) the following member functions:
-      protected:
-          XXH64_hash_t computeExecutionHashExt(std::initializer_list<XXH64_hash_t> otherHashes) const;
-      public:
-          virtual XXH64_hash_t computeExecutionHash() const { return computeExecutionHash({});}
-
-  Pseudo-code of computeExecutionHash(otherHashes): { return hash(output node hashes, input node hashes, otherHashes)); }
-
-  Command node class has member field: string _script
-  Command node overrides computeExecutionHash: return computeExecutionHash(hash(_script));
-  Note: there are 2 situations in which CommandNode::computeExecutionHash is called:
-	- during self-execution of the command node, in thread pool, immediately after completion of
-          command script. The hash is stored in Node::_executionHash
-        - after completion of command prerequisites execution to figure out whether command self-execution
-          is pending: pending =  _executionHash != computeExecutionHash()
-
-  File node overrides computeExecutionHash(): return hashFileContent(_name);
-  Because computeExecutionHash() is potentially expensive it is intended to be called only 
-  during self-execution of the file node.
-  In that case it obviously makes no sense to implement file node pending as: pending = _executionHash != computeExecutionHash()
-  Instead the implementation is: pending = _state == State::Dirty
-  A file node must be set dirty at start of alpha-build and, during beta-build, when the file is write-accessed.
-
-  See https://miro.com/app/board/uXjVO-7wAmU=/ 
-  In this board a build file node generates all command nodes, including the command scripts.
-  The build file may reference files (e.g. a file that contains a version nr) and globs (e.g. 
-  to create a compile command for each cpp file found in the src directory).
-  The execution hash of a build file node the becomes:
-	executionHash = hash(hash(input build files), hash(other input files), hash(input globs))
-  Note: the output command nodes are not part of this hash because there is no way
-  that the user can tamper with this output.
-  Note: files and globs are nodes.
-
-- What node info can be updated in threadpool context and what not?
-  E.g. at first glance updating Node::_executionHash, FileNode::_lastWriteTime in ThreadPool seems harm-less
-  Why? Because no other threads rely on this data while the node execution is in progress.
-  E.g. detecting a input include file during C++ compilation requires creation of a FileNode and
-  computation of the include file hash(es). The hashing must be done in threadpool. Adding the new node
-  to Graph however must either be done in graph critical section or in main thread context.
-  Changing Node::State is another example that must either be done in critical section or main thread.
-  Why? Because node's that execute their prerequisites inspect Node::State to figure out which prerequisites
-  need to be started.
-  
+More:
+- implement DotIgnoreNode
+- investigate use of std::filesystem::path.string() and intializing paths
+  from a std::string. Shouldn't we use wstring?

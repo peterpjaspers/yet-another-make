@@ -1,280 +1,246 @@
+
 #pragma once
 
 #include "Delegates.h"
+#include "IPersistable.h"
+#include "PriorityClass.h"
 
 #include <filesystem>
 #include <functional>
+#include <memory>
 #include <vector>
+#include <map>
 #include <unordered_set>
 #include <stdexcept>
+#include <atomic>
 #include <initializer_list>
+
+#ifdef _DEBUG
+#define ASSERT_MAIN_THREAD(contextPtr) (contextPtr)->assertMainThread()
+#else
+#define ASSERT_MAIN_THREAD(contextPtr)
+#endif
 
 namespace YAM
 {
-	class ExecutionContext;
+    class ExecutionContext;
+    class Node;
+    class FileRepositoryNode;
 
-	// Node is the base class of nodes in the YAM build graph. It has interfaces
-	// to execute a node and to access the inputs used and the outputs produced
-	// by the node execution. 
-	// Typical node subtypes for a SW build application like YAM are:
-	//     - Command node
-	//       Execution produces one or more output files. Execution may read
-	//	     source files and/or output files produced by other nodes.
-	//		 E.g. a C++ compile node produces an object file and reads a cpp and
-	//		 include files.
-	//     - Output file node (or derived file node)
-	//       Associated with an output file of a command node. 
-	//		 Execution (re-)computes hashes of the file content. 
-	//     - Source file node
-	//       Associated with a source file.
-	//		 Execution (re-)computes hashes of the file content.
-	//
-	// A node's name takes the form of a file path. For file nodes this path
-	// indeed references a file. In general however this need not be the case.
-	// E.g. a command node may be given a name like 'name-of-first-output\_cmd'
-	class __declspec(dllexport) Node
-	{
-	public:
-		enum class State {
-			Dirty = 1,	    // needs recursive execution
-			Executing = 2,	// recursive execution is in progress
-			Ok = 3,	        // recursive execution has succeeded
-			Failed = 4,	 	// recursive execution has failed
-			Canceled = 5,   // recursive execution was canceled
-			Deleted = 6		// node is deleted, to be garbage collected
+    class StateObserver {
+    public:
+        // Called when node state changes from Executing to Ok, Failed
+        // or Canceled
+        virtual void handleCompletionOf(Node* observedNode) = 0;
 
-			// A dirty node is a node whose output may no longer be valid. E.g.
-			// because the output has been tampered with or because input files
-			// may have been modified. A node must be marked Dirty when:
-			//  - it is created,
-			//	- its execution logic is modified,
-			//    e.g. the shell script of a command node is modified,
-			//  - a prerequisite is marked Dirty.
-			// 
-			// Nodes without prerequisites are reset to Dirty depending on their
-			// type. E.g. for a file node:
-			// At start of alpha-build all file nodes are set Dirty.
-			// At start of beta-build only files reported by the filesystem to
-			// have been write-accessed since previous build are set dirty.
-			//
-			// Failed and Canceled states become meaningless when starting a new
-			// build and must therefore be reset to Dirty at start of build.
-		};
+        // Called when node state changes to Dirty.
+        virtual void handleDirtyOf(Node* observedNode) = 0;
+    };
 
-		Node(ExecutionContext* context, std::filesystem::path const & name);
+    // Node is the base class of nodes in the YAM build graph. It provides an
+    // interface to execute a node. Semantics of node execution are determined 
+    // by derived classes.
+    //
+    // A node is not MT-safe: all member functions except postCompletion must
+    // be called from ExecutionContext::mainThread(). Applications must access
+    // node state and ExecutionContext::nodes() from mainThread only.
+    //  
+    class __declspec(dllexport) Node : 
+        public IPersistable, 
+        protected StateObserver,
+        public std::enable_shared_from_this<Node>
+    {
+    public:
+        enum class State {
+            Dirty = 1,      // pending execution
+            Executing = 2,  // execution is in progress
+            Ok = 3,         // last execution succeeded
+            Failed = 4,     // last execution failed
+            Canceled = 5,   // last execution was canceled
+            Deleted = 6,    // node is pending destruction
+        };
 
-		ExecutionContext* context() const;
-		std::filesystem::path const& name() const;
+        // Implementation of std::less allows nodes to be stored in a std::set
+        // in node->name() order.
+        struct CompareName {
+            constexpr bool operator()(const std::shared_ptr<Node>& lhs, const std::shared_ptr<Node>& rhs) const {
+                return lhs->name() < rhs->name();
+            }
+        };
 
-		State state() const { return _state; }
-		void setState(State newState);
+        Node(); // needed for deserialization
+        Node(ExecutionContext* context, std::filesystem::path const & name);
+        virtual ~Node();
 
-		// Return whether this node supports prerequisites.
-		// This is a class property.
-		//
-		// Prerequisites are nodes that need to execute before this node can
-		// execute.
-		// The prerequisites vector contains one or more of:
-		//		- (command) nodes that produce output nodes. 
-		//	      Output nodes are only allowed to be used as inputs by this
-		//		  node when the nodes that produce these outputs are in
-		//		  prerequisites.
-		//		- source nodes used as inputs by last execution of this node.
-		//		- output nodes of this node.
-		// 
-		// Source/output nodes are typically, but not necessarily, file nodes.
-		virtual bool supportsPrerequisites() const = 0;
+        ExecutionContext* context() const { return _context; }
 
-		// Pre: supportsPrerequisites()
-		// Append prerequisite nodes to 'prerequisites'.
-		virtual void appendPrerequisites(std::vector<Node*>& prerequisites) const = 0;
+        // Return name of this name. name() format is: <repoName>\<path>
+        // where <repoName> matches one of the names in context()->repositories().
+        std::filesystem::path const& name() const { return _name; }
 
-		// Return parent nodes.
-		// A parent node has this node as a prerequisite. 
-		std::unordered_set<Node*> const& parents() const { return _parents; }
-		
-		//
-		// Start of interfaces that access inputs and outputs of node execution.
-		//
-		
-		// Return whether this node supports having output nodes.
-		// This is a class property.
-		virtual bool supportsOutputs() const = 0;
+        virtual std::string className() const { return typeid(*this).name(); }
 
-		// Pre: supportsOutputs()
-        // Append the output nodes in 'outputs'.
-		// Note: outputs are typically, but not necessarily, output files nodes.
-		virtual void appendOutputs(std::vector<Node*>& outputs) const = 0;
+        // Return the repository that contains this node.
+        std::shared_ptr<FileRepositoryNode> const& repository() const;
 
-		// Return whether this node supports input nodes.
-		// This is a class property. 
-		virtual bool supportsInputs() const = 0;
+        // Return the absolute path name of the node, i.e. return name() in which
+        // <repoName> is replace by the repository absolute root directory path.
+        std::filesystem::path absolutePath() const;
 
-		// Pre: supportsInputs()
-		// Append the inputs nodes in 'inputs'.
-		// Note: inputs are typically, but not necessarily, source files and/or
-		// output files produced by prerequisite command nodes.
-		virtual void appendInputs(std::vector<Node*>& inputs) const = 0;
+        State state() const { return _state; }
 
-		//
-		// End of interfaces that access inputs and outputs of node execution.
-		// Start of Node execution interfaces
-		//
+        // Pre: state() != Node::State::Deleted
+        virtual void setState(State newState);
 
-		// Pre: state() == Node::State::Dirty
-		// Start asynchronous execution of prerequisites and self:
-		//		- prerequisites.each(start)
-		//		- on prerequisites completion: if (pendingStartSelf()) startSelf()
-		//		- on self completion: completor().broadcast(this)
-		// All three steps will be done in main thread. Actual self-execution
-		// will be done in thread pool. 
-		void start();
+        // Start asynchronous execution with given priority.
+        // Sub-classes must override this function as follows:
+        //    void start(..) override {
+        //       Node::start(..);
+        //       sub-class specific execution logic
+        //    }
+        // On completion the sub-class must call notifyCompletion when in
+        // main thread or call postCompletion when not in main thread.
+        //
+        // Pre: state() == Node::State::Dirty
+        virtual void start(PriorityClass prio);
 
-		// Return delegate to which clients can add callbacks that will be
-		// executed when execution completes. See start(). 
-		MulticastDelegate<Node*>& completor() { return _completor; }
+        // Return delegate to which clients can add callbacks that will be
+        // executed when execution of this node completes.
+        MulticastDelegate<Node*>& completor() { return _completor; }
 
-		// Return whether execution (including execution cancelation) is in 
-		// progress. Set busy() to false in main thread context just before
-		// broadcast of completor().
-		// Rationale: avoid race-condition where main thread code calls
-		// cancel() while execution just completed but completion callback
-		// was not yet processed by main thread.
-		bool busy() const;
+        // The MulticastDelegate overhead of adding/removing/calling callbacks
+        // is considerable. The *Observer() interfaces provide a faster, but
+        // less flexible, alternative for the completor() interface for the 
+        // special case where:
+        //    - observer is a StateObserver 
+        //    - an node X notifies its observers of a change in X->state() by
+        //      calling: for (obs : X->observers()) obs->handleStateChangeOf(X)
+        // 
+        void addObserver(StateObserver* observer);
+        void removeObserver(StateObserver* observer);
+        std::unordered_set<StateObserver*> const& observers() const {
+            return _observers;
+        }
 
-		// Pre: busy()
-		// Request cancelation of execution.
-		// Return immediately, do not block caller until execution has completed.
-		// Notify execution completion as specified by start() function. 
-		void cancel();
+        // Cancel node execution.
+        // Cancelation is asynchronous: completion as specified by start(..) 
+        // function. 
+        // Sub-classes must override this function as follows:
+        //    void cancel() override {
+        //       Node::cancel();
+        //       sub-class specific cancel logic
+        //    }
+        virtual void cancel();
 
-		// Pre: !busy()
-		// Suspend execution.
-		// While suspended: execution waits for node to be resumed() before
-		// continuing execution.
-		//
-		// Rationale: nodes (like command nodes) may be updated due to changes 
-		// in build files. Build file processing protocol:
-		//		1) For each modified build file:
-		//		   nodes: the set of nodes previously produced from build file
-		//		   previousNodes = nodes;
-		//		   nodes = ();
-		//		   previousNodess.each(suspend())
-		//		2) start execution of nodes in build scope
-		//		3) for each modified build file:
-		//				a) nodes = create/update nodes from build file
-		//				b) deletedNodes = previousNodes - nodes
-		//				   Set nodes in deletedNodes to NodeState::Deleted
-		//				c) previousNodes.each(resume())
-		//
-		// Note: nodes not suspended in step 1) execute concurrently with step 3). 
-		// Suspended nodes will resume in step 3c).
-		void suspend();
+        // Return whether cancelation is in progress.
+        bool canceling() const { return _canceling; }
 
-		// Pre: true
-		// When busy(): resume execution
-		void resume();
-		//
-		// End of Node execution interfaces
-		//
+        // Node execution may produce outputs whose content depends on inputs.
+        virtual void getOutputs(std::vector<std::shared_ptr<Node>>& outputs) const {}
+        virtual void getInputs(std::vector<std::shared_ptr<Node>>& inputs) const {}
 
-		void replaceParents(std::vector<Node*> const& newParents);
-		void addParent(Node* parent);
-		void removeParent(Node* parent);
+        // Inherited from IPersistable
+        void modified(bool newValue) override;
+        bool modified() const override;
+        bool deleted() const override;
+        // Pre: state() == Node::State::Deleted.
+        // Post: state() == Node::State::Dirty.
+        // State changed will not be notified to subscribers.
+        void undelete() override;
+        std::string describeName() const override { return _name.string(); }
+        std::string describeType() const override { return className(); }
 
-	protected:
-		ExecutionContext* _context;
+        // Inherited from IStreamer (via IPersistable)
+        void stream(IStreamer* streamer) override;
+        // Inherited from IPersistable
+        void prepareDeserialize() override;
+        bool restore(void* context, std::unordered_set<IPersistable const*>& restored) override;
 
-		// Pre: state() == State::Executing && all prerequisites are in State::Ok.
-		// Return true when self-execution is needed. 
-		// 
-		// Self-execution is needed when the node was never executed or when 
-		// there is reason to believe that previously computed outputs are no
-		// longer valid, typically because inputs (may) have changed.
-		// A node that has no self-execution implements this as: return false. This is
-		// the default implementation. 
-		// 
-		// Example:
-		// Assume all nodes are in State::Ok (i.e. have been executed successfully)
-		// and consider the following three nodes:
-		//    L: command node that links the object file produced by node C into a library
-		//        C: command node that compiles C++ source file F
-		//            F: C++ source file node
-		// 
-		// The user now edits the C++ file:
-		// The filesystem notifies YAM that the C++ file has been written.
-		// YAM adds the file to the list of write-accessed files.
-		// 
-		// The user then invokes YAM to build the library: 
-		// YAM marks the C++ source file node Dirty. The Dirty marking is
-		// propagated recursively to the compilation and link command nodes.
-		// 
-		// YAM starts execution of link node L (descending down-to the leaf nodes)
-		// Because the link node is Dirty YAM recursively executes the link
-		// node which recursively executes its Dirty prerequisite compile node C 
-		// node which recursively executes its Dirty prerequisite file node F.
-		// 
-		// Self-execution (ascending up-to the link node):
-		// The file node (re-)computes the hash of the C++ file.
-		// On file node completion the compile node detects that the C++ hash 
-		// has changed. This invalidates the output object file, hence it is 
-		// pendingStartSelf(). 
-		// 
-		// Assume that the C++ changes were only in comments. Comments do not
-		// affect object file content and therefore the hash of the object 
-		// file will not change, hence the link node is not pendingStartSelf().
-		// This completes the build.
-		// 
-		// Note: YAM is also capable of preventing re-compilation by using 
-		// aspect hashes. For C++ files an aspect hash exists that excludes 
-		// the comments from being hashed.
-		virtual bool pendingStartSelf() const { return false; }
+    protected:
+        // Called when node state is set to Node::State::Deleted
+        // Subclasses must release all references to other nodes,
+        // and remove themselves as observer of other nodes.
+        virtual void cleanup() {}
 
-		// Pre:pendingStartSelf(), current thread is main thread.
-		// Start self-execution of this node. E.g. for a compile command node
-		// start the compilation. Perform as much processing as possible by
-		// posting operations to threadPoolQueue.
-		// On completion: push notifyCompletion() to mainThreadQueue.
-		virtual void startSelf() { throw std::runtime_error("not implemented"); }
+        // Implements StateObserver::handleCompletionOf
+        // Overrides must be implemented like:
+        //      sub-class specific logic
+        //      Node::handleCompletionOf(observedNode)
+        void handleCompletionOf(Node* observedNode) override;
+        // Set state Dirty iff not Deleted
+        void handleDirtyOf(Node* observedNode) override;
 
-		// Pre:current thread is main thread.
-		// Called when self-execution is busy and cancel() is called.
-		virtual void cancelSelf() { return; }
+        // Start asynchronous execution of given set of 'nodes'.
+        // On completion call callback.Execute(state), where state
+        // is one of:
+        //    - Ok when all nodes executed successfully
+        //    - Failed when at least one node execution did not succeed
+        //    - Canceled when execution of this node was canceled
+        //
+        // Pre: each node in nodes is observed by this node, i.e. 
+        //      for (n : nodes) n->observers().contains(this)
+        // Pre: state() == Node::State::Executing
+        //
+        // Note: this is a convenience interface for subclasses whose execution
+        // logic needs execution of a collection of nodes. 
+        // Note: caller is responsible to keep 'nodes' in existence during
+        // execution.
+        //
+        template <class TNode> 
+        void startNodes(
+            std::vector<std::shared_ptr<TNode>> const& nodes,
+            Delegate<void, Node::State> const& callback,
+            PriorityClass prio
+        ) {
+            std::vector<Node*> rawNodes;
+            for (auto const& n : nodes) rawNodes.push_back(n.get());
+            startNodes(rawNodes, callback, prio);
+        }
 
-		// Push notifyCompletion(newState) to mainThreadQueue()
-		void postCompletion(Node::State newState);
+        void startNodes(
+            std::vector<Node*> const& nodes,
+            Delegate<void, Node::State> const& callback, 
+            PriorityClass prio);
 
-		void notifyCompletion(Node::State newState);
+        // Push notifyCompletion(newState) to context()->mainThreadQueue()
+        // To be called by subclass to notify execution completion from 
+        // any thread.
+        void postCompletion(Node::State newState);
 
-	private:
-		std::filesystem::path _name;
-		State _state;
-		std::unordered_set<Node*> _parents;
+        // To be called by subclass to notify execution completion from main
+        // thread. This function:
+        //    - sets node state to newState
+        //    - notifies observers()
+        //    - executes completor()
+        void notifyCompletion(Node::State newState);
 
-		// Node execution members
-		//
-		void continueStart();
-		void startPrerequisites();
-		void startPrerequisite(Node* prerequisite);
-		void handlePrerequisiteCompletion(Node* prerequisite);
-		void handlePrerequisitesCompletion();
-		bool allPrerequisitesAreOk() const;
+    private:
+        void startNode(Node* node, PriorityClass prio);
+        void _handleNodesCompletion();
 
-		enum class ExecutionState
-		{
-			Idle,		   // waiting for start()
-			Suspended,     // started while suspended, waiting for node to be resumed
-			Prerequisites, // waiting for prerequisites to finish execution
-			Self		   // waiting for self-execution to finish
-		};
-		ExecutionState _executionState;
-		bool _suspended;
-		// node prerequisites, captured at start-resume time.
-		std::vector<Node*> _prerequisites; 
-		// nodes in _prerequisites that are executing  
-		std::unordered_set<Node*> _executingPrerequisites;
-		bool _canceling;
-		MulticastDelegate<Node*> _completor;
-	};
+        ExecutionContext* _context;
+        std::filesystem::path _name;
+        State _state;
+        std::atomic<bool> _canceling;
+
+        // As requested by startNodes(..),
+        Delegate<void, Node::State> _callback;
+        std::unordered_set<Node*> _nodesToExecute;
+        // The size of the subset of _nodesToExecute that are executing.
+        std::size_t _nExecutingNodes;
+#ifdef _DEBUG
+        // nodes in _nodesToExecute that are executing  
+        // _nExecutingNodes = _executingNodes.size()
+        std::unordered_set<Node*> _executingNodes;
+#endif
+
+        MulticastDelegate<Node*> _completor;
+        bool _notifyingObservers;
+        std::unordered_set<StateObserver*> _observers;
+        // Observers that were added/removed while _notifyingObservers
+        std::vector<std::pair<StateObserver*, bool>> _addedAndRemovedObservers;
+
+        bool _modified;
+    };
 }
 

@@ -1,32 +1,31 @@
 #pragma once
 
-#include "Dispatcher.h"
-
 #include <thread>
 #include <string>
 
 namespace YAM
 {
-	class __declspec(dllexport) Thread
-	{
-	public:
-		Thread(Dispatcher* dispatcher, std::string const & name);
+    class PriorityDispatcher;
+    class __declspec(dllexport) Thread
+    {
+    public:
+        // Construct (and start) a thread that executes dispatcher->run().
+        Thread(PriorityDispatcher* dispatcher, std::string const & name);
+        ~Thread();
 
-		// Destructs and joins with _thread if joinable.
-		~Thread();
+        std::string const& name() const;
+        PriorityDispatcher* dispatcher() const;
 
-		std::string const& name() const;
-		Dispatcher* dispatcher() const;
+        bool joinable();
+        void join();
 
-		bool joinable();
-		void join();
+        // Return whether call is made in this thread.
+        bool isThisThread() const;
 
-	private:
-		void main();
-
-		Dispatcher* _dispatcher;
-		std::string _name;
-		std::thread _thread;
-	};
+    private:
+        PriorityDispatcher* _dispatcher;
+        std::string _name;
+        std::thread _thread;
+    };
 }
 

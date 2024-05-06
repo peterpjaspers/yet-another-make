@@ -2,6 +2,7 @@
 #include "PersistentPagePool.h"
 #include <map>
 #include <set>
+#include <vector>
 #include <iostream>
 #include <fstream>
 #include <filesystem>
@@ -9,6 +10,7 @@
 #include <algorithm>
 #include <cassert>
 #include <utility>
+//#include <boost/filesystem.hpp>
 
 using namespace BTree;
 using namespace std;
@@ -190,7 +192,7 @@ public:
     size_t treeSize() const { return( (tree != nullptr) ? tree->size() : 0 ); }
     virtual size_t size() const = 0;
 
-  uint32_t validatePersistentPagePool( PageSize pageSize ) const {
+    uint32_t validatePersistentPagePool( PageSize pageSize ) const {
         string path = directory + "/" + fileName + ".bt";
         log << "Reading from persistent page file " << path << "\n";
         uint32_t errors = 0;
@@ -595,7 +597,7 @@ public:
                 }
             }
             // Ensure that other content is not present
-            if (TryUnexpectedKeys) log << "Trying un-expected keys...\n";
+if (TryUnexpectedKeys) log << "Trying un-expected keys...\n";
             times( ProbeCount ) {
                 uint32_t key = generateUniqueKey();
                 if (TryUnexpectedKeys) {

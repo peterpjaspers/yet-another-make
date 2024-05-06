@@ -25,19 +25,19 @@ namespace BTree {
         {}
         template< class KT = K, std::enable_if_t<S<KT>,bool> = true >
         inline bool insert( const KT& key, std::string value ) {
-            return Tree< KT, char[] >::insert( key, value.c_str(), value.size() );
+            return Tree< KT, char[] >::insert( key, value.c_str(), static_cast<PageSize>(value.size()) );
         }
         template< class KT = K, std::enable_if_t<A<KT>,bool> = true >
         inline bool insert( const B<KT>* key, PageSize keySize, std::string value ) {
-            return Tree< KT, char[] >::insert( key, keySize, value.c_str(), value.size() );
+            return Tree< KT, char[] >::insert( key, keySize, value.c_str(), static_cast<PageSize>(value.size()) );
         }
         template< class KT = K, std::enable_if_t<S<KT>,bool> = true >
         inline bool replace( const KT& key, std::string value ) {
-            return Tree< KT, char[] >::replace( key, value.c_str(), value.size() );
+            return Tree< KT, char[] >::replace( key, value.c_str(), static_cast<PageSize>(value.size()) );
         }
         template< class KT = K, std::enable_if_t<A<KT>,bool> = true >
         inline bool replace( const B<KT>* key, PageSize keySize, std::string value ) {
-            return Tree< KT, char[] >::replace( key, keySize, value.c_str(), value.size() );
+            return Tree< KT, char[] >::replace( key, keySize, value.c_str(), static_cast<PageSize>(value.size()) );
         }
         template< class KT = K >
         inline const typename std::enable_if<S<KT>,std::string>::type retrieve( const K& key ) const {

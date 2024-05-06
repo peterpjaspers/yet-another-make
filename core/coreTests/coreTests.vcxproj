@@ -32,38 +32,84 @@
     <Import Project="..\boost_$(Platform).props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IntDir>$(ProjectDir)$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IntDir>$(ProjectDir)$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
   <ItemGroup>
-    <ClCompile Include="AdditionNode.cpp" />
-    <ClCompile Include="boostProcessTest.cpp" />
-    <ClCompile Include="commandNodeTest.cpp" />
+    <ClCompile Include="boostProcessTest.cpp">
+      <RuntimeLibrary Condition="'$(Configuration)|$(Platform)'=='Release|x64'">MultiThreadedDLL</RuntimeLibrary>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="buidFileParserNodeTest.cpp" />
+    <ClCompile Include="buildClientServiceTest.cpp" />
+    <ClCompile Include="builderTest.cpp" />
+    <ClCompile Include="buildFileCompilerTest.cpp" />
+    <ClCompile Include="buildFileDependenciesCompilerTest.cpp" />
+    <ClCompile Include="buildFileParserTest.cpp" />
+    <ClCompile Include="buildFileCompilerNodeTest.cpp" />
+    <ClCompile Include="buildOptionsParserTest.cpp" />
+    <ClCompile Include="buildServicePortRegistryTest.cpp" />
+    <ClCompile Include="buildServiceProtocolTest.cpp" />
+    <ClCompile Include="buildStateVersionTest.cpp" />
+    <ClCompile Include="collapsedFileChangesTest.cpp" />
+    <ClCompile Include="commandNodeTest.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </DisableSpecificWarnings>
+    </ClCompile>
     <ClCompile Include="delegatesTest.cpp" />
+    <ClCompile Include="directoryNodeTest.cpp">
+      <BufferSecurityCheck Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BufferSecurityCheck>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">X64;_DEBUG;_CONSOLE;_WIN32_WINNT=0x0601;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</SDLCheck>
+    </ClCompile>
+    <ClCompile Include="DirectoryTree.cpp" />
     <ClCompile Include="dispatcherTest.cpp" />
+    <ClCompile Include="dotYamDirectoryTest.cpp" />
+    <ClCompile Include="enduranceTest.cpp" />
     <ClCompile Include="executeNode.cpp" />
-    <ClCompile Include="fileAspectHasherTest.cpp" />
+    <ClCompile Include="executionContextTest.cpp" />
     <ClCompile Include="fileAspectSetTest.cpp" />
     <ClCompile Include="fileAspectTest.cpp" />
     <ClCompile Include="fileNodeTest.cpp" />
-    <ClCompile Include="inputFileAspectsTest.cpp" />
-    <ClCompile Include="nodeExecutionTest.cpp" />
+    <ClCompile Include="directoryWatcherWin32Test.cpp" />
+    <ClCompile Include="fileSystemTest.cpp" />
+    <ClCompile Include="globberTest.cpp" />
+    <ClCompile Include="globTest.cpp" />
+    <ClCompile Include="fileExecSpecsNodesTest.cpp" />
+    <ClCompile Include="memoryStreamTest.cpp" />
+    <ClCompile Include="monitoredProcessWin32Test.cpp" />
+    <ClCompile Include="msBuildTrackerOutputReaderTest.cpp" />
     <ClCompile Include="nodeSetTest.cpp" />
-    <ClCompile Include="NumberNode.cpp" />
+    <ClCompile Include="persistentBuildStateTest.cpp" />
+    <ClCompile Include="priorityDispatcherTest.cpp" />
     <ClCompile Include="regexSetTest.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="fileRepositoryTest.cpp" />
+    <ClCompile Include="repositoriesNodeTest.cpp" />
     <ClCompile Include="threadPoolTest.cpp" />
     <ClCompile Include="threadTest.cpp" />
     <ClCompile Include="main_gtest.cpp" />
+    <ClCompile Include="timePointTest.cpp" />
+    <ClCompile Include="streamerTest.cpp" />
+    <ClCompile Include="tokenizerTest.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\btree\btree.vcxproj">
+      <Project>{bce274f0-7a63-4d67-928b-f46c0eb23326}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\core.vcxproj">
       <Project>{2156af8d-ff04-4b0b-8a73-52440e5f63d0}</Project>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="AdditionNode.h" />
+    <ClInclude Include="DirectoryTree.h" />
     <ClInclude Include="executeNode.h" />
-    <ClInclude Include="NumberNode.h" />
   </ItemGroup>
   <ItemDefinitionGroup />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
@@ -73,14 +119,15 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>X64;_DEBUG;_CONSOLE;_WIN32_WINNT=0x0601;_%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>X64;_DEBUG;_CONSOLE;_WIN32_WINNT=0x0601;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
-      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <WarningLevel>Level3</WarningLevel>
       <AdditionalIncludeDirectories>D:\Peter\github\gtest\googletest\include\;..\core;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <DisableSpecificWarnings>4251</DisableSpecificWarnings>
+      <ForcedIncludeFiles>..\dbgMemLeaks.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -96,7 +143,7 @@
       <PreprocessorDefinitions>X64;NDEBUG;_CONSOLE;_WIN32_WINNT=0x0601;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <WarningLevel>Level3</WarningLevel>
-      <AdditionalIncludeDirectories>D:\Peter\github\gtest\googletest\include\;..\core;D:\Programs\boost_1_79_0;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\Peter\github\gtest\googletest\include\;..\core;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <DisableSpecificWarnings>4251</DisableSpecificWarnings>
@@ -107,7 +154,8 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <AdditionalLibraryDirectories>msvc/Release;D:\Peter\github\gtest\googletest\build\lib\Release;..\..\x64\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;gtest.lib;xxHash.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;gtest.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
 </Project>

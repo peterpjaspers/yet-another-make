@@ -1,9 +1,0 @@
-- What node info can be updated in threadpool context and what not?
-  E.g. at first glance updating Node::_executionHash, FileNode::_lastWriteTime in ThreadPool seems harm-less
-  Why? Because no other threads rely on this data while the node execution is in progress.
-  E.g. detecting an input include file during C++ compilation requires creation of a FileNode and
-  computation of the include file hash(es). The hashing must be done in threadpool. Adding the new node
-  to Graph however must either be done in graph critical section or in main thread context.
-  Changing Node::State is another example that must either be done in critical section or main thread.
-  Why? Because node's that execute their prerequisites inspect Node::State to figure out which prerequisites
-  need to be started.
