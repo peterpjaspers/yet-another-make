@@ -606,9 +606,7 @@ namespace YAM
         std::filesystem::path wdir = workingDirectory()->absolutePath();
         std::vector<OutputFilter> filters;
         for (auto const& output : outputs) {
-            std::filesystem::path absPath = output->absolutePath();
-            std::filesystem::path relPath = std::filesystem::relative(absPath, wdir);
-            OutputFilter filter(OutputFilter::Type::Output, relPath);
+            OutputFilter filter(OutputFilter::Type::Output, output->name());
             filters.push_back(filter);
         }
         outputFilters(filters, outputs);

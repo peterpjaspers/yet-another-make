@@ -1,5 +1,6 @@
 #include "executeNode.h"
 #include "../CommandNode.h"
+#include "../DirectoryNode.h"
 #include "../SourceFileNode.h"
 #include "../GeneratedFileNode.h"
 #include "../GroupNode.h"
@@ -113,10 +114,10 @@ namespace
             }
             {
                 pietjanCmd->workingDirectory(homeRepo->directoryNode());
-                CommandNode::OutputFilter f1(CommandNode::OutputFilter::Type::Ignore, "generated\\ignore1.txt");
-                CommandNode::OutputFilter f2(CommandNode::OutputFilter::Type::Ignore, "**\\ignore2.txt");
-                CommandNode::OutputFilter f3(CommandNode::OutputFilter::Type::Optional, "generated\\optional[12].txt");
-                CommandNode::OutputFilter f4(CommandNode::OutputFilter::Type::Output, "generated\\pietjanout.txt");
+                CommandNode::OutputFilter f1(CommandNode::OutputFilter::Type::Ignore, "@@.\\generated\\ignore1.txt");
+                CommandNode::OutputFilter f2(CommandNode::OutputFilter::Type::Ignore, "@@.\\**\\ignore2.txt");
+                CommandNode::OutputFilter f3(CommandNode::OutputFilter::Type::Optional, "@@.\\generated\\optional[12].txt");
+                CommandNode::OutputFilter f4(CommandNode::OutputFilter::Type::Output, "@@.\\generated\\pietjanout.txt");
                 pietjanCmd->outputFilters({f1,f2,f3,f4},  { pietjanOut });
                 group->add(pietOut);
                 pietjanCmd->orderOnlyInputs({ group, janOut });
@@ -160,11 +161,17 @@ namespace
             context.nodes().remove(pietCmd);
             context.nodes().remove(janCmd);
             context.nodes().remove(pietjanCmd);
+
+            DirectoryNode::removeGeneratedFile(pietOut);
+            DirectoryNode::removeGeneratedFile(janOut);
+            DirectoryNode::removeGeneratedFile(pietjanOut);
             context.nodes().remove(pietOut);
             context.nodes().remove(janOut);
             context.nodes().remove(pietjanOut);
+
             context.nodes().remove(pietSrc);
             context.nodes().remove(janSrc);
+
             context.repositoriesNode()->removeRepository(".");
             std::filesystem::remove_all(repoDir);
         }

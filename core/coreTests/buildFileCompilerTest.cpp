@@ -105,9 +105,9 @@ namespace
         std::vector<CommandNode::OutputFilter> const &filters0 = command0->outputFilters();
         ASSERT_EQ(2, filters0.size());
         EXPECT_EQ(CommandNode::OutputFilter::Output, filters0[0]._type);
-        EXPECT_EQ("output\\lib1.obj", filters0[0]._path);
+        EXPECT_EQ("@@repo\\output\\lib1.obj", filters0[0]._path);
         EXPECT_EQ(CommandNode::OutputFilter::Ignore, filters0[1]._type);
-        EXPECT_EQ(ignoredOutput.path, filters0[1]._path);
+        EXPECT_EQ(std::filesystem::path("@@repo") / ignoredOutput.path, filters0[1]._path);
 
         ASSERT_EQ(1, command1->cmdInputs().size());
         auto input10 = command1->cmdInputs()[0];
@@ -122,9 +122,9 @@ namespace
         std::vector<CommandNode::OutputFilter> const& filters1 = command1->outputFilters();
         ASSERT_EQ(2, filters1.size());
         EXPECT_EQ(CommandNode::OutputFilter::Output, filters1[0]._type);
-        EXPECT_EQ("output\\lib2.obj", filters1[0]._path);
+        EXPECT_EQ("@@repo\\output\\lib2.obj", filters1[0]._path);
         EXPECT_EQ(CommandNode::OutputFilter::Ignore, filters1[1]._type);
-        EXPECT_EQ( ignoredOutput.path, filters1[1]._path);
+        EXPECT_EQ(std::filesystem::path("@@repo") / ignoredOutput.path, filters1[1]._path);
 
         auto const& globs = compiler.inputGlobs();
         ASSERT_EQ(2, globs.size());

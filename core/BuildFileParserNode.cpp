@@ -141,7 +141,7 @@ namespace YAM
                     std::filesystem::path genBfPath(srcBfDirPath / genBfName);
                     auto genNode = std::make_shared<GeneratedFileNode>(context(), genBfPath, _executor);
                     context()->nodes().add(genNode);
-                    CommandNode::OutputFilter filter(CommandNode::OutputFilter::Output, genBfName);
+                    CommandNode::OutputFilter filter(CommandNode::OutputFilter::Output, genBfPath);
                     _executor->outputFilters({filter}, {genNode});
 
                     auto fileExecSpecsNode = repository()->fileExecSpecsNode();
