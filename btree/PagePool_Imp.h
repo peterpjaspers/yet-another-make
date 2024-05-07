@@ -24,7 +24,7 @@ namespace BTree {
         );
     }
     inline bool PagePool::persistent() const { return false; };
-    inline void PagePool::recover( const PageHeader& page, bool reuse ) {};
+    inline void PagePool::recover( const PageHeader& page, bool reuse ) { if (reuse) free( page ); };
     inline PageHeader* PagePool::clean() {
         currentRoot = commitRoot();
         return( currentRoot );

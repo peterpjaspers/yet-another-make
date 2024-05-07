@@ -17,8 +17,8 @@ namespace BTree {
     inline bool String2StringTree::replace( std::string key, std::string value ) {
         return Tree<char[],char[]>::replace( key.c_str(), key.size(), value.c_str(), value.size() );
     }
-    inline std::string String2StringTree::retrieve( std::string key ) const {
-        std::pair<const char*, PageIndex> result = Tree<char[],char[]>::retrieve( key.c_str(), key.size() );
+    inline std::string String2StringTree::at( std::string key ) const {
+        std::pair<const char*, PageIndex> result = Tree<char[],char[]>::at( key.c_str(), key.size() );
         return std::string( result.first, result.second );
     }
     inline void String2StringTree::erase( std::string key ) {

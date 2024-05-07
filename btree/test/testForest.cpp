@@ -162,21 +162,20 @@ int main(int argc, char* argv[]) {
         auto tree5 = forest->plantStreamingTree<uint32_t>();
         uint32StreamingTree = tree5.first;
         uint32StreamingIndex = tree5.second;
-
-        streamTrees( log, "Populated forest with empty trees" );
+        streamTrees( log, "Populated forest with initial trees" );
         log << "Commit initial forest...\n";
         forest->commit();
         errorCount += validateTrees( log, 0 );
-        log << "Populate trees in forest with entries...\n";
+        log << "Further populate trees in forest with entries...\n";
         populateTrees( ValueCount );
         streamTrees( log, "Populated forest with populated trees" );
         errorCount += validateTrees( log, ValueCount );
         log << "Recover to initial forest...\n";
         forest->recover();
-        // Validate that all B-Trees are int intital state...
         streamTrees( log, "Forest recovered to empty trees" );
+        // Validate that all B-Trees are in intital state...
         errorCount += validateTrees( log, 0 );
-        log << "Populate trees in forest with entries...\n";
+        log << "Re-populate trees in forest with entries...\n";
         populateTrees( ValueCount );
         streamTrees( log, "Populated forest with populated trees" );
         log << "Commit populated forest...\n";

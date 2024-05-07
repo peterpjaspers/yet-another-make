@@ -34,7 +34,7 @@ namespace BTree {
         o << "[ " << page.filling() << " / " << page.header.capacity << " ] " << std::setprecision(1) << std::fixed << ((100.0 * page.filling()) / page.header.capacity) << " %\n";
     }
 
-    // ToDo: 8-bit numeric types as hex (not ASCII chracters)
+    // ToDo: Stream 8-bit numeric types as hex (not ASCII chracters)
 
     template <class K, class V>
     void ASCIIPageStreamer::streamPage(std::ostream &o, const Page<K,V,false,false>& page) {

@@ -18,7 +18,8 @@ using namespace std::filesystem;
 
 const int BTreePageSize = 4096;
 
-const int EntryCounts[] = { 1000, 10000, 100000, 1000000, 10000000 };
+const vector<int>  DefaultEntryCounts = { 1000, 10000, 100000, 1000000, 10000000 };
+vector<int> EntryCounts;
 
 const int MinArray = 2;
 const int MaxArray = 15;
@@ -163,11 +164,11 @@ void treeReplace( Tree<K,V>& tree, const vector<B<K>>& key, const vector<B<V>>& 
 }
 template< class K, class V, std::enable_if_t<(!A<K>),bool> = true >
 void treeRetrieve( const Tree<K,V>& tree, const vector<B<K>>& key ) {
-    auto result = tree.retrieve( key[ 0 ] );
+    auto result = tree.at( key[ 0 ] );
 }
 template< class K, class V, std::enable_if_t<(A<K>),bool> = true >
 void treeRetrieve( const Tree<K,V>& tree, const vector<B<K>>& key ) {
-    auto result = tree.retrieve( key.data(), key.size() );
+    auto result = tree.at( key.data(), key.size() );
 }
 template< class K, class V, std::enable_if_t<(!A<K>),bool> = true >
 void treeRemove( Tree<K,V>& tree, const vector<B<K>>& key ) {
@@ -206,7 +207,7 @@ class PerformanceTest {
         chrono::duration<double> elapsed = (t1 - t0);
         return ((elapsed.count() / iterations) * 1000000);
     };
-    double retrieve( uint32_t iterations, vector<vector<B<K>>>& keys ) {
+    double at( uint32_t iterations, vector<vector<B<K>>>& keys ) {
         shuffle( keys.begin(), keys.end(), gen32 );
         auto t0 = chrono::steady_clock::now();;
         for ( uint32_t i = 0; i < iterations; i++ ) treeRetrieve<K,V>( *tree, keys[ i ] );
@@ -301,9 +302,9 @@ public:
         log << "Random replace " << (entryReplace - overhead) << " usec.\n";
         measureUsage();
         logStatistics( true );
-        auto entryRetrieve = retrieve( iterations, keys );
+        auto entryRetrieve = at( iterations, keys );
         log.precision( 3 );
-        log << "Random retrieve " << (entryRetrieve - overhead) << " usec.\n";
+        log << "Random at " << (entryRetrieve - overhead) << " usec.\n";
         measureUsage();
         logStatistics( true );
         auto entryRemove = erase( iterations, keys );
@@ -320,7 +321,12 @@ int main(int argc, char* argv[]) {
     create_directory( "testBTreePerformance ");
     int errors = 0;
     ofstream log;
-    log.open( "testBTreePerformance\\log.txt" );
+    if ( 2 <= argc ) {
+        for (int arg = 1; arg < argc; ++arg) { EntryCounts.push_back( stoi( argv[ arg ] ) ); }
+    } else {
+        EntryCounts = DefaultEntryCounts;
+    }
+    log.open( "testBTreePerformance\\logBTreePerformance.txt" );
     log << "32-bit integer key to 32-bit integer value performance ...\n";
     log.flush();
     try {

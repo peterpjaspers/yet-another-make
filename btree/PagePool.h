@@ -10,7 +10,7 @@ namespace BTree {
     // A PagePool maintains a list of fixed size pages in which a B-Tree is stored.
     // Pages are allocated on demand and recycled via a list of free pages.
     // A page is referred to by a PageLink which is in effect an index in the
-    // vector list of pages.
+    // list (vector) of pages.
     class PagePool {
     protected:
         // The (fized size) capacity of a page in 8-bit (uint8_t) bytes.
@@ -31,12 +31,13 @@ namespace BTree {
         PageLink commitLink;
     public:
         PagePool() =delete;
+        // Create a PagePool with pages of the given capacity.
         PagePool( PageSize pageCapacity );
         ~PagePool();
         PageSize pageCapacity() const;
         // Allocate a page.
         PageHeader* allocate();
-        // Return number of pages.
+        // Return total number of pages.
         uint32_t size() const;
         // Return number of free pages.
         uint32_t sizeFreed() const;
@@ -45,24 +46,28 @@ namespace BTree {
         // Return number of recover pages (in a persistent pool).
         virtual uint32_t sizeRecover() const;
         // Reference a page.
-        // Throws an exception if the page is free.
+        // Throws an exception if the page is free or the link is is invalid.
         PageHeader* reference( const PageLink& link ) const;
-        // Access a page.
+        // Access a (possibly free) page.
+        // Throws an exception if the link is is invalid.
         const PageHeader& access( const PageLink& link ) const;
         // Free a page.
         void free( const PageLink& link );
         void free( const PageHeader& header );
         void free( const PageHeader* header );
-        // Check if a link is valid; i.e., references a page in the pool.
+        // Check if a link is valid; i.e., actually references a page in the pool.
         bool valid( const PageLink& link );
         // Check if a page is valid.
         bool valid( const PageHeader& header );
+        // Mark page as modified.
         virtual void modify( const PageHeader& page );
         // Determine if this pool is persistent.
         virtual bool persistent() const;
-        virtual void recover( const PageHeader& page, bool reuse = false );
+        // Consolidate the current state of all modified pages.
         virtual void commit( const PageLink link, BTreeStatistics* stats = nullptr );
+        // Recover the state of all pages to that of the previous commit.
         virtual PageLink recover( bool freeModifiedPages = false, BTreeStatistics* stats = nullptr );
+        virtual void recover( const PageHeader& page, bool reuse = false );
         virtual PageHeader* clean();
         // Return page header of last commited root
         PageHeader* commitRoot() const;

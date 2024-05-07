@@ -5,7 +5,7 @@
 // ToDo: Provide transaction behaviour for file updates.
 // ToDo: Lazy read of pages from file.
 // ToDo: Swap pages to/from file to save memory based on usage count.
-// ToDo: Truncate file to largest persistent page during commit (to reduce use of persistent store).
+// ToDo: Truncate file to largest persistent page during commit (to reduce size of persistent store).
 
 using namespace std;
 

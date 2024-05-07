@@ -73,10 +73,8 @@ namespace BTree {
             return streamKey.key;
         }
         // Retrieve value at current iterator position.
-        // Returns an opened ValueReader for the stream at the current posisiton.
-        ValueReader<K>& value() const {
-            return tree().retrieve( key() );
-        }
+        // Returns an opened ValueReader for the stream at the current position.
+        ValueReader<K>& value() const { return tree().at( key() ); }
 
     };
 

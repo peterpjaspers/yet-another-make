@@ -53,7 +53,7 @@ namespace BTree {
         mutable uint16_t position;
         void readBlock() const {
             if ( buffer.second <= position ) {
-                buffer = tree.retrieve( streamKey );
+                buffer = tree.at( streamKey );
                 streamKey.nextBlock();
                 position = 0;
             }

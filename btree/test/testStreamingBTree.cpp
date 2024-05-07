@@ -97,7 +97,7 @@ int main(int argc, char* argv[]) {
     remove_all( "testStreamingBTree" );
     create_directory( "testStreamingBTree ");
     ofstream log;
-    log.open( "testStreamingBTree\\log.txt" );
+    log.open( "testStreamingBTree\\logStreamingBTree.txt" );
     uint32_t errors = 0;
     try {
         BTree::StreamingTree<uint32_t> tree( *createPagePool( true, "testStreamingBTree\\StreamingBTree.bt", BTreePageSize ) );
@@ -116,7 +116,7 @@ int main(int argc, char* argv[]) {
         log << "Reading " << KeyCount << " sets of " << ObjectCount << " objects...\n";
         for (int i = 0; i < KeyCount; ++i) {
             log << "Reading " << ObjectCount << " objects at key " << keys[ i ] << ".\n";
-            ValueReader<uint32_t>& reader = tree.retrieve( keys[ i ] );
+            ValueReader<uint32_t>& reader = tree.at( keys[ i ] );
             for ( uint16_t c = 0; c < ObjectCount; c++ ) {
                 Object o( 0 ), r( keys[ i ] + c );
                 streamObject<uint32_t>( reader, o );

@@ -15,7 +15,7 @@ namespace BTree {
         );
         bool insert( std::string key, std::string value );
         bool replace( std::string key, std::string value );
-        std::string retrieve( std::string key ) const;
+        std::string at( std::string key ) const;
         void erase( std::string key );
         void commit();
         void recover();
