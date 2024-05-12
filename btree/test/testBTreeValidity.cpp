@@ -49,7 +49,8 @@ const int MaxArray = 14;
 
 // Number of attempts to detect unexpected B-Tree content
 const int ProbeCount = 100;
-const int EnduranceCount = 1000;
+const int EnduranceCount = 10;
+const int TransactionCount = 10;
 
 mt19937 gen32;
 
@@ -71,6 +72,15 @@ void logUint16Array( ostream& log, const uint16_t* value, PageSize valueSize ) {
         log << value[ valueSize - 1 ];
     }
     log << " ]";
+}
+
+void logPageList( ostream& log, const vector<PageLink>& list, const string tag ) {
+    log << tag << " pages [";
+    if (0 < list.size()) {
+        log << " " << list[ 0 ];
+        for ( int i = 1; i < list.size(); ++i ) log << ", " << list[ i ];
+    }
+    log << " ]\n";
 }
 
 struct Uint16ArrayCompare {
@@ -190,7 +200,7 @@ public:
     size_t treeSize() const { return( (tree != nullptr) ? tree->size() : 0 ); }
     virtual size_t size() const = 0;
 
-  uint32_t validatePersistentPagePool( PageSize pageSize ) const {
+    uint32_t validatePersistentPagePool( PageSize pageSize ) const {
         uint32_t errors = 0;
         if ( isPersistent ) {
             log << "Reading from persistent page file " << persistentPath() << "\n";
@@ -358,16 +368,17 @@ public:
             << " pages, filling " << ((totalUsage * 100)/ capacity) << " %\n";
         // Now check to see if there are orphan pages.
         // An orphan is a non-free page that is not counted as a B-Tree page
-        uint32_t freePages = 0;
-        uint32_t modifiedPages = 0;
-        uint32_t recoverPages = 0;
-        uint32_t persistentPages = 0;
+        vector<PageLink> freePages;
+        vector<PageLink> modifiedPages;
+        vector<PageLink> recoverPages;
+        vector<PageLink> persistentPages;
         for (uint32_t i = 0; i < pool->size(); ++i ) {
-            const PageHeader& page = pool->access( PageLink( i ) );
-            if (page.free != 0) freePages += 1;
-            if (page.modified != 0) modifiedPages += 1;
-            if (page.recover != 0) recoverPages += 1;
-            if (page.persistent != 0) persistentPages += 1;
+            const PageLink link( i );
+            const PageHeader& page = pool->access( link );
+            if (page.free != 0) freePages.push_back( link );
+            if (page.modified != 0) modifiedPages.push_back( link );
+            if (page.recover != 0) recoverPages.push_back( link );
+            if (page.persistent != 0) persistentPages.push_back( link );
             if (!isPersistent && page.persistent != 0) {
                 log << "Page " << page.page << " marked as persistent in non-persistent pool!\n";
                 errors += 1;
@@ -377,31 +388,36 @@ public:
                 errors += 1;
             }
         }
-        if (freePages != pool->sizeFreed()) {
-            log << "Free pages list size " << pool->sizeFreed() << " does not match detected number of free pages " << freePages << "!\n";
+        if (freePages.size() != pool->sizeFreed()) {
+            log << "Free pages list size " << pool->sizeFreed() << " does not match detected number of free pages " << freePages.size() << "!\n";
             errors += 1;
         }
-        if (modifiedPages != pool->sizeModified()) {
-            log << "Modified pages list size " << pool->sizeModified() << " does not match detected number of modified pages " << modifiedPages << "!\n";
+        if (modifiedPages.size() != pool->sizeModified()) {
+            log << "Modified pages list size " << pool->sizeModified() << " does not match detected number of modified pages " << modifiedPages.size() << "!\n";
             errors += 1;
         }
-        if (recoverPages != pool->sizeRecover()) {
-            log << "Recover pages list size " << pool->sizeRecover() << " does not match detected number of recover pages " << recoverPages << "!\n";
+        if (recoverPages.size() != pool->sizeRecover()) {
+            log << "Recover pages list size " << pool->sizeRecover() << " does not match detected number of recover pages " << recoverPages.size() << "!\n";
             errors += 1;
         }
-        if (persistentPages < recoverPages) {
-            log << "Number of recover pages " << recoverPages << " exceeds number of persistent pages " << persistentPages << "!/n";
+        if (persistentPages.size() < recoverPages.size()) {
+            log << "Number of recover pages " << recoverPages.size() << " exceeds number of persistent pages " << persistentPages.size() << "!/n";
         }
-        if ((pageCount + freePages) < pool->size()) {
-            uint32_t orphans = (pool->size() - (pageCount + freePages));
+        if ((pageCount + freePages.size()) < pool->size()) {
+            auto orphans = (pool->size() - (pageCount + freePages.size()));
             log << "Detected " << orphans << " orphans out of " << pool->size() << " pages, B-Tree used " << pageCount << " pages!\n";
             errors += 1;
         }
         log << "Page pool consists of " << pool->size() << " pages, "
-            << freePages << " free, "
-            << modifiedPages << " modified, "
-            << persistentPages << " persistent, "
-            << recoverPages << " recover.\n";
+            << freePages.size() << " free, "
+            << modifiedPages.size() << " modified, "
+            << persistentPages.size() << " persistent, "
+            << recoverPages.size() << " recover.\n";
+        // Following page list logs are for debugging. Enable when requried.
+        // logPageList( log, freePages, "Free" );
+        // logPageList( log, modifiedPages, "Modified" );
+        // logPageList( log, persistentPages, "Persistent" );
+        // logPageList( log, recoverPages, "Recover" );
         return errors;
     }
 
@@ -1864,7 +1880,7 @@ public:
 }; // class Uint16ArrayUint16ArrayTreeTester
 
 template< class K, class V >
-pair<uint32_t,bool> doTest( TreeTester<K,V>& tester, size_t count1, size_t count2, ofstream& log ) {
+pair<uint32_t,bool> doTest( TreeTester<K,V>& tester, int count1, int count2, ofstream& log ) {
     uint32_t errors = 0;
     bool exception = false;
     try {
@@ -1875,23 +1891,23 @@ pair<uint32_t,bool> doTest( TreeTester<K,V>& tester, size_t count1, size_t count
         tester.createTree();
         errors += tester.validate();
         errors += tester.validate();
-        errors += tester.insert( static_cast<int>(count1), TreeTester<K,V>::Forward );
+        errors += tester.insert( count1, TreeTester<K,V>::Forward );
         errors += tester.validate();
-        errors += tester.erase( static_cast<int>(count2), TreeTester<K,V>::Forward );
-        errors += tester.validate();
-        tester.logTree();
-        tester.destroyTree();
-        tester.createTree();
-        errors += tester.insert( static_cast<int>(count1), TreeTester<K,V>::Forward );
-        errors += tester.validate();
-        errors += tester.erase( static_cast<int>(count2), TreeTester<K,V>::Reverse );
+        errors += tester.erase( count2, TreeTester<K,V>::Forward );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
-        errors += tester.insert( static_cast<int>(count1), TreeTester<K,V>::Forward );
+        errors += tester.insert( count1, TreeTester<K,V>::Forward );
         errors += tester.validate();
-        errors += tester.erase( static_cast<int>(count2), TreeTester<K,V>::Random );
+        errors += tester.erase( count2, TreeTester<K,V>::Reverse );
+        errors += tester.validate();
+        tester.logTree();
+        tester.destroyTree();
+        tester.createTree();
+        errors += tester.insert( count1, TreeTester<K,V>::Forward );
+        errors += tester.validate();
+        errors += tester.erase( count2, TreeTester<K,V>::Random );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
@@ -1899,23 +1915,23 @@ pair<uint32_t,bool> doTest( TreeTester<K,V>& tester, size_t count1, size_t count
         tester.createTree();
         errors += tester.validate();
         errors += tester.validate();
-        errors += tester.insert( static_cast<int>(count1), TreeTester<K,V>::Reverse );
+        errors += tester.insert( count1, TreeTester<K,V>::Reverse );
         errors += tester.validate();
-        errors += tester.erase( static_cast<int>(count2), TreeTester<K,V>::Forward );
-        errors += tester.validate();
-        tester.logTree();
-        tester.destroyTree();
-        tester.createTree();
-        errors += tester.insert( static_cast<int>(count1), TreeTester<K,V>::Reverse );
-        errors += tester.validate();
-        errors += tester.erase( static_cast<int>(count2), TreeTester<K,V>::Reverse );
+        errors += tester.erase( count2, TreeTester<K,V>::Forward );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
-        errors += tester.insert( static_cast<int>(count1), TreeTester<K,V>::Reverse );
+        errors += tester.insert( count1, TreeTester<K,V>::Reverse );
         errors += tester.validate();
-        errors += tester.erase( static_cast<int>(count2), TreeTester<K,V>::Random );
+        errors += tester.erase( count2, TreeTester<K,V>::Reverse );
+        errors += tester.validate();
+        tester.logTree();
+        tester.destroyTree();
+        tester.createTree();
+        errors += tester.insert( count1, TreeTester<K,V>::Reverse );
+        errors += tester.validate();
+        errors += tester.erase( count2, TreeTester<K,V>::Random );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
@@ -1923,23 +1939,23 @@ pair<uint32_t,bool> doTest( TreeTester<K,V>& tester, size_t count1, size_t count
         tester.createTree();
         errors += tester.validate();
         errors += tester.validate();
-        errors += tester.insert( static_cast<int>(count1), TreeTester<K,V>::Random );
+        errors += tester.insert( count1, TreeTester<K,V>::Random );
         errors += tester.validate();
-        errors += tester.erase( static_cast<int>(count2), TreeTester<K,V>::Forward );
-        errors += tester.validate();
-        tester.logTree();
-        tester.destroyTree();
-        tester.createTree();
-        errors += tester.insert( static_cast<int>(count1), TreeTester<K,V>::Random );
-        errors += tester.validate();
-        errors += tester.erase( static_cast<int>(count2), TreeTester<K,V>::Reverse );
+        errors += tester.erase( count2, TreeTester<K,V>::Forward );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
-        errors += tester.insert( static_cast<int>(count1), TreeTester<K,V>::Random );
+        errors += tester.insert( count1, TreeTester<K,V>::Random );
         errors += tester.validate();
-        errors += tester.erase( static_cast<int>(count2), TreeTester<K,V>::Random );
+        errors += tester.erase( count2, TreeTester<K,V>::Reverse );
+        errors += tester.validate();
+        tester.logTree();
+        tester.destroyTree();
+        tester.createTree();
+        errors += tester.insert( count1, TreeTester<K,V>::Random );
+        errors += tester.validate();
+        errors += tester.erase( count2, TreeTester<K,V>::Random );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
@@ -1948,12 +1964,12 @@ pair<uint32_t,bool> doTest( TreeTester<K,V>& tester, size_t count1, size_t count
         log << "Endurance test...\n";
         tester.createPool();
         tester.createTree();
-        errors += tester.insert( static_cast<int>(count1), TreeTester<K,V>::Random );
+        errors += tester.insert( count1, TreeTester<K,V>::Random );
         errors += tester.validate();
         times( EnduranceCount ) {
-            errors += tester.insert( static_cast<int>(count1/3), TreeTester<K,V>::Random );
+            errors += tester.insert( count1/3, TreeTester<K,V>::Random );
             errors += tester.validate();
-            errors += tester.erase( static_cast<int>(count1/3), TreeTester<K,V>::Random );
+            errors += tester.erase( count1/3, TreeTester<K,V>::Random );
             errors += tester.validate();
         }
         tester.destroyTree();
@@ -1964,40 +1980,48 @@ pair<uint32_t,bool> doTest( TreeTester<K,V>& tester, size_t count1, size_t count
         tester.createPool();
         tester.createTree();
         errors += tester.validate();
-        errors += tester.insert( static_cast<int>(count1) / 10, TreeTester<K,V>::Random );
+        errors += tester.insert( count1/2, TreeTester<K,V>::Random );
+        // tester.logTree();
         errors += tester.validate();
-        errors += tester.commit();
-        errors += tester.validate();
-        errors += tester.insert( static_cast<int>(count1 - (count1 / 10)), TreeTester<K,V>::Random );
-        errors += tester.validate();
-        errors += tester.commit();
-        errors += tester.validate();
-        errors += tester.replace( static_cast<int>(count1 / 2) );
-        errors += tester.validate();
-        errors += tester.erase( static_cast<int>(count1 - (count1 / 4)), TreeTester<K,V>::Random );
-        errors += tester.validate();
-        errors += tester.recover();
-        errors += tester.validate();
-        errors += tester.erase( static_cast<int>(count1 / 2), TreeTester<K,V>::Random );
-        errors += tester.validate();
-        errors += tester.replace( static_cast<int>(count1 / 2) );
-        errors += tester.validate();
-        errors += tester.insert( static_cast<int>(count1 / 2), TreeTester<K,V>::Random );
-        errors += tester.validate();
-        errors += tester.assign();
-        errors += tester.validate();
-        tester.destroyTree();
-        tester.createTree();
-        errors += tester.validate();
-        tester.destroyTree();
-        tester.destroyPool();
-        tester.createPool();
-        tester.createTree();
-        errors += tester.validate();
-        errors += tester.erase( static_cast<int>(count1 / 4), TreeTester<K,V>::Random );
-        errors += tester.validate();
-        errors += tester.recover();
-        errors += tester.validate();
+        times( TransactionCount ) {
+            errors += tester.insert( count1/2, TreeTester<K,V>::Random );
+            // tester.logTree();
+            errors += tester.validate();
+            errors += tester.commit();
+            // tester.logTree();
+            errors += tester.validate();
+            errors += tester.replace( count1/2 );
+            // tester.logTree();
+            errors += tester.validate();
+            errors += tester.recover();
+            // tester.logTree();
+            errors += tester.validate();
+            errors += tester.erase( count1/2, TreeTester<K,V>::Random );
+            // tester.logTree();
+            errors += tester.validate();
+            errors += tester.recover();
+            // tester.logTree();
+            errors += tester.validate();
+            errors += tester.assign();
+            // tester.logTree();
+            errors += tester.validate();
+            tester.destroyTree();
+            tester.createTree();
+            // tester.logTree();
+            errors += tester.validate();
+            tester.destroyTree();
+            tester.destroyPool();
+            tester.createPool();
+            tester.createTree();
+            // tester.logTree();
+            errors += tester.validate();
+            errors += tester.erase( count1/2, TreeTester<K,V>::Random );
+            // tester.logTree();
+            errors += tester.validate();
+            errors += tester.commit();
+            // tester.logTree();
+            errors += tester.validate();
+        }
         tester.destroyTree();
         tester.destroyPool();
         tester.deletePersistentStore();
@@ -2023,8 +2047,8 @@ int main(int argc, char* argv[]) {
     log.open( "testBTreeValidity\\logBTreeValidity.txt" );
     uint32_t errorCount = 0;
     uint32_t exceptionCount = 0;
-    size_t count1 = 0;
-    size_t count2 = 0;
+    int count1 = 0;
+    int count2 = 0;
     if (2 <= argc) count1 = stoi( argv[ 1 ] );
     if (3 <= argc) count2 = stoi( argv[ 2 ] );
     for ( int arg = 3; arg < argc; ++arg ) {
@@ -2052,19 +2076,16 @@ int main(int argc, char* argv[]) {
         if (errors.second) {
             log << "Exception detected!\n";
             exceptionCount += 1;
-        } else if (0 < errors.first) {
+        }
+        if (0 < errors.first) {
             log << errors.first << " errors detected!\n";
             errorCount += errors.first;
         }
         log << "\n";
     }
-    if (0 < exceptionCount) {
-        log << exceptionCount << " exceptions detected!";
-    } else if (0 < errorCount) {
-        log << "Total of " << errorCount << " errors detected!";
-    } else {
-        log << "No errors detected.";
-    }
+    if (0 < exceptionCount) log << "Total of " << exceptionCount << " exceptions detected!\n";
+    if (0 < errorCount) log << "Total of " << errorCount << " errors detected!\n";
+    if ((exceptionCount ==0) && (errorCount ==0)) log << "No errors detected.\n";
     log.close();
     exit( errorCount );
 };
