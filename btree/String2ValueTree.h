@@ -4,6 +4,8 @@
 #include "BTree.h"
 #include <string.h>
 
+// ToDo: Avoid static_cast<PageSize> by replacing with test on maximum size of array within a Page
+
 namespace BTree {
 
     template< class V >
@@ -25,27 +27,27 @@ namespace BTree {
         {}
         template< class VT = V, std::enable_if_t<S<VT>,bool> = true >
         inline bool insert( std::string key, const VT& value ) {
-            return Tree< char[], VT >::insert( key.c_str(), key.size(), value );
+            return Tree< char[], VT >::insert( key.c_str(), static_cast<PageSize>(key.size()), value );
         }
         template< class VT = V, std::enable_if_t<A<VT>,bool> = true >
         inline bool insert( std::string key, const B<VT>* value, PageSize valueSize ) {
-            return Tree< char[], VT >::insert( key.c_str(), key.size(), value, valueSize );
+            return Tree< char[], VT >::insert( key.c_str(), static_cast<PageSize>(key.size()), value, valueSize );
         }
         template< class VT = V, std::enable_if_t<S<VT>,bool> = true >
         inline bool replace( std::string key, const VT& value ) {
-            return Tree< char[], VT >::replace( key.c_str(), key.size(), value );
+            return Tree< char[], VT >::replace( key.c_str(), static_cast<PageSize>(key.size()), value );
         }
         template< class VT = V, std::enable_if_t<A<VT>,bool> = true >
         inline bool replace( std::string key, const B<VT>* value, PageSize valueSize ) {
-            return Tree< char[], VT >::replace( key.c_str(), key.size(), value, valueSize );
+            return Tree< char[], VT >::replace( key.c_str(), static_cast<PageSize>(key.size()), value, valueSize );
         }
         template< class VT = V, std::enable_if_t<S<VT>,bool> = true >
         inline const B<VT>& at( std::string key ) const {
-            return Tree< char[], VT >::at( key.c_str(), key.size() );
+            return Tree< char[], VT >::at( key.c_str(), static_cast<PageSize>(key.size()) );
         }
         template< class VT = V, std::enable_if_t<A<VT>,bool> = true >
         inline std::pair<const B<VT>*, PageIndex> at( std::string key ) const {
-            return Tree< char[], VT >::at( key.c_str(), key.size() );
+            return Tree< char[], VT >::at( key.c_str(), static_cast<PageSize>(key.size()) );
         }
         template< class VT = V >
         inline void erase( std::string key ) {
