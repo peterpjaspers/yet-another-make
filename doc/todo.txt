@@ -2,6 +2,8 @@ Todo for R 0.1.0
 Bugs
 - fix (header->free == 1)  throw std::string(signature) + " - Accessing freed page.";
   Reproduce with coreTests EnduranceTest
+- investigate why accessMonitor test.exe x y crashes when x, y > 1
+- investigate use of _declspec(dllexport) in access monitor
 - create test_yam dir and build it. Then rename dir project to project1 and run yam.
   Expected result: build passes, actual result: build fails because stale output
   files in dir project1.

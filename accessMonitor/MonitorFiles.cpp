@@ -827,11 +827,11 @@ namespace AccessMonitor {
         }
 
         inline wstring widen( const string& fileName ) {
-        if (fileName.empty()) return {};
-        int len = MultiByteToWideChar( CP_UTF8, 0, &fileName[0], fileName.size(), NULL, 0 );
-        wstring wideFileName( len, 0 );
-        MultiByteToWideChar( CP_UTF8, 0, &fileName[0], fileName.size(), &wideFileName[0], len );
-        return wideFileName;
+            if (fileName.empty()) return {};
+            int len = MultiByteToWideChar( CP_UTF8, 0, &fileName[0], static_cast<int>(fileName.size()), NULL, 0 );
+            wstring wideFileName( len, 0 );
+            MultiByteToWideChar( CP_UTF8, 0, &fileName[0], static_cast<int>(fileName.size()), &wideFileName[0], len );
+            return wideFileName;
         }
 
         // Extract file name from handle to opened file

@@ -1,8 +1,8 @@
-#include "Monitor.h"
-#include "Session.h"
-#include "LogFile.h"
-#include "FileNaming.h"
-#include "MonitorLogging.h"
+#include "../Monitor.h"
+#include "../Session.h"
+#include "../LogFile.h"
+#include "../FileNaming.h"
+#include "../MonitorLogging.h"
 
 #include <windows.h>
 #include <string>

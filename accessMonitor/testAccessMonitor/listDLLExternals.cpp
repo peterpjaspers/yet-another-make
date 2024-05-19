@@ -60,7 +60,7 @@ namespace AccessMonitor {
             if (length == 0) errorException( "GetModuleFileNameA" );
             std::string path( fullName );
             if ( (0 < match.size()) && (path.size() <= path.find( match )) ) continue;
-            int pos = path.rfind( "\\" );
+            std::size_t pos = path.rfind( "\\" );
             std::string dir( path, 0, pos );
             std::string base( path, (pos + 1), path.size() );
             dlls.push_back( ModuleFile( base, dir ) );
