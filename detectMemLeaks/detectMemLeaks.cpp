@@ -10,6 +10,7 @@ void detectMemLeaks()
     *x = 7;
 
     printf("%d\n", *x);
+    //free(x); //leak!
 
     x = (int*)calloc(3, sizeof(int));
     x[0] = 7;
@@ -17,4 +18,5 @@ void detectMemLeaks()
     x[2] = 777;
 
     printf("%d %d %d\n", x[0], x[1], x[2]);
+    //free(x); //leak!
 }
