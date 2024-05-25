@@ -4,6 +4,8 @@
 #include "BTree.h"
 #include <string.h>
 
+// ToDo: Avoid static_cast<PageSize> by replacing with test on maximum size of array within a Page
+
 namespace BTree {
 
     template< class K >
@@ -40,13 +42,13 @@ namespace BTree {
             return Tree< KT, char[] >::replace( key, keySize, value.c_str(), static_cast<PageSize>(value.size()) );
         }
         template< class KT = K >
-        inline const typename std::enable_if<S<KT>,std::string>::type retrieve( const K& key ) const {
-            std::pair< const char*, PageSize > result = Tree< KT, char[] >::retrieve( key );
+        inline const typename std::enable_if<S<KT>,std::string>::type at( const K& key ) const {
+            std::pair< const char*, PageSize > result = Tree< KT, char[] >::at( key );
             return std::string( result.first, result.second );
         }
         template< class KT = K >
-        inline const typename std::enable_if<A<KT>,std::string>::type retrieve( const B<KT>* key, PageSize keySize ) const {
-            std::pair< const char*, PageSize > result = Tree< KT, char[] >::retrieve( key, keySize );
+        inline const typename std::enable_if<A<KT>,std::string>::type at( const B<KT>* key, PageSize keySize ) const {
+            std::pair< const char*, PageSize > result = Tree< KT, char[] >::at( key, keySize );
             return std::string( result.first, result.second );
         }
         template< class KT = K >

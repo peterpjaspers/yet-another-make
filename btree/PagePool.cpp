@@ -82,8 +82,12 @@ namespace BTree {
         }
     };
 
-    // Commit all outstanding modify requests by defining new root.
+    // Commit all outstanding modify requests by defining new root and clearing modified list.
     void PagePool::commit( const PageLink link, BTreeStatistics* stats ) {
+        for ( auto link : freePages ) {
+            const PageHeader& freePage = access( link );
+            freePage.modified = 0;
+        }
         for ( auto link : modifiedPages ) {
             const PageHeader& modifiedPage = access( link );
             modifiedPage.modified = 0;

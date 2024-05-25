@@ -382,8 +382,7 @@ namespace YAM
         if (!garbageKeys.empty()) {
             for (int i = 0; i < garbageKeys.size(); ++i) {
                 auto &key = garbageKeys[i];
-                auto &object = _keyToDeletedObject[key];
-                if (!removePendingDelete(key, object)) {
+                if (!removePendingDelete(key)) {
                     throw std::runtime_error("Failed to remove object from storage");
                 }
             }
@@ -438,7 +437,7 @@ namespace YAM
     void PersistentBuildState::retrieveKey(Key key) {
         KeyCode code(key);
         auto tree = _typeToTree[code._type];
-        auto& btreeVReader = tree->retrieve(key);
+        auto& btreeVReader = tree->at(key);
         retrieveKey(key, btreeVReader);
     }
 
@@ -482,7 +481,7 @@ namespace YAM
             }
             auto pit = _deletedObjectToKey.find(p.get());
             if (pit != _deletedObjectToKey.end()) {
-                throw std::exception("Attempt to deleted a pending delete object.");
+                throw std::exception("Attempt to delete a pending delete object.");
             }
             auto it = _objectToKey.find(p.get());
             if (it == _objectToKey.end()) {
@@ -603,16 +602,13 @@ namespace YAM
         return tree->erase(key);
     }
 
-    bool PersistentBuildState::removePendingDelete(Key key, std::shared_ptr<IPersistable> const& object) {
-        if (!object->deleted()) {
-            throw std::exception("cannot removePendingDelete an object in state !deleted()");
-        }
+    bool PersistentBuildState::removePendingDelete(Key key) {
         auto it = _keyToDeletedObject.find(key);
         if (it == _keyToDeletedObject.end()) {
-            throw std::exception("Unknown object");
+            throw std::exception("Unknown key");
         }
+        _deletedObjectToKey.erase(it->second.get());
         _keyToDeletedObject.erase(it);
-        _deletedObjectToKey.erase(object.get());
         KeyCode code(key);
         auto tree = _typeToTree[code._type];
         return tree->erase(key);

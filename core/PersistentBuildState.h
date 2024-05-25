@@ -93,7 +93,7 @@ namespace YAM
         void store(Key key,std::shared_ptr<IPersistable> const& object);
 
         bool remove(Key key, std::shared_ptr<IPersistable> const& object);
-        bool removePendingDelete(Key key, std::shared_ptr<IPersistable> const& object);
+        bool removePendingDelete(Key key);
         
         // Return in storedState the objects that have a key.
         void getStoredState(std::unordered_set<std::shared_ptr<IPersistable>>& storedState);

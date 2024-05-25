@@ -18,7 +18,8 @@ using namespace std::filesystem;
 
 const int BTreePageSize = 4096;
 
-const int EntryCounts[] = { 1000, 10000, 100000, 1000000, 10000000 };
+const vector<int>  DefaultEntryCounts = { 1000, 10000, 100000, 1000000, 10000000 };
+vector<int> EntryCounts;
 
 const int MinArray = 2;
 const int MaxArray = 15;
@@ -69,11 +70,11 @@ uint32_t generateRandomLength( uint32_t min, uint32_t max ) {
 }
 
 template< class T >
-vector<T> generate( uint32_t min, uint32_t max ) {
+vector<T> generate( int min, int max ) {
     vector<T> value;
-    uint32_t n = 0;
+    int n = 0;
     while (n < min) { value.push_back( generateRandomValue<T>() ); ++n; }
-    uint32_t N = generateRandomLength( min, max );
+    int N = generateRandomLength( min, max );
     while (n < N) { value.push_back( generateRandomValue<T>() ); ++n; }
     return value;
 }
@@ -94,7 +95,7 @@ struct ArrayCompare {
 };
 
 template< class T >
-vector<vector<T>> generateUniqueKeys( uint32_t count, uint32_t min, uint32_t max ) {
+vector<vector<T>> generateUniqueKeys( int count, int min, int max ) {
     vector<vector<T>> keys;
     set<vector<T>,ArrayCompare<T>> keySet;
     for (uint32_t i = 0; i < count; ++i) {
@@ -107,7 +108,7 @@ vector<vector<T>> generateUniqueKeys( uint32_t count, uint32_t min, uint32_t max
 }
 
 template< class T >
-vector<vector<T>> generateValues( uint32_t count, uint32_t min, uint32_t max ) {
+vector<vector<T>> generateValues( int count, int min, int max ) {
     vector<vector<T>> values;
     for (uint32_t i = 0; i < count; ++i) values.push_back( generate<T>( min, max ) );
     return values;
@@ -163,11 +164,11 @@ void treeReplace( Tree<K,V>& tree, const vector<B<K>>& key, const vector<B<V>>& 
 }
 template< class K, class V, std::enable_if_t<(!A<K>),bool> = true >
 void treeRetrieve( const Tree<K,V>& tree, const vector<B<K>>& key ) {
-    auto result = tree.retrieve( key[ 0 ] );
+    auto result = tree.at( key[ 0 ] );
 }
 template< class K, class V, std::enable_if_t<(A<K>),bool> = true >
 void treeRetrieve( const Tree<K,V>& tree, const vector<B<K>>& key ) {
-    auto result = tree.retrieve( key.data(), static_cast<PageSize>(key.size()) );
+    auto result = tree.at( key.data(), static_cast<PageSize>(key.size()) );
 }
 template< class K, class V, std::enable_if_t<(!A<K>),bool> = true >
 void treeRemove( Tree<K,V>& tree, const vector<B<K>>& key ) {
@@ -183,10 +184,10 @@ class PerformanceTest {
     PagePool* pool;
     BTree::Tree<K,V>* tree;
     ofstream& log;
-    pair<double,uint32_t> calibrate( uint32_t iterations, vector<vector<B<K>>>& keys, vector<vector<B<V>>>& values ) {
+    pair<double,int> calibrate( int iterations, vector<vector<B<K>>>& keys, vector<vector<B<V>>>& values ) {
         uint32_t matches = 0;
         auto t0 = chrono::steady_clock::now();;
-        for ( uint32_t i = 0; i < iterations; i++ ) matches += accessKeyValue( *tree, keys[ i ], values[ i ] );
+        for ( int i = 0; i < iterations; i++ ) matches += accessKeyValue( *tree, keys[ i ], values[ i ] );
         auto t1 = chrono::steady_clock::now();
         chrono::duration<double> elapsed = (t1 - t0);
         return { ((elapsed.count() / iterations) * 1000000), matches };
@@ -206,7 +207,7 @@ class PerformanceTest {
         chrono::duration<double> elapsed = (t1 - t0);
         return ((elapsed.count() / iterations) * 1000000);
     };
-    double retrieve( uint32_t iterations, vector<vector<B<K>>>& keys ) {
+    double at( uint32_t iterations, vector<vector<B<K>>>& keys ) {
         shuffle( keys.begin(), keys.end(), gen32 );
         auto t0 = chrono::steady_clock::now();;
         for ( uint32_t i = 0; i < iterations; i++ ) treeRetrieve<K,V>( *tree, keys[ i ] );
@@ -276,7 +277,7 @@ public:
         log.precision( 3 );
         log << "Payload    : " << ((100.0 * usage.payload) / (usage.pageCapacity * (usage.pages - usage.freePages))) << " %\n";
     }
-    void measurePerformance( uint32_t iterations ) {
+    void measurePerformance( int iterations ) {
         vector<vector<B<K>>> keys = generateUniqueKeys<B<K>>( iterations, (A<K> ? MinArray : 1), (A<K> ? MaxArray : 1) );
         vector<vector<B<V>>> values = generateValues<B<V>>( iterations, (A<V> ? MinArray : 1), (A<V> ? MaxArray : 1) );
         vector<vector<B<V>>> replaceValues = generateValues<B<V>>( iterations, (A<V> ? MinArray : 1), (A<V> ? MaxArray : 1) );
@@ -301,9 +302,9 @@ public:
         log << "Random replace " << (entryReplace - overhead) << " usec.\n";
         measureUsage();
         logStatistics( true );
-        auto entryRetrieve = retrieve( iterations, keys );
+        auto entryRetrieve = at( iterations, keys );
         log.precision( 3 );
-        log << "Random retrieve " << (entryRetrieve - overhead) << " usec.\n";
+        log << "Random at " << (entryRetrieve - overhead) << " usec.\n";
         measureUsage();
         logStatistics( true );
         auto entryRemove = erase( iterations, keys );
@@ -320,7 +321,12 @@ int main(int argc, char* argv[]) {
     create_directory( "testBTreePerformance ");
     int errors = 0;
     ofstream log;
-    log.open( "testBTreePerformance\\log.txt" );
+    if ( 2 <= argc ) {
+        for (int arg = 1; arg < argc; ++arg) { EntryCounts.push_back( stoi( argv[ arg ] ) ); }
+    } else {
+        EntryCounts = DefaultEntryCounts;
+    }
+    log.open( "testBTreePerformance\\logBTreePerformance.txt" );
     log << "32-bit integer key to 32-bit integer value performance ...\n";
     log.flush();
     try {

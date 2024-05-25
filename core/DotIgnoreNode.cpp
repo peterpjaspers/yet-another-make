@@ -57,8 +57,8 @@ namespace YAM
 
     void DotIgnoreNode::clear() {
         for (auto file : _dotIgnoreFiles) {
-            context()->nodes().remove(file);
             file->removeObserver(this);
+            context()->nodes().remove(file);
         }
         _dotIgnoreFiles.clear();
     }

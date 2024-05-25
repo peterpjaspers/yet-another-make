@@ -12,13 +12,11 @@
 #include "CompareKey.h"
 
 // ToDo: Provide function to compact B-Tree to contiguous pages (reducing memory usage and persistent file size)
-// ToDo: Provide merge function
+// ToDo: Provide merge function on entire B-Trees
 // ToDo: Avoid additional lookUp when growing (gain is marginal for page capacity large relative to key-value size)
 // ToDo: Try to reduce number of unsuccessful merge attempts (adapt thresholds dynamically?)
 // ToDo: Improve filling by distributing page content left and right during merge.
 // ToDo: Avoid growing by distributing page content left and/or right. Will probably also improve filling.
-// ToDo: implement = and [] operators
-// ToDo: rename retrieve to at
 
 namespace BTree {
 
@@ -262,44 +260,44 @@ namespace BTree {
         // Throws an exception if key was not found.
         // O(logN(n)*log(N)) complexity.
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&S<VT>),bool> = true >
-        const VT& retrieve( const KT& key) const {
-            static const char* signature = "const V& Tree<K,V>::retrieve( const K& key) const";
+        const VT& at( const KT& key) const {
+            static const char* signature = "const V& Tree<K,V>::at( const K& key) const";
             if (stats) stats->retrievals += 1;
             Trail trail( *this );
             if (!lookUp<KT>( key, trail )) throw std::string( signature ) + " - Key not found";
             return value<VT>( trail );
         }
         template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&S<VT>),bool> = true >
-        const VT& retrieve( const B<KT>* key, PageSize keySize ) const {
-            static const char* signature = "const V& Tree<K,V>::retrieve( const K* key, PageSize keySize ) const";
+        const VT& at( const B<KT>* key, PageSize keySize ) const {
+            static const char* signature = "const V& Tree<K,V>::at( const K* key, PageSize keySize ) const";
             if (stats) stats->retrievals += 1;
             Trail trail( *this );
             if (!lookUp<KT>( key, keySize, trail )) throw std::string( signature ) + " - Key not found";
             return value<VT>( trail );
         }
         template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&S<VT>),bool> = true >
-        const VT& retrieve( const std::pair< const B<KT>*, PageSize >& key ) const {
-            return retrieve( key.first, key.second );
+        const VT& at( const std::pair< const B<KT>*, PageSize >& key ) const {
+            return at( key.first, key.second );
         }
         template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&A<VT>),bool> = true >
-        std::pair<const B<VT>*, PageSize> retrieve( const KT& key) const {
-            static const char* signature = "std::pair<const V*, PageSize> Tree<K,V>::retrieve( const K& key) const";
+        std::pair<const B<VT>*, PageSize> at( const KT& key) const {
+            static const char* signature = "std::pair<const V*, PageSize> Tree<K,V>::at( const K& key) const";
             if (stats) stats->retrievals += 1;
             Trail trail( *this );
             if (!lookUp<KT>( key, trail )) throw std::string( signature ) + " - Key not found";
             return value<VT>( trail );
         }
         template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&A<VT>),bool> = true >
-        std::pair<const B<VT>*, PageSize> retrieve( const B<KT>* key, PageSize keySize ) const {
-            static const char* signature = "std::pair<const V*, PageSize> Tree<K,V>::retrieve( const K* key, PageSize keySize ) const";
+        std::pair<const B<VT>*, PageSize> at( const B<KT>* key, PageSize keySize ) const {
+            static const char* signature = "std::pair<const V*, PageSize> Tree<K,V>::at( const K* key, PageSize keySize ) const";
             if (stats) stats->retrievals += 1;
             Trail trail( *this );
             if (!lookUp<KT>( key, keySize, trail )) throw std::string( signature ) + " - Key not found";
             return value<VT>( trail );
         }
         template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&A<VT>),bool> = true >
-        std::pair<const B<VT>*, PageSize> retrieve( const std::pair< const B<KT>*, PageSize >& key ) const {
-            return retrieve( key.first, key.second );
+        std::pair<const B<VT>*, PageSize> at( const std::pair< const B<KT>*, PageSize >& key ) const {
+            return at( key.first, key.second );
         }
 
         // Remove a key-value pair.
@@ -422,6 +420,17 @@ namespace BTree {
             clear();
             for ( auto src : tree ) insert( src.first, src.second );
         }
+        // Assignment operator
+        Tree<K,V>& operator=( const Tree<K,V>& tree ) { assign( tree ); return *this; }
+        // Indexing operator
+        template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&S<VT>),bool> = true >
+        inline const VT& operator[]( const KT& key ) const { return at( key ); }
+        template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&S<VT>),bool> = true >
+        inline const VT& operator[]( const std::pair<const B<KT>*,PageSize> key ) const { return at( key ); }
+        template< class KT = K, class VT = V, std::enable_if_t<(S<KT>&&A<VT>),bool> = true >
+        inline std::pair<const B<VT>*,PageSize> operator[]( const KT& key ) const { return at( key ); }
+        template< class KT = K, class VT = V, std::enable_if_t<(A<KT>&&A<VT>),bool> = true >
+        inline std::pair<const B<VT>*,PageSize> operator[]( const std::pair<const B<KT>*,PageSize> key ) const { return at( key ); }
         // Return the number of key-value entries in the B-tree.
         // O(logN(n)) complexity.
         size_t size() const { return( pageCount( *root ) ); }
@@ -534,7 +543,7 @@ namespace BTree {
                     } else {
                         node->replace( trail.index(), header.page, copy );
                     }
-                    recoverPage( node->header, (mode == PersistentTransaction) );
+                    recoverPage( node->header, (mode != MemoryTransaction) );
                     updateNodeTrail( trail, copy->header );
                 }
             }
@@ -570,7 +579,7 @@ namespace BTree {
         // Recover (persistent) src page if it differs from dst page;
         // i.e., dst is the copy-on-update version of src.
         inline void recoverUpdatedPage( const PageHeader& src, const PageHeader& dst ) {
-            if (src.page != dst.page) recoverPage( src, (mode == PersistentTransaction) );
+            if (src.page != dst.page) recoverPage( src, (mode != MemoryTransaction) );
         }
         inline void recoverPage( const PageHeader& page, bool free ) const {
             if (stats && free) stats->pageFrees += 1;
@@ -844,7 +853,7 @@ namespace BTree {
             } else {
                 removeAt<KT,PageLink>( trail.pop() );
             }
-            recoverPage( page->header, (mode == PersistentTransaction) );
+            recoverPage( page->header, (mode != MemoryTransaction) );
         }
 
         // Remove entry at trail.
@@ -1007,7 +1016,7 @@ namespace BTree {
                 removeAt<KT,PageLink>( srcTrail.pop() );
             }
             recoverUpdatedPage( dst->header, dstCopy->header );
-            recovePage( src->header, (mode == PersistentTransaction) );
+            recovePage( src->header, (mode != MemoryTransaction) );
         }
         // Append indexed content of source Page right to destination Page, adjusting split key
         // of destination page accordingly.
@@ -1031,7 +1040,7 @@ namespace BTree {
             dst->shiftLeft( *newDst, dst->size() );
             replaceSplitKey<KT,VT>( dstTrail, *srcCopy, index, newDst->header.page );
             srcCopy->erase( index );
-            recovePage( dst->header, (mode == PersistentTransaction) );
+            recovePage( dst->header, (mode != MemoryTransaction) );
             recoverUpdatedPage( src->header, srcCopy->header );
         }
         // Append entire content of src Page to dst Page, adjusting split key and
@@ -1055,7 +1064,7 @@ namespace BTree {
             insertSplit<VT>( *dst, dst->header.count, *ancestor, splitKeyIndex, *src, dstCopy );
             if (0 < src->header.count) src->shiftLeft( *dstCopy, src->header.count );
             recoverUpdatedPage( dst->header, dstCopy->header );
-            recoverPage( src->header, (mode == PersistentTransaction) );
+            recoverPage( src->header, (mode != MemoryTransaction) );
             // A non-empty ancestor node must exist as we just merged two pages
             // Remove link to recently merged page
             pruneBranch( srcTrail );
@@ -1102,7 +1111,7 @@ namespace BTree {
         void pruneBranch( Trail& trail ) {
             auto node = page<PageLink>( trail );
             while (node->size() == 0) {
-                recoverPage( node->header, (mode == PersistentTransaction) );
+                recoverPage( node->header, (mode != MemoryTransaction) );
                 node = page<PageLink>( trail.pop() );
             }
         }
@@ -1111,7 +1120,7 @@ namespace BTree {
             while ((root->count == 0) && (0 < root->depth)) {
                 auto rootPage = page<PageLink>( root );
                 rootUpdate( pool.reference( rootPage->split() ) );
-                recoverPage( rootPage->header, (mode == PersistentTransaction) );
+                recoverPage( rootPage->header, (mode != MemoryTransaction) );
             }
         }
         template< class KT, std::enable_if_t<(S<KT>),bool> = true >
@@ -1186,7 +1195,7 @@ namespace BTree {
                     if (node->splitDefined()) freeAll( pool.access( node->split() ), recover );
                     for (PageIndex i = 0; i < node->size(); i++) freeAll( pool.access( node->value( i ) ), recover );
                 }
-                if (recover) recoverPage( page, (mode == PersistentTransaction) );
+                if (recover) recoverPage( page, (mode != MemoryTransaction) );
             }
         }
 

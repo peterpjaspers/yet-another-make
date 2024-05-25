@@ -25,16 +25,17 @@ namespace BTree {
     template <class K, class V, bool KA, bool VA>
     void ASCIIPageStreamer::streamPageHeader(std::ostream &o, const Page<K, V, KA, VA>& page) {
         o << "Page" << page.header.page << "." << page.header.depth << " (";
-        if (page.header.free == 1) o << "?";
-        if (page.header.modified == 1) o << "~";
-        if (page.header.persistent == 1) o << "*";
-        if (page.header.recover == 1) o << "!";
+        if (page.header.free == 1) o << "F";
+        if (page.header.modified == 1) o << "M";
+        if (page.header.persistent == 1) o << "P";
+        if (page.header.recover == 1) o << "R";
+        if (page.header.stored == 1) o << "S";
         o << ")\n";
         streamPageMapping<K,V>( o, page );
         o << "[ " << page.filling() << " / " << page.header.capacity << " ] " << std::setprecision(1) << std::fixed << ((100.0 * page.filling()) / page.header.capacity) << " %\n";
     }
 
-    // ToDo: 8-bit numeric types as hex (not ASCII chracters)
+    // ToDo: Stream 8-bit numeric types as hex (not ASCII chracters)
 
     template <class K, class V>
     void ASCIIPageStreamer::streamPage(std::ostream &o, const Page<K,V,false,false>& page) {

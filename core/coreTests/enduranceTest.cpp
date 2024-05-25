@@ -112,6 +112,7 @@ namespace
             std::filesystem::path reposFile(repoDir / "yamConfig/repositories.txt");
             std::string repos = R"(
                 name = test_1 dir = ..\test_yam_1 type = Build;
+                name = test_2 dir = ..\test_yam_2 type = Build;
             )";
             writeFile(reposFile, repos);
         }
@@ -122,14 +123,53 @@ namespace
         }
     };
 
-    // Reproduces crash in build 2.0
-    //TEST(Endurance, repeatAddRemoveRepositories_crashIn2_0) {
-    void ignore2_0() {
+    // Reproduces crash caused by bug in PersistentBuildState::removePendingDelete
+    // Crash fixed by commit after commit edc730a7c8e2e431162d9837d290d10a4ebae942
+    TEST(Endurance, reproducePendingDeleteCrash) {
         std::filesystem::remove_all("D:\\test_yam");
         std::filesystem::remove_all("D:\\test_yam_1");
+        std::filesystem::remove_all("D:\\test_yam_2");
         std::filesystem::copy("D:\\clean_repos\\test_yam", "D:\\test_yam", std::filesystem::copy_options::recursive);
         std::filesystem::copy("D:\\clean_repos\\test_yam_1", "D:\\test_yam_1", std::filesystem::copy_options::recursive);
-        for (int nRestarts = 0; nRestarts < 10; nRestarts++) {
+        std::filesystem::copy("D:\\clean_repos\\test_yam_2", "D:\\test_yam_2", std::filesystem::copy_options::recursive);
+        const int maxRestarts = 10;
+        std::shared_ptr<BuildResult> result;
+        {
+            TestDriver driver;
+            driver.addRepos();
+            result = driver.build();
+            ASSERT_EQ(TRUE, result->state() == BuildResult::State::Ok);
+            driver.removeRepos();
+            result = driver.build();
+            ASSERT_EQ(TRUE, result->state() == BuildResult::State::Ok);
+            driver.addRepos();
+            result = driver.build();
+            ASSERT_EQ(TRUE, result->state() == BuildResult::State::Ok);
+            driver.removeRepos();
+            result = driver.build();
+            ASSERT_EQ(TRUE, result->state() == BuildResult::State::Ok);
+        }
+        {
+            TestDriver driver;
+            driver.addRepos();
+            result = driver.build();
+            ASSERT_EQ(TRUE, result->state() == BuildResult::State::Ok);
+            driver.removeRepos();
+            result = driver.build();
+            ASSERT_EQ(TRUE, result->state() == BuildResult::State::Ok);
+        }
+    }
+
+    // Reproduces crash in build 2.0
+    // Crash fixed by commit after commit edc730a7c8e2e431162d9837d290d10a4ebae942
+    TEST(Endurance, repeatAddRemoveRepositories_crashIn2_0) {
+        std::filesystem::remove_all("D:\\test_yam");
+        std::filesystem::remove_all("D:\\test_yam_1");
+        std::filesystem::remove_all("D:\\test_yam_2");
+        std::filesystem::copy("D:\\clean_repos\\test_yam", "D:\\test_yam", std::filesystem::copy_options::recursive);
+        std::filesystem::copy("D:\\clean_repos\\test_yam_1", "D:\\test_yam_1", std::filesystem::copy_options::recursive);
+        std::filesystem::copy("D:\\clean_repos\\test_yam_2", "D:\\test_yam_2", std::filesystem::copy_options::recursive);
+        for (int nRestarts = 0; nRestarts < 4; nRestarts++) {
             TestDriver driver;
             auto& stats = driver.context->statistics();
             stats.registerNodes = true;
@@ -145,32 +185,6 @@ namespace
                 } else {
                     driver.removeRepos();
                 }
-            }
-        }
-    }
-
-    // Reproduces crash in build 4.0
-    //TEST(Endurance, repeatAddRemoveRepositories_crashIn4_0) {
-    void ignore4_0() {
-        std::filesystem::remove_all("D:\\test_yam");
-        std::filesystem::remove_all("D:\\test_yam_1");
-        std::filesystem::copy("D:\\clean_repos\\test_yam", "D:\\test_yam", std::filesystem::copy_options::recursive);
-        std::filesystem::copy("D:\\clean_repos\\test_yam_1", "D:\\test_yam_1", std::filesystem::copy_options::recursive);
-        for (int nRestarts = 0; nRestarts < 10; nRestarts++) {
-            TestDriver driver;
-            auto& stats = driver.context->statistics();
-            stats.registerNodes = true;
-            if (nRestarts % 2 == 0) {
-                driver.removeRepos();
-            } else {
-                driver.addRepos();
-            }
-            for (int nBuilds = 0; nBuilds < 1; nBuilds++) {
-                stats.reset();
-                std::cout << "\nStarting build " << nRestarts << "." << nBuilds << std::endl;
-                std::shared_ptr<BuildResult> result = driver.build();
-                ASSERT_EQ(TRUE, result->state() == BuildResult::State::Ok);
-                std::cout << "Completed build " << nRestarts << "." << nBuilds << std::endl;
             }
         }
     }

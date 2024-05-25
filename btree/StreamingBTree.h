@@ -75,8 +75,8 @@ namespace BTree {
         }
         // Retrieve a streamed object.
         // Returns value reader streamer to stream the object.
-        ValueReader<K>& retrieve( const K& key ) const {
-            static const char* signature = "ValueReader<K>& StreamingTree<K>::retrieve( const K& key )";
+        ValueReader<K>& at( const K& key ) const {
+            static const char* signature = "ValueReader<K>& StreamingTree<K>::at( const K& key )";
             if (writer.isOpen() && (writer.key() == key)) {
                 throw std::string( signature ) + " : Accessing reader stream on open writer stream";
             }

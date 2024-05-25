@@ -3,6 +3,8 @@
 
 #include "BTree.h"
 
+#include <iterator>
+
 // ToDo: Provide const TreeIterator (ConstTreeIterator). begin, end and find functions on Tree are const.
 // ToDo: provide assignment (and operator)
 // ToDo: avoid dynamic allocation of iterators in Tree::begin,end & find
@@ -25,6 +27,14 @@ namespace BTree {
     protected:
         Trail trail;
     public:
+        // Implement these typedefs to avoid deriving from class iterator (deprecated since C++17)
+        /*
+        typedef difference_type nullptr_t;
+        typedef value_type std::remove_cv_t<T>(T);
+        typedef pointer std::pair< const B<K>&, const V& >; // typedef depends on B and S on K and V
+        typedef reference std::pair< const B<K>&, const V& >; // typedef depends on B and S on K and V
+        typedef iterator_category std::bidirectional_iterator_tag;
+        */
         TreeIterator() = delete;
         TreeIterator( const TreeBase& tree ) : trail( tree ) {}
         TreeIterator( const TreeIterator& iterator ) : trail( iterator.trail ) {}

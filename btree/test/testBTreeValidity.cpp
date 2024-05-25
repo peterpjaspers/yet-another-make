@@ -19,6 +19,8 @@ using namespace std::filesystem;
 #define each(i,count) for(int i = 0; i < int(count); ++i)
 #define times(count) for(int i = 0; i < int(count); ++i)
 
+// ToDo: Validate = and [] operators on B-Tree
+
 // Test program to measure B-Tree validity.
 // B-Tree validity is performed via a comprehensive set of use cases.
 // Tests are performed on four types of B-Trees:
@@ -32,8 +34,6 @@ using namespace std::filesystem;
 // This enables validating which entries should be present in the B-Tree and which should not.
 // And additional std::map is used for validation of transaction behavior. This map contains
 // values held in the B-Tree at the last commit.
-
-// ToDo: use std filesystem calls to remove windows specific code
 
 // B-Tree page size is kept low to maximize B-Tree depth improving test coverage
 // MaxArray chosen to comform to maximum entry size constraint
@@ -51,6 +51,8 @@ const int MaxArray = 14;
 
 // Number of attempts to detect unexpected B-Tree content
 const int ProbeCount = 100;
+const int EnduranceCount = 10;
+const int TransactionCount = 10;
 
 mt19937 gen32;
 
@@ -74,6 +76,15 @@ void logUint16Array( ostream& log, const uint16_t* value, PageSize valueSize ) {
     log << " ]";
 }
 
+void logPageList( ostream& log, const vector<PageLink>& list, const string tag ) {
+    log << tag << " pages [";
+    if (0 < list.size()) {
+        log << " " << list[ 0 ];
+        for ( int i = 1; i < list.size(); ++i ) log << ", " << list[ i ];
+    }
+    log << " ]\n";
+}
+
 struct Uint16ArrayCompare {
     bool operator()( const vector<uint16_t>* lhs, const vector<uint16_t>* rhs ) const {
         if (compare( lhs->data(), PageSize(lhs->size()), rhs->data(), PageSize(rhs->size()) ) < 0) return( true );
@@ -93,28 +104,12 @@ size_t generateIndex( size_t range ) {
     return( gen32() % range );
 }
 
-PagePool* createPagePool( bool persistent, PageSize pageSize, const string& path = "" ) {
-    if ( persistent ) {
-        // Determine stored page size (if any)...
-        PageSize storedPageSize = PersistentPagePool::pageCapacity( path );
-        return new PersistentPagePool( ((0 < storedPageSize) ? storedPageSize : pageSize), path );
-    } else {
-        return new PagePool( pageSize );
-    }
-}
-void destroyPagePool( bool persistent, PagePool* pool ) {
-    if (persistent) {
-        delete( dynamic_cast<PersistentPagePool*>(pool) );
-    } else {
-        delete( pool );
-    }
-}
-
 template< class K, class V >
 class TreeTester {
 protected:
     const string directory;
     const string fileName;
+    bool isPersistent;
     ostream& log;
     PagePool* pool;
     Tree< K, V >* tree;
@@ -136,46 +131,61 @@ public:
         directory( dir ),
         fileName( file ),
         log( logStream ),
+        isPersistent( false ),
         pool( nullptr ),
         tree( nullptr )
     {}
-    ~TreeTester() { destroyTree(); destroyPool(); deletePersistentStore(); }
+    ~TreeTester() {
+        if (tree != nullptr) destroyTree();
+        if (pool != nullptr) destroyPool();
+        if (exists( persistentPath() )) deletePersistentStore();
+    }
+    void persistent( bool p ) {
+        if (pool != nullptr) log << "Cannot change persistency while pool exists!\n";
+        isPersistent = p;
+    }
+    string persistentPath() const { return directory + "/" + fileName + ".bt"; }
     void createPool() {
         if (pool == nullptr) {
-            log << "Constructing persistent page pool on " << directory + "/" + fileName + ".bt" << " ...\n" << flush;
-            string poolFile = directory + "/" + fileName + ".bt";
-            pool = createPagePool( true, BTreePageSize, poolFile );
+            if ( isPersistent ) {
+                log << "Constructing persistent page pool on " << persistentPath() << " ...\n" << flush;
+                string poolFile = persistentPath();
+                PageSize storedPageSize = PersistentPagePool::pageCapacity( poolFile );
+                pool = new PersistentPagePool( ((0 < storedPageSize) ? storedPageSize : BTreePageSize), poolFile );
+            } else {
+                pool = new PagePool( BTreePageSize );                
+            }
         } else {
-            log << "Page pool " << directory + "/" + fileName + ".bt" << " already exists!\n" << flush;
+            log << "Page pool already exists!\n" << flush;
         }
     }
     void destroyPool() {
         log << "Deleting page pool ...\n" << flush;
-        if (tree != nullptr) {
-            log << "B-Tree on " << directory + "/" + fileName + ".bt" << " still exists!\n" << flush;
-        }
+        if (tree != nullptr) { log << "B-Tree still exists!\n" << flush; }
         if (pool != nullptr) {
-            destroyPagePool( true, pool );
+            if ( isPersistent ) delete static_cast<PersistentPagePool*>( pool );
+            else delete pool;
             pool = nullptr;
         } else {
-            log << "Page pool on " << directory + "/" + fileName + ".bt" << " does not exist!\n" << flush;
+            log << "Page pool does not exist!\n" << flush;
         }
     }
     virtual void deletePersistentStore() {
-        log << "Deleting persistent store " << directory + "/" + fileName + ".bt" << " ...\n" << flush;
-        if (pool != nullptr) {
-            log << "Page pool on " << directory + "/" + fileName + ".bt" << " still exists!\n" << flush;
+        if ( isPersistent ) {
+            log << "Deleting persistent store " << persistentPath() << " ...\n" << flush;
+            if (pool != nullptr) log << "Page pool still exists!\n" << flush;
+            remove( persistentPath() );
+        } else {
+            log << "Page pool is not persistent!\n";
         }
-        string poolFile = directory + "/" + fileName + ".bt";
-        system( ("DEL " + directory + "\\" + fileName + ".bt").c_str() );
     }
     virtual void createTree() {
-        log << "Constructing B-Tree on " << directory + "/" + fileName + ".bt" << " ...\n" << flush;
+        log << "Constructing B-Tree...\n" << flush;
         if (tree == nullptr) {
             tree = new Tree< K, V >( *pool );
             tree->enableStatistics();
         } else {
-            log << "B-Tree on " << directory + "/" + fileName + ".bt" << " already exists!\n" << flush;
+            log << "B-Tree already exists!\n" << flush;
         }
     }
     virtual void destroyTree() {
@@ -185,7 +195,7 @@ public:
             delete( tree );
             tree = nullptr;
         } else {
-            log << "B-Tree on page pool " << directory + "/" + fileName + ".bt" << " does not exist!\n" << flush;
+            log << "B-Tree does not exist!\n" << flush;
         }
     }
     PageDepth treeDepth() const { return(  (tree != nullptr) ? tree->depth() : 0 ); }
@@ -193,82 +203,83 @@ public:
     virtual size_t size() const = 0;
 
     uint32_t validatePersistentPagePool( PageSize pageSize ) const {
-        string path = directory + "/" + fileName + ".bt";
-        log << "Reading from persistent page file " << path << "\n";
         uint32_t errors = 0;
-        fstream file( path, ios::in | ios::binary );
-        if (file.good()) {
-            file.seekg( 0, file.end );
-            size_t fileSize = file.tellg();
-            size_t pageCount = ((fileSize - sizeof(PageHeader)) / pageSize);
-            if (pageCount == 0) {
-                log << "Page file contains less than 1 page!\n";
-                errors += 1;
-            };
-            PageHeader root;
-            file.seekg( 0, file.beg );
-            file.read( reinterpret_cast<char*>( &root ), sizeof(PageHeader) );
+        if ( isPersistent ) {
+            log << "Reading from persistent page file " << persistentPath() << "\n";
+            fstream file( persistentPath(), ios::in | ios::binary );
             if (file.good()) {
-                if (root.capacity != pageSize) {
-                    log << "Root page capacity " << root.capacity << " does not match expected capacity " << pageSize << "!\n";
+                file.seekg( 0, file.end );
+                size_t fileSize = file.tellg();
+                size_t pageCount = ((fileSize - sizeof(PageHeader)) / pageSize);
+                if (pageCount == 0) {
+                    log << "Page file contains less than 1 page!\n";
                     errors += 1;
-                }
-                if (fileSize != ((pageCount * pageSize) + sizeof(PageHeader))) {
-                    log << "File size " << fileSize << " does not match expected size for " << pageCount << " pages!\n";
-                    errors += 1;
-                }
-                auto buffer = new uint8_t[ pageSize ];
-                for (size_t index = 0; index < pageCount; ++index) {
-                    file.read( reinterpret_cast<char*>( buffer ), pageSize );
-                    if (!file.good()) {
-                        log << "File read error on page " << index << " !\n";
+                };
+                PageHeader root;
+                file.seekg( 0, file.beg );
+                file.read( reinterpret_cast<char*>( &root ), sizeof(PageHeader) );
+                if (file.good()) {
+                    if (root.capacity != pageSize) {
+                        log << "Root page capacity " << root.capacity << " does not match expected capacity " << pageSize << "!\n";
                         errors += 1;
-                        break;
                     }
-                    auto page = reinterpret_cast<PageHeader*>( buffer );
-                    if (page->free == 1) {
-                        if (
-                            (page->modified != 0) ||
-                            (page->persistent != 0) ||
-                            (page->recover != 0) ||
-                            (page->stored != 1) ||
-                            (page->capacity != BTreePageSize)
-                        ) {
-                            log << "Free page " << index << " is corrupt : "
-                                << " modified " << page->modified
-                                << ", persistent " << page->persistent
-                                << ", recover " << page->recover
-                                << ", stored " << page->stored
-                                << ", capacity " << page->capacity
-                                << "!\n";
+                    if (fileSize != ((pageCount * pageSize) + sizeof(PageHeader))) {
+                        log << "File size " << fileSize << " does not match expected size for " << pageCount << " pages!\n";
+                        errors += 1;
+                    }
+                    auto buffer = new uint8_t[ pageSize ];
+                    for (size_t index = 0; index < pageCount; ++index) {
+                        file.read( reinterpret_cast<char*>( buffer ), pageSize );
+                        if (!file.good()) {
+                            log << "File read error on page " << index << " !\n";
                             errors += 1;
+                            break;
                         }
-                    } else {
-                        if (
-                            (page->modified != 0) ||
-                            (page->persistent != 1) ||
-                            (page->recover != 0) ||
-                            (page->stored != 1) ||
-                            (page->capacity != BTreePageSize)
-                        ) {
-                            log << "Persistentent page " << index << " is corrupt : "
-                                << " modified " << page->modified
-                                << ", persistent " << page->persistent
-                                << ", recover " << page->recover
-                                << ", stored " << page->stored
-                                << ", capacity " << page->capacity
-                                << "!\n";
-                            errors += 1;
+                        auto page = reinterpret_cast<PageHeader*>( buffer );
+                        if (page->free == 1) {
+                            if (
+                                (page->modified != 0) ||
+                                (page->persistent != 0) ||
+                                (page->recover != 0) ||
+                                (page->stored != 1) ||
+                                (page->capacity != BTreePageSize)
+                            ) {
+                                log << "Free page " << index << " is corrupt : "
+                                    << " modified " << page->modified
+                                    << ", persistent " << page->persistent
+                                    << ", recover " << page->recover
+                                    << ", stored " << page->stored
+                                    << ", capacity " << page->capacity
+                                    << "!\n";
+                                errors += 1;
+                            }
+                        } else {
+                            if (
+                                (page->modified != 0) ||
+                                (page->persistent != 1) ||
+                                (page->recover != 0) ||
+                                (page->stored != 1) ||
+                                (page->capacity != BTreePageSize)
+                            ) {
+                                log << "Persistentent page " << index << " is corrupt : "
+                                    << " modified " << page->modified
+                                    << ", persistent " << page->persistent
+                                    << ", recover " << page->recover
+                                    << ", stored " << page->stored
+                                    << ", capacity " << page->capacity
+                                    << "!\n";
+                                errors += 1;
+                            }
                         }
                     }
-                }
-                delete[] buffer;
-            } else {
-                log << "File read error on root header!\n";
-                errors += 1;
+                    delete[] buffer;
+                } else {
+                    log << "File read error on root header!\n";
+                    errors += 1;
 
+                }
+                file.close();
             }
-            file.close();
         }
         return errors;
     }
@@ -359,46 +370,56 @@ public:
             << " pages, filling " << ((totalUsage * 100)/ capacity) << " %\n";
         // Now check to see if there are orphan pages.
         // An orphan is a non-free page that is not counted as a B-Tree page
-        uint32_t freePages = 0;
-        uint32_t modifiedPages = 0;
-        uint32_t recoverPages = 0;
-        uint32_t persistentPages = 0;
+        vector<PageLink> freePages;
+        vector<PageLink> modifiedPages;
+        vector<PageLink> recoverPages;
+        vector<PageLink> persistentPages;
         for (uint32_t i = 0; i < pool->size(); ++i ) {
-            const PageHeader& page = pool->access( PageLink( i ) );
-            if (page.free != 0) freePages += 1;
-            if (page.modified != 0) modifiedPages += 1;
-            if (page.recover != 0) recoverPages += 1;
-            if (page.persistent != 0) persistentPages += 1;
+            const PageLink link( i );
+            const PageHeader& page = pool->access( link );
+            if (page.free != 0) freePages.push_back( link );
+            if (page.modified != 0) modifiedPages.push_back( link );
+            if (page.recover != 0) recoverPages.push_back( link );
+            if (page.persistent != 0) persistentPages.push_back( link );
+            if (!isPersistent && page.persistent != 0) {
+                log << "Page " << page.page << " marked as persistent in non-persistent pool!\n";
+                errors += 1;
+            }
             if ((page.recover != 0) && (page.persistent == 0)) {
                 log << "Recovering non-persistent page " << page.page << "!\n";
                 errors += 1;
             }
         }
-        if (freePages != pool->sizeFreed()) {
-            log << "Free pages list size " << pool->sizeFreed() << " does not match detected number of free pages " << freePages << "!\n";
+        if (freePages.size() != pool->sizeFreed()) {
+            log << "Free pages list size " << pool->sizeFreed() << " does not match detected number of free pages " << freePages.size() << "!\n";
             errors += 1;
         }
-        if (modifiedPages != pool->sizeModified()) {
-            log << "Modified pages list size " << pool->sizeModified() << " does not match detected number of modified pages " << modifiedPages << "!\n";
+        if (modifiedPages.size() != pool->sizeModified()) {
+            log << "Modified pages list size " << pool->sizeModified() << " does not match detected number of modified pages " << modifiedPages.size() << "!\n";
             errors += 1;
         }
-        if (recoverPages != pool->sizeRecover()) {
-            log << "Recover pages list size " << pool->sizeRecover() << " does not match detected number of recover pages " << recoverPages << "!\n";
+        if (recoverPages.size() != pool->sizeRecover()) {
+            log << "Recover pages list size " << pool->sizeRecover() << " does not match detected number of recover pages " << recoverPages.size() << "!\n";
             errors += 1;
         }
-        if (persistentPages < recoverPages) {
-            log << "Number of recover pages " << recoverPages << " exceeds number of persistent pages " << persistentPages << "!/n";
+        if (persistentPages.size() < recoverPages.size()) {
+            log << "Number of recover pages " << recoverPages.size() << " exceeds number of persistent pages " << persistentPages.size() << "!/n";
         }
-        if ((pageCount + freePages) < pool->size()) {
-            uint32_t orphans = (pool->size() - (pageCount + freePages));
+        if ((pageCount + freePages.size()) < pool->size()) {
+            auto orphans = (pool->size() - (pageCount + freePages.size()));
             log << "Detected " << orphans << " orphans out of " << pool->size() << " pages, B-Tree used " << pageCount << " pages!\n";
             errors += 1;
         }
         log << "Page pool consists of " << pool->size() << " pages, "
-            << freePages << " free, "
-            << modifiedPages << " modified, "
-            << persistentPages << " persistent, "
-            << recoverPages << " recover.\n";
+            << freePages.size() << " free, "
+            << modifiedPages.size() << " modified, "
+            << persistentPages.size() << " persistent, "
+            << recoverPages.size() << " recover.\n";
+        // Following page list logs are for debugging. Enable when requried.
+        // logPageList( log, freePages, "Free" );
+        // logPageList( log, modifiedPages, "Modified" );
+        // logPageList( log, persistentPages, "Persistent" );
+        // logPageList( log, recoverPages, "Recover" );
         return errors;
     }
 
@@ -414,7 +435,7 @@ public:
             if (TryUnexpectedKeys) log << " (with tests on unexpected keys) ";
             log << "...\n" << flush;
             if (tree == nullptr) {
-                log << "B-Tree on page pool " << directory + "/" + fileName + ".bt" << " does not exist!\n";
+                log << "B-Tree does not exist!\n";
                 errors += 1;
             } else {
                 size_t tSize = treeSize();
@@ -445,7 +466,7 @@ public:
         if (tree != nullptr) {
             tree->commit();
         } else {
-            log << "B-Tree on page pool " << directory + "/" + fileName + ".bt" << " does not exist!\n" << flush;
+            log << "B-Tree does not exist!\n" << flush;
             errors += 1;
         }
         return errors;
@@ -456,7 +477,7 @@ public:
         if (tree != nullptr) {
             tree->recover();
         } else {
-            log << "B-Tree on page pool " << directory + "/" + fileName + ".bt" << " does not exist!\n" << flush;
+            log << "B-Tree does not exist!\n" << flush;
             errors += 1;
         }
         return errors;
@@ -502,7 +523,7 @@ public:
         if (tree != nullptr) {
             this->log << *tree << flush;
         } else {
-            log << "B-Tree on page pool " << directory + "/" + fileName + ".bt" << " does not exist!\n" << flush;
+            log << "B-Tree does not exist!\n" << flush;
             errors += 1;
         }
         return errors;
@@ -580,7 +601,7 @@ public:
         if (tree != nullptr) {
             // Ensure that all expected content is actually present
             for (auto entry = content.cbegin(); entry != content.cend(); ++entry) {
-                uint32_t retrieved = tree->retrieve( entry->first );
+                auto retrieved = tree->at( entry->first );
                 if (retrieved != entry->second) {
                     log << "Key " << entry->first << " : Expected " << entry->second << ", retrieved " << retrieved << "!\n";
                     errors += 1;
@@ -602,7 +623,7 @@ if (TryUnexpectedKeys) log << "Trying un-expected keys...\n";
                 uint32_t key = generateUniqueKey();
                 if (TryUnexpectedKeys) {
                     try {
-                        auto retrieved = tree->retrieve( key );
+                        auto retrieved = tree->at( key );
                         log << "Retrieved " << retrieved << " with unexpected key " << key << "!\n";
                         errors += 1;
                     }
@@ -714,7 +735,7 @@ if (TryUnexpectedKeys) log << "Trying un-expected keys...\n";
     };
     uint32_t assign() {
         uint32_t errors = TreeTester<uint32_t,uint32_t>::assign();
-        PagePool* temp = createPagePool( false, (BTreePageSize * 2) );
+        PagePool* temp = new PagePool( BTreePageSize * 2 );
         {
             // Enclose in block to destruct B-Tree prior to destructing
             // dynamically allocated PagePool
@@ -737,7 +758,7 @@ if (TryUnexpectedKeys) log << "Trying un-expected keys...\n";
                 errors += 1;
             }
         }
-        destroyPagePool( false, temp );
+        delete temp;
         return errors;
     };
 }; // class Uint32Uint32TreeTester
@@ -844,9 +865,9 @@ public:
                     uint32_t retrieved;
                     if (usePair) {
                         pair<const uint16_t*, PageSize> keyPair = { entry->first->data(), static_cast<PageSize>(entry->first->size()) };
-                        retrieved = tree->retrieve( keyPair );
+                        retrieved = tree->at( keyPair );
                     } else {
-                        retrieved = tree->retrieve( entry->first->data(), static_cast<PageSize>(entry->first->size()) );
+                        retrieved = tree->at( entry->first->data(), static_cast<PageSize>(entry->first->size()) );
                     }
                     if (retrieved != entry->second) {
                         log << "Key " << entry->first << " : Expected " << entry->second << ", retrieved " << retrieved << "!\n";
@@ -899,9 +920,9 @@ public:
                         uint32_t retrieved;
                         if (usePair) {
                             pair<const uint16_t*, PageSize> keyPair = { key->data(), static_cast<PageSize>(key->size()) };
-                            retrieved = tree->retrieve( keyPair );
+                            retrieved = tree->at( keyPair );
                         } else {
-                            retrieved = tree->retrieve( key->data(), static_cast<PageSize>(key->size()) );
+                            retrieved = tree->at( key->data(), static_cast<PageSize>(key->size()) );
                         }
                         log << "Retrieved " << retrieved << " with unexpected key ";
                         logUint16Array( log, key->data(), static_cast<PageSize>(key->size()) );
@@ -1090,7 +1111,7 @@ public:
     };
     uint32_t assign() {
         uint32_t errors = TreeTester<uint16_t[],uint32_t>::assign();
-        PagePool* temp = createPagePool( false, (BTreePageSize * 2) );
+        PagePool* temp = new PagePool( BTreePageSize * 2 );
         {
             // Enclose in block to destruct B-Tree prior to destructing
             // dynamically allocated PagePool
@@ -1113,7 +1134,7 @@ public:
                 errors += 1;
             }
         }
-        destroyPagePool( false, temp );
+        delete temp;
         return errors;
     };
 }; // class Uint16ArrayUint32TreeTester
@@ -1213,7 +1234,7 @@ public:
             // Ensure that all expected content is actually present
             for (auto entry = content.cbegin(); entry != content.cend(); ++entry) {
                 try {
-                    auto retrieved = tree->retrieve( entry->first );
+                    auto retrieved = tree->at( entry->first );
                     if (Uint16ArrayCompare::compare( entry->second->data(), static_cast<PageSize>(entry->second->size()), retrieved.first, retrieved.second )) {
                         log << "Key " << entry->first << " : Expected ";
                         logUint16Array( log, entry->second->data(), static_cast<PageSize>(entry->second->size()) );
@@ -1248,7 +1269,7 @@ public:
                 uint32_t key = generateUniqueKey();
                 if (TryUnexpectedKeys) {
                     try {
-                        auto retrieved = tree->retrieve( key );
+                        auto retrieved = tree->at( key );
                         log << "Retrieved ";
                         logUint16Array( log, retrieved.first, retrieved.second );
                         log << " with unexpected key " << key << "!\n";
@@ -1405,7 +1426,7 @@ public:
     };
     uint32_t assign() {
         uint32_t errors = TreeTester<uint32_t,uint16_t[]>::assign();
-        PagePool* temp = createPagePool( false, (BTreePageSize * 2) );
+        PagePool* temp = new PagePool( BTreePageSize * 2 );
         {
             // Enclose in block to destruct B-Tree prior to destructing
             // dynamically allocated PagePool
@@ -1428,7 +1449,7 @@ public:
                 errors += 1;
             }
         }
-        destroyPagePool( false, temp );
+        delete temp;
         return errors;
     };
 }; // class Uint32Uint16ArrayTreeTester
@@ -1543,9 +1564,9 @@ public:
                     pair<const uint16_t*,PageSize> retrieved;
                     if (usePair) {
                         pair<const uint16_t*, PageSize> keyPair = { entry->first->data(), static_cast<PageSize>(entry->first->size()) };
-                        retrieved = tree->retrieve( keyPair );
+                        retrieved = tree->at( keyPair );
                     } else {
-                        retrieved = tree->retrieve( entry->first->data(), static_cast<PageSize>(entry->first->size()) );
+                        retrieved = tree->at( entry->first->data(), static_cast<PageSize>(entry->first->size()) );
                     }
                     if (Uint16ArrayCompare::compare( entry->second->data(), static_cast<PageSize>(entry->second->size()), retrieved.first, retrieved.second )) {
                         log << "Key ";
@@ -1603,9 +1624,9 @@ public:
                         pair<const uint16_t*,PageSize> retrieved;
                         if (usePair) {
                             pair<const uint16_t*, PageSize> keyPair = { key->data(), static_cast<PageSize>(key->size()) };
-                            retrieved = tree->retrieve( keyPair );
+                            retrieved = tree->at( keyPair );
                         } else {
-                            retrieved = tree->retrieve( key->data(), static_cast<PageSize>(key->size()) );
+                            retrieved = tree->at( key->data(), static_cast<PageSize>(key->size()) );
                         }
                         log << "Retrieved ";
                         logUint16Array( log, retrieved.first, retrieved.second );
@@ -1807,7 +1828,7 @@ public:
     };
     uint32_t assign() {
         uint32_t errors = TreeTester<uint16_t[],uint16_t[]>::assign();
-        PagePool* temp = createPagePool( false, (BTreePageSize * 2) );
+        PagePool* temp = new PagePool( BTreePageSize * 2 );
         {
             // Enclose in block to destruct B-Tree prior to destructing
             // dynamically allocated PagePool
@@ -1830,7 +1851,7 @@ public:
                 errors += 1;
             }
         }
-        destroyPagePool( false, temp );
+        delete temp;
         return errors;
     };
     void statistics() const {
@@ -1861,123 +1882,151 @@ public:
 }; // class Uint16ArrayUint16ArrayTreeTester
 
 template< class K, class V >
-pair<uint32_t,bool> doTest( TreeTester<K,V>& tester, size_t count1, size_t count2, ofstream& log ) {
+pair<uint32_t,bool> doTest( TreeTester<K,V>& tester, int count1, int count2, ofstream& log ) {
     uint32_t errors = 0;
     bool exception = false;
     try {
+        log << "Forward, Reverse and Random insertion and removal test...\n";
+        tester.persistent( false );
         tester.createPool();
         // Insertion in forward order
         tester.createTree();
         errors += tester.validate();
-        errors += tester.commit();
         errors += tester.validate();
-        errors += tester.insert(static_cast<int>(count1), TreeTester<K,V>::Forward );
+        errors += tester.insert( count1, TreeTester<K,V>::Forward );
         errors += tester.validate();
-        errors += tester.erase(static_cast<int>(count2), TreeTester<K,V>::Forward );
-        errors += tester.validate();
-        tester.logTree();
-        tester.destroyTree();
-        tester.createTree();
-        errors += tester.insert(static_cast<int>(count1), TreeTester<K,V>::Forward );
-        errors += tester.validate();
-        errors += tester.erase(static_cast<int>(count2), TreeTester<K,V>::Reverse );
+        errors += tester.erase( count2, TreeTester<K,V>::Forward );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
-        errors += tester.insert(static_cast<int>(count1), TreeTester<K,V>::Forward );
+        errors += tester.insert( count1, TreeTester<K,V>::Forward );
         errors += tester.validate();
-        errors += tester.erase(static_cast<int>(count2), TreeTester<K,V>::Random );
+        errors += tester.erase( count2, TreeTester<K,V>::Reverse );
+        errors += tester.validate();
+        tester.logTree();
+        tester.destroyTree();
+        tester.createTree();
+        errors += tester.insert( count1, TreeTester<K,V>::Forward );
+        errors += tester.validate();
+        errors += tester.erase( count2, TreeTester<K,V>::Random );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         // Insertion in reverse order
         tester.createTree();
         errors += tester.validate();
-        errors += tester.commit();
         errors += tester.validate();
-        errors += tester.insert(static_cast<int>(count1), TreeTester<K,V>::Reverse );
+        errors += tester.insert( count1, TreeTester<K,V>::Reverse );
         errors += tester.validate();
-        errors += tester.erase(static_cast<int>(count2), TreeTester<K,V>::Forward );
-        errors += tester.validate();
-        tester.logTree();
-        tester.destroyTree();
-        tester.createTree();
-        errors += tester.insert(static_cast<int>(count1), TreeTester<K,V>::Reverse );
-        errors += tester.validate();
-        errors += tester.erase(static_cast<int>(count2), TreeTester<K,V>::Reverse );
+        errors += tester.erase( count2, TreeTester<K,V>::Forward );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
-        errors += tester.insert(static_cast<int>(count1), TreeTester<K,V>::Reverse );
+        errors += tester.insert( count1, TreeTester<K,V>::Reverse );
         errors += tester.validate();
-        errors += tester.erase(static_cast<int>(count2), TreeTester<K,V>::Random );
+        errors += tester.erase( count2, TreeTester<K,V>::Reverse );
+        errors += tester.validate();
+        tester.logTree();
+        tester.destroyTree();
+        tester.createTree();
+        errors += tester.insert( count1, TreeTester<K,V>::Reverse );
+        errors += tester.validate();
+        errors += tester.erase( count2, TreeTester<K,V>::Random );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         // Insertion in random order
         tester.createTree();
         errors += tester.validate();
-        errors += tester.commit();
         errors += tester.validate();
-        errors += tester.insert(static_cast<int>(count1), TreeTester<K,V>::Random );
+        errors += tester.insert( count1, TreeTester<K,V>::Random );
         errors += tester.validate();
-        errors += tester.erase(static_cast<int>(count2), TreeTester<K,V>::Forward );
-        errors += tester.validate();
-        tester.logTree();
-        tester.destroyTree();
-        tester.createTree();
-        errors += tester.insert(static_cast<int>(count1), TreeTester<K,V>::Random );
-        errors += tester.validate();
-        errors += tester.erase(static_cast<int>(count2), TreeTester<K,V>::Reverse );
+        errors += tester.erase( count2, TreeTester<K,V>::Forward );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
         tester.createTree();
-        errors += tester.insert( static_cast<int>(count1), TreeTester<K,V>::Random );
+        errors += tester.insert( count1, TreeTester<K,V>::Random );
         errors += tester.validate();
-        errors += tester.erase(static_cast<int>(count2), TreeTester<K,V>::Random );
+        errors += tester.erase( count2, TreeTester<K,V>::Reverse );
         errors += tester.validate();
         tester.logTree();
         tester.destroyTree();
-        // Commit and recover test
         tester.createTree();
+        errors += tester.insert( count1, TreeTester<K,V>::Random );
         errors += tester.validate();
-        errors += tester.insert(static_cast<int>(count1) / 10, TreeTester<K,V>::Random );
+        errors += tester.erase( count2, TreeTester<K,V>::Random );
         errors += tester.validate();
-        errors += tester.commit();
-        errors += tester.validate();
-        errors += tester.insert(static_cast<int>(count1 - (count1 / 10)), TreeTester<K,V>::Random );
-        errors += tester.validate();
-        errors += tester.commit();
-        errors += tester.validate();
-        errors += tester.replace(static_cast<int>(count1 / 2) );
-        errors += tester.validate();
-        errors += tester.erase(static_cast<int>(count1 - (count1 / 4)), TreeTester<K,V>::Random );
-        errors += tester.validate();
-        errors += tester.recover();
-        errors += tester.validate();
-        errors += tester.erase(static_cast<int>(count1 / 2), TreeTester<K,V>::Random );
-        errors += tester.validate();
-        errors += tester.replace(static_cast<int>(count1 / 2) );
-        errors += tester.validate();
-        errors += tester.insert(static_cast<int>(count1 / 2), TreeTester<K,V>::Random );
-        errors += tester.validate();
-        errors += tester.assign();
-        errors += tester.validate();
-        tester.destroyTree();
-        tester.createTree();
-        errors += tester.validate();
+        tester.logTree();
         tester.destroyTree();
         tester.destroyPool();
+        // Endurance test by randomly inserting and removing ~33 % of B-Tree repeatedly
+        log << "Endurance test...\n";
+        tester.createPool();
+        tester.createTree();
+        errors += tester.insert( count1, TreeTester<K,V>::Random );
+        errors += tester.validate();
+        times( EnduranceCount ) {
+            errors += tester.insert( count1/3, TreeTester<K,V>::Random );
+            errors += tester.validate();
+            errors += tester.erase( count1/3, TreeTester<K,V>::Random );
+            errors += tester.validate();
+        }
+        tester.destroyTree();
+        tester.destroyPool();
+        // Commit and recover tests on persistent page pool
+        log << "Persistent commit and recover test...\n";
+        tester.persistent( true );
         tester.createPool();
         tester.createTree();
         errors += tester.validate();
-        errors += tester.erase(static_cast<int>(count1 / 4), TreeTester<K,V>::Random );
+        errors += tester.insert( count1/2, TreeTester<K,V>::Random );
+        // tester.logTree();
         errors += tester.validate();
-        errors += tester.recover();
-        errors += tester.validate();
+        times( TransactionCount ) {
+            errors += tester.insert( count1/2, TreeTester<K,V>::Random );
+            // tester.logTree();
+            errors += tester.validate();
+            errors += tester.commit();
+            // tester.logTree();
+            errors += tester.validate();
+            errors += tester.replace( count1/2 );
+            // tester.logTree();
+            errors += tester.validate();
+            errors += tester.recover();
+            // tester.logTree();
+            errors += tester.validate();
+            errors += tester.erase( count1/2, TreeTester<K,V>::Random );
+            // tester.logTree();
+            errors += tester.validate();
+            errors += tester.recover();
+            // tester.logTree();
+            errors += tester.validate();
+            errors += tester.assign();
+            // tester.logTree();
+            errors += tester.validate();
+            tester.destroyTree();
+            tester.createTree();
+            // tester.logTree();
+            errors += tester.validate();
+            tester.destroyTree();
+            tester.destroyPool();
+            tester.createPool();
+            tester.createTree();
+            // tester.logTree();
+            errors += tester.validate();
+            errors += tester.erase( count1/2, TreeTester<K,V>::Random );
+            // tester.logTree();
+            errors += tester.validate();
+            errors += tester.commit();
+            // tester.logTree();
+            errors += tester.validate();
+        }
+        tester.destroyTree();
+        tester.destroyPool();
+        tester.deletePersistentStore();
     }
     catch ( string message ) {
         log << "Exception : " << message << "!\n";
@@ -2000,8 +2049,8 @@ int main(int argc, char* argv[]) {
     log.open( "testBTreeValidity\\logBTreeValidity.txt" );
     uint32_t errorCount = 0;
     uint32_t exceptionCount = 0;
-    size_t count1 = 0;
-    size_t count2 = 0;
+    int count1 = 0;
+    int count2 = 0;
     if (2 <= argc) count1 = stoi( argv[ 1 ] );
     if (3 <= argc) count2 = stoi( argv[ 2 ] );
     for ( int arg = 3; arg < argc; ++arg ) {
@@ -2029,19 +2078,16 @@ int main(int argc, char* argv[]) {
         if (errors.second) {
             log << "Exception detected!\n";
             exceptionCount += 1;
-        } else if (0 < errors.first) {
+        }
+        if (0 < errors.first) {
             log << errors.first << " errors detected!\n";
             errorCount += errors.first;
         }
         log << "\n";
     }
-    if (0 < exceptionCount) {
-        log << exceptionCount << " exceptions detected!";
-    } else if (0 < errorCount) {
-        log << "Total of " << errorCount << " errors detected!";
-    } else {
-        log << "No errors detected.";
-    }
+    if (0 < exceptionCount) log << "Total of " << exceptionCount << " exceptions detected!\n";
+    if (0 < errorCount) log << "Total of " << errorCount << " errors detected!\n";
+    if ((exceptionCount ==0) && (errorCount ==0)) log << "No errors detected.\n";
     log.close();
     exit( errorCount );
 };

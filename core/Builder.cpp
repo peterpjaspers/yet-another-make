@@ -454,7 +454,7 @@ namespace YAM
     }
 
     // Called in main thread
-    void Builder::_notifyCompletion(Node::State resultState) {\
+    void Builder::_notifyCompletion(Node::State resultState) {
         _periodicStorage->suspend();
         _storeBuildState();
         auto state = BuildResult::State::Unknown;

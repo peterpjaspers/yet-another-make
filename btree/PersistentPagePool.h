@@ -15,10 +15,10 @@ namespace BTree {
     // persistent file.
     class PersistentPagePool : public PagePool {
     private:
-        // Pages to be recoverd from persistent store when a transaction fails (call to recover()).
+        // Pages to be recoverd from persistent store when a transaction fails (call to recover).
         // Note that pages in this list may also reside in the modified list and/or the free list
         // depending on the operations performed on the page. The recover list is emptied
-        // when a transaction succeeds (with commit()) or fails (with recover()).
+        // when a transaction succeeds (with commit) or fails (with recover).
         std::vector<PageLink> recoverPages;
         std::string fileName;
     public:

@@ -12,6 +12,24 @@
 
 namespace BTree {
 
+    // Class with functions operating on B-Tree Pages.
+    // Page content is rearranged to accomodate the required function.
+    //
+    // pageSplit       : set split value in Page
+    // pageRemoveSplit : remove split value from Page
+    // pageInsert      : insert key-value at index
+    // pageReplace     : replace value or key-value at index
+    // pageRemove      : remove key-value at index
+    // shiftRight      : shift Page content upwards from index to front of other Page
+    // shiftLeft       : shift content up to index to back of other Page
+    //
+    // Each function is provided in all combinations of:
+    //
+    //  Scalar key and scalar value
+    //  Array key and scalar value
+    //  Scalar key and array value
+    //  Array key and array value
+    //
     class PageFunctions {
     public:
 

@@ -73,7 +73,7 @@ int main(int argc, char* argv[]) {
     create_directory( "testStringBTree ");
     int errors = 0;
     // String2String test
-    stream.open( "testStringBTree\\log.txt" );
+    stream.open( "testStringBTree\\logStringBTree.txt" );
     try {
         map<string,string> entries;
         vector<string> keys;
@@ -103,7 +103,7 @@ int main(int argc, char* argv[]) {
         }
         stream << "Reading " << ValueCount << " strings with string keys...\n";
         for ( auto key : keys ) {
-            string value = tree.retrieve( key );
+            auto value = tree.at( key );
             if ( value != entries[ key ] ) {
                 stream << "Value mismatch for key " << key << " : expected " << entries[ key ] << ", retrieved " << value << "!\n";
                 errors += 1;
@@ -151,7 +151,7 @@ int main(int argc, char* argv[]) {
         }
         stream << "Reading " << ValueCount << " 32-bit unsigned integers with string keys...\n";
         for ( auto key : keys ) {
-            uint32_t value = tree.retrieve( key );
+            auto value = tree.at( key );
             if ( value != entries[ key ] ) {
                 stream << "Value mismatch for key " << key << " : expected " << entries[ key ] << ", retrieved " << value << "!\n";
                 errors += 1;
@@ -200,8 +200,8 @@ int main(int argc, char* argv[]) {
         stream << "Reading " << ValueCount << " 16-bit unsigned integer arrays with string keys...\n";
         for ( auto key : keys ) {
             auto reference = entries[ key ];
-            auto retrieved = tree.retrieve( key );
-            if (BTree::defaultCompareArray( reference.data(), static_cast<PageSize>(reference.size()), retrieved.first, retrieved.second) != 0) {
+            auto retrieved = tree.at( key );
+            if (BTree::defaultCompareArray( reference.data(), static_cast<PageSize>(reference.size()), retrieved.first, static_cast<PageSize>(retrieved.second) ) != 0) {
                 stream << "Value mismatch for key " << key << " : expected ";
                 streamUint16Array( stream, reference );
                 stream << ", retrieved ";
@@ -253,7 +253,7 @@ int main(int argc, char* argv[]) {
         stream << "Reading " << ValueCount << " strings with 32-bit unsigned int keys...\n";
         for ( auto key : keys ) {
             auto reference = entries[ key ];
-            string value = tree.retrieve( key );
+            auto value = tree.at( key );
             if ( value != reference ) {
                 stream << "Value mismatch for " << key << " : expected " << reference << ", retrieved " << value << ".\n";
                 errors += 1;
@@ -300,7 +300,7 @@ int main(int argc, char* argv[]) {
         stream << "Reading " << ValueCount << " strings with 16-bit unsigned int array keys...\n";
         for ( auto key : keys ) {
             auto reference = entries[ key ];
-            string value = tree.retrieve( key.data(), static_cast<PageSize>(key.size()) );
+            auto value = tree.at( key.data(), static_cast<PageSize>(key.size()) );
             if ( value != reference ) {
                 stream << "Value mismatch : expected " << reference << ", retrieved " << value << ".\n";
                 errors += 1;
