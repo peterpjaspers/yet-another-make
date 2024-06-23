@@ -9,19 +9,6 @@
 namespace
 {
     uint32_t streamableTypeId = 0;
-
-    bool equalPaths(std::filesystem::path const& p1, std::filesystem::path const& p2) {
-        auto p1it = p1.begin();
-        auto p2it = p2.begin();
-        bool equal = true;
-        for (;
-            p1it != p1.end() && p2it != p2.end() && equal;
-            p1it++, p2it++
-        ) {
-            equal = *p1it == *p2it;
-        }
-        return equal;
-    }
 }
 
 namespace YAM

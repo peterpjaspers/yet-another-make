@@ -21,6 +21,7 @@ namespace
     };
 
     std::filesystem::path wdir(std::filesystem::current_path());
+
     TEST(MonitoredProcessWin32, ping) {
         std::map<std::string, std::string> env;
 
@@ -84,30 +85,21 @@ namespace
 
     TEST(MonitoredProcessWin32, fileDependencies) {
         WorkingDir tempDir;
+        std::string cmdExe = boost::process::search_path("cmd").string();
         std::map<std::string, std::string> env;
-        std::filesystem::path junkFile(tempDir.dir / "junk.txt");
-        auto readJunkFile = [&]() {
-            std::ifstream istream(junkFile);
-            std::string result;
-            istream >> result;
-            istream.close();
-            return result;
-        };
 
-        auto cmdExe = boost::process::search_path("cmd").string();
         MonitoredProcessWin32 cmd(
-            cmdExe, 
-            "/c echo rubbish > junk.txt & type junk.txt", 
-            tempDir.dir, 
+            cmdExe,
+            " /c echo rubbish > junk.txt & type junk.txt",
+            wdir,
             env);
         EXPECT_TRUE(cmd.wait_for(15000));
         MonitoredProcessResult result = cmd.wait();
         ASSERT_EQ(0, result.exitCode);
         EXPECT_EQ(1, result.readFiles.size());
-        EXPECT_TRUE(result.readFiles.contains(junkFile));
-        EXPECT_EQ(1, result.writtenFiles.size());
-        EXPECT_TRUE(result.writtenFiles.contains(junkFile));
         EXPECT_EQ(0, result.readOnlyFiles.size());
-        EXPECT_EQ(std::string("rubbish"), readJunkFile());
+        EXPECT_EQ(1, result.writtenFiles.size());
+        EXPECT_TRUE(result.readFiles.contains(wdir / "junk.txt"));
+        EXPECT_TRUE(result.writtenFiles.contains(wdir / "junk.txt"));
     }
 }

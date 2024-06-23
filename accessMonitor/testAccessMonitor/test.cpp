@@ -65,7 +65,7 @@ void doFileAccess() {
     if (remoteProcess) {
         wstringstream command;
         command
-            << L"C:\\Users\\philv\\Code\\yam\\yet-another-make\\accessMonitor\\remoteTest.exe"
+            << L"D:/Peter/Github/yam/x64/Debug/remoteTest.exe"
             << L" " 
             << threads
             << L" "

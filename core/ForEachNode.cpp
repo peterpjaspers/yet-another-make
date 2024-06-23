@@ -373,7 +373,7 @@ namespace YAM
         rule->line = _ruleLineNr;
         rule->forEach = false;
 
-        auto inputPath = std::filesystem::proximate(inputFile->name(), workingDirectory()->name());
+        auto inputPath = inputFile->name().lexically_proximate(workingDirectory()->name());
         BuildFile::Input input;
         input.line = _ruleLineNr;
         input.exclude = false;

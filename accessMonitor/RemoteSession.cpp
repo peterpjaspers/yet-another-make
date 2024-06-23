@@ -13,6 +13,7 @@ namespace AccessMonitor {
         // TLS data is used to avoid mutual exclusion when accessing this data.
         struct MonitorData {
             SessionID       session;
+            std::filesystem::path directory;
             ProcessID       process;
             ThreadID        thread;
             LogFile*        eventLog;
@@ -29,16 +30,22 @@ namespace AccessMonitor {
         if (sessionData == nullptr) throw string( signature ) + " - No session active!";
         return sessionData->session;
     }
-    SessionID CreateSession() {
+    std::filesystem::path const& CurrentSessionDirectory() {
+        static const char* signature = "SessionID CurrentSessionDirectory()";
+        if (sessionData == nullptr) throw string(signature) + " - No session active!";
+        return sessionData->directory;
+    }
+    SessionID CreateSession(std::filesystem::path const& directory) {
         static const char* signature = "SessionID CreateSession()";
         throw string( signature ) + " - Invalid call!";
     }
-    void CreateRemoteSession( SessionID session, ProcessID process, ThreadID thread ) {
+    void CreateRemoteSession(std::filesystem::path const& directory, SessionID session, ProcessID process, ThreadID thread ) {
         static const char* signature = "void CreateRemoteSession( SessionID session, ProcessID process, ThreadID thread )";
         if (sessionData != nullptr) throw string( signature ) + " - Remote session already created!";
         const lock_guard<mutex> lock( sessionMutex );
-        auto data = static_cast<MonitorData*>( LocalAlloc( LMEM_FIXED, sizeof( MonitorData ) ) );
+        auto data = static_cast<MonitorData*>( LocalAlloc( LPTR, sizeof( MonitorData ) ) );
         data->session = session;
+        data->directory = directory;
         data->process = process;
         data->thread = thread;
         sessionData = data;
@@ -50,7 +57,7 @@ namespace AccessMonitor {
         LocalFree( static_cast<HLOCAL>( const_cast<MonitorData*>( sessionData ) ) );
         sessionData = nullptr;
     }
-    void AddThreadToSession( SessionID session, LogFile* eventLog, LogFile* debugLog ) {}
+    void AddThreadToSession( SessionID session, std::filesystem::path const& directory, LogFile* eventLog, LogFile* debugLog ) {}
     void RemoveThreadFromSession() {}
 
     bool SessionDefined() {

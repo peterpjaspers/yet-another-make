@@ -7,6 +7,7 @@
 #include <filesystem>
 
 using namespace std;
+using namespace std::filesystem;
 
 namespace AccessMonitor {
     
@@ -20,7 +21,7 @@ namespace AccessMonitor {
     // that excutes LoadLibrary as its (main) function. The DLLMain entry point of the library is
     // called as a result of loading the DLL.
     // Throws one of a number of failure specific exceptions.
-    void inject( SessionID session, ProcessID process, ThreadID thread, const wstring& library ) {
+    void inject( path const& sessionDirectory, SessionID session, ProcessID process, ThreadID thread, const wstring& library ) {
         const char* signature = "void inject( SessionID session, ProcessID process, const wstring& library )";
         HANDLE processHandle = OpenProcess( PROCESS_CREATE_THREAD | PROCESS_VM_OPERATION | PROCESS_VM_WRITE, FALSE, (DWORD)process );
         if (processHandle != nullptr) {
@@ -34,7 +35,7 @@ namespace AccessMonitor {
                         if (function != nullptr) {
                             HANDLE threadHandle = CreateRemoteThread( processHandle, nullptr, 0, function, fileName, CREATE_SUSPENDED, nullptr );
                             // Communicate session ID and main thread ID via session ID file...
-                            recordSessionInfo( session, process, thread );
+                            recordSessionInfo(sessionDirectory, session, process, thread );
                             if (threadHandle != nullptr) {
                                 auto processPatched = AccessEvent( "ProcessPatched", session, process );
                                 if (ResumeThread( threadHandle ) == 1) {

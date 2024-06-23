@@ -1,3 +1,6 @@
+
+#define _CRT_SECURE_NO_WARNINGS
+
 #include "Process.h"
 #include "PatchProcess.h"
 #include "Session.h"
@@ -15,26 +18,33 @@ using namespace std::filesystem;
 namespace {
 
     DWORD monitorDLLMain( void* argument ) {
+        //bool go = true;
+        //while (go) {
+        //    bool stop = true;
+        //}
+        std::filesystem::path sessionDirectory = std::filesystem::temp_directory_path();
         ProcessID process = CurrentProcessID();
         SessionID session;
         ThreadID mainThread; // Main thread ID of (remote) process
-        retrieveSessionInfo( process, session, mainThread );
-        CreateRemoteSession( session, process, mainThread );
+        retrieveSessionInfo( sessionDirectory, process, session, mainThread );
+        CreateRemoteSession(sessionDirectory, session, process, mainThread );
+        auto requestExit = AccessEvent( "RequestExit", session, process );
+        auto processPatched = AccessEvent( "ProcessPatched", session, process );
         SessionDebugLog( createDebugLog() );
         SessionEventLog( createEventLog() );
         debugLog().enable( PatchedFunction | ParseLibrary | PatchExecution | FileAccesses );
         debugRecord() << "Start monitoring session " << session << " in process " << process << "..." << dec << record;
         patchProcess();
-        auto requestExit = AccessEvent( "RequestExit", session, process );
-        EventSignal( "ProcessPatched", session, process ); // Signal (parent) process that monitoring has started
+        EventSignal( processPatched ); // Signal (parent) process that monitoring has started
         EventWait( requestExit ); // Wait for process to (request) exit before exitting monitor thread
-        ReleaseEvent( requestExit );
         debugRecord() << "Stop monitoring session " << session << " in process " << process << "..." << dec << record;
         unpatchProcess();
-        remove( sessionInfoPath( process ) );
+        remove( sessionInfoPath(sessionDirectory, process ) );
         SessionEventLogClose();
         SessionDebugLogClose();
         EventSignal( "ExitProcess", session, process ); // Signal process that it may exit
+        ReleaseEvent( processPatched );
+        ReleaseEvent( requestExit );
         return ERROR_SUCCESS;
     }
 

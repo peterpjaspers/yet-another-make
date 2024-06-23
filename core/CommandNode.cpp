@@ -1214,6 +1214,7 @@ namespace YAM
 
         std::map<std::string, std::string> env;
         env["TMP"] = tmpDir.string();
+        env["TEMP"] = tmpDir.string();
 
         std::filesystem::path wdir;
         auto locked = _workingDir.lock();

@@ -313,6 +313,9 @@
     <None Include="IStreamer.inl" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\accessMonitorLib\accessMonitorLib.vcxproj">
+      <Project>{479a7e12-68c4-47d4-8bef-b8b836a9425d}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\btree\btree.vcxproj">
       <Project>{bce274f0-7a63-4d67-928b-f46c0eb23326}</Project>
     </ProjectReference>

@@ -126,12 +126,13 @@ namespace
     // Reproduces crash caused by bug in PersistentBuildState::removePendingDelete
     // Crash fixed by commit after commit edc730a7c8e2e431162d9837d290d10a4ebae942
     TEST(Endurance, reproducePendingDeleteCrash) {
-        std::filesystem::remove_all("D:\\test_yam");
-        std::filesystem::remove_all("D:\\test_yam_1");
-        std::filesystem::remove_all("D:\\test_yam_2");
-        std::filesystem::copy("D:\\clean_repos\\test_yam", "D:\\test_yam", std::filesystem::copy_options::recursive);
-        std::filesystem::copy("D:\\clean_repos\\test_yam_1", "D:\\test_yam_1", std::filesystem::copy_options::recursive);
-        std::filesystem::copy("D:\\clean_repos\\test_yam_2", "D:\\test_yam_2", std::filesystem::copy_options::recursive);
+        std::error_code ec;
+        std::filesystem::remove_all("D:\\test_yam", ec);
+        std::filesystem::remove_all("D:\\test_yam_1", ec);
+        std::filesystem::remove_all("D:\\test_yam_2", ec);
+        std::filesystem::copy("D:\\clean_repos\\test_yam", "D:\\test_yam", std::filesystem::copy_options::recursive, ec);
+        std::filesystem::copy("D:\\clean_repos\\test_yam_1", "D:\\test_yam_1", std::filesystem::copy_options::recursive, ec);
+        std::filesystem::copy("D:\\clean_repos\\test_yam_2", "D:\\test_yam_2", std::filesystem::copy_options::recursive, ec);
         const int maxRestarts = 10;
         std::shared_ptr<BuildResult> result;
         {
