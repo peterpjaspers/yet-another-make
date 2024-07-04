@@ -1,0 +1,95 @@
+Todo for R 0.1.0
+Bugs
+- fix (header->free == 1)  throw std::string(signature) + " - Accessing freed page.";
+  Reproduce with coreTests EnduranceTest
+- create test_yam dir and build it. Then rename dir project to project1 and run yam.
+  Expected result: build passes, actual result: build fails because stale output
+  files in dir project1.
+  This problem can be solved when yamServer was observing the repository when the 
+  renaming took place. It is not easy though.
+  Else it is alpha build: Yam will remove mirror of project and add mirror of
+  project1 and will see no relation between these 2 events. Perhaps heuristics
+  can be used to detect that project1 is a rename of project. In that case
+  Yam can delete the stale output files. Should only be deleted on user confirm.
+  Try to solve this or accept and explain in the manual?
+
+Features
+- multi-repo build: clone repos in subdirs of the yam root dir.
+  Remove relation with .git directory in class DotYamDirectory?
+- buildscope: current implementation only searches for the producers of dirty 
+  generated file nodes. Could also search all dirty nodes to allow for example:
+      yam *.cpp // hash file nodes
+      yam buildfile_yam.txt // compile buildfile, or execute all commands 
+                            // produced by buildfile
+      yam submodules/<objects> // execute group
+
+- integrate Phil's file access monitor
+    - how to deal with input dependencies on non-existing source files
+      Note: these source file nodes are NOT in state Deleted. How to GC these
+      nodes when no longer refd => GC sweep over context to remove node with
+      use_count 1. delete when not observed
+    - how to deal with directory enumeration (file paths containing *)
+    - //? (extended length) paths (now //? is remove, i.e. convert to normal length path)
+    - After execution (hashing) of detected input and output files: check whether
+      last write times match the ones provided by access monitor. If not equal
+      then fail the execution and invalidate the execution hash to force command 
+      to re-execute at next build. 
+
+- fileaspect configuration
+      - hash = last-write-time (e.g. for generated files in cmd executionhash)
+      - import lib exports hash (hash i/f of dll)
+- unit-test support
+- packaging support (group containing files-to-be-packaged, buildfile that generates packaging rule)
+- response files
+- xxhash stream
+- build yam with yam
+- deal with dependencies on gtest, boost, xxhash
+  xxhash requires license to be part of binary redistribution.
+- license
+- C++20 modules support
+  Allow commands to generate buildfiles.
+  while (dirty buildfiles found) build();
+  Buildfile that generates two rules:
+      - a rule to parse each C++ file for module imports/exports and store these
+       imports/exports in file.cpp.modules and in group <modules>
+      - <modules> |> generateCompileRules %f %o |> buildfile_yam_cppmodules.txt
+       Where generatedCompileRules creates the compilation rules taking the 
+       module dependency graph into account.
+  yam recognizes this rule (by its output file name) as a rule-producing rule,
+  parses the resulting buildfile_yam_cppmodules.txt into compilation CommandNodes 
+  and executes the commands.
+- end-to-end testing (automated gtest)
+- scalability measurements
+- documentation
+- inform Mike Shal
+
+Out-of-scope:
+- distributed build
+- build cache (read MS buildXL section on caching!)
+- btree/page caching
+- tup-compatible syntax
+- variants (tup variants, MR build configurations)
+  Requires syntax for variables
+- buildstate export to e.g. Jason or XML or to some graph format.
+  Export verbose or compact.
+  Verbose: references to nodes are path names
+  Compact: each node has a unique id, references to nodes are ids.
+
+Ideas:
+- yam creates group hierachy of output files. Hierarchy
+  mirrors the directory tree in which outputs are stored.
+  E.g. outputs are a/O1, a/O2, a/b/c/O3. 
+  Output groups <a> contains O1, O2 and <b>, <b> contains <c>, 
+  <c> contains O3.
+  yam <b>/** builds all outputs in <b> recursively. Same would happen
+  for yam b/**. 
+  <b>/** is kind of O(N) where N is nr of elements below <b>
+  b/** is O(N), where N is nr of dirty generated file nodes in buildstate.
+  yam <b>/<c>/O3 is O(N) where N is nr of elements in <b> and in <c>
+
+
+
+More:
+- implement DotIgnoreNode
+- investigate use of std::filesystem::path.string() and intializing paths
+  from a std::string. Shouldn't we use wstring?

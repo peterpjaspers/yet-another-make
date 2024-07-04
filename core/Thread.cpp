@@ -1,39 +1,47 @@
 #include "Thread.h"
+#include "PriorityDispatcher.h"
 
-#include <exception>
-#include <chrono>
+namespace
+{
+    void run(YAM::PriorityDispatcher* dispatcher) {
+        dispatcher->run();
+    }
+}
 
 namespace YAM
 {
-	Thread::Thread(Dispatcher* dispatcher, std::string const& name)
-		: _dispatcher(dispatcher)
-		, _name(name)
-		, _thread(&Thread::main, this)
-	{}
+    Thread::Thread(PriorityDispatcher* dispatcher, std::string const& name)
+        : _dispatcher(dispatcher)
+        , _name(name)
+        , _thread(&run, _dispatcher)
+    {}
 
-	Thread::~Thread() {
-		if (joinable()) {
-			join();
-		}
-	}
+    Thread::~Thread() {
+        if (joinable()) {
+            join();
+        }
+    }
 
-	std::string const& Thread::name() const {
-		return _name;
-	}
+    std::string const& Thread::name() const {
+        return _name;
+    }
 
-	bool Thread::joinable() {
-		return _thread.joinable();
-	}
+    PriorityDispatcher* Thread::dispatcher() const {
+        return _dispatcher;
+    }
 
-	void Thread::join() {
-		_thread.join();
-	}
+    bool Thread::joinable() {
+        return _thread.joinable();
+    }
 
-	void Thread::main() {
-		while (!_dispatcher->stopped()) {
-			Delegate<void> d = _dispatcher->pop();
-			if (d.IsBound()) d.Execute();
-		}
-	}
+    void Thread::join() {
+        _thread.join();
+    }
+
+    bool Thread::isThisThread() const {
+        auto id = _thread.get_id();
+        auto tid = std::this_thread::get_id();
+        return id == tid;
+    }
 }
 

@@ -1,5 +1,9 @@
 #include "gtest/gtest.h"
 #include "executeNode.h"
+#include "../CommandNode.h"
+#include "../ExecutionContext.h"
+#include "../Dispatcher.h"
+#include "../DispatcherFrame.h"
 #include <map>
 #include <thread>
 #include <mutex>
@@ -8,50 +12,88 @@ namespace YAMTest
 {
     using namespace YAM;
 
-    std::chrono::seconds timeout(10);
+    std::chrono::seconds timeout(1000);
 
     bool executeNode(Node* n) {
-		std::vector<YAM::Node*> nodes{ n };
-		return executeNodes(nodes);
+        std::vector<YAM::Node*> nodes{ n };
+        return executeNodes(nodes);
     }
 
-    bool executeNodes(std::vector<YAM::Node*> const & nodes) {
-		std::map<Node*, bool> completed;
-		std::map<Node*, DelegateHandle> handles;
-		std::mutex mtx;
-		std::condition_variable cv;
+    bool executeNodes(std::vector<std::shared_ptr<Node>> const& nodes) {
+        std::vector<YAM::Node*> nodePtrs;
+        for (auto const& n : nodes) nodePtrs.push_back(n.get());
+        return executeNodes(nodePtrs);
+    }
 
-		for (std::size_t i = 0; i < nodes.size(); ++i) {
-			Node* n = nodes[i];
-			completed[n] = false;
-			handles[n] = n->completor() += [&, n](Node* node)
-			{
-				EXPECT_EQ(n, node);
-				{
-					std::lock_guard lk(mtx);
-					EXPECT_FALSE(completed[node]);
-					completed[node] = true;
-				}
-				cv.notify_one();
-			};
-		}
+    class Executor
+    {
+    public:
+        Executor(std::vector<Node*> const& nodes)
+            : _nodes(nodes)
+            , _nCompleted(0)
+        {}
 
-		for (std::size_t i = 0; i < nodes.size(); ++i) nodes[i]->start();
+        void execute() {
+            for (auto n : _nodes) {
+                if (completed(n)) {
+                    _handleNodeCompletion(n);
+                } else {
+                    _handles[n] = n->completor().Add(
+                        Delegate<void, Node*>::CreateRaw(this, &Executor::_handleNodeCompletion));
+                    if (n->state() == Node::State::Dirty) n->start(PriorityClass::VeryLow);
+                }
+            }
+            _nodes[0]->context()->mainThreadQueue().run(&_frame);
 
-		bool allCompleted = false;
-		std::unique_lock ulk(mtx);
-		cv.wait_for(ulk, std::chrono::seconds(timeout), [&]()
-			{
-				allCompleted = true;
-				for (std::size_t i = 0; i < nodes.size(); ++i) allCompleted &= completed[nodes[i]];
-				return allCompleted;
-			});
+            for (auto& pair : _handles) {
+                pair.first->completor().Remove(pair.second);
+            }
+            for (auto node : _nodes) {
+                if (completed(node)) _nCompleted++;
+            }
+            _dispatcher.stop();
+        }
 
-		for (std::size_t i = 0; i < nodes.size(); ++i) {
-			Node* n = nodes[i];
-			n->completor() -= handles[n];
-		}
+        bool wait() {
+            _dispatcher.run();
+            return _nCompleted == _nodes.size();
+        }
 
-		return allCompleted;
+    private:
+        std::vector<Node*> _nodes;
+        std::vector<Node*> _completed;
+        std::map<Node*, DelegateHandle> _handles;
+        Dispatcher _dispatcher;
+        DispatcherFrame _frame;
+        std::atomic<unsigned int> _nCompleted;
+
+        bool completed(Node* node) {
+            return
+                node->state() == Node::State::Ok
+                || node->state() == Node::State::Failed
+                || node->state() == Node::State::Canceled;
+        }
+
+        void _handleNodeCompletion(Node* node) {
+            bool const complete = completed(node);
+            if (!complete) {
+                ASSERT_TRUE(complete);
+            }
+            _completed.push_back(node);
+            if (_completed.size() == _nodes.size()) {
+                _nodes[0]->context()->mainThreadQueue().push(Delegate<void>::CreateLambda(
+                    [this]() { _frame.stop(); }));
+            }
+        }
+
+    };
+
+    bool executeNodes(std::vector<Node*> const& nodes) {
+        if (nodes.empty()) return true;
+        Executor ex(nodes);
+        ExecutionContext* context = nodes[0]->context();
+        context->mainThreadQueue().push(Delegate<void>::CreateLambda(
+            [&ex]() {ex.execute(); }));
+        return ex.wait();
     }
 }

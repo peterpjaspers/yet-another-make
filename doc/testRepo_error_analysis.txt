@@ -1,0 +1,76 @@
+Repo: d:\testRepo
+.yam
+bin
+mod1
+   bin
+   algo.cpp
+   buildfile_yam.txt
+      : foreach *.cpp |> copy %f %o |> bin\%B.obj { objectFiles }
+      : { objectFiles } |> echo %f > %o |> bin\core.txt { dlls }
+      : { dlls } |> type %f > %o |> bin\core.dll
+   lib.cpp
+   main.cpp
+buildfile_yam.txt
+      buildfile mod1
+      : foreach *.cpp |> copy %f %o |> bin\%B.obj { objectFiles }
+      : { objectFiles } |> echo %f > %o |> bin\core.txt { dlls }
+      : { dlls } |> type %f > %o |> bin\core.dll
+lib.cpp
+main.cpp
+
+1-st build: results as expected.
+
+Remove foreach rule in both buildfiles.
+
+2-nd build:
+Expected result: No such group: { objectFiles }
+Actual result:
+14:36:36.059 Error: Buildfile "<.>\\mod1\\buildfile_yam.txt" references generated input file "<.>\\bin\\core.txt"
+which is defined in buildfile "<.>\\buildfile_yam.txt"
+"<.>\\buildfile_yam.txt" must be declared as buildfile dependency in buildfile "<.>\\mod1\\buildfile_yam.txt"
+
+14:36:36.059 Error: Buildfile "<.>\\mod1\\buildfile_yam.txt" references generated input file "<.>\\bin\\lib.obj"
+which is defined in buildfile "<.>\\buildfile_yam.txt"
+"<.>\\buildfile_yam.txt" must be declared as buildfile dependency in buildfile "<.>\\mod1\\buildfile_yam.txt"
+
+14:36:36.060 Error: Buildfile "<.>\\mod1\\buildfile_yam.txt" references generated input file "<.>\\bin\\main.obj"
+which is defined in buildfile "<.>\\buildfile_yam.txt"
+"<.>\\buildfile_yam.txt" must be declared as buildfile dependency in buildfile "<.>\\mod1\\buildfile_yam.txt"
+
+Explanation: 
+<.>\mod1\buildfile_yam.txt is processed before <.>\buildfile_yam.txt. 
+It removes its outputs from group {objectFiles} and removes the group from the context because observers is empty.
+This is first fault: a group is never observed.
+Note that at this point the group is still refd by the BuildFileCompilerNode of <.>\buildfile_yam.txt
+and that the outputs of <.>\buildfile_yam.txt are still in {objectFiles}
+When <.>\mod1\buildfile_yam.txt processes input {objectFiles} it finds these outputs and produces above errors.
+
+The build is aborted and <.>\buildfile_yam.txt is NOT processed.
+
+3-d etc build:
+Expected result: No such input group name: { objectFiles }
+Actual result: No such input group name: { objectFiles }
+Explanation:
+When <.>\mod1\buildfile_yam.txt is processed it cannot find the input group {objectFiles} and produces above error.
+
+Corrective action: re-insert foreach rules
+
+4-th build:
+Expected result: build succeeded
+Actual result: crash 
+Crash also reproduces after fixing first fault, i.e. after no longer removing group from context.
+Crash occurs when: bin\core.txt\__cmd starts mod1\bin\algo.obj which is in Deleted state.
+This node has been set to Deleted and removed from context in 3-d build. 
+But this gen file node is still observed by the echo rule in .\buildfile_yam.txt
+Why is this? it should have been moved to Dirty when processing the re-inserted foreach rule in mod1\buildfile_yam.txt
+
+Corrective action: restart yamServer and rebuild
+Result: crash in PersistentBuildState which tries to insert a null object in the buildstate.
+The key of the null object reveals that it is a former command node.
+There are multiple null objects in the retrieved buildstate: 3 command nodes, 5 group nodes.
+How can these keys still exists and the objects not?
+
+Root cause of these problems is probably that the two buildfiles are cyclic dependent through
+their group usage. In the tup example on group usage you see buildfiles A and B that only add to the
+group and buildfile C that only reads from the group. C is dependent on A and B, i.e. A and B
+always execute before C.

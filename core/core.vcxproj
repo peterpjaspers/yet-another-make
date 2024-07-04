@@ -1,14 +1,6 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
-    <ProjectConfiguration Include="Debug|Win32">
-      <Configuration>Debug</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Release|Win32">
-      <Configuration>Release</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
@@ -26,27 +18,14 @@
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <ConfigurationType>DynamicLibrary</ConfigurationType>
-    <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
-    <CharacterSet>Unicode</CharacterSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
-    <ConfigurationType>DynamicLibrary</ConfigurationType>
-    <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>Unicode</CharacterSet>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
@@ -57,83 +36,42 @@
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="boost_x64_debug.props" />
+    <Import Project="boost_$(Platform).props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="boost_$(Platform).props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LinkIncremental>true</LinkIncremental>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <LinkIncremental>false</LinkIncremental>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <IntDir>$(ProjectDir)$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
+    <IntDir>$(ProjectDir)$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
-      <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;CORE_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ConformanceMode>true</ConformanceMode>
-      <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-    </ClCompile>
-    <Link>
-      <SubSystem>Windows</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
-      <EnableUAC>false</EnableUAC>
-    </Link>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
-      <FunctionLevelLinking>true</FunctionLevelLinking>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
-      <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;CORE_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ConformanceMode>true</ConformanceMode>
-      <PrecompiledHeader>Use</PrecompiledHeader>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-    </ClCompile>
-    <Link>
-      <SubSystem>Windows</SubSystem>
-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <OptimizeReferences>true</OptimizeReferences>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
-      <EnableUAC>false</EnableUAC>
-    </Link>
-  </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;CORE_EXPORTS;_WINDOWS;_USRDLL;_WIN32_WINNT=0x0601;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;CORE_EXPORTS;_WINDOWS;_USRDLL;_WIN32_WINNT=0x0601;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <DisableSpecificWarnings>4251</DisableSpecificWarnings>
+      <ForcedIncludeFiles>dbgMemLeaks.h</ForcedIncludeFiles>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalLibraryDirectories>..\x64\Debug;D:\Programs\boost_1_79_0\lib64-msvc-14.3;</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\x64\Debug;%(AdditionalLibraryDirectories);</AdditionalLibraryDirectories>
       <AdditionalDependencies>xxHash.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -143,10 +81,13 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;CORE_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;CORE_EXPORTS;_WINDOWS;_USRDLL;_WIN32_WINNT=0x0601;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <DisableSpecificWarnings>4251</DisableSpecificWarnings>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -154,29 +95,197 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
+      <AdditionalLibraryDirectories>..\x64\Release;%(AdditionalLibraryDirectories);</AdditionalLibraryDirectories>
+      <AdditionalDependencies>xxHash.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="AcyclicTrail.h" />
+    <ClInclude Include="BasicOStreamLogBook.h" />
+    <ClInclude Include="BuildClient.h" />
+    <ClInclude Include="Builder.h" />
+    <ClInclude Include="BuildFileCompilerNode.h" />
+    <ClInclude Include="BuildFileCycleFinder.h" />
+    <ClInclude Include="BuildFileDependenciesCompiler.h" />
+    <ClInclude Include="BuildOptions.h" />
+    <ClInclude Include="BuildScopeFinder.h" />
+    <ClInclude Include="ForEachNode.h" />
+    <ClInclude Include="PercentageFlagsCompiler.h" />
+    <ClInclude Include="FileExecSpecsNode.h" />
+    <ClInclude Include="BuildFileParserNode.h" />
+    <ClInclude Include="FileRepositoryNode.h" />
+    <ClInclude Include="BuildStateVersion.h" />
+    <ClInclude Include="PeriodicTimer.h" />
+    <ClInclude Include="PriorityClass.h" />
+    <ClInclude Include="PriorityDispatcher.h" />
+    <ClInclude Include="RepositoriesNode.h" />
+    <ClInclude Include="Glob.h" />
+    <ClInclude Include="Globber.h" />
+    <ClInclude Include="BuildFileParser.h" />
+    <ClInclude Include="BuildRequest.h" />
+    <ClInclude Include="BuildResult.h" />
+    <ClInclude Include="BuildService.h" />
+    <ClInclude Include="BuildServicePortRegistry.h" />
+    <ClInclude Include="BuildServiceProtocol.h" />
+    <ClInclude Include="BuildServiceMessageTypes.h" />
+    <ClInclude Include="CollapsedFileChanges.h" />
+    <ClInclude Include="DotGitDirectory.h" />
+    <ClInclude Include="DotYamDirectory.h" />
+    <ClInclude Include="GroupCycleFinder.h" />
+    <ClInclude Include="GroupNode.h" />
+    <ClInclude Include="IObjectStreamer.h" />
+    <ClInclude Include="IPersistable.h" />
+    <ClInclude Include="ISharedObjectStreamer.h" />
+    <ClInclude Include="IValueStreamer.h" />
+    <ClInclude Include="NodeMapStreamer.h" />
+    <ClInclude Include="ObjectStreamer.h" />
+    <ClInclude Include="PersistentBuildState.h" />
+    <ClInclude Include="RepositoryNameFile.h" />
+    <ClInclude Include="SharedObjectStreamer.h" />
+    <ClInclude Include="Streamer.h" />
+    <ClInclude Include="StopBuildRequest.h" />
     <ClInclude Include="CommandNode.h" />
+    <ClInclude Include="Console.h" />
+    <ClInclude Include="ConsoleLogBook.h" />
+    <ClInclude Include="ConsoleWin32.h" />
+    <ClInclude Include="dbgMemLeaks.h" />
     <ClInclude Include="Delegates.h" />
+    <ClInclude Include="DotIgnoreNode.h" />
+    <ClInclude Include="EndianShip.h" />
+    <ClInclude Include="EndOfStreamException.h" />
+    <ClInclude Include="IStreamable.h" />
+    <ClInclude Include="IStreamer.h" />
+    <ClInclude Include="IIOStream.h" />
+    <ClInclude Include="MemoryStream.h" />
+    <ClInclude Include="ShutdownRequest.h" />
+    <ClInclude Include="DirectoryNode.h" />
+    <ClInclude Include="DispatcherFrame.h" />
     <ClInclude Include="ExecutionContext.h" />
     <ClInclude Include="ExecutionStatistics.h" />
-    <ClInclude Include="OutputFileNode.h" />
+    <ClInclude Include="FileAspect.h" />
+    <ClInclude Include="DirectoryWatcher.h" />
+    <ClInclude Include="DirectoryWatcherWin32.h" />
+    <ClInclude Include="FileSystem.h" />
+    <ClInclude Include="GlobNode.h" />
+    <ClInclude Include="IConsole.h" />
+    <ClInclude Include="IDirectoryWatcher.h" />
+    <ClInclude Include="ILogBook.h" />
+    <ClInclude Include="IMonitoredProcess.h" />
+    <ClInclude Include="LogRecord.h" />
+    <ClInclude Include="MemoryLogBook.h" />
+    <ClInclude Include="FileRepositoryWatcher.h" />
+    <ClInclude Include="MonitoredProcess.h" />
+    <ClInclude Include="MonitoredProcessWin32.h" />
+    <ClInclude Include="MSBuildTrackerOutputReader.h" />
+    <ClInclude Include="MultiwayLogBook.h" />
+    <ClInclude Include="RegexSet.h" />
+    <ClInclude Include="FileAspectSet.h" />
+    <ClInclude Include="GeneratedFileNode.h" />
     <ClInclude Include="Dispatcher.h" />
     <ClInclude Include="FileNode.h" />
     <ClInclude Include="NodeSet.h" />
     <ClInclude Include="Node.h" />
     <ClInclude Include="SourceFileNode.h" />
+    <ClInclude Include="BuildFile.h" />
+    <ClInclude Include="BuildFileCompiler.h" />
+    <ClInclude Include="TcpStream.h" />
     <ClInclude Include="Thread.h" />
     <ClInclude Include="ThreadPool.h" />
+    <ClInclude Include="TimePoint.h" />
+    <ClInclude Include="BinaryValueStreamer.h" />
+    <ClInclude Include="BuildFileTokenizer.h" />
+    <ClInclude Include="BuildFileTokenSpecs.h" />
+    <ClInclude Include="Token.h" />
+    <ClInclude Include="TokenPathSpec.h" />
+    <ClInclude Include="TokenRegexSpec.h" />
+    <ClInclude Include="BuildOptionsParser.h" />
+    <ClInclude Include="computeMapsDifference.h" />
+    <ClInclude Include="TokenScriptSpec.h" />
+    <ClInclude Include="xxhash.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="CommandNode.cpp">
+    <ClCompile Include="BasicOStreamLogBook.cpp" />
+    <ClCompile Include="BuildClient.cpp" />
+    <ClCompile Include="Builder.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="BuildFile.cpp" />
+    <ClCompile Include="BuildFileCompilerNode.cpp" />
+    <ClCompile Include="BuildFileCycleFinder.cpp" />
+    <ClCompile Include="BuildFileDependenciesCompiler.cpp" />
+    <ClCompile Include="BuildOptions.cpp" />
+    <ClCompile Include="BuildScopeFinder.cpp" />
+    <ClCompile Include="ForEachNode.cpp" />
+    <ClCompile Include="PercentageFlagsCompiler.cpp" />
+    <ClCompile Include="FileExecSpecsNode.cpp" />
+    <ClCompile Include="BuildFileParserNode.cpp" />
+    <ClCompile Include="BuildFileTokenSpecs.cpp" />
+    <ClCompile Include="FileRepositoryNode.cpp" />
+    <ClCompile Include="BuildStateVersion.cpp" />
+    <ClCompile Include="PeriodicTimer.cpp" />
+    <ClCompile Include="PriorityDispatcher.cpp" />
+    <ClCompile Include="RepositoriesNode.cpp" />
+    <ClCompile Include="Glob.cpp" />
+    <ClCompile Include="Globber.cpp" />
+    <ClCompile Include="BuildFileParser.cpp" />
+    <ClCompile Include="BuildRequest.cpp" />
+    <ClCompile Include="BuildResult.cpp" />
+    <ClCompile Include="BuildService.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="BuildServicePortRegistry.cpp" />
+    <ClCompile Include="BuildServiceProtocol.cpp" />
+    <ClCompile Include="CollapsedFileChanges.cpp" />
+    <ClCompile Include="DotGitDirectory.cpp" />
+    <ClCompile Include="DotYamDirectory.cpp" />
+    <ClCompile Include="GroupCycleFinder.cpp" />
+    <ClCompile Include="GroupNode.cpp" />
+    <ClCompile Include="PersistentBuildState.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="RepositoryNameFile.cpp" />
+    <ClCompile Include="SharedObjectStreamer.cpp" />
+    <ClCompile Include="Streamer.cpp" />
+    <ClCompile Include="StopBuildRequest.cpp" />
+    <ClCompile Include="CommandNode.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4251;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4251;4996</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="Console.cpp" />
+    <ClCompile Include="ConsoleLogBook.cpp" />
+    <ClCompile Include="ConsoleWin32.cpp" />
+    <ClCompile Include="DotIgnoreNode.cpp" />
+    <ClCompile Include="MemoryStream.cpp" />
+    <ClCompile Include="ShutdownRequest.cpp" />
+    <ClCompile Include="DirectoryNode.cpp" />
     <ClCompile Include="ExecutionContext.cpp" />
     <ClCompile Include="ExecutionStatistics.cpp" />
-    <ClCompile Include="OutputFileNode.cpp" />
+    <ClCompile Include="FileAspect.cpp" />
+    <ClCompile Include="DirectoryWatcher.cpp" />
+    <ClCompile Include="DirectoryWatcherWin32.cpp" />
+    <ClCompile Include="FileSystem.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4251;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4251;4996</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="GlobNode.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="LogRecord.cpp" />
+    <ClCompile Include="MemoryLogBook.cpp" />
+    <ClCompile Include="FileRepositoryWatcher.cpp" />
+    <ClCompile Include="MonitoredProcess.cpp" />
+    <ClCompile Include="MonitoredProcessWin32.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4251;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4251;4996</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="MSBuildTrackerOutputReader.cpp">
+      <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdcpp20</LanguageStandard>
+    </ClCompile>
+    <ClCompile Include="MultiwayLogBook.cpp" />
+    <ClCompile Include="RegexSet.cpp" />
+    <ClCompile Include="FileAspectSet.cpp" />
+    <ClCompile Include="GeneratedFileNode.cpp" />
     <ClCompile Include="Dispatcher.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="FileNode.cpp" />
@@ -187,8 +296,29 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="SourceFileNode.cpp" />
+    <ClCompile Include="BuildFileCompiler.cpp" />
+    <ClCompile Include="TcpStream.cpp" />
     <ClCompile Include="Thread.cpp" />
     <ClCompile Include="ThreadPool.cpp" />
+    <ClCompile Include="TimePoint.cpp" />
+    <ClCompile Include="BinaryValueStreamer.cpp" />
+    <ClCompile Include="BuildFileTokenizer.cpp" />
+    <ClCompile Include="TokenPathSpec.cpp" />
+    <ClCompile Include="TokenRegexSpec.cpp" />
+    <ClCompile Include="BuildOptionsParser.cpp" />
+    <ClCompile Include="TokenScriptSpec.cpp" />
+    <ClCompile Include="xxhash.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="IStreamer.inl" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\accessMonitorLib\accessMonitorLib.vcxproj">
+      <Project>{479a7e12-68c4-47d4-8bef-b8b836a9425d}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\btree\btree.vcxproj">
+      <Project>{bce274f0-7a63-4d67-928b-f46c0eb23326}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

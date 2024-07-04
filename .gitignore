@@ -36,6 +36,7 @@ bld/
 .vs/
 # Uncomment if you have tasks that create the project's static files in wwwroot
 #wwwroot/
+enc_temp_folder/
 
 # Visual Studio 2017 auto generated files
 Generated\ Files/
@@ -91,6 +92,8 @@ StyleCopReport.xml
 *_wpftmp.csproj
 *.log
 *.tlog
+!tup.read.2.tlog
+!tup.write.2.tlog
 *.vspscc
 *.vssscc
 .builds
@@ -403,3 +406,18 @@ FodyWeavers.xsd
 # Website
 website/**/node_modules
 website/**/dist
+
+# yam
+.yam/
+btree/test/testBtreeIterator
+btree/test/testBtreePerformance
+btree/test/testBtreeValidity
+btree/test/testForest
+btree/test/testPage
+btree/test/testStreamingBtree
+btree/test/testStringBtree
+
+*.exe
+*.bt
+*.txt
+accessMonitor/accessMonitor.dll

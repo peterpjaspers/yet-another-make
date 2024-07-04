@@ -1,0 +1,164 @@
+-- execution hash
+After command (cmd) node execution the cmd node computes and stores the state
+of its inputs and outputs. This state is condensed into a single hash code.
+In pseudo-code:
+
+    CommandNode::executeSelf() {
+        executeScript(_script); // TODO: decide on terminology
+        _executionHash = computeExecutionHash();
+    }
+
+    XXH64_hash_t CommandNode::computeExecutionHash() {
+        return computeHash(
+            computeHash(_script), 
+            computeHash(getHashesOf(_outputFiles)), 
+            computeHash(getHashesOf(_inputFiles)));
+    }
+
+Note: variables that start with underscore (_) are member fields of cmd node.
+Note: output and input files are prerequisites of the cmd node. Prerequisites
+are executed before the cmd node itself is executed. Executing a file node 
+means that that node computes the file hash and stores it in a member field.
+Therefore cmd node does not compute the file hashes itself. Instead it 
+retrieves these hashes from the file nodes via getHashesOf(..).
+
+-- incremental build: CommandNode
+The execution hash allows the cmd node to detect whether its outputs are still
+up-to-date. Yam build logic in pseudo code is as follows (replacing asynchronous
+execution by synchronous execution to simplify the code):
+
+    Node::executeIfOutdated() {
+        if (this->_state == Dirty) {
+            this->prerequisites().forEach(executeIfOutdated);
+            if (this->pendingStartSelf()) this->executeSelf();
+        }
+    }
+    
+    virtual bool Node::pendingStartSelf() = 0;
+    virtual void Node::executeSelf() = 0;
+    
+    // return whether outputs are out-dated
+    bool CommandNode::pendingStartSelf() override {
+        return  _executionHash != computeExecutionHash();
+    }
+
+    void CommandNode::executeSelf() override {
+        executeScript(_script); // TODO: decide on terminology
+        _executionHash = computeExecutionHash();
+    }
+
+-- why are output file hashes part of the execution hash?
+The outputs of a cmd node become out-dated when 1 or more inputs change or when
+the user has tampered with 1 or more output files. In principle there is no
+need for users to tamper with output files (assuming yam design and code is
+free of bugs). But sometimes users do not trust the build system and delete
+output files to force the build system to re-build them. By including output 
+file hashes in the execution hash the cmd node is able to detect this.
+
+-- incremental build: FileNode.
+Cmd and file nodes are subject to same incremental build logic.
+A possible implementation of this logic for FileNode could be:
+
+    bool FileNode:pendingStartSelf() override {
+        return _fileHash != computeFileHash(_name);
+    }
+
+    void FileNode::executeSelf() override {
+        _fileHash = computeFileHash(_name);
+    }
+
+This implementation has disadvantages:
+    - pendingStartSelf() is only called when node is Dirty.
+      Yam will set file nodes to Dirty at start of alpha-build and when it 
+      it receives notification from the filesystem that files have been 
+      write-accessed. Often, but not always, this indicates that the file
+      was modified. Anyway Yam needs to always recompute the file hash.
+    - pendingStartSelf() is called from main thread causing the expensive
+      computeFileHash(_name) to block main thread and to reduce scalability.
+    - if pendingStartSelf() evalutates true then the file hash is also 
+      computed by FileNode::executeSelf() (which runs in the thread pool)
+
+These disadvantages disappear when implementing as follows:
+
+    bool FileNode:pendingStartSelf() override {
+        return true;
+    }
+
+    void FileNode::executeSelf() override {
+        _fileHash = computeFileHash(_name);
+    }
+
+Note: a file node Dirty state must be propagated to all cmd nodes that have 
+this file either as input or output file.
+A dirty cmd node may or may not (in case file hash did not change) execute.
+If it executes however it will update its output files. Therefore the Dirty
+propagation must be recursive: a command node that is set Dirty must propagate
+the Dirty state to its output file nodes.
+
+-- execution hash of build file node
+A build file node is a node that generates command and file nodes as specified
+in a build file.
+See https://miro.com/app/board/uXjVO-7wAmU=/ . In this board a build file node
+generates all command nodes, including the command scripts. The build file may
+reference files (e.g. a file that contains a version nr) and globs (e.g. glob
+*.cpp is used to create a compile command for each cpp file found in the src 
+directory). The execution hash of a build  file is computed as:
+    
+    XXH64_hash_t BuildFileNode::computeExecutionHash() {
+        return computeHash(
+            computeHash(getHashesOf(_inputBuildFiles)),  
+            computeHash(getHashesOf(_otherInputFiles)), 
+            computeHash(getHashesOf(_inputGlobs)));
+    }
+
+_inputBuildFiles: contains FileNode for the build file and a FileNode for each
+of the files included (recursively) by the build file.
+
+_otherInputFiles: contains FileNode for each file read during processing of the
+build file. Processing is required when the build file is executeable, e.g. as 
+in tup's lua build files or when it contains declarative statements that replace 
+references to a file by the content of that file.
+
+_inputGlobs: contains GlobNode for each glob used in build files, e.g. as in
+tup's foreach build rule. GlobNode execution evaluates the glob and keeps track
+of the content of the searched directory (or directories in case of a recusive 
+glob) by computing a hash of the directory entry names.
+
+Note: the output of a build file node are cmd and file nodes. These nodes are 
+not part of the build file node execution hash because users cannot tamper
+with these nodes: users can only change these nodes by changing build files. 
+
+
+From mrmake:
+
+Node.BuildingBlock.Workspace.ContainsFile returns false when queried for
+directories or non-existing files. This is intentional.
+Note that in exceptional cases this may cause incorrect build results. Example:
+For the C++ compilation of source.cpp the include-file directory search path contains
+directories A and B. Source.cpp includes x.h. Only B\x.h exists.
+The compiler first tries to read A\x.h. Because this file does not exist it will read 
+B\x.h. Only B\x.h will be registered as a dependency of source.cpp.
+Now someone creates A\x.h (not equal to B\x.h) with the intent that A\x.h has precedence
+over B\x.h. However, this will not cause a recompilation of source.cpp.
+If both B\x.h and A\x.h had been stored as dependencies, then the change of B\x.h (from
+non-existent to existent) would have been detected and would have resulted in 
+recompilation of source.cpp.
+
+05-Apr-2018: tried to fix above limitation by also accepting non-existing files as
+dependencies. For header file dependencies in C/C++-compilation this turned out not to work.
+The reason is that cl.exe checks existence of include files by querying the include
+file directories instead of by opening the include files. Adding a directory as dependency
+would result in many (unnecessary) rebuilds after adding/removing a file to the directory
+and is therefore not implemented.
+A possible workaround (specific for cl.exe) would be to have the compile script generate 
+dependencies for the non-existing include files using bp_register_as_input_file (analogous
+to bp_register_as_outputfile)
+
+11-Jan-2023: Phil suggested the following:
+Assume compile commands used include dirs A, B, C
+Initially only C contains file x.h
+Assume compile command in set {C1...Cn} have input dependency on C\x.h
+When a new file Z/x.h is added: invalidate output of all commands that have an input 
+dependency on file with name x.h.
+Note: if Z equals A or B then this is exactly what we want.
+Otherwise the recompilations are done unnecessarily.

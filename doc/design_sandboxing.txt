@@ -1,0 +1,22 @@
+--Rationale for sandbox build.
+Many files are needed as input for a successfull build. Repeating a build that 
+was successfull on machine A on another machine B fails when machine B does not
+have all the necessary files.
+
+This problem can be solved in several ways. E.g. Google's Bazel build system
+requires you to specify a-priori all required inputs. A Bazel sandbox build 
+copies all these inputs to an environment, the so-called sandbox and then runs
+the build in that sandbox. The sandbox contains no other files than the ones
+specified as inputs. The build can now be reproduced by running it, on any
+machine, in a copy of the sandbox.
+
+-- YAM sandbox build
+YAM, unlike Bazel, does not require you to specify all required inputs on a
+per command granularity. YAM however does require on workspace granularity
+to specify all allowed input locations. YAM discovers actually used input files
+from these locations as cmd scripts get executed.
+YAM then has 2 options to implement sandboxing:
+    - copy the content of all workspace input locations to the sandbox, then
+      run the build in the sandbox
+    - build, copy all input files used by this build to the sandbox, then
+      reproduce build in (copies) of the sandbox.

@@ -2,290 +2,326 @@
 #include "NodeSet.h"
 #include "Delegates.h"
 #include "ExecutionContext.h"
+#include "FileRepositoryNode.h"
+#include "IStreamer.h"
+
+#include <iostream>
+
+namespace {
+    using namespace YAM;
+
+    bool allNodesAreOk(std::unordered_set<Node*> const& nodes) {
+        for (auto const& n : nodes) {
+            if (n->state() == Node::State::Deleted) continue;
+            if (n->state() != Node::State::Ok) return false;
+        }
+        return true;
+    }
+
+    bool isFailedOrCanceled(Node const* node) {
+        return (
+            node->state() == Node::State::Failed
+            || node->state() == Node::State::Canceled);
+    }
+}
 
 namespace YAM
 {
-	Node::Node(ExecutionContext* context, std::filesystem::path const& name)
-        : _context(context)
-		, _executionHash(rand())
-		, _name(name)
-		, _state(Node::State::Dirty)
-        , _executionState(ExecutionState::Idle)
-        , _suspended(false)
+    Node::Node()
+        : _context(nullptr)
+        , _state(Node::State::Dirty)
         , _canceling(false)
-	{} 
+        , _nExecutingNodes(0)
+        , _notifyingObservers(false)
+        , _modified(false) // because this instance will be deserialized
+    {}
 
-	std::filesystem::path const& Node::name() const {
-		return _name; 
-	}
+    Node::Node(ExecutionContext* context, std::filesystem::path const& name)
+        : _context(context)
+        , _name(name)
+        , _state(Node::State::Dirty)
+        , _canceling(false)
+        , _nExecutingNodes(0)
+        , _notifyingObservers(false)
+        , _modified(true)
+    {}
 
-    ExecutionContext* Node::context() const {
-        return _context;
+    Node::~Node() {}
+
+    std::shared_ptr<FileRepositoryNode> const& Node::repository() const {
+        auto repoName = FileRepositoryNode::repoNameFromPath(name());
+        return context()->findRepository(repoName);
     }
 
-	void Node::setState(State newState) {
-		if (_state != newState) {
-			_state = newState;
-			if (_state == Node::State::Dirty) {
-				for (auto p : _parents) p->setState(Node::State::Dirty);
-			}
-		}
-	}
-
-	void Node::replaceParents(std::vector<Node*> const& newParents) {
-		_parents.clear();
-		for (auto p : newParents) addParent(p);
-	}
-
-	void Node::addParent(Node* parent) {
-		auto p = _parents.insert(parent);
-		if (!p.second) throw std::runtime_error("Attempt to add duplicate parent");
-	}
-
-	void Node::removeParent(Node* parent) {
-		if (0 == _parents.erase(parent)) throw std::runtime_error("Attempt to remove unknown parent");
-	}
-
-    void Node::suspend() {
-        if (busy()) throw std::runtime_error("Attempt to suspend while busy");
-        _suspended = true;
+    std::filesystem::path Node::absolutePath() const {
+        return repository()->absolutePathOf(name());
     }
 
-    void Node::resume() {
-        _suspended = false;
-        if (_executionState == ExecutionState::Suspended) {
-            continueStart();
+    void Node::setState(State newState) {
+        if (_state != newState) {
+            if (_state == State::Deleted) {
+                throw std::runtime_error("Not allowed to update state of Deleted object");
+            }
+            State oldState = _state;
+            _state = newState;
+            if (oldState == State::Failed || oldState == State::Canceled) {
+                _context->nodes().unregisterFailedOrCanceledNode(shared_from_this());
+            } else if (oldState == State::Dirty) {
+                _context->nodes().unregisterDirtyNode(shared_from_this());
+            }
+            if (_state == State::Dirty) {
+                _context->nodes().registerDirtyNode(shared_from_this());
+            } else if (_state == State::Failed || _state == State::Canceled) {
+                _context->nodes().registerFailedOrCanceledNode(shared_from_this());
+            }
+            bool nowCompleted =
+                _state == State::Ok
+                || _state == State::Failed
+                || _state == State::Canceled;
+            _notifyingObservers = true;
+            if (_state == State::Dirty) {
+                for (auto observer : _observers) {
+                    observer->handleDirtyOf(this);
+                }
+            } else if (_state == State::Deleted) {
+                cleanup();
+            }
+            if (oldState == State::Executing && nowCompleted) {
+                for (auto observer : _observers) {
+                    observer->handleCompletionOf(this);
+                }
+            }
+            _notifyingObservers = false;
+            for (auto const& pair : _addedAndRemovedObservers) {
+                if (pair.second) {
+                    addObserver(pair.first);
+                } else {
+                    removeObserver(pair.first);
+                }
+            }
+            _addedAndRemovedObservers.clear();
         }
     }
 
-    void Node::start() {
-        if (busy()) throw std::runtime_error("Attempt to start while busy");
+    void Node::addObserver(StateObserver* observer) {
+        if (_notifyingObservers) {
+            _addedAndRemovedObservers.push_back({ observer, true });
+            return;
+        }
+        auto p = _observers.insert(observer);
+        if (!p.second) {
+            throw std::runtime_error("Attempt to add duplicate state observer");
+        }
+    }
+
+    void Node::removeObserver(StateObserver* observer) {
+        if (_notifyingObservers) {
+            _addedAndRemovedObservers.push_back({ observer, false });
+            return;
+        }
+        if (0 == _observers.erase(observer)) throw std::runtime_error("Attempt to remove unknown state observer");
+    }
+
+    void Node::start(PriorityClass prio) {
+        ASSERT_MAIN_THREAD(_context);
         if (state() != Node::State::Dirty) throw std::runtime_error("Attempt to start while not dirty");
         _context->statistics().registerStarted(this);
         setState(Node::State::Executing);
-        if (_suspended) {
-            _executionState = ExecutionState::Suspended;
-        }
-        else {
-            continueStart();
-        }
     }
 
-    void Node::continueStart() {
-        if (_state == Node::State::Deleted) {
-            notifyCompletion(State::Deleted);
+    void Node::startNodes(
+        std::vector<Node*> const& nodes,
+        Delegate<void, Node::State> const& callback,
+        PriorityClass prio
+    ) {
+        ASSERT_MAIN_THREAD(_context);
+        if (_state != Node::State::Executing) throw std::runtime_error("Attempt to start nodes while not in executing state");
+        if (_nExecutingNodes != 0) throw std::runtime_error("Attempt to start nodes while already executing nodes");
+        bool stop = false;
+        for (auto n : nodes) {
+            stop = stop || isFailedOrCanceled(n);
+            _nodesToExecute.insert(n);
         }
-        else if (supportsPrerequisites()) {
-            startPrerequisites();
-        }
-        else if (pendingStartSelf()) {
-            _executionState = ExecutionState::Self;
-            _context->statistics().registerSelfExecuted(this);
-            startSelf();
+        _callback = callback;
+        if (stop) {
+            cancel();
         } else {
-            notifyCompletion(State::Ok);
+            for (auto n : _nodesToExecute) startNode(n, prio);
         }
+        if (_nExecutingNodes == 0) _handleNodesCompletion();
     }
 
-    void Node::startPrerequisites() {
-        _executionState = ExecutionState::Prerequisites;
-        _prerequisites.clear();
-        appendPrerequisites(_prerequisites);
-        for (Node* p : _prerequisites) startPrerequisite(p);
-        handlePrerequisitesCompletion();
-    }
-
-    void Node::startPrerequisite(Node* prerequisite) {
-        // No subscription is made to the completed event of the prerequisites 
-        // because the subscription overhead is too large.
-        // Instead completion callback is done via handlePrerequisiteCompletion.
-        switch (prerequisite->state()) {
+    void Node::startNode(Node* node, PriorityClass prio) {
+#ifdef _DEBUG
+        if (!node->observers().contains(this)) {
+            throw std::runtime_error("Started node is not observed");
+        }
+#endif
+        switch (node->state()) {
         case Node::State::Dirty:
         {
-            _executingPrerequisites.insert(prerequisite);
-            prerequisite->start();
+            _nExecutingNodes += 1;
+#ifdef _DEBUG
+            _executingNodes.insert(node);
+#endif
+            node->start(prio);
             break;
         }
         case Node::State::Executing:
         {
-            // Multiply referenced node, already started by another
-            // executor. Wait for it to complete.
-            _executingPrerequisites.insert(prerequisite);
+            _nExecutingNodes += 1;
+#ifdef _DEBUG
+            _executingNodes.insert(node);
+#endif
             break;
         }
         case Node::State::Ok: break;
         case Node::State::Failed: break;
         case Node::State::Canceled: break;
-        case Node::State::Deleted: break;
+        case Node::State::Deleted:break;
         default:
-            throw std::runtime_error("Unknown Node::State");
+        throw std::runtime_error("Unknown Node::State");
         }
     }
 
-    void Node::handlePrerequisiteCompletion(Node* prerequisite) {
-        // When a prerequisite completes it's recursive executor calls this
-        // function for all if its parent executors. There may be parents that
-        // are not part of the build scope. So ignore the callback when this
-        // executor is in Idle state.
-        //
-        if (_executionState == ExecutionState::Prerequisites) {
-
-            auto preqState = prerequisite->state();
-            bool preqCompleted =
-                preqState == Node::State::Ok
-                || preqState == Node::State::Failed
-                || preqState == Node::State::Canceled
-                || preqState == Node::State::Deleted;
-            if (!preqCompleted) {
-                throw std::runtime_error("Completed prerequisite has invalid Node::State");
-            }
-            if (1 == _executingPrerequisites.erase(prerequisite)) {
-                bool stopBuild = (preqState != Node::State::Ok); // todo: && !_node->logBook()->keepWorking();
-                if (stopBuild) {
-                    // At this point in the build process:
-                    //  - all busy recursive executors are waiting for prerequisite
-                    //    or self-executors to complete
-                    //  - busy self-executors have posted operations to the thread
-                    //    pool or are already executing operations in thread pool
-                    //    context and are awaiting completion of these operations.
-                    //    Note: a thread pool operation notifies its completion
-                    //    by posting a completion operation to the main thread.
-                    //    Thread pool and completion operations are member
-                    //    functions of the self-executor.
-                    //
-                    // Stopping the build requires:
-                    // 1) to suspend the thread pool
-                    //    This speeds-up the cancelation process by not
-                    //    starting posted operations that can not yet detect
-                    //    that they must stop processing (see step 2 and 4).
-                    // 2) to request all busy recursive and self-executors to
-                    //    cancel the build, i.e. to take measures to stop
-                    //    execution as soon as possible. I.e. for a recursive
-                    //    executor to not start the self-executor.
-                    //    E.g. a command node self-executor posts an operation
-                    //    that runs a shell process to execute the command
-                    //    script. This operation blocks until the shell exits. 
-                    //    To expedite cancelation the command node executor sets
-                    //    a cancel flag, kills the shell and awaits completion
-                    //    notification. Also see step 4.
-                    // 3) to resume the thread pool
-                    // 4) an operation running in thread pool to (frequently)
-                    //    check the cancel flag and to stop processing if it is
-                    //    set. E.g. in step 2 a shell process is killed causing
-                    //    the thread pool operation to unblock. The operation
-                    //    checks the cancel flag, and if set, stops further
-                    //    processing and posts a completion operation with status
-                    //    canceled to the main thread.
-                    //
-                    cancel();
-                    // TODO: how to notify all other executors that build must be stopped ?
-                    //mainDispatcher().post((_node->LogBook.RaiseStopRequested));
-                }
-
-                // TODO: can prerequisites indeed contain duplicates? Should
-                // that be disallowed?
-                //
-                // A node may have duplicate prerequisites, e.g. because a source
-                // file node is both registered as an input file and as a compute
-                // dependency. In that case this callback can be called more
-                // than once from the same node. Therefore ignore such duplicate
-                // callbacks. 
-                handlePrerequisitesCompletion();
-            }
+    void Node::handleDirtyOf(Node* observedNode) { 
+        if (_state != Node::State::Deleted) {
+            setState(Node::State::Dirty);
         }
     }
 
-    void Node::handlePrerequisitesCompletion() {
-        bool allCompleted = _executingPrerequisites.size() == 0;
-        if (allCompleted) {
-            if (_canceling) {
-                notifyCompletion(State::Canceled);
-            }
-            else if (!allPrerequisitesAreOk()) {
-                notifyCompletion(State::Failed);
-            }
-            else if (pendingStartSelf()) {
-                _executionState = ExecutionState::Self;
-                _context->statistics().registerSelfExecuted(this);
-                startSelf();
-            }
-            else {
-                notifyCompletion(State::Ok);
-            }
+    // This node subscribed at 'node' to be notified of completion of its
+    // execution.
+    void Node::handleCompletionOf(Node* node) {
+        // When a node completes it calls this function for ALL if its 
+        // observers. This node must only handle completion of node when
+        // it is actually waiting for node to complete.
+        if (_nodesToExecute.find(node) == _nodesToExecute.end()) return;
+#ifdef _DEBUG
+        if (_nExecutingNodes != _executingNodes.size()) {
+            throw std::exception("_nExecutingNodes != _executingNodes.size()");
         }
+        if (0 == _executingNodes.erase(node)) {
+            throw std::exception("callback from unexpected node");
+        }
+#endif
+        if (0 == _nExecutingNodes) {
+            throw std::exception("_nExecutingNodes cannot drop below zero");
+        }
+        _nExecutingNodes -= 1;
+
+        auto nodeState = node->state();
+        bool nodeCompleted =
+            nodeState == Node::State::Ok
+            || nodeState == Node::State::Failed
+            || nodeState == Node::State::Canceled;
+        if (!nodeCompleted) {
+            throw std::runtime_error("Executing node notifies unexpected state change");
+        }
+        bool stopBuild = (nodeState != Node::State::Ok); // todo: && !_node->logBook()->keepWorking();
+        if (stopBuild) {
+            cancel();
+        }
+        if (_nExecutingNodes == 0) _handleNodesCompletion();
     }
 
-    bool Node::allPrerequisitesAreOk() const {
-        bool allOk = true;
-        for (std::size_t i = 0; i < _prerequisites.size() && allOk; ++i) {
-            allOk = _prerequisites[i]->state() == Node::State::Ok;
+    void Node::_handleNodesCompletion() {
+        bool allOk = allNodesAreOk(_nodesToExecute);
+        _nodesToExecute.clear();
+#ifdef _DEBUG
+        _executingNodes.clear();
+#endif
+        Node::State state;
+        if (_canceling) {
+            state = State::Canceled;
+        } else if (allOk) {
+            state = State::Ok;
+        } else {
+            state = State::Failed;
         }
-        return allOk;
+        auto d = Delegate<void>::CreateLambda([this, state]()
+        {
+            _callback.Execute(state);
+        });
+        _context->mainThreadQueue().push(std::move(d));
     }
 
     void Node::postCompletion(Node::State newState) {
         auto d = Delegate<void>::CreateLambda([this, newState]()
-            {
-                notifyCompletion(newState);
-            });
+        {
+            notifyCompletion(newState);
+        });
         _context->mainThreadQueue().push(std::move(d));
     }
 
     void Node::notifyCompletion(Node::State newState) {
-        _executionState = ExecutionState::Idle;
+        ASSERT_MAIN_THREAD(_context);
+        if (_state != Node::State::Executing) throw std::exception("cannot complete when not executing");
+        if (0 < _nExecutingNodes) throw std::exception("cannot complete when executing nodes");
+        if (!_nodesToExecute.empty()) throw std::exception("_nodesToExecute must be empty");
+#ifdef _DEBUG
+        if (_nExecutingNodes != _executingNodes.size()) throw std::exception("_nExecutingNodes != _executingNodes.size()");
+#endif
         _canceling = false;
-        _prerequisites.clear();
-        _executingPrerequisites.clear();
-
+        //std::stringstream ss;
+        //ss << _name.string() << " completed with state " << static_cast<int>(newState);
+        //LogRecord progress(LogRecord::Progress, ss.str());
+        //_context->logBook()->add(progress);
         setState(newState);
-
-        for (auto p : _parents) p->handlePrerequisiteCompletion(this);
         _completor.Broadcast(this);
     }
 
-    // Pre: busy()
-    // Request cancelation of execution.
-    // Return immediately, do not block caller until execution has completed.
-    // Notify execution completion as specified by start() function. 
-    bool Node::busy() const {
-        return _state == State::Executing;
-    }
-
     void Node::cancel() {
-        if (!busy()) {
-            throw std::runtime_error("Attempt to cancel while not busy");
-        }
+        if (_state != Node::State::Executing) return;
         if (!_canceling) {
             _canceling = true;
-            switch (_executionState) {
-            case ExecutionState::Idle:
-                break;
-            case ExecutionState::Suspended:
-                notifyCompletion(State::Canceled);
-                break;
-            case ExecutionState::Prerequisites:
-                for (auto preq : _executingPrerequisites) {
-                    preq->cancel();
-                }
-                break;
-            case ExecutionState::Self:
-                cancelSelf();
-            default:
-                throw std::runtime_error("invalid _executionState");
+            for (auto p : _nodesToExecute) {
+                p->cancel();
             }
         }
     }
 
-    XXH64_hash_t Node::computeExecutionHashExt(std::initializer_list<XXH64_hash_t> additionalHashes) const {
-        std::vector<Node*> nodes;
-        if (supportsInputs()) appendInputs(nodes);
-        if (supportsOutputs()) appendOutputs(nodes);
+    void Node::modified(bool newValue) {
+        if (_modified != newValue) {
+            _modified = newValue;
+            if (_modified) {
+                _context->nodes().changeSetModify(shared_from_this());
+            }
+        }
+    }
 
-        std::vector<XXH64_hash_t> hashes;
-        hashes.reserve(nodes.size() + additionalHashes.size());
-        for (auto node : nodes) hashes.push_back(node->executionHash());
-        hashes.insert(hashes.end(), additionalHashes.begin(), additionalHashes.end());
+    bool Node::modified() const {
+        return _modified;
+    }
 
-        return XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
+    bool Node::deleted() const {
+        return _state == Node::State::Deleted;
+    }
+
+    void Node::undelete() {
+        if (_state != Node::State::Deleted) {
+            throw std::runtime_error("Not allowed to undelete an object that is not in deleted state");
+        }
+        _state = Node::State::Dirty;
+    }
+
+    void Node::stream(IStreamer* streamer) {
+        streamer->stream(_name);
+        uint32_t state;
+        if (streamer->writing()) state = static_cast<uint32_t>(_state);
+        streamer->stream(state);
+        if (streamer->reading()) _state = static_cast<Node::State>(state);
+    }
+
+    void Node::prepareDeserialize() {
+    }
+
+    bool Node::restore(void* context, std::unordered_set<IPersistable const*>& restored) {
+        bool inserted = restored.insert(this).second;
+        if (inserted) {
+            _context = reinterpret_cast<ExecutionContext*>(context);
+            _modified = false;
+        }
+        return inserted;
     }
 }

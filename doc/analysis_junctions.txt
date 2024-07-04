@@ -1,0 +1,87 @@
+Junctions are potentially a much simpler approach to multi-repository builds 
+than the currently implemented design.
+
+This document describes the behavior of file change detection and file access
+monitoring when a junction exists in a yam repository.
+
+File change monitoring
+copy d:\clean_repos\test_yam_* d:\
+cd d:\test_yam
+mklink /j link_submodules submodules
+    Now run directoryWatcherDemo d:\test_yam
+    Add/change/remove files in d:\test_yam\link_submodules and d:\test_yam\submodules
+    Observation: all changes are detected as changes in the target directory,
+    i.e. in  d:\test_yam\submodules
+
+mklink /j link_test_yam_1 d:\test_yam_1
+    Now run directoryWatcherDemo d:\test_yam
+    Add/change/remove files in d:\test_yam\link_test_yam_1 and d:\test_yam_1
+    Observation: no changes are detected
+
+Conclusion: changes are only detected when the junction points to a directory 
+that is below the directory being monitored. 
+However, to be useful for multi-repo build the junction must point to a directory
+outside the tree that is to be build.
+Note: symbolic link shows same behavior
+
+File access monitoring:
+copy d:\clean_repos\test_yam_* d:\
+cd d:\test_yam
+mklink /j link_test_yam_1 ..\test_yam_1
+
+    Now run yam
+    Fails with error:
+        [0.628s] File D:\test_yam_1\submodules\sm3\poo.cpp is used as input or
+        output by script: copy  %f %o . This script is defined in buildfile
+        "@@test_0\\link_test_yam_1\\submodules\\sm3\\buildfile_yam.txt" by the 
+        rule at line 1.
+        This file is not part of a known file repository and will not be tracked 
+        for changes.
+
+    This message comes from CommandNode when trying to convert detected input 
+    file absolute path to symbolic path.
+
+Conclusion: file access monitoring returns the path name in the target directory,
+even though the file was accessed in the junction directory.
+
+End conclusion:
+Observed behavior complicate support for junctions. Supporting junctions requires
+yam to:
+    - detect that a junction points to a target dir outside the repository tree
+    - start a seperate directory watcher on an out-of-repo target dir
+    - maintain a map of target dir to junction dir
+    - convert the path of detected file change to path in junction dir
+    - convert the path of detected file access to path in junction dir
+      
+When supporting junctions to reference other repos one still needs to specify
+whether to track, build or ignore everything that happens in the junction dir.
+This can be specified in a configuration file, e.g. a variant of the current 
+repositories.txt or a kind of of .yamignore file. These specs can also be 
+applied to non-junction directories. E.g. ignore a sub-tree (not a junction) 
+that does not contain buildable files.
+
+When keeping repositories.txt we can replace repo name by repo junction path.
+E.g:
+    junction=repos\libs dir=d:\libraries type=Build
+    junction=repos\utils dir=d:\utilities type=Build
+    junction=repos\windows dir=c:\windows type=Ignore (?o?r: dir=c:\windows type=Ignore)
+    junction=generated dir=d:\generated_<reponame> type=Track
+or keep repo name and add junction as optional property
+name=libs junction=repos\libs dir=d:\libraries type=Build
+name=utils junction=repos\utils dir=d:\utilities type=Build
+name=windows dir=c:\windows type=Ignore 
+junction=generated dir=d:\generated_<reponame> type=Track
+
+The buildfiles now reference all input and output files relative to home root dir.
+No more use of symbolic path names needed. All paths in buildstate are paths
+below home repo root dir.
+Note: still need to configure which build cache to use for this home repo.
+But then it is a cache name, not a repo name.
+Note: ideal is to detect junctions and keep Build/Ignore/Track specs seperate.
+This file must make it easy to specify things like:
+    Build .\** Track \boost\** Ignore C:\Windows\** (Track overrides Build, 
+    Ignore overrides Build and Track
+or
+    Ignore .\** Build .\libs Build .\utils Track C:\windows
+
+
