@@ -23,7 +23,8 @@ void worker( const path directoryPath ) {
     CopyFileW( (directoryPath / "moreJunk.txt").c_str(), (directoryPath / "evenMoreJunk.txt").c_str(), false );
     remove( directoryPath / "junk.txt" );
     rename( directoryPath / "moreJunk.txt", directoryPath / "yetMoreJunk.txt" );
-    remove_all( directoryPath );
+    error_code ec;
+    remove_all( directoryPath, ec );
 }
 
 void doFileAccess( int threads, const string& directory ) {

@@ -26,7 +26,8 @@ namespace AccessMonitor {
             if (exists( sessionData )) {
                 // Session directory already exists, presumably due to a previous session 
                 // Remove all data session left behind...
-                remove_all( sessionData );
+                error_code ec;
+                remove_all( sessionData, ec );
             }
             create_directory( sessionData );
         }

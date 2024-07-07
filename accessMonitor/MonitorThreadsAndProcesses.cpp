@@ -15,6 +15,7 @@
 // ToDo: Use GetBinaryType to determine whether to inject 32-bit or 64-bit DLL
 // ToDo: Single definition/declaration of accessMonitor.dll file name/path...
 // ToDo: Implenent for Linux and MacOS, current implementation is Windows only...
+// ToDo: How to handle processes that exit without actually calling ExitProcess or TerminateProcess
 
 using namespace std;
 

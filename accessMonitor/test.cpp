@@ -11,9 +11,6 @@
 #include <thread>
 #include <cstdlib>
 
-// ToDo: Understand why we get access denied errors on files when running with large (>20) number of sessions and (or?)
-//       large (>100) number of threads.
-
 using namespace AccessMonitor;
 using namespace std;
 using namespace std::filesystem;
@@ -45,7 +42,8 @@ void worker( const path directoryPath ) {
         debugRecord() << "std::filesystem::rename( " << (directoryPath / "moreJunk.txt").c_str() << ", " << (directoryPath / "yetMorejunk.txt").c_str() << " )" << record;
         rename( directoryPath / "moreJunk.txt", directoryPath / "yetMoreJunk.txt" );
         debugRecord() << "std::filesystem::remove_all( " << directoryPath << " )" << record;
-        remove_all( directoryPath );
+        error_code ec;
+        remove_all( directoryPath, ec );
         debugRecord() << "std::filesystem::create_directories( " << directoryPath << " )" << record;
         create_directories( directoryPath );
         file = ofstream( directoryPath / "junk.txt" );

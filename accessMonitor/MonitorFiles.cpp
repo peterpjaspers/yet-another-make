@@ -19,6 +19,8 @@ using namespace std::filesystem;
 // ToDo: Add function calling convention to all externals
 // ToDo: Implenent for Linux and MacOS, current implementation is Windows only...
 
+// ToDo: Drop-out of patch function quickly when not in a session.
+
 namespace AccessMonitor {
 
     namespace {
@@ -897,6 +899,7 @@ namespace AccessMonitor {
             WIN32_FILE_ATTRIBUTE_DATA attributes;
             // Get attributes can succeed even when not referring to an actual file!
             auto getAttributes = reinterpret_cast<TypeGetFileAttributesExW>(original( (PatchFunction)PatchGetFileAttributesExW ));
+            if (getAttributes == nullptr) getAttributes = GetFileAttributesExW;
             if (getAttributes( fileName.c_str(), GetFileExInfoStandard, &attributes ) && (attributes.dwFileAttributes != INVALID_FILE_ATTRIBUTES)) {
                 int64_t timeValue = (static_cast<int64_t>(attributes.ftLastWriteTime.dwHighDateTime) << 32)  + attributes.ftLastWriteTime.dwLowDateTime;
                 auto fileTime = FileTime( chrono::duration<int64_t,ratio<1,10000000>>( timeValue ) );
@@ -910,7 +913,7 @@ namespace AccessMonitor {
             }
             return FileTime();
         }
-        // Register file access mode on file (path)
+        // Register file access mode on file path
         wstring fileAccess( const wstring& fileName, FileAccessMode mode ) {
             DWORD error = GetLastError();
             auto fullFileName = fullName( fileName.c_str() );
@@ -924,6 +927,7 @@ namespace AccessMonitor {
         wstring fileAccess( const string& fileName, FileAccessMode mode ) {
             return fileAccess( widen( fileName ), mode );
         }
+        // Register file access mode on (file) handle
         wstring fileAccess( HANDLE handle, FileAccessMode mode ) {
             DWORD error = GetLastError();
             auto fullFileName = fullName( handle );

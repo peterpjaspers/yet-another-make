@@ -26,14 +26,18 @@ void worker( const path directoryPath ) {
     CopyFileW( (directoryPath / "moreJunk.txt").c_str(), (directoryPath / "evenMoreJunk.txt").c_str(), false );
     remove( directoryPath / "junk.txt" );
     rename( directoryPath / "moreJunk.txt", directoryPath / "yetMoreJunk.txt" );
-    remove_all( directoryPath );
+    error_code ec;
+    remove_all( directoryPath, ec );
 }
 
 int main( int argc, char* argv[] ) {
     // Manually create a session data directory...
     auto session = 1;
     const path sessionData( sessionDataPath( session ) );
-    if (exists( sessionData ))  remove_all( sessionData );
+    if (exists( sessionData )) {
+        error_code ec;
+        remove_all( sessionData, ec );
+    }
     create_directory( sessionData );
     auto process = CurrentProcessID();
     auto thread = CurrentThreadID();
