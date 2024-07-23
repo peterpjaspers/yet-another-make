@@ -20,7 +20,7 @@ namespace AccessMonitor {
             PatchFunction* address;
             Patch() : library( nullptr ), original( nullptr ), address( nullptr ) {}
         };
-        map< string, HMODULE > patchedLibraries;
+        map< string, HMODULE > parsedLibraries;
         map< string, PatchFunction > registeredPatches;
         map< PatchFunction, Patch > functionToPatch;
         bool librariesPatched = false;
@@ -93,10 +93,10 @@ namespace AccessMonitor {
         static const char* signature = "void parseLibrary( const string& libName )";
         if (librariesPatched) throw string( signature ) + string( " - Parsing library IATs while libraries are patched!" );
         auto libraryName = toUpper( libName );
-        if (patchedLibraries.count( libraryName ) == 0)  {
+        if (parsedLibraries.count( libraryName ) == 0)  {
             if (debugLog( ParseLibrary )) { debugRecord() << L"Parsing " << ((0 < libraryName.size()) ? widen( libraryName.c_str() ) : L"program executable" )<< record; }
             HMODULE library = LoadLibraryExA( libraryName.c_str(), nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32 );
-            patchedLibraries[ libraryName ] = library;
+            parsedLibraries[ libraryName ] = library;
             static uint64_t Ordinal = 0x8000000000000000;
             static uint64_t Last = 0xFFFF;
             HMODULE imageBase = GetModuleHandleA( (0 < libraryName.size()) ? libraryName.c_str() : nullptr );
@@ -107,7 +107,7 @@ namespace AccessMonitor {
                 string importLibName( (const char*)(importDescriptor->Name + (char*)imageBase) );
                 string importLibraryName = toUpper( importLibName );
                 HMODULE importLibrary = LoadLibraryExA( importLibraryName.c_str(), nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32 );
-                patchedLibraries[ importLibraryName ] = importLibrary;
+                parsedLibraries[ importLibraryName ] = importLibrary;
                 if (debugLog( ParseLibrary )) { debugRecord() << L"Parsing " << widen( importLibraryName.c_str() ) << L" IAT" << record; }
                 IMAGE_THUNK_DATA* originalFirstThunk = (IMAGE_THUNK_DATA*)((char*)imageBase + importDescriptor->OriginalFirstThunk);
                 IMAGE_THUNK_DATA* firstThunk = (IMAGE_THUNK_DATA*)((char*)imageBase + importDescriptor->FirstThunk);
@@ -120,7 +120,7 @@ namespace AccessMonitor {
                         PatchFunction function = registeredPatches[ name ];
                         Patch& patchData = functionToPatch[ function ];
                         if (debugLog( PatchedFunction )) { debugRecord() << L"      Located IAT patch function " << widen( name ) << " in " << widen( importLibraryName ) << record; }
-                        patchData.library = &(patchedLibraries.find( importLibraryName )->first);
+                        patchData.library = &(parsedLibraries.find( importLibraryName )->first);
                         patchData.address = reinterpret_cast<PatchFunction*>(&firstThunk->u1.Function);
                         patchData.original = *patchData.address;
                     }
@@ -131,7 +131,7 @@ namespace AccessMonitor {
             }
         }
     } // void parseLibrary( const string& libName )
-    void parseLibrary( const wstring& libName, bool force ) { parseLibrary( narrow( libName ) ); }
+    void parseLibrary( const wstring& libName ) { parseLibrary( narrow( libName ) ); }
 
     void registerPatch( std::string name, PatchFunction function ) {
         static const char* signature = "void registerPatch( std::string name, PatchFunction function, std::string library )";
@@ -163,7 +163,7 @@ namespace AccessMonitor {
         static const char* signature = "void patch()";
         if (librariesPatched) throw string( signature ) + string( " - Libraries already patched!" );
         if (debugLog( ParseLibrary )) debugRecord() << L"Parsing libraries..." << record;
-        parseLibrary( "" );
+        parseLibrary( "" ); // Parse (DLL) library entries imported by current program (executable)
         if (debugLog( ParseLibrary )) debugRecord() << L"Done Parsing libraries..." << record;
         patchAll();
         librariesPatched = true;
@@ -172,8 +172,8 @@ namespace AccessMonitor {
         static const char* signature = "void unpatch()";
         if (!librariesPatched) throw string( signature ) + string( " - Libraries not patched!" );
         unpatchAll();
-        for ( auto lib : patchedLibraries ) FreeLibrary( lib.second );
-        patchedLibraries.clear();
+        for ( auto lib : parsedLibraries ) FreeLibrary( lib.second );
+        parsedLibraries.clear();
         functionToPatch.clear();
         librariesPatched = false;
     }

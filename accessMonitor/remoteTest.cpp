@@ -46,5 +46,6 @@ int main( int argc, char* argv[] ) {
     if (2 < argc) directory = argv[ 2 ];
     if (1 < argc) threads = atoi( argv[ 1 ] );
     doFileAccess( threads, directory );
+    return( 0 );
 };
 

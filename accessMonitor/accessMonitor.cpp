@@ -6,8 +6,6 @@
 
 #include <windows.h>
 
-// ToDo: Understand why Stop monitoring debug message is not present in CMD process
-
 using namespace AccessMonitor;
 using namespace std;
 using namespace std::filesystem;
@@ -20,7 +18,6 @@ namespace {
         ThreadID mainThread; // Main thread ID of (remote) process
         retrieveSessionInfo( process, session, mainThread );
         CreateRemoteSession( session, process, mainThread );
-        auto requestExit = AccessEvent( "RequestExit", session, process );
         auto processPatched = AccessEvent( "ProcessPatched", session, process );
         SessionDebugLog( createDebugLog() );
         SessionEventLog( createEventLog() );
@@ -28,16 +25,18 @@ namespace {
         debugRecord() << "Start monitoring session " << session << " in process " << process << "..." << dec << record;
         patchProcess();
         EventSignal( processPatched ); // Signal (parent) process that monitoring has started
-        EventWait( requestExit ); // Wait for process to (request) exit before exitting monitor thread
+        ReleaseEvent( processPatched );
+        return ERROR_SUCCESS;
+    }
+
+    void exitHandler() {
+        ProcessID process = CurrentProcessID();
+        SessionID session = CurrentSessionID();
         debugRecord() << "Stop monitoring session " << session << " in process " << process << "..." << dec << record;
         unpatchProcess();
         remove( sessionInfoPath( process ) );
         SessionEventLogClose();
         SessionDebugLogClose();
-        EventSignal( "ExitProcess", session, process ); // Signal process that it may exit
-        ReleaseEvent( processPatched );
-        ReleaseEvent( requestExit );
-        return ERROR_SUCCESS;
     }
 
 }
@@ -46,6 +45,7 @@ BOOL WINAPI DllMain( HINSTANCE dll,  DWORD reason, LPVOID arg ) {
     if (reason == DLL_PROCESS_ATTACH) {
         auto monitorThread = CreateThread( nullptr, 0, monitorDLLMain, nullptr, 0, nullptr );
         if (monitorThread == nullptr) return false;
+        atexit( exitHandler );
     } else if (reason == DLL_THREAD_ATTACH) {
     } else if (reason == DLL_THREAD_DETACH) {
     } else if (reason == DLL_PROCESS_DETACH) {

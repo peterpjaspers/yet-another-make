@@ -48,9 +48,4 @@ int main( int argc, char* argv[] ) {
     EventWait( patched );
     ReleaseEvent( patched );
     worker( uniqueName( L"Session", session ) );
-    EventSignal( "RequestExit", session, process );
-    EventWait( exit );
-    ReleaseEvent( patched );
-    ReleaseEvent( exit );
-    FreeLibrary( library );
 }
