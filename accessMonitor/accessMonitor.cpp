@@ -21,7 +21,7 @@ namespace {
         SessionID session;
         ThreadID mainThread; // Main thread ID of (remote) process
         retrieveSessionInfo( sessionDirectory, process, session, mainThread );
-        CreateRemoteSession(sessionDirectory, session, process, mainThread );
+        CreateRemoteSession( sessionDirectory, session, process, mainThread );
         auto requestExit = AccessEvent( "RequestExit", session, process );
         auto processPatched = AccessEvent( "ProcessPatched", session, process );
         SessionDebugLog( createDebugLog() );
@@ -37,10 +37,9 @@ namespace {
     void exitHandler() {
         ProcessID process = CurrentProcessID();
         SessionID session = CurrentSessionID();
-        path sessionDirectory = temp_directory_path();
         debugRecord() << "Stop monitoring session " << session << " in process " << process << "..." << dec << record;
         unpatchProcess();
-        remove( sessionInfoPath(sessionDirectory, process ) );
+        remove( sessionInfoPath( temp_directory_path(), process ) );
         SessionEventLogClose();
         SessionDebugLogClose();
     }
