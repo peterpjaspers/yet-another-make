@@ -22,21 +22,21 @@ namespace AccessMonitor {
 
     namespace {
 
-        const wstring patchDLLFile( L"C:\\Users\\philv\\Code\\yam\\yet-another-make\\accessMonitor\\accessMonitor.dll" );
+        const wstring patchDLLFile( L"D:\\Peter\\github\\yam\\x64\\Debug\\accessMonitorDll.dll" );
 
         void injectProcess( DWORD pid, DWORD tid ) {
             ProcessID process = GetProcessID( pid );
             ThreadID main = GetThreadID( tid );
             debugRecord() << L"MonitorThreadsAndProcesses - Injecting DLL " << patchDLLFile << " in process " << process << " with main thread " << main << "..." << record;
-            inject( CurrentSessionID(), process, main, patchDLLFile );
+            inject( CurrentSessionDirectory(), CurrentSessionID(), process, main, patchDLLFile );
         }
 
         inline wostream& debugMessage( const char* function ) {
             return debugRecord() << L"MonitorThreadsAndProcesses - " << function << "( ";
         }
         inline wostream& debugMessage( const char* function, bool success ) {
-            DWORD errorCOde = GetLastError();
-            if (!success) debugRecord() << L"MonitorThreadsAndProcesses - " << function << L" failed with  error : " << lasErrorString( errorCOde ) << record;
+            DWORD errorCode = GetLastError();
+            if (!success) debugRecord() << L"MonitorThreadsAndProcesses - " << function << L" failed with  error : " << lasErrorString( errorCode ) << record;
             return debugMessage( function );
         }
         inline wostream& debugMessage( const char* function, HANDLE handle ) {
@@ -47,13 +47,14 @@ namespace AccessMonitor {
             LPTHREAD_START_ROUTINE  function;
             LPVOID                  parameter;
             SessionID               session;
+            std::filesystem::path   sessionDirectory;
             LogFile*                eventLog;
             LogFile*                debugLog;
         };
 
         DWORD threadPatch( void* argument ) {
             auto args = static_cast<const ThreadArguments*>( argument );
-            AddThreadToSession( args->session, args->eventLog, args->debugLog );
+            AddThreadToSession( args->session, args->sessionDirectory, args->eventLog, args->debugLog );
             auto result = args->function( args-> parameter );
             RemoveThreadFromSession();
             LocalFree( argument );
@@ -70,10 +71,11 @@ namespace AccessMonitor {
         ) {
             TypeCreateThread function = reinterpret_cast<TypeCreateThread>(original( (PatchFunction)PatchCreateThread ));
             bool resume = !(dwCreationFlags & CREATE_SUSPENDED);
-            auto args = static_cast<ThreadArguments*>( LocalAlloc( LMEM_FIXED, sizeof( ThreadArguments ) ) );
+            auto args = static_cast<ThreadArguments*>( LocalAlloc( LPTR, sizeof( ThreadArguments ) ) );
             args->function = lpStartAddress;
             args->parameter = lpParameter;
             args->session = CurrentSessionID();
+            args->sessionDirectory = CurrentSessionDirectory();
             args->eventLog = SessionEventLog();
             args->debugLog = SessionDebugLog();
             HANDLE handle = function( lpThreadAttributes, dwStackSize, threadPatch, args, (dwCreationFlags | CREATE_SUSPENDED), lpThreadId );
@@ -89,6 +91,7 @@ namespace AccessMonitor {
             DWORD   dwExitCode
         ) {
             TypeExitThread function = reinterpret_cast<TypeExitThread>(original( (PatchFunction)PatchExitThread ));
+            auto error = GetLastError();
             auto thread = CurrentThreadID();
             if (debugLog( PatchExecution )) debugMessage( "ExitThread" ) << dwExitCode << " ) on "  << thread << record;
             function( dwExitCode );
@@ -99,6 +102,7 @@ namespace AccessMonitor {
             DWORD   dwExitCode
         ) {
             TypeTerminateThread function = reinterpret_cast<TypeTerminateThread>(original( (PatchFunction)PatchTerminateThread ));
+            auto error = GetLastError();
             auto thread = GetThreadID( GetThreadId( hThread ) );
             if (debugLog( PatchExecution )) debugMessage( "TerminateThread" ) << thread << ", "  << dwExitCode << " )" << record;
             return function( hThread, dwExitCode );

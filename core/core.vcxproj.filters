@@ -13,42 +13,51 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\Node">
+      <UniqueIdentifier>{fb1e924d-5858-4250-a277-fe4478586bb7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\LogBook">
+      <UniqueIdentifier>{57dcfe1e-1f13-419f-92c2-4ce57377e5cf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Thread">
+      <UniqueIdentifier>{dfd60f0b-0a10-49fe-9171-b8aaa6ce74e8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\LogBook">
+      <UniqueIdentifier>{760a99d0-ff49-42e7-9551-452a2a829f7a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Node">
+      <UniqueIdentifier>{c74a1041-24c3-4d8f-9527-da0451d4398f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Thread">
+      <UniqueIdentifier>{763c51ea-9638-47ac-8ad8-4bfdf1c99eb3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Stream">
+      <UniqueIdentifier>{92067dfd-3da0-48bb-80c7-0f14fcaa5d44}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Stream">
+      <UniqueIdentifier>{aa61fa18-f868-40f2-b28a-7f699085cbf4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\BuildService">
+      <UniqueIdentifier>{a674e7e2-0525-4827-ae00-6b38c6875501}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\BuildService">
+      <UniqueIdentifier>{9d6d618b-9987-41d7-b09d-c4c3eaeb0900}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\BuildFileCompiler">
+      <UniqueIdentifier>{9cf55302-45d8-4d05-96a1-f099dae4bafb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\BuildFileCompiler">
+      <UniqueIdentifier>{5dd8690a-6430-48bb-ae69-fc2736b8e358}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Delegates.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="NodeSet.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Node.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Dispatcher.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Thread.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ThreadPool.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="FileNode.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="CommandNode.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="SourceFileNode.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ExecutionContext.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ExecutionStatistics.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="FileAspectHasher.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="FileAspectSet.h">
@@ -60,48 +69,303 @@
     <ClInclude Include="RegexSet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="InputFileAspects.h">
+    <ClInclude Include="MSBuildTrackerOutputReader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="GeneratedFileNode.h">
+    <ClInclude Include="DirectoryWatcher.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="IDirectoryWatcher.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectoryWatcherWin32.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="IMonitoredProcess.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MonitoredProcessWin32.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MonitoredProcess.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FileSystem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Builder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="dbgMemLeaks.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FileRepositoryWatcher.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FileNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="CommandNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="GeneratedFileNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="GlobNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="Node.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="NodeSet.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="SourceFileNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="BasicOStreamLogBook.h">
+      <Filter>Header Files\LogBook</Filter>
+    </ClInclude>
+    <ClInclude Include="Console.h">
+      <Filter>Header Files\LogBook</Filter>
+    </ClInclude>
+    <ClInclude Include="ConsoleLogBook.h">
+      <Filter>Header Files\LogBook</Filter>
+    </ClInclude>
+    <ClInclude Include="ConsoleWin32.h">
+      <Filter>Header Files\LogBook</Filter>
+    </ClInclude>
+    <ClInclude Include="DotIgnoreNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="ILogBook.h">
+      <Filter>Header Files\LogBook</Filter>
+    </ClInclude>
+    <ClInclude Include="LogRecord.h">
+      <Filter>Header Files\LogBook</Filter>
+    </ClInclude>
+    <ClInclude Include="MemoryLogBook.h">
+      <Filter>Header Files\LogBook</Filter>
+    </ClInclude>
+    <ClInclude Include="MultiwayLogBook.h">
+      <Filter>Header Files\LogBook</Filter>
+    </ClInclude>
+    <ClInclude Include="ThreadPool.h">
+      <Filter>Header Files\Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="Thread.h">
+      <Filter>Header Files\Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="Dispatcher.h">
+      <Filter>Header Files\Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="DispatcherFrame.h">
+      <Filter>Header Files\Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="IConsole.h">
+      <Filter>Source Files\LogBook</Filter>
+    </ClInclude>
+    <ClInclude Include="EndianShip.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="IStreamable.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="IStreamer.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="IIOStream.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="MemoryStream.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="EndOfStreamException.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="BinaryValueStreamer.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="TcpStream.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildRequest.h">
+      <Filter>Header Files\BuildService</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildResult.h">
+      <Filter>Header Files\BuildService</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildService.h">
+      <Filter>Header Files\BuildService</Filter>
+    </ClInclude>
+    <ClInclude Include="ShutdownRequest.h">
+      <Filter>Header Files\BuildService</Filter>
+    </ClInclude>
+    <ClInclude Include="StopBuildRequest.h">
+      <Filter>Header Files\BuildService</Filter>
+    </ClInclude>
+    <ClInclude Include="SharedObjectStreamer.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="IObjectStreamer.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="IValueStreamer.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="Streamer.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="ObjectStreamer.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="ISharedObjectStreamer.h">
+      <Filter>Header Files\Stream</Filter>
+    </ClInclude>
+    <ClInclude Include="TimePoint.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildClient.h">
+      <Filter>Header Files\BuildService</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildServiceMessageTypes.h">
+      <Filter>Header Files\BuildService</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildServiceProtocol.h">
+      <Filter>Header Files\BuildService</Filter>
+    </ClInclude>
+    <ClInclude Include="DotYamDirectory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DotGitDirectory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildServicePortRegistry.h">
+      <Filter>Header Files\BuildService</Filter>
+    </ClInclude>
+    <ClInclude Include="CollapsedFileChanges.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PersistentBuildState.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="IPersistable.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildFileParser.h">
+      <Filter>Header Files\BuildFileCompiler</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildFileTokenizer.h">
+      <Filter>Header Files\BuildFileCompiler</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildFile.h">
+      <Filter>Header Files\BuildFileCompiler</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildFileTokenSpecs.h">
+      <Filter>Header Files\BuildFileCompiler</Filter>
+    </ClInclude>
+    <ClInclude Include="Glob.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectoryNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="Globber.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildFileCompiler.h">
+      <Filter>Header Files\BuildFileCompiler</Filter>
+    </ClInclude>
+    <ClInclude Include="GroupNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildFileDependenciesCompiler.h">
+      <Filter>Header Files\BuildFileCompiler</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildFileCompilerNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildFileParserNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="AcyclicTrail.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="NodeMapStreamer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GroupCycleFinder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Token.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TokenPathSpec.h">
+      <Filter>Header Files\BuildFileCompiler</Filter>
+    </ClInclude>
+    <ClInclude Include="TokenRegexSpec.h">
+      <Filter>Header Files\BuildFileCompiler</Filter>
+    </ClInclude>
+    <ClInclude Include="FileExecSpecsNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="RepositoriesNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="RepositoryNameFile.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildOptions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildOptionsParser.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildScopeFinder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildFileCycleFinder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="computeMapsDifference.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FileRepositoryNode.h">
+      <Filter>Header Files\Node</Filter>
+    </ClInclude>
+    <ClInclude Include="xxhash.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PercentageFlagsCompiler.h">
+      <Filter>Header Files\BuildFileCompiler</Filter>
+    </ClInclude>
+    <ClInclude Include="TokenScriptSpec.h">
+      <Filter>Header Files\BuildFileCompiler</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildStateVersion.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PeriodicTimer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PriorityDispatcher.h">
+      <Filter>Header Files\Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="PriorityClass.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ForEachNode.h">
+      <Filter>Header Files\Node</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="NodeSet.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Node.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Dispatcher.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Thread.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ThreadPool.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="FileNode.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="CommandNode.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="SourceFileNode.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="ExecutionContext.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ExecutionStatistics.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="FileAspectHasher.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="FileAspectSet.cpp">
@@ -113,11 +377,232 @@
     <ClCompile Include="RegexSet.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="InputFileAspects.cpp">
+    <ClCompile Include="MSBuildTrackerOutputReader.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DirectoryWatcher.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DirectoryWatcherWin32.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MonitoredProcessWin32.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MonitoredProcess.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="FileSystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Builder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="FileRepositoryWatcher.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BasicOStreamLogBook.cpp">
+      <Filter>Source Files\LogBook</Filter>
+    </ClCompile>
+    <ClCompile Include="CommandNode.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="Console.cpp">
+      <Filter>Source Files\LogBook</Filter>
+    </ClCompile>
+    <ClCompile Include="ConsoleLogBook.cpp">
+      <Filter>Source Files\LogBook</Filter>
+    </ClCompile>
+    <ClCompile Include="ConsoleWin32.cpp">
+      <Filter>Source Files\LogBook</Filter>
+    </ClCompile>
+    <ClCompile Include="Dispatcher.cpp">
+      <Filter>Source Files\Thread</Filter>
+    </ClCompile>
+    <ClCompile Include="DotIgnoreNode.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="FileNode.cpp">
+      <Filter>Source Files\Node</Filter>
     </ClCompile>
     <ClCompile Include="GeneratedFileNode.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="GlobNode.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="LogRecord.cpp">
+      <Filter>Source Files\LogBook</Filter>
+    </ClCompile>
+    <ClCompile Include="MemoryLogBook.cpp">
+      <Filter>Source Files\LogBook</Filter>
+    </ClCompile>
+    <ClCompile Include="MultiwayLogBook.cpp">
+      <Filter>Source Files\LogBook</Filter>
+    </ClCompile>
+    <ClCompile Include="Node.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="NodeSet.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="SourceFileNode.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="Thread.cpp">
+      <Filter>Source Files\Thread</Filter>
+    </ClCompile>
+    <ClCompile Include="ThreadPool.cpp">
+      <Filter>Source Files\Thread</Filter>
+    </ClCompile>
+    <ClCompile Include="MemoryStream.cpp">
+      <Filter>Source Files\Stream</Filter>
+    </ClCompile>
+    <ClCompile Include="BinaryValueStreamer.cpp">
+      <Filter>Source Files\Stream</Filter>
+    </ClCompile>
+    <ClCompile Include="TcpStream.cpp">
+      <Filter>Source Files\Stream</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildRequest.cpp">
+      <Filter>Source Files\BuildService</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildResult.cpp">
+      <Filter>Source Files\BuildService</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildService.cpp">
+      <Filter>Source Files\BuildService</Filter>
+    </ClCompile>
+    <ClCompile Include="ShutdownRequest.cpp">
+      <Filter>Source Files\BuildService</Filter>
+    </ClCompile>
+    <ClCompile Include="StopBuildRequest.cpp">
+      <Filter>Source Files\BuildService</Filter>
+    </ClCompile>
+    <ClCompile Include="SharedObjectStreamer.cpp">
+      <Filter>Source Files\Stream</Filter>
+    </ClCompile>
+    <ClCompile Include="Streamer.cpp">
+      <Filter>Source Files\Stream</Filter>
+    </ClCompile>
+    <ClCompile Include="TimePoint.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="BuildClient.cpp">
+      <Filter>Source Files\BuildService</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildServiceProtocol.cpp">
+      <Filter>Source Files\BuildService</Filter>
+    </ClCompile>
+    <ClCompile Include="DotYamDirectory.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DotGitDirectory.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildServicePortRegistry.cpp">
+      <Filter>Source Files\BuildService</Filter>
+    </ClCompile>
+    <ClCompile Include="CollapsedFileChanges.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PersistentBuildState.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildFileParser.cpp">
+      <Filter>Source Files\BuildFileCompiler</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildFileTokenizer.cpp">
+      <Filter>Source Files\BuildFileCompiler</Filter>
+    </ClCompile>
+    <ClCompile Include="Glob.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DirectoryNode.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="Globber.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildFileCompiler.cpp">
+      <Filter>Source Files\BuildFileCompiler</Filter>
+    </ClCompile>
+    <ClCompile Include="GroupNode.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildFileDependenciesCompiler.cpp">
+      <Filter>Source Files\BuildFileCompiler</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildFileCompilerNode.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildFileParserNode.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildFile.cpp">
+      <Filter>Source Files\BuildFileCompiler</Filter>
+    </ClCompile>
+    <ClCompile Include="GroupCycleFinder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildFileTokenSpecs.cpp">
+      <Filter>Source Files\BuildFileCompiler</Filter>
+    </ClCompile>
+    <ClCompile Include="TokenRegexSpec.cpp">
+      <Filter>Source Files\BuildFileCompiler</Filter>
+    </ClCompile>
+    <ClCompile Include="TokenPathSpec.cpp">
+      <Filter>Source Files\BuildFileCompiler</Filter>
+    </ClCompile>
+    <ClCompile Include="FileExecSpecsNode.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="RepositoriesNode.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="RepositoryNameFile.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildOptions.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildOptionsParser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildScopeFinder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildFileCycleFinder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="FileRepositoryNode.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+    <ClCompile Include="xxhash.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PercentageFlagsCompiler.cpp">
+      <Filter>Source Files\BuildFileCompiler</Filter>
+    </ClCompile>
+    <ClCompile Include="TokenScriptSpec.cpp">
+      <Filter>Source Files\BuildFileCompiler</Filter>
+    </ClCompile>
+    <ClCompile Include="BuildStateVersion.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PeriodicTimer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PriorityDispatcher.cpp">
+      <Filter>Source Files\Thread</Filter>
+    </ClCompile>
+    <ClCompile Include="ForEachNode.cpp">
+      <Filter>Source Files\Node</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="IStreamer.inl">
+      <Filter>Header Files\Stream</Filter>
+    </None>
   </ItemGroup>
 </Project>

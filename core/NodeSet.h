@@ -1,47 +1,105 @@
 #pragma once
 
-#include <map>
+#include "Delegates.h"
 #include <filesystem>
+#include <memory>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace YAM
 {
-	class Node;
-	class Dispatcher;
+    class Node;
 
-	class __declspec(dllexport) NodeSet
-	{
-	public:
-		// Construct a set that can hold Node instances.
-		// Nodes are identified by their name(). 
-		// No duplicates allowed.
-		NodeSet() = default;
+    // Class to store nodes that have unique names.
+    class __declspec(dllexport) NodeSet
+    {
+    public:
+        // Construct a set that can hold Node instances.
+        // Nodes are identified by their name(). 
+        // No duplicates allowed.
+        NodeSet() = default;
 
-		// Add node to the set.
-		void addIfAbsent(Node* node);
+        // Add node to the set.
+        void addIfAbsent(std::shared_ptr<Node> const& node);
 
-		// Add node to the set.
-		// Pre: !Contains(node->Name())
-		void add(Node* node);
+        // Add node to the set.
+        // Pre: !Contains(node->Name())
+        void add(std::shared_ptr<Node> const& node);
 
-		// Remove node from the set.
-		// Pre: Contains(node->Name())
-		void remove(Node* node);
+        // Remove node from the set.
+        // Pre: Contains(node->Name())
+        void remove(std::shared_ptr<Node> const& node);
 
-		// Remove node from the set.
-		void removeIfPresent(Node* node);
+        // Remove node from the set.
+        void removeIfPresent(std::shared_ptr<Node> const& node);
 
-		// Find and return node that matches nodeName;
-		// Return null when not found.
-		Node* find(std::filesystem::path const& nodeName) const;
+        // Remove all nodes from the set.
+        void clear();
 
-		// Return whether the set contains a node with given 'nodeName'
-		bool contains(std::filesystem::path const& nodeName) const;
+        // Find and return node that matches nodeName;
+        // Return null when not found.
+        std::shared_ptr<Node> find(std::filesystem::path const& nodeName) const;
 
-		std::size_t size() const;
+        // Return in 'foundNodes' all nodes for which includeNode(node)==true.
+        void find(
+            Delegate<bool, std::shared_ptr<Node> const&> includeNode,
+            std::vector<std::shared_ptr<Node>>& foundNodes) const;
 
-	private:
-		// TODO: used unordered_set. However set cannot use std::filesystem::path as keys.
-		std::map<std::filesystem::path, Node*> _nodes;
-	};
+        // Execute action on each node in the set.
+        void foreach(Delegate<void, std::shared_ptr<Node> const&> action);
+
+        // Return whether the set contains a node with given 'nodeName'
+        bool contains(std::filesystem::path const& nodeName) const;
+
+        std::size_t size() const;
+
+        std::vector<std::shared_ptr<Node>> nodes() const;
+        std::unordered_map<std::filesystem::path, std::shared_ptr<Node>> nodesMap() const;
+
+        // Pre: node->state() == Node::State::Dirty
+        void registerDirtyNode(std::shared_ptr<Node> const& node);
+        // Pre: node->state() != Node::State::Dirty
+        void unregisterDirtyNode(std::shared_ptr<Node> const& node);
+        // Return map from node class name to the set of instances of that class
+        // in state Node::State::Dirty
+        std::unordered_map<std::string, std::unordered_set<std::shared_ptr<Node>>> const& dirtyNodes() const;
+
+
+        // Pre: node->state() == Node::State::Failed || Node::State::Canceled
+        void registerFailedOrCanceledNode(std::shared_ptr<Node> const& node);
+        // Pre: node->state() != Node::State::Failed || Node::State::Canceled
+        void unregisterFailedOrCanceledNode(std::shared_ptr<Node> const& node);
+        // Return map from node class name to the set of instances of that class
+        // in state Node::State::Failed || Node::State::Canceled
+        std::unordered_map<std::string, std::unordered_set<std::shared_ptr<Node>>> const& failedOrCanceledNodes() const;
+
+        // Register node as modified in changeset.
+        // Pre: node->modified()
+        void changeSetModify(std::shared_ptr<Node> const& node);
+
+        // Return changes in the nodeset since last call to clearChangeSet().
+        // The sets do not intersect.
+        std::unordered_set<std::shared_ptr<Node>> const& addedNodes() const;
+        std::unordered_set<std::shared_ptr<Node>> const& modifiedNodes() const;
+        std::unordered_set<std::shared_ptr<Node>> const& removedNodes() const;
+
+        std::size_t changeSetSize() const;
+        void clearChangeSet();
+
+    private:
+        void changeSetAdd(std::shared_ptr<Node> const& node);
+        void changeSetRemove(std::shared_ptr<Node> const& node);
+
+        std::unordered_map<std::filesystem::path, std::shared_ptr<Node>> _nodes;
+
+        std::unordered_map<std::string, std::unordered_set<std::shared_ptr<Node>>> _dirtyNodes;
+        std::unordered_map<std::string, std::unordered_set<std::shared_ptr<Node>>> _failedOrCanceledNodes;
+
+        // Changeset
+        std::unordered_set<std::shared_ptr<Node>> _addedNodes;
+        std::unordered_set<std::shared_ptr<Node>> _modifiedNodes;
+        std::unordered_set<std::shared_ptr<Node>> _removedNodes;
+
+    };
 }
 

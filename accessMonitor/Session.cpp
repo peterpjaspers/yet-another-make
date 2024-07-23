@@ -14,6 +14,7 @@ namespace AccessMonitor {
         // TLS data is used to avoid mutual exclusion when accessing this data.
         struct MonitorData {
             SessionID       session;
+            std::filesystem::path directory;
             ProcessID       process;
             ThreadID        thread;
             LogFile*        eventLog;
@@ -28,13 +29,19 @@ namespace AccessMonitor {
 
     }
 
-    SessionID CurrentSessionID() { 
+    SessionID CurrentSessionID() {
         static const char* signature = "SessionID CurrentSessionID()";
-        auto data = static_cast<const MonitorData*>( TlsGetValue( tlsSessionIndex ) );
-        if (data == nullptr) throw string( signature ) + " - Thread not active on a session!";
+        auto data = static_cast<const MonitorData*>(TlsGetValue(tlsSessionIndex));
+        if (data == nullptr) throw string(signature) + " - Thread not active on a session!";
         return data->session;
     }
-    SessionID CreateSession() {
+    std::filesystem::path const& CurrentSessionDirectory() {
+        static const char* signature = "SessionID CurrentSessionDirectory()";
+        auto data = static_cast<const MonitorData*>(TlsGetValue(tlsSessionIndex));
+        if (data == nullptr) throw string(signature) + " - Thread not active on a session!";
+        return data->directory;
+    }
+    SessionID CreateSession(std::filesystem::path const& directory) {
         static const char* signature = "SessionID CreateSession()";
         auto data = static_cast<MonitorData*>( TlsGetValue( tlsSessionIndex ) );
         if (data != nullptr) throw string( signature ) + " - Thread already active on a session!";
@@ -49,10 +56,10 @@ namespace AccessMonitor {
             newSession = nextSession++;
         }
         sessions.insert( newSession );
-        AddThreadToSession( newSession );
+        AddThreadToSession( newSession, directory );
         return newSession;
     }
-    void CreateRemoteSession( SessionID session, ProcessID process, ThreadID thread ) {
+    void CreateRemoteSession( std::filesystem::path const& sessionDirectory, SessionID session, ProcessID process, ThreadID thread ) {
         static const char* signature = "void CreateRemoteSession( SessionID session, ProcessID process, ThreadID thread )";
         throw string( signature ) + " - Invalid call!";
     }
@@ -71,9 +78,10 @@ namespace AccessMonitor {
             tlsSessionIndex = (DWORD)-1;
         }
     }
-    void AddThreadToSession( SessionID session, LogFile* eventLog, LogFile* debugLog ) {
-        auto data = static_cast<MonitorData*>( LocalAlloc( LMEM_FIXED, sizeof( MonitorData ) ) );
+    void AddThreadToSession( SessionID session, std::filesystem::path const& directory, LogFile* eventLog, LogFile* debugLog ) {
+        auto data = static_cast<MonitorData*>( LocalAlloc(LPTR , sizeof( MonitorData ) ) );
         data->session = session;
+        data->directory = directory;
         data->process = CurrentProcessID();
         data->thread = CurrentThreadID();
         data->eventLog = eventLog;

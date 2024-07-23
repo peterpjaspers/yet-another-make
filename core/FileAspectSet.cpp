@@ -2,44 +2,65 @@
 
 namespace YAM
 {
-	std::vector<FileAspect> const& FileAspectSet::aspects() const {
-		return _aspects;
-	}
+    FileAspectSet::FileAspectSet(const std::string& name) :
+        _name(name) {
+    }
 
-	std::pair<bool, FileAspect const&> FileAspectSet::find(std::string const& aspectName) const {
-		for (auto& _a : _aspects) {
-			if (_a.name() == aspectName) return { true, _a };
-		}
-		return { false, FileAspect() };
-	}
+    const std::string& FileAspectSet::name() const {
+        return _name;
+    }
 
-	FileAspect const & FileAspectSet::findApplicableAspect(std::filesystem::path const & fileName) const {
-		FileAspect const * foundAspect = nullptr;
-		for (auto& _a : _aspects) {
-			if (_a.matches(fileName)) {
-				if (foundAspect != nullptr) throw std::runtime_error("fileName must be applicable for one aspect only");
-				foundAspect = &_a;
-			}
-		}
-		return foundAspect != nullptr ? *foundAspect : FileAspect::entireFileAspect();
-	}
+    std::vector<FileAspect> FileAspectSet::aspects() const {
+        std::vector<FileAspect> aspects;
+        for (auto& _a : _aspects) {
+            aspects.push_back(_a.second);
+        }
+        return aspects;
+    }
 
-	void FileAspectSet::add(FileAspect const& aspect) {
-		const bool alreadyExists = find(aspect.name()).first;
-		if (alreadyExists) throw std::runtime_error("aspect must be unique");
-		_aspects.push_back(aspect);
-	}
+    std::pair<bool, FileAspect const&> FileAspectSet::find(std::string const& aspectName) const {
+        auto const& a = _aspects.find(aspectName);
+        if (a != _aspects.cend()) return { true, a->second };
+        return { false, FileAspect()};
+    }
 
-	void FileAspectSet::remove(FileAspect const& aspect) {
-		for (std::size_t index = 0; index < _aspects.size(); ++index) {
-			if (_aspects[index].name() == aspect.name()) {
-				_aspects.erase(_aspects.begin() + index);
-			    break;
-			}
-		}		
-	}	
+    FileAspect const & FileAspectSet::findApplicableAspect(std::filesystem::path const & fileName) const {
+        FileAspect const * foundAspect = nullptr;
+        for (auto const& _a : _aspects) {
+            FileAspect const& aspect = _a.second;
+            if (aspect.appliesTo(fileName)) {
+                if (foundAspect != nullptr) throw std::runtime_error("fileName must be applicable for one aspect only");
+                foundAspect = &aspect;
+            }
+        }
+        return foundAspect != nullptr ? *foundAspect : FileAspect::entireFileAspect();
+    }
 
-	void FileAspectSet::clear() {
-		_aspects.clear();
-	}
+    void FileAspectSet::add(FileAspect const& aspect) {
+        if (_aspects.contains(aspect.name())) throw std::runtime_error("aspect name must be unique");
+        _aspects.insert({ aspect.name(), aspect });
+    }
+
+    void FileAspectSet::remove(FileAspect const& aspect) {
+        auto const& a = _aspects.find(aspect.name());
+        if (a != _aspects.cend()) _aspects.erase(a->first);
+    }
+
+    bool FileAspectSet::contains(std::string const& aspectName) const {
+        return _aspects.contains(aspectName);
+    }
+
+    void FileAspectSet::clear() {
+        _aspects.clear();
+    }
+
+    FileAspectSet const& FileAspectSet::entireFileSet() {
+        static FileAspectSet entireFileSet("entireFileSet");
+        static bool entireFileSetInitialized = false;
+        if (!entireFileSetInitialized) {
+            entireFileSetInitialized = true;
+            entireFileSet.add(FileAspect::entireFileAspect());
+        }
+        return entireFileSet;
+    }
 }

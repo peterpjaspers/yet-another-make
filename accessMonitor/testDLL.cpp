@@ -10,7 +10,7 @@ using namespace AccessMonitor;
 using namespace std;
 using namespace std::filesystem;
 
-const std::wstring patchDLLFile( L"C:\\Users\\philv\\Code\\yam\\yet-another-make\\accessMonitor\\accessMonitor.dll" );
+const std::wstring patchDLLFile( L"D:\\Peter\\github\\yam\\x64\\Debug\\accessMonitorDLL.dll" );
 
 void worker( const path directoryPath ) {
     current_path( temp_directory_path() );
@@ -43,7 +43,7 @@ int main( int argc, char* argv[] ) {
     auto thread = CurrentThreadID();
     auto patched = AccessEvent( "ProcessPatched", session, process );
     auto exit = AccessEvent( "ExitProcess", session, process );
-    recordSessionInfo( session, process, thread );
+    recordSessionInfo(temp_directory_path(), session, process, thread );
     HMODULE library = LoadLibraryW( patchDLLFile.c_str() );
     EventWait( patched );
     ReleaseEvent( patched );

@@ -56,8 +56,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateDirectoryA>(original( (PatchFunction)PatchCreateDirectoryA ));
             BOOL created = function( pathName, securityAttributes );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "CreateDirectoryA", created ) << pathName << L", ... )" << record;
             fileAccess( pathName, AccessWrite );
+            SetLastError(error);
             return created;
         }
         typedef BOOL(*TypeCreateDirectoryW)(LPCWSTR,LPSECURITY_ATTRIBUTES);
@@ -67,8 +69,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateDirectoryW>(original( (PatchFunction)PatchCreateDirectoryW ));
             BOOL created = function( pathName, securityAttributes );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "CreateDirectoryW", created ) << pathName << L", ... )" << record;
             fileAccess( pathName, AccessWrite );
+            SetLastError(error);
             return created;
         }
         typedef BOOL(*TypeCreateDirectoryExA)(LPCSTR,LPCSTR,LPSECURITY_ATTRIBUTES);
@@ -79,8 +83,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateDirectoryExA>(original( (PatchFunction)PatchCreateDirectoryExA ));
             BOOL created = function( templateDirectory, newDirectory, securityAttributes );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "CreateDirectoryExA", created ) << newDirectory << L", ... )" << record;
             fileAccess( newDirectory, AccessWrite );
+            SetLastError(error);
             return created;
         }
         typedef BOOL(*TypeCreateDirectoryExW)(LPCWSTR,LPCWSTR,LPSECURITY_ATTRIBUTES);
@@ -91,8 +97,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateDirectoryExW>(original( (PatchFunction)PatchCreateDirectoryExW ));
             BOOL created = function( templateDirectory, newDirectory, securityAttributes );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "CreateDirectoryExA", created ) << newDirectory << L", ... )" << record;
             fileAccess( newDirectory, AccessWrite );
+            SetLastError(error);
             return created;
         }
         typedef BOOL(*TypeRemoveDirectoryA)(LPCSTR);
@@ -101,8 +109,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeRemoveDirectoryA>(original( (PatchFunction)PatchRemoveDirectoryA ));
             BOOL removed = function( pathName );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "RemoveDirectoryA", removed ) << pathName << L", ... )" << record;
             fileAccess( pathName, AccessDelete );
+            SetLastError(error);
             return removed;
         }
         typedef BOOL(*TypeRemoveDirectoryW)(LPCWSTR);
@@ -111,8 +121,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeRemoveDirectoryW>(original( (PatchFunction)PatchRemoveDirectoryW ));
             BOOL removed = function( pathName );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "RemoveDirectoryW", removed ) << pathName << L", ... )" << record;
             fileAccess( pathName, AccessDelete );
+            SetLastError(error);
             return removed;
         }
         typedef HANDLE(*TypeCreateFileA)(LPCSTR,DWORD,DWORD,LPSECURITY_ATTRIBUTES,DWORD,DWORD,HANDLE);
@@ -127,8 +139,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateFileA>(original( (PatchFunction)PatchCreateFileA ));
             HANDLE handle = function( fileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "CreateFileA", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
             fileAccess( handle, requestedAccessMode( dwDesiredAccess ) );
+            SetLastError(error);
             return handle;
         }
         typedef HANDLE(*TypeCreateFileW)(LPCWSTR,DWORD,DWORD,LPSECURITY_ATTRIBUTES,DWORD,DWORD,HANDLE);
@@ -143,8 +157,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateFileW>(original( (PatchFunction)PatchCreateFileW ));
             HANDLE handle = function( fileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "CreateFileW", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
             fileAccess( handle, requestedAccessMode( dwDesiredAccess ) );
+            SetLastError(error);
             return handle;
         }
         typedef HANDLE(*TypeCreateFileTransactedA)(LPCSTR,DWORD,DWORD,LPSECURITY_ATTRIBUTES,DWORD,DWORD,HANDLE,HANDLE,PUSHORT,PVOID);
@@ -162,8 +178,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateFileTransactedA>(original( (PatchFunction)PatchCreateFileTransactedA ));
             HANDLE handle = function( fileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile, hTransaction, pusMiniVersion, lpExtendedParameter );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "CreateFileTransactedA", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
             fileAccess( handle, requestedAccessMode( dwDesiredAccess ) );
+            SetLastError(error);
             return handle;
         }
         typedef HANDLE(*TypeCreateFileTransactedW)(LPCWSTR,DWORD,DWORD,LPSECURITY_ATTRIBUTES,DWORD,DWORD,HANDLE,HANDLE,PUSHORT,PVOID);
@@ -181,8 +199,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateFileTransactedW>(original( (PatchFunction)PatchCreateFileTransactedW ));
             HANDLE handle = function( fileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile, hTransaction, pusMiniVersion, lpExtendedParameter );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "CreateFileTransactedW", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
             fileAccess( handle, requestedAccessMode( dwDesiredAccess ) );
+            SetLastError(error);
             return handle;
         }
         typedef HANDLE(*TypeCreateFile2)(LPCWSTR,DWORD,DWORD,DWORD,LPCREATEFILE2_EXTENDED_PARAMETERS);
@@ -195,8 +215,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateFile2>(original( (PatchFunction)PatchCreateFile2 ));
             HANDLE handle = function( fileName, dwDesiredAccess, dwShareMode, dwCreationDisposition, pCreateExParams );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "CreateFile2", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
             fileAccess( handle, requestedAccessMode( dwDesiredAccess ) );
+            SetLastError(error);
             return handle;
         }
         typedef HANDLE(*TypeReOpenFile)(HANDLE,DWORD,DWORD,DWORD);
@@ -208,8 +230,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeReOpenFile>(original( (PatchFunction)PatchReOpenFile ));
             HANDLE handle = function( hOriginalFile, dwDesiredAccess, dwShareMode, dwFlagsAndAttributes );
+            auto error = GetLastError();
             auto fileName = fileAccess( handle, requestedAccessMode( dwDesiredAccess ) );
             if (debugLog( PatchExecution )) debugMessage( "ReOpenFile", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
+            SetLastError(error);
             return handle;
         }
         typedef HFILE(*TypeOpenFile)(LPCSTR,LPOFSTRUCT,UINT);
@@ -220,8 +244,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeOpenFile>(original( (PatchFunction)PatchOpenFile ));
             HFILE handle = function( fileName, lpReOpenBuff, uStyle );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "OpenFile", (handle != HFILE_ERROR) ) << fileName << L", ... ) -> " << handle << record;
             fileAccess( fileName, requestedAccessMode( uStyle ) );
+            SetLastError(error);
             return handle;
 
         }
@@ -229,14 +255,17 @@ namespace AccessMonitor {
         BOOL PatchDeleteFileA( LPCSTR fileName ) {
             auto function = reinterpret_cast<TypeDeleteFileA>(original( (PatchFunction)PatchDeleteFileA ));
             BOOL deleted = function( fileName );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "DeleteFileA", deleted ) << fileName << L", ... )" << record;
             fileAccess( fileName, AccessDelete );
+            SetLastError(error);
             return deleted;
         }
         typedef BOOL(*TypeDeleteFileW)(LPCWSTR);
         BOOL PatchDeleteFileW( LPCWSTR fileName ) {
             auto function = reinterpret_cast<TypeDeleteFileW>(original( (PatchFunction)PatchDeleteFileW ));
             BOOL deleted = function( fileName );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "DeleteFileW", deleted ) << fileName << L", ... )" << record;
             fileAccess( fileName, AccessDelete );
             return deleted;
@@ -245,16 +274,20 @@ namespace AccessMonitor {
         BOOL PatchDeleteFileTransactedA( LPCSTR fileName, HANDLE hTransaction ) {
             auto function = reinterpret_cast<TypeDeleteFileTransactedA>(original( (PatchFunction)PatchDeleteFileTransactedA ));
             BOOL deleted = function( fileName, hTransaction );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "DeleteFileTransactedA", deleted ) << fileName << L", ... )" << record;
             fileAccess( fileName, AccessDelete );
+            SetLastError(error);
             return deleted;
         }
         typedef BOOL(*TypeDeleteFileTransactedW)(LPCWSTR,HANDLE);
         BOOL PatchDeleteFileTransactedW( LPCWSTR fileName, HANDLE hTransaction ) {
             auto function = reinterpret_cast<TypeDeleteFileTransactedW>(original( (PatchFunction)PatchDeleteFileTransactedW ));
             BOOL deleted = function( fileName, hTransaction );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "DeleteFileTransactedW", deleted ) << fileName << L", ... )" << record;
             fileAccess( fileName, AccessDelete );
+            SetLastError(error);
             return deleted;
         }
         typedef BOOL(*TypeCopyFileA)(LPCSTR,LPCSTR,BOOL);
@@ -264,10 +297,12 @@ namespace AccessMonitor {
             BOOL   failIfExists
         ) {
             auto function = reinterpret_cast<TypeCopyFileA>(original( (PatchFunction)PatchCopyFileA ));
+            auto error = GetLastError();
             fileAccess( existingFileName, AccessRead );
             BOOL copied = function( existingFileName, newFileName, failIfExists );
             if (debugLog( PatchExecution )) debugMessage( "CopyFileA", copied ) << existingFileName << L", " << newFileName << L", ... )" << record;
             fileAccess( newFileName, AccessWrite );
+            SetLastError(error);
             return copied;
         }
         typedef BOOL(*TypeCopyFileW)(LPCWSTR,LPCWSTR,BOOL);
@@ -277,10 +312,12 @@ namespace AccessMonitor {
             BOOL    failIfExists
         ) {
             auto function = reinterpret_cast<TypeCopyFileW>(original( (PatchFunction)PatchCopyFileW ));
+            auto error = GetLastError();
             fileAccess( existingFileName, AccessRead);
             BOOL copied = function( existingFileName, newFileName, failIfExists );
             if (debugLog( PatchExecution )) debugMessage( "CopyFileW", copied ) << existingFileName << L", " << newFileName << L", ... )" << record;
             fileAccess( newFileName, AccessWrite );
+            SetLastError(error);
             return copied;
         }
         typedef BOOL(*TypeCopyFileExA)(LPCSTR,LPCSTR,LPPROGRESS_ROUTINE,LPVOID,LPBOOL,DWORD);
@@ -293,10 +330,12 @@ namespace AccessMonitor {
             DWORD              dwCopyFlags
         ) {
             auto function = reinterpret_cast<TypeCopyFileExA>(original( (PatchFunction)PatchCopyFileExA ));
+            auto error = GetLastError();
             fileAccess( existingFileName, AccessRead );
             BOOL copied = function( existingFileName, newFileName, lpProgressRoutine, lpData, pbCancel, dwCopyFlags );
             if (debugLog( PatchExecution )) debugMessage( "CopyFileExA", copied ) << existingFileName << L", " << newFileName << L", ... )" << record;
             fileAccess( newFileName, AccessWrite );
+            SetLastError(error);
             return copied;
         }
         typedef BOOL(*TypeCopyFileExW)(LPCWSTR,LPCWSTR,LPPROGRESS_ROUTINE,LPVOID,LPBOOL,DWORD);
@@ -309,10 +348,12 @@ namespace AccessMonitor {
             DWORD              dwCopyFlags
         ) {
             auto function = reinterpret_cast<TypeCopyFileExW>(original( (PatchFunction)PatchCopyFileExW ));
+            auto error = GetLastError();
             fileAccess( existingFileName, AccessRead );
             BOOL copied = function( existingFileName, newFileName, lpProgressRoutine, lpData, pbCancel, dwCopyFlags );
             if (debugLog( PatchExecution )) debugMessage( "CopyFileExW", copied ) << existingFileName << L", " << newFileName << L", ... )" << record;
             fileAccess( newFileName, AccessWrite );
+            SetLastError(error);
             return copied;
         }
         typedef BOOL(*TypeCopyFileTransactedA)(LPCSTR,LPCSTR,LPPROGRESS_ROUTINE,LPVOID,LPBOOL,DWORD,HANDLE);
@@ -326,10 +367,12 @@ namespace AccessMonitor {
             HANDLE             hTransaction
         ) {
             auto function = reinterpret_cast<TypeCopyFileTransactedA>(original( (PatchFunction)PatchCopyFileTransactedA ));
+            auto error = GetLastError();
             fileAccess( existingFileName, AccessRead );
             BOOL copied = function( existingFileName, newFileName, lpProgressRoutine,lpData, pbCancel, dwCopyFlags, hTransaction );
             if (debugLog( PatchExecution )) debugMessage( "CopyFileTransactedA", copied ) << existingFileName << L", " << newFileName << L", ... )" << record;
             fileAccess( newFileName, AccessWrite );
+            SetLastError(error);
             return copied;
         }
         typedef BOOL(*TypeCopyFileTransactedW)(LPCWSTR,LPCWSTR,LPPROGRESS_ROUTINE,LPVOID,LPBOOL,DWORD,HANDLE);
@@ -343,10 +386,12 @@ namespace AccessMonitor {
             HANDLE             hTransaction
         ) {
             auto function = reinterpret_cast<TypeCopyFileTransactedW>(original( (PatchFunction)PatchCopyFileTransactedW ));
+            auto error = GetLastError();
             fileAccess( existingFileName, AccessRead);
             BOOL copied = function( existingFileName, newFileName, lpProgressRoutine,lpData, pbCancel, dwCopyFlags, hTransaction );
             if (debugLog( PatchExecution )) debugMessage( "CopyFileTransactedW", copied ) << existingFileName << L", " << newFileName << L", ... )" << record;
             fileAccess( newFileName, AccessWrite );
+            SetLastError(error);
             return copied;
         }
         typedef HRESULT(*TypeCopyFile2)(PCWSTR,PCWSTR,COPYFILE2_EXTENDED_PARAMETERS*);
@@ -356,11 +401,13 @@ namespace AccessMonitor {
             COPYFILE2_EXTENDED_PARAMETERS* pExtendedParameters
         ) {
             auto function = reinterpret_cast<TypeCopyFile2>(original( (PatchFunction)PatchCopyFile2 ));
-            BOOL copied = function( existingFileName, newFileName, pExtendedParameters );
-            if (debugLog( PatchExecution )) debugMessage( "CopyFile2", copied ) << existingFileName << L", " << newFileName << L", ... )" << record;
+            auto result = function( existingFileName, newFileName, pExtendedParameters );
+            auto error = GetLastError();
+            if (debugLog( PatchExecution )) debugMessage( "CopyFile2", result== S_OK) << existingFileName << L", " << newFileName << L", ... )" << record;
             fileAccess( existingFileName, AccessRead );
             fileAccess( newFileName, AccessWrite );
-            return copied;
+            SetLastError(error);
+            return result;
         }
         typedef BOOL(*TypeReplaceFileA)(LPCSTR,LPCSTR,LPCSTR,DWORD,LPVOID,LPVOID);
         BOOL PatchReplaceFileA(
@@ -374,9 +421,11 @@ namespace AccessMonitor {
             auto function = reinterpret_cast<TypeReplaceFileA>(original( (PatchFunction)PatchReplaceFileA ));
             fileAccess( lpReplacementFileName, AccessRead );
             BOOL replaced = function( lpReplacedFileName, lpReplacementFileName, lpBackupFileName, dwReplaceFlags, lpExclude, lpReserved );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "ReplaceFileA", replaced ) << lpReplacedFileName << L", " << lpReplacementFileName << L", ... )" << record;
             fileAccess( lpReplacedFileName, AccessWrite );
             if (lpBackupFileName!= nullptr) fileAccess( lpBackupFileName, AccessWrite );
+            SetLastError(error);
             return replaced;
         }
         typedef BOOL(*TypeReplaceFileW)(LPCWSTR,LPCWSTR,LPCWSTR,DWORD,LPVOID,LPVOID);
@@ -391,9 +440,11 @@ namespace AccessMonitor {
             auto function = reinterpret_cast<TypeReplaceFileW>(original( (PatchFunction)PatchReplaceFileW ));
             fileAccess( lpReplacementFileName, AccessRead );
             BOOL replaced = function( lpReplacedFileName, lpReplacementFileName, lpBackupFileName, dwReplaceFlags, lpExclude, lpReserved );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "ReplaceFileW", replaced ) << lpReplacedFileName << L", " << lpReplacementFileName << L", ... )" << record;
             fileAccess( lpReplacedFileName, AccessWrite );
             if (lpBackupFileName!= nullptr) fileAccess( lpBackupFileName, AccessWrite );
+            SetLastError(error);
             return replaced;
         }
         typedef BOOL(*TypeMoveFileA)(LPCSTR,LPCSTR);
@@ -403,9 +454,11 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeMoveFileA>(original( (PatchFunction)PatchMoveFileA ));
             BOOL moved = function( existingFileName, newFileName );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "MoveFileA", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
             fileAccess( existingFileName, AccessDelete );
             fileAccess( newFileName, AccessWrite );
+            SetLastError(error);
             return moved;
         }       
         typedef BOOL(*TypeMoveFileW)(LPCWSTR,LPCWSTR);
@@ -415,9 +468,11 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeMoveFileW>(original( (PatchFunction)PatchMoveFileW ));
             BOOL moved = function( existingFileName, newFileName );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "MoveFileW", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
             fileAccess( existingFileName, AccessDelete );
             fileAccess( newFileName, AccessWrite );
+            SetLastError(error);
             return moved;
         }
         typedef BOOL(*TypeMoveFileExA)(LPCSTR,LPCSTR,DWORD);
@@ -428,9 +483,11 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeMoveFileExA>(original( (PatchFunction)PatchMoveFileExA ));
             BOOL moved = function( existingFileName, newFileName, flags );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "MoveFileExA", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
             fileAccess( existingFileName, AccessDelete );
             fileAccess( newFileName, AccessWrite );
+            SetLastError(error);
             return moved;
         }       
         typedef BOOL(*TypeMoveFileExW)(LPCWSTR,LPCWSTR,DWORD);
@@ -442,8 +499,10 @@ namespace AccessMonitor {
             auto function = reinterpret_cast<TypeMoveFileExW>(original( (PatchFunction)PatchMoveFileExW ));
             fileAccess( existingFileName, AccessDelete );
             BOOL moved = function( existingFileName, newFileName, flags );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "MoveFileExW", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
             fileAccess( newFileName, AccessWrite );
+            SetLastError(error);
             return moved;
         }       
         typedef BOOL(*TypeMoveFileWithProgressA)(LPCSTR,LPCSTR,LPPROGRESS_ROUTINE,LPVOID,DWORD);
@@ -457,8 +516,10 @@ namespace AccessMonitor {
             auto function = reinterpret_cast<TypeMoveFileWithProgressA>(original( (PatchFunction)PatchMoveFileWithProgressA ));
             fileAccess( existingFileName, AccessDelete );
             BOOL moved = function( existingFileName, newFileName, lpProgressRoutine, lpData, dwFlags );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "MoveFileWithProgressA", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
             fileAccess( newFileName, AccessWrite );
+            SetLastError(error);
             return moved;
         }
         typedef BOOL(*TypeMoveFileWithProgressW)(LPCWSTR,LPCWSTR,LPPROGRESS_ROUTINE,LPVOID,DWORD);
@@ -472,8 +533,10 @@ namespace AccessMonitor {
             auto function = reinterpret_cast<TypeMoveFileWithProgressW>(original( (PatchFunction)PatchMoveFileWithProgressW ));
             fileAccess( existingFileName, AccessDelete );
             BOOL moved = function( existingFileName, newFileName, lpProgressRoutine, lpData, dwFlags );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "MoveFileWithProgressW", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
             fileAccess( newFileName, AccessWrite );
+            SetLastError(error);
             return moved;
         }
         typedef BOOL(*TypeMoveFileWithProgressTransactedA)(LPCSTR,LPCSTR,LPPROGRESS_ROUTINE,LPVOID,DWORD,HANDLE);
@@ -488,8 +551,10 @@ namespace AccessMonitor {
             auto function = reinterpret_cast<TypeMoveFileWithProgressTransactedA>(original( (PatchFunction)PatchMoveFileWithProgressTransactedA ));
             fileAccess( existingFileName, AccessDelete );
             BOOL moved = function( existingFileName, newFileName, lpProgressRoutine, lpData, dwFlags, hTransaction );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "PatchMoveFileWithProgressTransactedA", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
             fileAccess( newFileName, AccessWrite );
+            SetLastError(error);
             return moved;
         }
         typedef BOOL(*TypeMoveFileWithProgressTransactedW)(LPCWSTR,LPCWSTR,LPPROGRESS_ROUTINE,LPVOID,DWORD,HANDLE);
@@ -504,8 +569,10 @@ namespace AccessMonitor {
             auto function = reinterpret_cast<TypeMoveFileWithProgressTransactedW>(original( (PatchFunction)PatchMoveFileWithProgressTransactedW ));
             fileAccess( existingFileName, AccessDelete );
             BOOL moved = function( existingFileName, newFileName, lpProgressRoutine, lpData, dwFlags, hTransaction );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "PatchMoveFileWithProgressTransactedW", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
             fileAccess( newFileName, AccessWrite );
+            SetLastError(error);
             return moved;
         }
         typedef HANDLE(*TypeFindFirstFileA)(LPCSTR,LPWIN32_FIND_DATAA);
@@ -515,8 +582,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeFindFirstFileA>(original( (PatchFunction)PatchFindFirstFileA ));
             HANDLE handle = function( fileName, lpFindFileData );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "FindFirstFileA", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
             fileAccess( fileName, AccessRead );
+            SetLastError(error);
             return handle;
         }        
         typedef HANDLE(*TypeFindFirstFileW)(LPCWSTR,LPWIN32_FIND_DATAW);
@@ -526,8 +595,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeFindFirstFileW>(original( (PatchFunction)PatchFindFirstFileW ));
             HANDLE handle = function( fileName, lpFindFileData );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "FindFirstFileW", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
             fileAccess( fileName, AccessRead );
+            SetLastError(error);
             return handle;
         }
         typedef HANDLE(*TypeFindFirstFileExA)(LPCSTR,FINDEX_INFO_LEVELS,LPVOID,FINDEX_SEARCH_OPS,LPVOID,DWORD);
@@ -541,8 +612,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeFindFirstFileExA>(original( (PatchFunction)PatchFindFirstFileExA ));
             HANDLE handle = function( fileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "FindFirstFileExA", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
             fileAccess( fileName, AccessRead );
+            SetLastError(error);
             return handle;
         }
         typedef HANDLE(*TypeFindFirstFileExW)(LPCWSTR,FINDEX_INFO_LEVELS,LPVOID,FINDEX_SEARCH_OPS,LPVOID,DWORD);
@@ -556,8 +629,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeFindFirstFileExW>(original( (PatchFunction)PatchFindFirstFileExW ));
             HANDLE handle = function( fileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "FindFirstFileExW", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
             fileAccess( fileName, AccessRead );
+            SetLastError(error);
             return handle;
         }
         typedef HANDLE(*TypeFindFirstFileTransactedA)(LPCSTR,FINDEX_INFO_LEVELS,LPVOID,FINDEX_SEARCH_OPS,LPVOID,DWORD,HANDLE);
@@ -572,8 +647,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeFindFirstFileTransactedA>(original( (PatchFunction)PatchFindFirstFileTransactedA ));
             HANDLE handle = function( fileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags, hTransaction );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "FindFirstFileTransactedA", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
             fileAccess( fileName, AccessRead );
+            SetLastError(error);
             return handle;
         }
         typedef HANDLE(*TypeFindFirstFileTransactedW)(LPCWSTR,FINDEX_INFO_LEVELS,LPVOID,FINDEX_SEARCH_OPS,LPVOID,DWORD,HANDLE);
@@ -588,8 +665,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeFindFirstFileTransactedW>(original( (PatchFunction)PatchFindFirstFileTransactedW ));
             HANDLE handle = function( fileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags, hTransaction );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "FindFirstFileTransactedW", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
             fileAccess( fileName, AccessRead );
+            SetLastError(error);
             return handle;
         }
         typedef DWORD(*TypeGetFileAttributesA)(LPCSTR);
@@ -598,8 +677,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeGetFileAttributesA>(original( (PatchFunction)PatchGetFileAttributesA ));
             auto attributes = function( fileName );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "GetFileAttributesA", (attributes != INVALID_FILE_ATTRIBUTES) ) << fileName << L", ... )" << record;
             fileAccess( fileName, AccessRead );
+            SetLastError(error);
             return attributes;
         }
         typedef DWORD(*TypeGetFileAttributesW)(LPCWSTR);
@@ -608,8 +689,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeGetFileAttributesW>(original( (PatchFunction)PatchGetFileAttributesW ));
             auto attributes = function( fileName );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "GetFileAttributesW", (attributes != INVALID_FILE_ATTRIBUTES) ) << fileName << L", ... )" << record;
             fileAccess( fileName, AccessRead );
+            SetLastError(error);
             return attributes;
         }
         typedef BOOL(*TypeGetFileAttributesExA)(LPCSTR,GET_FILEEX_INFO_LEVELS,LPVOID);
@@ -620,8 +703,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeGetFileAttributesExA>(original( (PatchFunction)PatchGetFileAttributesExA ));
             auto gotAttributes = function( fileName, fInfoLevelId, lpFileInformation );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "GetFileAttributesExA", gotAttributes ) << fileName << L", ... )" << record;
             fileAccess( fileName, AccessRead );
+            SetLastError(error);
             return gotAttributes;
         }
         typedef BOOL(*TypeGetFileAttributesExW)(LPCWSTR,GET_FILEEX_INFO_LEVELS,LPVOID);
@@ -632,8 +717,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeGetFileAttributesExW>(original( (PatchFunction)PatchGetFileAttributesExW ));
             auto gotAttributes = function( fileName, fInfoLevelId, lpFileInformation );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "GetFileAttributesExW", gotAttributes ) << fileName << L", ... )" << record;
             fileAccess( fileName, AccessRead );
+            SetLastError(error);
             return gotAttributes;
         }
         typedef BOOL(*TypeGetFileAttributesTransactedA)(LPCSTR,GET_FILEEX_INFO_LEVELS,LPVOID,HANDLE);
@@ -645,8 +732,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeGetFileAttributesTransactedA>(original( (PatchFunction)PatchGetFileAttributesTransactedA ));
             bool gotAttributes = function( fileName, fInfoLevelId, lpFileInformation, hTransaction );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "GetFileAttributesTransactedA", gotAttributes ) << fileName << L", ... )" << record;
             fileAccess( fileName, AccessRead );
+            SetLastError(error);
             return gotAttributes;
         }
         typedef BOOL(*TypeGetFileAttributesTransactedW)(LPCWSTR,GET_FILEEX_INFO_LEVELS,LPVOID,HANDLE);
@@ -658,8 +747,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeGetFileAttributesTransactedW>(original( (PatchFunction)PatchGetFileAttributesTransactedW ));
             auto gotAttributes = function( fileName, fInfoLevelId, lpFileInformation, hTransaction );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "GetFileAttributesTransactedW", gotAttributes ) << fileName << L", ... )" << record;
             fileAccess( fileName, AccessRead );
+            SetLastError(error);
             return gotAttributes;
         }
         typedef BOOL(*TypeSetFileAttributesA)(LPCSTR,DWORD);
@@ -669,8 +760,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeSetFileAttributesA>(original( (PatchFunction)PatchSetFileAttributesA ));
             BOOL set = function( fileName, dwFileAttributes );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "PatchSetFileAttributesA", set ) << fileName << L", ... )" << record;
             fileAccess( fileName, AccessWrite );
+            SetLastError(error);
             return set;
         }
         typedef BOOL(*TypeSetFileAttributesW)(LPCWSTR,DWORD);
@@ -680,8 +773,10 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeSetFileAttributesW>(original( (PatchFunction)PatchSetFileAttributesW ));
             BOOL set = function( fileName, dwFileAttributes );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "PatchSetFileAttributesW", set ) << fileName << L", ... )" << record;
             fileAccess( fileName, AccessWrite );
+            SetLastError(error);
             return set;
         }
         typedef BOOL(*TypeCreateHardLinkA)(LPCSTR,LPCSTR,LPSECURITY_ATTRIBUTES);
@@ -692,9 +787,11 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateHardLinkA>(original( (PatchFunction)PatchCreateHardLinkA ));
             BOOL created = function( lpFileName, lpExistingFileName, lpSecurityAttributes );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "CreateHardLinkA", created )  << lpFileName << L", " << lpExistingFileName << ",  ... )" << record;
             fileAccess( lpFileName, AccessWrite );
             fileAccess( lpExistingFileName, AccessRead );
+            SetLastError(error);
             return created;
         }
         typedef BOOL(*TypeCreateHardLinkW)(LPCWSTR,LPCWSTR,LPSECURITY_ATTRIBUTES);
@@ -705,9 +802,11 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateHardLinkW>(original( (PatchFunction)PatchCreateHardLinkW ));
             BOOL created = function( lpFileName, lpExistingFileName, lpSecurityAttributes );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "CreateHardLinkW", created )  << lpFileName << L", " << lpExistingFileName << ",  ... )" << record;
             fileAccess( lpFileName, AccessWrite );
             fileAccess( lpExistingFileName, AccessRead );
+            SetLastError(error);
             return created;
         }
         typedef BOOL(*TypeCreateHardLinkTransactedA)(LPCSTR,LPCSTR,LPSECURITY_ATTRIBUTES,HANDLE);
@@ -719,9 +818,11 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateHardLinkTransactedA>(original( (PatchFunction)PatchCreateHardLinkTransactedA ));
             BOOL created = function( lpFileName, lpExistingFileName, lpSecurityAttributes, hTransaction );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "CreateHardLinkTransactedA", created ) << lpFileName << L", " << lpExistingFileName << ",  ... )" << record;
             fileAccess( lpFileName, AccessWrite );
             fileAccess( lpExistingFileName, AccessRead );
+            SetLastError(error);
             return created;
         }
         typedef BOOL(*TypeCreateHardLinkTransactedW)(LPCWSTR,LPCWSTR,LPSECURITY_ATTRIBUTES,HANDLE);
@@ -733,9 +834,11 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateHardLinkTransactedW>(original( (PatchFunction)PatchCreateHardLinkTransactedW ));
             BOOL created = function( lpFileName, lpExistingFileName, lpSecurityAttributes, hTransaction );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "CreateHardLinkTransactedW", created ) << lpFileName << L", " << lpExistingFileName << ",  ... )" << record;
             fileAccess( lpFileName, AccessWrite );
             fileAccess( lpExistingFileName, AccessRead );
+            SetLastError(error);
             return created;
         }
         typedef BOOLEAN(*TypeCreateSymbolicLinkA)(LPCSTR,LPCSTR,DWORD);
@@ -746,9 +849,11 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateSymbolicLinkA>(original( (PatchFunction)PatchCreateSymbolicLinkA ));
             BOOL created = function( lpSymlinkFileName, lpTargetFileName, dwFlags );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "CreateSymbolicLinkA", created ) << lpSymlinkFileName << L", " << lpTargetFileName << L", " << dwFlags << " )" << record;
             fileAccess( lpSymlinkFileName, AccessWrite );
             fileAccess( lpTargetFileName, AccessRead );
+            SetLastError(error);
             return created;
         }
         typedef BOOLEAN(*TypeCreateSymbolicLinkW)(LPCWSTR,LPCWSTR,DWORD);
@@ -759,9 +864,11 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateSymbolicLinkW>(original( (PatchFunction)PatchCreateSymbolicLinkW ));
             BOOL created = function( lpSymlinkFileName, lpTargetFileName, dwFlags );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "CreateSymbolicLinkW", created ) << lpSymlinkFileName << L", " << lpTargetFileName << L", " << dwFlags << " )" << record;
             fileAccess( lpSymlinkFileName, AccessWrite );
             fileAccess( lpTargetFileName, AccessRead );
+            SetLastError(error);
             return created;
         }
         typedef BOOLEAN(*TypeCreateSymbolicLinkTransactedA)(LPCSTR,LPCSTR,DWORD,HANDLE);
@@ -773,9 +880,11 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateSymbolicLinkTransactedA>(original( (PatchFunction)PatchCreateSymbolicLinkTransactedA ));
             BOOL created = function( lpSymlinkFileName, lpTargetFileName, dwFlags, hTransaction );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "CreateSymbolicLinkTransactedA", created ) << lpSymlinkFileName << L", " << lpTargetFileName << L", " << dwFlags << " )" << record;
             fileAccess( lpSymlinkFileName, AccessWrite );
             fileAccess( lpTargetFileName, AccessRead );
+            SetLastError(error);
             return created;
         }
         typedef BOOLEAN(*TypeCreateSymbolicLinkTransactedW)(LPCWSTR,LPCWSTR,DWORD,HANDLE);
@@ -787,16 +896,18 @@ namespace AccessMonitor {
         ) {
             auto function = reinterpret_cast<TypeCreateSymbolicLinkTransactedW>(original( (PatchFunction)PatchCreateSymbolicLinkTransactedW ));
             BOOL created = function( lpSymlinkFileName, lpTargetFileName, dwFlags, hTransaction );
+            auto error = GetLastError();
             if (debugLog( PatchExecution )) debugMessage( "CreateSymbolicLinkTransactedW", created ) << lpSymlinkFileName << L", " << lpTargetFileName << L", " << dwFlags << " )" << record;
             fileAccess( lpSymlinkFileName, AccessWrite );
             fileAccess( lpTargetFileName, AccessRead );
+            SetLastError(error);
             return created;
         }
         typedef BOOL(*TypeCloseHandle)(HANDLE);
         BOOL PatchCloseHandle( HANDLE handle ) {
             auto function = reinterpret_cast<TypeCloseHandle>(original( (PatchFunction)PatchCloseHandle ));
             // Record last write time when closing file opened for write (also for WithProgress calls)
-            wstring fileName = fileAccess( handle );
+            wstring fileName = fileAccess( handle, AccessNone );
             if  (fileName != L"") {
                 if (debugLog( PatchExecution )) debugMessage( "CloseHandle" ) << handleCode( handle ) << L" ) on " << fileName.c_str() << record;
             }
@@ -829,33 +940,40 @@ namespace AccessMonitor {
         }
 
         inline wstring widen( const string& fileName ) {
-        if (fileName.empty()) return {};
-        int len = MultiByteToWideChar( CP_UTF8, 0, &fileName[0], fileName.size(), NULL, 0 );
-        wstring wideFileName( len, 0 );
-        MultiByteToWideChar( CP_UTF8, 0, &fileName[0], fileName.size(), &wideFileName[0], len );
-        return wideFileName;
+            if (fileName.empty()) return {};
+            int len = MultiByteToWideChar( CP_UTF8, 0, &fileName[0], static_cast<int>(fileName.size()), NULL, 0 );
+            wstring wideFileName( len, 0 );
+            MultiByteToWideChar( CP_UTF8, 0, &fileName[0], static_cast<int>(fileName.size()), &wideFileName[0], len );
+            return wideFileName;
+        }
+
+        wstring simplify(wchar_t const* fileName) {
+            wstring simplePath = fileName;
+            if ((simplePath.size() <= MAX_PATH) && simplePath.starts_with(L"\\\\?\\")) simplePath = &fileName[4];
+            if (simplePath.starts_with(L"\\\\.\\")) simplePath = &fileName[4];
+            std::erase(simplePath, '"');
+            simplePath.insert(0, L"\"");
+            simplePath.append(L"\"");
+            return path(simplePath).generic_wstring();
         }
 
         // Extract file name from handle to opened file
         // Will return empty string if handle does not refer to a file
         wstring fullName( HANDLE handle ) {
             wchar_t fileNameString[ MaxFileName ];
-            wstring fileName;
             if ( GetFinalPathNameByHandleW( handle, fileNameString, MaxFileName, 0 ) ) {
-                fileName = fileNameString;
-                if (fileName.starts_with( L"\\\\?\\" ))  fileName = &fileNameString[ 4 ];
-                if (fileName.starts_with( L"\\\\.\\" ))  fileName = &fileNameString[ 4 ];
+                return simplify(fileNameString);
             }
-            return path( fileName ).generic_wstring();
+            return path("").generic_wstring();
         }
         // Expand file name to full path (according to Windows semantics)
         // Returns empty string if file name expansion fails.
         wstring fullName( const wchar_t* fileName ) {
             wchar_t filePath[ MaxFileName ];
             wchar_t* fileNameAddress;
+            wstring _fileName;
             DWORD length = GetFullPathNameW( fileName, MaxFileName, filePath, &fileNameAddress );
-            if (length == 0) return wstring( L"" );
-            return path( filePath ).generic_wstring();
+            return simplify(filePath);
         }
         wstring fullName( const char* fileName ) {
             return fullName( widen( string( fileName ) ).c_str() );
@@ -865,7 +983,7 @@ namespace AccessMonitor {
         }
 
         void recordEvent( const wstring& file, FileAccessMode mode, const FileTime& time ) {
-            if (recordingEvents()) eventRecord() << file << L" [ " << time << L" ] " << modeToString( mode ) << record;
+            if (recordingEvents()) eventRecord() << file << L" [" << time << L"] " << modeToString(mode) << record;
         }
 
         // Retrieve access rights from opened handle...
@@ -915,13 +1033,11 @@ namespace AccessMonitor {
         }
         // Register file access mode on file path
         wstring fileAccess( const wstring& fileName, FileAccessMode mode ) {
-            DWORD error = GetLastError();
             auto fullFileName = fullName( fileName.c_str() );
             if (fullFileName != L"") {
                 if (debugLog( FileAccesses )) debugRecord() << L"MonitorFiles - " << modeToString( mode ) << L" access by name on file " << fullFileName << record;
                 recordEvent( fullFileName, mode, getLastWriteTime( fileName ) );
             }
-            SetLastError( error );
             return fullFileName;
         }
         wstring fileAccess( const string& fileName, FileAccessMode mode ) {
@@ -929,13 +1045,11 @@ namespace AccessMonitor {
         }
         // Register file access mode on (file) handle
         wstring fileAccess( HANDLE handle, FileAccessMode mode ) {
-            DWORD error = GetLastError();
             auto fullFileName = fullName( handle );
             if (fullFileName != L"") {
                 if (debugLog( FileAccesses )) debugRecord() << L"MonitorFiles - " << modeToString( mode ) << L" access by handle " << handleCode( handle) << " on file " << fullFileName << record;
                 recordEvent( fullFileName, mode, getLastWriteTime( fullFileName ) );
             }
-            SetLastError( error );
             return fullFileName;
         }
 
@@ -1057,3 +1171,4 @@ namespace AccessMonitor {
     }
 
 } // namespace AccessMonitor
+auto error = GetLastError();

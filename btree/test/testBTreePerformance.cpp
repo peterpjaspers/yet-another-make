@@ -98,7 +98,7 @@ template< class T >
 vector<vector<T>> generateUniqueKeys( int count, int min, int max ) {
     vector<vector<T>> keys;
     set<vector<T>,ArrayCompare<T>> keySet;
-    for ( int i = 0; i < count; ++i) {
+    for (int i = 0; i < count; ++i) {
         auto key = generate<T>( min, max );
         while (keySet.count( key ) == 1) key = generate<T>( min, max );
         keys.push_back( key );
@@ -110,7 +110,7 @@ vector<vector<T>> generateUniqueKeys( int count, int min, int max ) {
 template< class T >
 vector<vector<T>> generateValues( int count, int min, int max ) {
     vector<vector<T>> values;
-    for ( int i = 0; i < count; ++i) values.push_back( generate<T>( min, max ) );
+    for (int i = 0; i < count; ++i) values.push_back( generate<T>( min, max ) );
     return values;
 }
 

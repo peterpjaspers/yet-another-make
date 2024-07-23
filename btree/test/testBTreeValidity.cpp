@@ -2,6 +2,7 @@
 #include "PersistentPagePool.h"
 #include <map>
 #include <set>
+#include <vector>
 #include <iostream>
 #include <fstream>
 #include <filesystem>
@@ -9,6 +10,7 @@
 #include <algorithm>
 #include <cassert>
 #include <utility>
+//#include <boost/filesystem.hpp>
 
 using namespace BTree;
 using namespace std;
@@ -616,7 +618,7 @@ public:
                 }
             }
             // Ensure that other content is not present
-            if (TryUnexpectedKeys) log << "Trying un-expected keys...\n";
+if (TryUnexpectedKeys) log << "Trying un-expected keys...\n";
             times( ProbeCount ) {
                 uint32_t key = generateUniqueKey();
                 if (TryUnexpectedKeys) {

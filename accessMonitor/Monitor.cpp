@@ -21,8 +21,8 @@ namespace AccessMonitor {
     namespace {
 
         // Create data directory for a session
-        void createSessionDirectory( const SessionID session ) {
-            const path sessionData( sessionDataPath( session ) );
+        void createSessionDirectory( path const& sessionDirectory, const SessionID session ) {
+            const path sessionData( sessionDataPath(sessionDirectory, session ) );
             if (exists( sessionData )) {
                 // Session directory already exists, presumably due to a previous session 
                 // Remove all data session left behind...
@@ -50,8 +50,8 @@ namespace AccessMonitor {
         //
         // Last write time is collapsed to the lastest last write time.
         //
-        MonitorEvents collectMonitorEvents( const SessionID session ) {
-            const path sessionData( sessionDataPath( session ) );
+        MonitorEvents collectMonitorEvents( path const& sessionDirectory, const SessionID session ) {
+            const path sessionData( sessionDataPath(sessionDirectory, session ) );
             MonitorEvents collected;
             for (auto const& entry : directory_iterator( sessionData )) {
                 auto eventFile = wifstream( entry.path() );
@@ -64,13 +64,13 @@ namespace AccessMonitor {
                     eventFile >> ws >> accessMode >> ws;
                     if (eventFile.good()) {
                         if (0 < collected.count( filePath )) {
-                            auto& access = collected[ filePath ];
-                            if (access.lastWriteTime < lastWriteTime) access.lastWriteTime = lastWriteTime;
+                            auto& access = collected[ filePath ];                            
                             auto mode = stringToMode( accessMode );
                             if ((mode & AccessDelete) != 0) access.mode = AccessDelete;
                             else if ((mode & AccessWrite) != 0) access.mode = AccessWrite;
                             else if (((mode & AccessRead) != 0) && ((access.mode & AccessDelete) == 0) && ((access.mode & AccessWrite) == 0)) access.mode = AccessRead;
                             access.modes |= mode;
+                            if ((access.lastWriteTime < lastWriteTime) && ((mode & AccessRead) == 0)) access.lastWriteTime = lastWriteTime;
                         } else {
                             collected[ filePath ] = FileAccess( stringToMode( accessMode ), lastWriteTime );
                         }
@@ -82,21 +82,29 @@ namespace AccessMonitor {
         }
     }
 
-    void startMonitoring() {
-        SessionID session = CreateSession();
+    void startMonitoring(std::filesystem::path const& directory) {
+        std::filesystem::path tempDir;
+        if (directory.empty()) {
+            tempDir = std::filesystem::temp_directory_path();
+        } else {
+            tempDir = directory;
+        }
+        std::filesystem::create_directory(tempDir / dataDirectory());
+        SessionID session = CreateSession(tempDir);
         SessionDebugLog( createDebugLog() );
         debugLog().enable( PatchedFunction | ParseLibrary | PatchExecution | FileAccesses | WriteTime );
         debugRecord() << "Start monitoring session " << session << "..." << record;
-        createSessionDirectory( session );
+        createSessionDirectory( tempDir, session );
         SessionEventLog( createEventLog() );
         patchProcess();
     }
 
     MonitorEvents stopMonitoring() {
         auto session = CurrentSessionID();
+        path const& sessionDirectory = CurrentSessionDirectory();
         debugRecord() << "Stop monitoring session " << session << "..." << record;
         SessionEventLogClose();
-        auto events = collectMonitorEvents( session );
+        auto events = collectMonitorEvents( sessionDirectory, session );
         unpatchProcess();
         SessionDebugLogClose();
         RemoveSession();

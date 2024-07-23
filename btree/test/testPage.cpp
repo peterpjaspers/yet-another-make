@@ -8,6 +8,7 @@
 #include <random>
 #include <algorithm>
 
+using namespace std;
 using namespace BTree;
 using namespace std;
 using namespace std::filesystem;

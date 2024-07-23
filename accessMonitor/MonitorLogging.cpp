@@ -25,7 +25,7 @@ namespace AccessMonitor {
     }
     LogRecord& debugRecord() { return debugLog()(); }
 
-    LogFile* createEventLog() { return new LogFile( monitorEventsPath( CurrentProcessID(), CurrentSessionID() ) ); }
+    LogFile* createEventLog() { return new LogFile( monitorEventsPath( CurrentSessionDirectory(), CurrentProcessID(), CurrentSessionID() ) ); }
     bool recordingEvents() {
         auto log = SessionEventLog();
         if (log == nullptr) return false;

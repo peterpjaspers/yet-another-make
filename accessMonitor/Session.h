@@ -4,18 +4,24 @@
 #include "Process.h"
 #include "LogFile.h"
 
+#include <filesystem>
+
 namespace AccessMonitor {
 
     // Get SessionID of session associated with the current thread
     SessionID CurrentSessionID();
-    // Create a new session on the current thread
-    SessionID CreateSession();
+    // Get directory for temporary data storage of session associated with the
+    // current thread.
+    std::filesystem::path const& CurrentSessionDirectory();
+    // Create a new session on the current thread.
+    // Store session temporary data in given directory.
+    SessionID CreateSession(std::filesystem::path const& directory);
     // Create existing session in remote process
-    void CreateRemoteSession( SessionID session, ProcessID process, ThreadID thread );
+    void CreateRemoteSession(std::filesystem::path const& directory, SessionID session, ProcessID process, ThreadID thread );
     // Remove a session from the current thread
     void RemoveSession();
     // Add current thread to session
-    void AddThreadToSession( SessionID session, LogFile* eventLog = nullptr, LogFile* debugLog = nullptr );
+    void AddThreadToSession( SessionID session, std::filesystem::path const& directory, LogFile* eventLog = nullptr, LogFile* debugLog = nullptr );
     // Remove current thread from session 
     void RemoveThreadFromSession();
     // Test if session is defined on current thread

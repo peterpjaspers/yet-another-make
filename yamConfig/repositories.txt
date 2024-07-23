@@ -1,0 +1,3 @@
+//name = test_1 dir = ..\test_yam_1 type = Build;
+//name = test_2 dir = ..\test_yam_2 type = Track; 
+name=windows dir=C:\Windows type=Ignore;

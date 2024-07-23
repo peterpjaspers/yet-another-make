@@ -1,0 +1,120 @@
+---Why support multi repository build?
+Most buildsystems assume all sources to be in a single respository,
+i.e. in a single directory tree. This makes it hard to perform builds
+when using multiple repos. 
+
+E.g. assume repos R1 and R2 where R1 defines some library LIB and R2 
+uses LIB. Without multi-repo support a developer must first build R1,
+then build R2. This is clumsy. With multi-repo support the developer 
+need only start a build in R2 and yam will figure out what to build
+and where to build. This requires R2 to contain a configuration file
+that specifies the repositories (repo name and repo root dir) on which 
+R2 depends.
+
+Note: git supports sub-modules. Using sub-modules allows for a multi-repo
+approach in a single directory tree. This avoids the complications discussed
+in this document.
+
+---How to identify files in buildfiles and nodes in the DAG in a multi-repo build?
+Things are simple when supporting 1 repository only:
+A developer starts a build from any working directory in the repo tree.
+Yam finds the repo root dir by searching for the .yam dir in the parent
+directories of the working dir.
+All node names in the graph are paths relative to the repo root dir.
+The file names used in rules in a buildfile are relative to the buildfile
+directory. Example:
+A buildfile C:\R1\someBuildPath\buildfile.yam contains rule
+	: someSrcPath\aap.c |> gcc -c %f -o %o |> someSrcPath\%B.o
+someSrcPath is relative to C:\R1\someBuildPath.
+The script expands to: gcc -c someSrcPath\aap.c -o someSrcPath\aap.o
+The input file node name is normalizedPath(someBuildPath\someSrcPath\aap.c)
+The output file node name is normalizedPath(someBuildPath\someSrcPath\aap.o)
+The command node name is normalizedPath(someBuildPath\someSrcPath\aap.c\__cmd__)
+The command node has working dir someBuildPath (relative to root)
+Yam executes the script with working directory set to C:\R1\someBuildPath
+
+Example single repo:
+	repo root is C:\R1\
+	             C:\R1\.yam
+	             C:\R1\.yam\buildstate
+	             C:\R1\d1\
+	             C:\R1\d1\d2
+	             C:\R1\d1\d2\buildfile.yam
+	             C:\R1\d1\src
+	             C:\R1\d1\src\aap.c (includes aap.h)
+	             C:\R1\d1\bin
+	             C:\R1\d1\include
+	             C:\R1\d1\include\aap.h
+
+	Rule
+		: ..\src\aap.c |> gcc -c %f -o %o |> ..\bin\%B.o
+	expands to:
+		: ..\src\aap.c |> gcc -c ..\src\aap.c -o ..\src\aap.o |> ..\bin\aap.o
+	Source file node name: d1\src\aap.c
+	Command node name: d1\bin\aap.o\__cmd__
+	Script executing in working directory C:\R1\d1\d2
+	File tracing the script reveals that C:\R1\d1\include\aap.h is input.
+	The name of associated source file node: d1\include\aap.h
+
+
+When supporting multiple repos we can still work with relative path names
+in a buildfile for files that reside in the repo that contains that buildfile.
+When referring to files in another repos symbolic absolute path names of the 
+form <repo name>\remainder are used.
+
+Example multi repo:
+	repo R1 is   C:\R1\
+	             C:\R1\d1\
+	             C:\R1\d1\d2
+	             C:\R1\d1\d2\buildfile.yam
+	             C:\R1\d1\src
+	             C:\R1\d1\src\aap.c (includes aap.h)
+	             C:\R1\d1\bin
+	             C:\R1\d1\include
+	             C:\R1\d1\include\aap.h
+
+	repo R2 is   C:\R2\
+	             C:\R2\d1\
+	             C:\R2\d1\d2
+	             C:\R2\d1\d2\buildfile.yam
+	             C:\R2\d1\src
+	             C:\R2\d1\src\aap.c (includes aap.h)
+	             C:\R2\d1\bin
+	             C:\R2\d1\include
+	             C:\R2\d1\include\aap.h
+
+For sake of clarity the unlikely scenario is choosen that R1 and R2
+have same dir and file names.
+
+When processing C:\R1\d1\d2\buildfile.yam
+	Rule
+		: ..\src\aap.c |> gcc -c %f -o %o |> %B.o
+	expands to:
+		: ..\src\aap.c |> gcc -c ..\src\aap.c -o ..\src\aap.o |> ..\src\aap.o
+	Source file node name: <R1>\d1\src\aap.c
+	Command node name: <R1>\d1\src\aap.o\__cmd__\
+	Script executing in working directory C:\R1\d1\d2. This path is obtained
+	by taking the repo name from command node and looking up repo root in 
+	repo configuration file.
+	File tracing the script reveals that C:\R1\d1\include\aap.h is input.
+	The name of associated source file node becomes: <R1>\d1\include\aap.h
+
+
+When processing C:\R2\d1\d2\buildfile.yam
+Same as processing in R1 but all R1 replaced by R2
+Each node carries the name of the repo. This indirection allows repo dirs
+to be defined in a configuration file.
+
+In the above examples we derived the repo root by finding the .yam file in
+the parent dirs of the directory in which the user started the build and 
+interpreted relative path names to be relative to this repo root.
+How then does a buildfile in R2 reference source or generated files in R1?
+Answer: by using a symbolic absolute path <repo name>\remainder.
+Note: a yam build started from R2 will process all build files in R1 and R2.
+The buildstate of R2 includes all commands and file defined in R1 buildfiles.
+
+Example:
+Assume that a buildfile in R1 defines a rule with output file C:\R1\d3\bin\aap.lib.
+A rule in a buildfile in R2 uses this file as input to link an executable:
+    : ..\src\aap.o <R1>\d3\bin\aap.lib |> link %f -o %o |> ..\bin\program
+Note: a relative path in a buildfile is relative to the buildfile directory.

@@ -1,0 +1,182 @@
+---How does tup process Tupfiles, i.e. the tup buildfiles?
+Aspects: 
+    - repository mirror
+    - rule ordering
+    - globs on source and generated files
+    - bins
+    - groups
+    - owning output files
+
+The following is solely based on info from tup manual and tup-user mailing 
+list. I did not look into the code in the tup git repo.
+
+--Repository mirror
+Tup first scans the repository directory tree to find all tupfiles. While doing 
+so it mirrors directories and files as nodes in its graph.
+Tup starts buildfile processing once the mirror is complete.
+
+--Rule ordering
+Tup requires an output (generated) file to be defined before it can be used as 
+rule input. This requires that:
+    - rules in a buildfile are ordered 
+    - processing of buildfiles is ordered such that a buildfile BA that has a 
+      rule RA that defines output OA is processed before a buildfile BB that 
+      has a rule RB that has input OA.
+The user is responsible for ordering the rules in a buildfile. 
+Tup takes care of ordering of buildfile processing as follows:
+    - an outputfile can only be written into the directory that contains the
+      tupfile, i.e. each directory in which you want to store generated files
+      must have a tupfile.
+    - when tup parses an input file 'dirname/filename' then it first parses
+      'dirname/Tupfile'. It does so because 'dirname/filename' possibly refers
+      to a generated file. That file can only be defined in 'dirname/Tupfile'.
+      Note: tup possibly first tries to find 'dirname/filename' in the graph.
+      repository. Only when not found it parses 'dirname/Tupfile' and then
+      checks whether generated file node 'dirname/Tupfile' is in the graph.
+      If not: error.
+
+--Globs on source and generated files
+A rule input can be either a path name or a glob. Tup resolves globs on the 
+nodes in the graph. For source files that is straightforward because case tup 
+mirrors the repository tree before starting buildfile processing. For generated
+files this is not the case because generated file nodes that would match the 
+glob may not yet have been created. This requires tup to first parse all 
+tupfiles that produce output files that (may) match the glob. E.g. input glob
+'dirname/**/*.obj' would require tup to process all tupfiles in the 'dirname'
+directory tree.
+Tup simplifies this problem by not allowing ** globs and globs do not match
+directories. So "src/*.obj" will work, but "*/*.obj" will not.
+
+Example:
+    foreach a b |> copy %f %o |> copyof_%B
+    copyof_* |> echo %f > %o |> copylist_1.txt
+    foreach c |> copy %f %o |> copyof_%B
+    copyof_* |> echo %f > %o |> copylist_2.txt
+I expect copylist_1.txt to contain: copyof_a copyof_b
+I expect copylist_2.txt to contain: copyof_a copyof_b copyof_c
+Experimentation proves that the expectation is correct.
+
+--Bins
+A bin is a collection of outputfiles. Each rule can optionally add its outputs
+to a bin. Later rules, in the same buildfile, can reference the bin in their
+input section. A bin cannot be referenced outside the buildfile.
+Example:
+    foreach a b |> copy %f %o |> copyof_%B {copies}
+    {copies} |> echo %f > %o |> copylist_1.txt
+    foreach c |> copy %f %o |> copyof_%B {copies}
+    {copies} |> echo %f > %o |> copylist_2.txt
+I expect copylist_1.txt to contain: copyof_a copyof_b
+I expect copylist_2.txt to contain: copyof_a copyof_b copyof_c
+
+--Goups
+A group is like a bin but has global scope. I.e. rules in multiple buildfiles
+can add their outputs to the same group.
+Example from tup manual:
+#./submodules/sm1/Tupfile
+   : foo.c |> gcc -c %f -o %o |> %B.o ../<submodgroup>
+#./submodules/sm2/Tupfile
+   : bar.c |> gcc -c %f -o %o |> %B.o ../<submodgroup>
+#./project/Tupfile
+   : ../submodules/<submodgroup> |> echo '%<submodgroup>' > %o |> submodules_group.txt
+
+submodules_group.txt contains: ../submodules/sm1/foo.o ../submodules/sm2/bar.o
+Note: a rule cannot use same group as input and as output: cyclic dependency.
+
+I can think of 2 possible designs:
+    - a group is a node in the graph, a command depends on the group node, i.e.
+      it executes the group before it executes itself.
+      Note: this implies that execution of a command with input group G cannot 
+      start until all rules that contribute to G have been parsed.     
+    - a group is NOT a node in the graph but a construct that only exists during
+      parsing. Input group content is known at parse time. Two choices:
+         - parse all buildfiles/rules that add to a group before parsing the 
+           rules that use the group as input. This has same effect as 
+           group-as-a-node.
+         - only parse explicitly defined buildfile dependencies. A 
+           buildfile/rule then only 'sees' the contributions to the group of
+           these buildfiles.
+           In this design each buildfile keeps track of its contribution to the group.
+           Choice: only use group contribution from the direct buildfile deps or
+           use group contributions from the buildfile deps recursively.
+
+Tup processes all tupfiles in the directory tree ../submodules before it
+processes the rule that uses the group as input
+This would allow submodules_group.txt to either contain
+     ../submodules/sm1/foo.o ../submodules/sm2/bar.o
+  or ../submodules/sm2/bar.o ../submodules/sm1/foo.o
+The order of output files in the group depends on the order in which sm1 and sm2 are
+processed. This may be non-deterministic in case of parallel processing.
+Experimentation shows that the order is not constant.
+
+What happens in this case?:
+#./submodules/sm1/Tupfile
+: foo.c |> gcc -c %f -o %o |> %B.o ../<submodgroup>
+: ../<submodgroup> |> echo '%<submodgroup>' > %o |> sm1_group.txt
+
+#./submodules/sm2/Tupfile
+: bar.c |> gcc -c %f -o %o |> %B.o ../<submodgroup>
+
+#./project/Tupfile
+: ../submodules/<submodgroup> |> echo '%<submodgroup>' > %o |> submodules_group1.txt
+: goo.c |> gcc -c %f -o %o |> %B.o ../submodules/<submodgroup>
+: ../submodules/<submodgroup> |> echo '%<submodgroup>' > %o |> submodules_group2.txt
+
+Either:
+sm1_group.txt: foo.obj (../submodules/sm1/foo.o)
+submodules_group1.txt: ../submodules/sm1/foo.o ../submodules/sm2/bar.o
+submodules_group2.txt: ../submodules/sm1/foo.o ../submodules/sm2/bar.o 
+                       ./project/goo.o
+or: all equal to submodules_group2.txt.
+
+Experimentation shows that it is equal to submodules_group2.txt except that
+pathnames are relative to sm1: ../sm2/bar.obj foo.obj ../../project/goo.obj
+
+This experiment shows that a tup group is a node in the graph and that group
+content is not evaluated at parse time but at command execution time.
+If it had been global in the sense that only its name is global and input group
+content and order is determined at parse time then it would conflict with my 
+assumption that tup parses all buildfiles in the submodules tree before it
+parses the input group.
+In this case sm1 would first parse sm1/ (cycle!, ignore?) and sm2/. But it would 
+not parse project/ which also contributes to the group.
+
+--Owning output files
+Removing output file definitions from tup rules makes tup delete these files
+reparsing the changed buildfiles.
+Tup looses track of output files when moving (renaming) directories and files. 
+Without a change monitor this also cannot work. With a change monitor it could
+work in principle.
+When moving a directory tup sees the Tupfile at a different location and parses
+it. During parsing it raises an error like:
+tup error: Attempting to insert 'submodules_f.txt' as a generated node when it 
+already exists as a different type (normal file). You can do one of two things 
+to fix this:
+  1) If this file is really supposed to be created from the command, delete the
+     file from the filesystem and try again.
+  2) Change your rule in the Tupfile so you aren't trying to overwrite the file.
+
+---How does yam process buildfiles?
+
+--Globs on source and generated files
+Yam does not impose tup's "output files are in the Tupfile directory" upon the
+user. In tup the search domain for a glob dir/*.obj is simply the set of output
+files defined by the rules in dir/Tupfile. In yam this will not work because 
+there is no relation between Tupfile directory and output file directory. In 
+yam the user must therefore specify the build files that span the search domain
+for the glob. This puts a burden on the user. But the alternative is an 
+implementation with O(N) time complexity, N being the number of file nodes in
+the graph. See scenario 2d in design_buildfile.txt.
+
+--Cyclic group dependencies
+    <grpA> |> ... %<grpA> ... |> b <grpB>
+    <grpB> |> ... %<grpB> ... |> c <grpA>
+
+Cyclic group dependencies can occur because of the lazy evaluation of group
+content, i.e. during command execution. Note that cyclic dependencies among
+rules that do not use groups cannot occur because yam (and tup) requires output
+files to be defined before they can be used as inputs. E.g. for rules
+    A |> ... %f ... |> b B
+    B |> ... %f ... |> c A
+yam (and tup) will raise an error in the first rule because input A is not
+yet defined.
+

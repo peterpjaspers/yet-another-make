@@ -1,0 +1,169 @@
+New nodes are added to the context:
+- during repo mirroring
+- during build file parsing: globnodes for the buildfile dependency declaration
+- during build file compilation: glob nodes for the cmd and order-only inputs,
+  command, genfile, output group nodes. Also group nodes can be created from
+  cmd/order-only grouo inputs.
+- during cmd execution when cmd detects a file dependency in a Tracked 
+  FileRepository or a dependency on a non-existing file
+  
+References to nodes are held by:
+- DirectoryNode to other dir/file nodes and to buildfile parser+compiler
+- GlobNodes to input DirectoryNodes
+- BuildFileParser to GlobNodes and to requisite parser nodes
+- BuildFileCompiler to input glob, file, input/output group, command, genfile
+  (output) and output group nodes and to requisite compiler nodes
+- CommandNode to cmd and order-only input genfile and group nodes, to 
+  genfile output nodes, to srcfile/genfile nodes associated with the detected
+  script file dependencies, to working dir directory node.
+- GroupNode to genfile nodes
+
+Nodes are removed, and marked Deleted, from the context:
+- during repo mirroring: nodes associated with deleted dirs/files are removed.
+  Also buildfile parser&compiler nodes are removed.
+- during build file parsing: when previously defined buildfile dependency
+  globs are removed from build file. The glob is possibly shared by multiple
+  buildfile parsers (because multiple buildfiles can have same deps.)
+  So removing the glob from context requires the glob to be no longer
+  referenced from these buildfiles/parsers. The parsers subscribe at these
+  globs for changes. So the glob can be removed from context when it is
+  no longer observed.
+- during build file compilation: previously defined command, output genfile, 
+  input glob, output group nodes definitions are removed from build file. 
+  Also input groups can possibly be removed.
+
+
+Requirement
+Buildstate storage must be possible at arbitrary points during build without 
+compromising integrity of persistent state. 
+How does this requirement impact the design of YAM? 
+
+Impact on current design
+A store request computes the difference between the set of stored nodes and
+the set of nodes in execution context. This yields the set of nodes that were
+removed/added/modified-in-place since the previous store request.
+In this design a reference from a node X to a node Y is only allowed when Y 
+is also in storage or about to be added to storage. Things go wrong, i.e.
+an exception is thrown when X tries to serialize its reference to Y and Y
+is not in storage nor in the set of nodes to be added to storage.
+Things also go wrong if stored X references stored Y and Y is deleted from
+storage and X is not updated in storage to remove its reference to Y. Stored 
+X now holds a dangling reference to Y. At next retrieval X tries to dereference 
+Y which results in an exception. 
+Note: in memory a reference to a node-removed-from context is not a problem
+because of the use of shared_ptrs. In persistent memory a reference to a
+node-removed-from-storage is a dangling pointer.
+
+Conclusion for current storage design:
+Given:
+    - Storage must be possible at arbitrary points during build
+    - Stored and to-be-stored/replaced nodes are not allowed to reference 
+      nodes that are not part of execution context
+Then: 
+    - deletion (removal from context) of node Y AND removing all references
+      to Y must be an atomic operation.
+
+How can this be implemented? The following design options are considered:
+    - brute force
+    - state observation 
+    - filtered streaming 
+
+Brute force: on removal of node Y, request each node in the context to remove 
+its references to Y. Requires changes in all node classes that hold refs
+tp other nodes.
+Disadvantage: time complexity O(total nr of nodes * nr of removed nodes).
+
+State observation: use the Node observer mechanism. If:
+    - node X that references node Y also observes state of Y
+    - removal of Y updates state of Y to Deleted 
+    - callback from Y to X takes care of removing references to Y and
+      setting X modified (to ensure its replacement in storage at next
+      store request). Note: do not set dirty because node is already
+      set dirty by filerepowatcher and dirty propagation.
+Time complexity is nice: O(total nr of modified nodes)
+Problem: Not all nodes that reference Y also observe Y.
+E.g. CommandNode does not observe its source and generated file cmd inputs.
+It only observes the producers of its input generated file nodes and
+the file nodes associated with files detected during cmd script execution.
+Requires changes in StateObserver and all node classes that hold refs to
+other nodes.
+Take care: when Y notifies X to remove reference to Y then observation 
+of Y by X must be stopped.
+
+Filtered streaming: he streaming method of node X is modified to remove refs
+Y in Deleted state before serializing X. This only works if X is part of storage
+request, i.e. if X was marked modified. Else stored X will reference not-stored Y.
+On next retrieval of X dereferencing Y will return a, not-initalized node, in
+state Deleted (requires change in PersistentBuildState). Deserialization code
+of X must be robust for this and remove such nodes from its state.
+Ideally X is marked modified. This suggests that state observeration is a more
+attractive alternative.
+
+
+Alternative storage design: allow storage of nodes in Deleted state
+Current design requires that all referenced nodes are in context.
+The following design does not have this constraint:
+When during storage node X streams (writes) Deleted node G and 
+PersistentBuildState contains no key for G (in _objectToKey) then it creates
+this key on-the-fly and streams/stores G. 
+When during retrieval node X streams (reads) G and key-of G is not in storage
+then an object in Deleted state is returned. This resembles earlier discussed
+'filtered streaming' scenario.
+Note that without further measures G is left as garbage in storage when a future 
+version of X no longer references G. Such garbage can be collected as follows:
+    - retrieve all keys from all btrees
+    - for each key
+        - create placeholder object of correct type
+        - initialize key.refcnt=1
+        - call retrieve(key,reader) to stream the key value into the
+          placeholder object.
+        - for each call to retrieve(key) key.refcnt++
+    - garbage == all_keys - all_keys.where(key is deleted and refcnt==1).
+
+In this design still the difference between context and stored state determines 
+which objects must be inserted/replaced/removed. Removal request from stoarge
+can now either be executed or ignored:
+When removal is executed:
+     - storage may result in a Deleted node to be stored. 
+     - retrieval may result in unknown key to be retrieved => return Deleted node
+When removal is ignored:
+     - storage may result in a Deleted node to be stored. 
+     - retrieval of Deleted node never fails (because Deleted nodes get stored)
+     - Deleted node in storage may end as garbage
+     - Garbage can be detected/collection during retrieveAll.
+Best solution seems to be to allow deleted nodes in storage.
+Take care: deleted nodes must not be added to context as side effect of their 
+retrieval. I.e. only the objects with keys in all_keys-garbage.
+
+
+
+The following sections contain insights obtained during above design analysis.
+
+Inconsistent behavior between rules with input paths and input globs
+when source files are deleted. Input path==path without glob chars.
+With input globs: Rule is recompiled, compile error when empty input.
+With input path: rule is not recompiled. Deleted file is noticed on next
+execution of command scripts that require the file to exist.
+Reason: no glob for input path nor observation of Deleted state. 
+What if input path is generated file? Input glob makes no sense in this case.
+Proposal: also use glob for source file input path as this has minimal
+impact on implementation.
+
+Removing output group node from context.
+Multiple compilers may contribute to a group. A compiler that no longer 
+contributes to a group can therefore only remove/Delete that group when
+it is empty because compilers will not reference groups to which they
+did not contribute.
+Problem: the output group may be referenced in input sections. This situation 
+can be detected because an input group is observed by the command node for
+which it is a cmd or order-only input.
+Conclusion: an empty output group can be removed/Deleted when it is empty
+and not observed.
+Note: a rule that has in input group node while that group did not yet exist
+causes the group to be created. This group will never be deleted in case 
+later compilations do not contribute outputs to that group. A command node
+could raise a warning that an input group is empty.
+
+Removing glob node from context
+Glob nodes only make sense when observed. Hence a parser/compiler that no
+longer depends on a glob can remove that glob when it is no longer observed.
