@@ -18,6 +18,8 @@ namespace AccessMonitor {
             ThreadID        thread;
             LogFile*        eventLog;
             LogFile*        debugLog;
+            MonitorGuard    fileGuard;
+            MonitorGuard    threadAndProcessGuard;
         };
 
         mutex sessionMutex;
@@ -89,6 +91,16 @@ namespace AccessMonitor {
     }
     void SessionDebugLogClose() {
         if ((sessionData != nullptr) && (sessionData->debugLog != nullptr)) sessionData->debugLog->close();
+    }
+
+    MonitorGuard* SessionFileGuard() {
+        if (sessionData == nullptr) return nullptr;
+        return const_cast<MonitorGuard*>( &sessionData->fileGuard );
+    }
+
+    MonitorGuard* SessionThreadAndProcessGuard() {
+        if (sessionData == nullptr) return nullptr;
+        return const_cast<MonitorGuard*>( &sessionData->threadAndProcessGuard );
     }
 
 } // namespace AccessMonitor

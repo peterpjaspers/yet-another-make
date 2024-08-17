@@ -10,7 +10,8 @@ using namespace AccessMonitor;
 using namespace std;
 using namespace std::filesystem;
 
-const std::wstring patchDLLFile( L"C:\\Users\\philv\\Code\\yam\\yet-another-make\\accessMonitor\\accessMonitor.dll" );
+const std::wstring patchDLLFile( L"C:/Users/philv/Code/yam/yet-another-make/accessMonitor/dll/accessMonitor.dll" );
+// const std::wstring patchDLLFile( L"D:/Peter/github/yam/x64/Debug/dll/accessMonitorDLL.dll" );
 
 void worker( const path directoryPath ) {
     current_path( temp_directory_path() );
@@ -26,27 +27,26 @@ void worker( const path directoryPath ) {
     CopyFileW( (directoryPath / "moreJunk.txt").c_str(), (directoryPath / "evenMoreJunk.txt").c_str(), false );
     remove( directoryPath / "junk.txt" );
     rename( directoryPath / "moreJunk.txt", directoryPath / "yetMoreJunk.txt" );
-    remove_all( directoryPath );
+    error_code ec;
+    remove_all( directoryPath, ec );
 }
 
 int main( int argc, char* argv[] ) {
     // Manually create a session data directory...
     auto session = 1;
-    const path sessionData( sessionDataPath( session ) );
-    if (exists( sessionData ))  remove_all( sessionData );
+    const path sessionData( sessionDataPath( temp_directory_path(), session ) );
+    if (exists( sessionData )) {
+        error_code ec;
+        remove_all( sessionData, ec );
+    }
     create_directory( sessionData );
     auto process = CurrentProcessID();
     auto thread = CurrentThreadID();
     auto patched = AccessEvent( "ProcessPatched", session, process );
     auto exit = AccessEvent( "ExitProcess", session, process );
-    recordSessionInfo( session, process, thread );
+    recordSessionInfo( temp_directory_path(), session, process, thread );
     HMODULE library = LoadLibraryW( patchDLLFile.c_str() );
     EventWait( patched );
     ReleaseEvent( patched );
     worker( uniqueName( L"Session", session ) );
-    EventSignal( "RequestExit", session, process );
-    EventWait( exit );
-    ReleaseEvent( patched );
-    ReleaseEvent( exit );
-    FreeLibrary( library );
 }

@@ -1,11 +1,11 @@
 
 #define _CRT_SECURE_NO_WARNINGS
 
-#include "Process.h"
-#include "PatchProcess.h"
-#include "Session.h"
-#include "FileNaming.h"
-#include "MonitorLogging.h"
+#include "../Process.h"
+#include "../PatchProcess.h"
+#include "../Session.h"
+#include "../FileNaming.h"
+#include "../MonitorLogging.h"
 
 #include <windows.h>
 
@@ -22,7 +22,6 @@ namespace {
         ThreadID mainThread; // Main thread ID of (remote) process
         retrieveSessionInfo( sessionDirectory, process, session, mainThread );
         CreateRemoteSession( sessionDirectory, session, process, mainThread );
-        auto requestExit = AccessEvent( "RequestExit", session, process );
         auto processPatched = AccessEvent( "ProcessPatched", session, process );
         SessionDebugLog( createDebugLog() );
         SessionEventLog( createEventLog() );
@@ -44,17 +43,27 @@ namespace {
         SessionDebugLogClose();
     }
 
-}
+} // namespace
 
 BOOL WINAPI DllMain( HINSTANCE dll,  DWORD reason, LPVOID arg ) {
     if (reason == DLL_PROCESS_ATTACH) {
         auto monitorThread = CreateThread( nullptr, 0, monitorDLLMain, nullptr, 0, nullptr );
         if (monitorThread == nullptr) return false;
         atexit( exitHandler );
-    } else if (reason == DLL_THREAD_ATTACH) {
-    } else if (reason == DLL_THREAD_DETACH) {
-    } else if (reason == DLL_PROCESS_DETACH) {
-        if (arg != nullptr) return true;
     }
     return true;
 }
+
+    // if (dwReason == DLL_PROCESS_ATTACH) {
+    //     DetourRestoreAfterWith();
+
+    //     DetourTransactionBegin();
+    //     DetourUpdateThread(GetCurrentThread());
+    //     DetourAttach(&(PVOID&)TrueSleep, TimedSleep);
+    //     DetourTransactionCommit();
+    // } else if (dwReason == DLL_PROCESS_DETACH) {
+    //     DetourTransactionBegin();
+    //     DetourUpdateThread(GetCurrentThread());
+    //     DetourDetach(&(PVOID&)TrueSleep, TimedSleep);
+    //     DetourTransactionCommit();
+    // }

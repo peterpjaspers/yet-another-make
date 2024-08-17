@@ -2,6 +2,7 @@
 #define ACCESS_MONITOR_MONITOR_H
 
 #include "FileAccess.h"
+#include "MonitorLogging.h"
 
 #include <filesystem>
 #include <map>
@@ -20,7 +21,8 @@ namespace AccessMonitor {
     // process. Caller must ensure this by setting variables TMP and TEMP in
     // the environment of the spawned process to the directory used by the 
     // parent process.
-    void startMonitoring(std::filesystem::path const& directory = "");
+    // The aspects argument defines which aspects to log.
+    void startMonitoring( std::filesystem::path const& directory = "", const LogAspects aspects = (PatchExecution | FileAccesses) );
     // Stop monitoring file access.
     // Returns collection of monitored file accesses.
     MonitorEvents stopMonitoring();

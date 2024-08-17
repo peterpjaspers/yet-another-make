@@ -1,5 +1,4 @@
 #include "Monitor.h"
-#include "MonitorLogging.h"
 #include "Process.h"
 #include "Session.h"
 #include "FileNaming.h"
@@ -82,7 +81,7 @@ namespace AccessMonitor {
         }
     }
 
-    void startMonitoring(std::filesystem::path const& directory) {
+    void startMonitoring( std::filesystem::path const& directory, const LogAspects aspects ) {
         std::filesystem::path tempDir;
         if (directory.empty()) {
             tempDir = std::filesystem::temp_directory_path();
@@ -92,7 +91,7 @@ namespace AccessMonitor {
         std::filesystem::create_directory(tempDir / dataDirectory());
         SessionID session = CreateSession(tempDir);
         SessionDebugLog( createDebugLog() );
-        debugLog().enable( PatchedFunction | ParseLibrary | PatchExecution | FileAccesses | WriteTime );
+        debugLog().enable( aspects );
         debugRecord() << "Start monitoring session " << session << "..." << record;
         createSessionDirectory( tempDir, session );
         SessionEventLog( createEventLog() );

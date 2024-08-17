@@ -36,6 +36,18 @@ namespace AccessMonitor {
     LogFile* SessionDebugLog();
     void SessionDebugLogClose();
 
+    struct MonitorGuard {
+        bool monitoring;
+        unsigned long errorCode;
+        inline MonitorGuard() : monitoring( false ), errorCode( 0 ) {};
+    };
+
+    // Access file monitoring guard data.
+    MonitorGuard* SessionFileGuard();
+    // Access thread and process monitoring guard data.
+    MonitorGuard* SessionThreadAndProcessGuard();
+
+
 } // namespace AccessMonitor
 
 #endif // ACCESS_MONITOR_SESSION_H

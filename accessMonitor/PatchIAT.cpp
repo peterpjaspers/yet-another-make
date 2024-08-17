@@ -4,9 +4,7 @@
 #include <windows.h>
 #include <imagehlp.h>
 
-#include <set>
 #include <map>
-#include <vector>
 
 using namespace std;
 
@@ -45,8 +43,8 @@ namespace AccessMonitor {
     }
 
     // Registered functions may not actually be patched (imported) in an executable or DLL.
-    // In that case, repatchFunction and unpatchFunction do nothing.
-    bool repatchFunction( const PatchFunction function ) {
+    // In that case, patchFunction and unpatchFunction do nothing.
+    bool patchFunction( const PatchFunction function ) {
         if (0 < functionToPatch.count( function )) {
             auto patchData = functionToPatch[ function ];
             patchImportEntry( patchData.address, function );
@@ -70,18 +68,18 @@ namespace AccessMonitor {
         return false;
     }
     void patchAll() {
-        for ( auto patchFunction : registeredPatches ) {
-            if (repatchFunction( patchFunction.second )) {
-                auto patchData = functionToPatch[ patchFunction.second ];
-                if (debugLog( PatchedFunction )) { debugRecord() << L"      Patched function " << widen( patchFunction.first ) << " in " << widen( *patchData.library ) << record; }
+        for ( auto function : registeredPatches ) {
+            if (patchFunction( function.second )) {
+                auto patchData = functionToPatch[ function.second ];
+                if (debugLog( PatchedFunction )) { debugRecord() << L"      Patched function " << widen( function.first ) << " in " << widen( *patchData.library ) << record; }
             }
         }
     }
     void unpatchAll() {
-        for ( auto patchFunction : registeredPatches ) {
-            if (unpatchFunction( patchFunction.second )) {
-                auto patchData = functionToPatch[ patchFunction.second ];
-                if (debugLog( PatchedFunction )) { debugRecord() << L"      Unpatched function " << widen( patchFunction.first ) << " in " << widen( *patchData.library ) << record; }
+        for ( auto function : registeredPatches ) {
+            if (unpatchFunction( function.second )) {
+                auto patchData = functionToPatch[ function.second ];
+                if (debugLog( PatchedFunction )) { debugRecord() << L"      Unpatched function " << widen( function.first ) << " in " << widen( *patchData.library ) << record; }
             }
         }        
     }
@@ -149,15 +147,6 @@ namespace AccessMonitor {
 
     PatchFunction original( std::string name ) { return functionToPatch[ registeredPatches[ name ] ].original; }
     PatchFunction original( PatchFunction function ) { return functionToPatch[ function ].original; }
-    PatchFunction patched( std::string name ) { return registeredPatches[ name ]; }
-    const std::string& patchedLibrary( std::string name ) { return *functionToPatch[ registeredPatches[ name ] ].library; }
-    const std::string& patchedLibrary( PatchFunction function ){ return *functionToPatch[ function ].library; }
-
-    bool pathOverridden( std::string name ) {
-        PatchFunction function = patched( name );
-        Patch& patch = functionToPatch[ function ];
-        return( (*patch.address != patch.original) && (*patch.address != function) );
-    }
 
     void patch() {
         static const char* signature = "void patch()";

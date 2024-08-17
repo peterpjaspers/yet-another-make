@@ -11,6 +11,8 @@
 #include <thread>
 #include <cstdlib>
 
+// ToDo: Figure out why program crashes when not all file from previous run are deleted.
+
 using namespace AccessMonitor;
 using namespace std;
 using namespace std::filesystem;
@@ -18,6 +20,9 @@ using namespace std::filesystem;
 static int sessions = 1;
 static int threads = 1;
 static bool remoteProcess = false;
+
+const std::wstring remoteTestFile( L"C:/Users/philv/Code/yam/yet-another-make/accessMonitor/test/remoteTest.exe" );
+// const std::wstring remoteTestFile( L"D:/Peter/Github/yam/x64/Debug/remoteTest.exe" );
 
 void worker( const path directoryPath ) {
     try {
@@ -63,7 +68,7 @@ void doFileAccess() {
     if (remoteProcess) {
         wstringstream command;
         command
-            << L"D:/Peter/Github/yam/x64/Debug/remoteTest.exe"
+            << remoteTestFile
             << L" " 
             << threads
             << L" "
@@ -85,7 +90,7 @@ void doFileAccess() {
 }
 
 void doMonitoredFileAccess() {
-    startMonitoring();
+    startMonitoring( "", PatchedFunction | PatchExecution | FileAccesses | WriteTime );
     auto session = CurrentSessionID();
     doFileAccess();
     auto results( stopMonitoring() );

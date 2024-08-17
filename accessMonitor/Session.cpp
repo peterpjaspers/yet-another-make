@@ -19,6 +19,8 @@ namespace AccessMonitor {
             ThreadID        thread;
             LogFile*        eventLog;
             LogFile*        debugLog;
+            MonitorGuard    fileGuard;
+            MonitorGuard    threadAndProcessGuard;
         };
 
         unsigned int tlsSessionIndex = -1;
@@ -129,6 +131,18 @@ namespace AccessMonitor {
     void SessionDebugLogClose() {
         auto data = static_cast<const MonitorData*>( TlsGetValue( tlsSessionIndex ) );
         if ((data != nullptr) && (data->debugLog != nullptr)) data->debugLog->close();
+    }
+
+    MonitorGuard* SessionFileGuard() {
+        auto data = static_cast<MonitorData*>( TlsGetValue( tlsSessionIndex ) );
+        if (data == nullptr) return nullptr;
+        return &data->fileGuard;
+    }
+
+    MonitorGuard* SessionThreadAndProcessGuard() {
+        auto data = static_cast<MonitorData*>( TlsGetValue( tlsSessionIndex ) );
+        if (data == nullptr) return nullptr;
+        return &data->threadAndProcessGuard;
     }
 
 } // namespace AccessMonitor
