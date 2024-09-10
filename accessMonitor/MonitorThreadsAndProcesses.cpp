@@ -29,8 +29,7 @@ namespace AccessMonitor {
             ProcessMonitorGuard() : MonitorGuard( SessionThreadAndProcessAccess() ) {}
         };
 
-        // const std::wstring patchDLLFile( L"C:/Users/philv/Code/yam/yet-another-make/accessMonitor/dll/accessMonitor.dll" );
-        const std::wstring patchDLLFile( L"C:/Users/philv/Code/yam/yet-another-make/accessMonitor/dll/accessMonitorDetours.dll" );
+        const std::wstring patchDLLFile( L"C:/Users/philv/Code/yam/yet-another-make/accessMonitor/dll/accessMonitor.dll" );
         // const std::wstring patchDLLFile( L"D:/Peter/github/yam/x64/Debug/dll/accessMonitorDLL.dll" );
 
         void injectProcess( DWORD pid, DWORD tid ) {
