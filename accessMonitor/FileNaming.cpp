@@ -28,25 +28,25 @@ namespace AccessMonitor {
     }
 
     // Return path to session ID file
-    path sessionInfoPath(path const& sessionDir, const ProcessID process) {
-        return path(sessionDir / _dataDirectory / uniqueName( L"SessionID", process, L"txt" ) );
+    path sessionInfoPath( path const& sessionDir, const ProcessID process ) {
+        return path( sessionDir / _dataDirectory / uniqueName( L"SessionID", process, L"txt" ) );
     }
     // Return path to session data directory
-    path sessionDataPath(path const& sessionDir, const SessionID session) {
-        return path(sessionDir / _dataDirectory / uniqueName( L"Session", session ) );
+    path sessionDataPath( path const& sessionDir, const SessionID session ) {
+        return path( sessionDir / _dataDirectory / uniqueName( L"Session", session ) );
     }
     // Return path to monitor events for this process
-    path monitorEventsPath(path const& sessionDir, const ProcessID process, const SessionID session) {
+    path monitorEventsPath( path const& sessionDir, const ProcessID process, const SessionID session ) {
         return sessionDataPath( sessionDir, session ) / uniqueName( L"Monitor_Events", process, L"log" );
     }
     // Record session ID and main thread ID of a (remote) process
-    void recordSessionInfo(path const& sessionDir, const SessionID session, const ProcessID process, ThreadID thread ) {
+    void recordSessionInfo( path const& sessionDir, const SessionID session, const ProcessID process, ThreadID thread ) {
         auto sessionIDFile = ofstream( sessionInfoPath( sessionDir, process ) );
         sessionIDFile << session << " " << thread << endl;
         sessionIDFile.close();
     }
     // Retrieve session ID and main thread ID of a (remote) process
-    void retrieveSessionInfo(path const& sessionDir, const ProcessID process, SessionID& session, ThreadID& thread ) {
+    void retrieveSessionInfo( path const& sessionDir, const ProcessID process, SessionID& session, ThreadID& thread ) {
         auto sessionFile = ifstream( sessionInfoPath( sessionDir, process ) );
         sessionFile >> session >> thread;
         sessionFile.close();            

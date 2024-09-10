@@ -3,50 +3,52 @@
 
 #include "Process.h"
 #include "LogFile.h"
+#include "Patch.h"
 
 #include <filesystem>
 
 namespace AccessMonitor {
 
-    // Get SessionID of session associated with the current thread
+    // Get SessionID of session associated with current thread
     SessionID CurrentSessionID();
-    // Get directory for temporary data storage of session associated with the
-    // current thread.
+    // Get directory for session data storage associated with current thread.
     std::filesystem::path const& CurrentSessionDirectory();
-    // Create a new session on the current thread.
-    // Store session temporary data in given directory.
-    SessionID CreateSession(std::filesystem::path const& directory);
-    // Create existing session in remote process
-    void CreateRemoteSession(std::filesystem::path const& directory, SessionID session, ProcessID process, ThreadID thread );
-    // Remove a session from the current thread
+    // Create a new session on current thread.
+    // Store session data in given directory.
+    // If 
+    SessionID CreateSession( std::filesystem::path const& directory, SessionID session = CreateNewSession, ProcessID process = CurrentProcessID(), ThreadID thread = CurrentThreadID() );
+    // Remove session from current thread
     void RemoveSession();
     // Add current thread to session
     void AddThreadToSession( SessionID session, std::filesystem::path const& directory, LogFile* eventLog = nullptr, LogFile* debugLog = nullptr );
     // Remove current thread from session 
     void RemoveThreadFromSession();
-    // Test if session is defined on current thread
-    bool SessionDefined();
 
-    // Set/get event log/record for current session thread.
+    // Set/get event log for current session.
     void SessionEventLog( LogFile* log );
     LogFile* SessionEventLog();
     void SessionEventLogClose();
-    // Set/get debug log/record for current session thread.
+    // Set/get debug log for current session.
     void SessionDebugLog( LogFile* log );
     LogFile* SessionDebugLog();
     void SessionDebugLogClose();
 
-    struct MonitorGuard {
-        bool monitoring;
+    struct MonitorAccess {
+        int monitorCount;
         unsigned long errorCode;
-        inline MonitorGuard() : monitoring( false ), errorCode( 0 ) {};
+        inline MonitorAccess() : monitorCount( 0 ), errorCode( 0 ) {};
     };
 
-    // Access file monitoring guard data.
-    MonitorGuard* SessionFileGuard();
-    // Access thread and process monitoring guard data.
-    MonitorGuard* SessionThreadAndProcessGuard();
+    // Return file monitoring access data.
+    MonitorAccess* SessionFileAccess();
+    // Return thread and process monitoring access data.
+    MonitorAccess* SessionThreadAndProcessAccess();
 
+    // Initialize session if not yet initialized.
+    // The first thread to call this function will perform the actual inialization.
+    // Other threads will be blocked until initialization is completed.
+    // Once initialized, the overhead is a test on a boolean value.
+    void SessionInitialize();
 
 } // namespace AccessMonitor
 

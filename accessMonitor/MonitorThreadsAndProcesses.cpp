@@ -1,3 +1,4 @@
+#include "Monitor.h"
 #include "MonitorThreadsAndProcesses.h"
 #include "Process.h"
 #include "Session.h"
@@ -23,22 +24,13 @@ namespace AccessMonitor {
 
     namespace {
 
-        bool enterMonitor() {
-            auto guard = SessionThreadAndProcessGuard();
-            if ((guard != nullptr) && !guard->monitoring) {
-                guard->monitoring = true;
-                guard->errorCode = GetLastError();
-                return true;
-            }
-            return false;
-        }
-        void exitMonitor() {
-            auto guard = SessionThreadAndProcessGuard();
-            guard->monitoring = false;
-            SetLastError( guard->errorCode );
-        }
+        class ProcessMonitorGuard : public MonitorGuard {
+        public:
+            ProcessMonitorGuard() : MonitorGuard( SessionThreadAndProcessAccess() ) {}
+        };
 
-        const std::wstring patchDLLFile( L"C:/Users/philv/Code/yam/yet-another-make/accessMonitor/dll/accessMonitor.dll" );
+        // const std::wstring patchDLLFile( L"C:/Users/philv/Code/yam/yet-another-make/accessMonitor/dll/accessMonitor.dll" );
+        const std::wstring patchDLLFile( L"C:/Users/philv/Code/yam/yet-another-make/accessMonitor/dll/accessMonitorDetours.dll" );
         // const std::wstring patchDLLFile( L"D:/Peter/github/yam/x64/Debug/dll/accessMonitorDLL.dll" );
 
         void injectProcess( DWORD pid, DWORD tid ) {
@@ -60,8 +52,10 @@ namespace AccessMonitor {
             return debugMessage( function, (handle != INVALID_HANDLE_VALUE) );
         }
 
-        struct ThreadArguments {
-            LPTHREAD_START_ROUTINE  function;
+        // A created thread main function is called indirectly via a wrapper function that adds and
+        // subsequently removes the created thread from the session thread administration.
+        struct WrapperArguments {
+            LPTHREAD_START_ROUTINE  main;
             LPVOID                  parameter;
             SessionID               session;
             std::filesystem::path   sessionDirectory;
@@ -69,15 +63,15 @@ namespace AccessMonitor {
             LogFile*                debugLog;
         };
 
-        DWORD threadPatch( void* argument ) {
-            auto args = static_cast<const ThreadArguments*>( argument );
+        DWORD threadWrapper( void* argument ) {
+            auto args = static_cast<const WrapperArguments*>( argument );
             AddThreadToSession( args->session, args->sessionDirectory, args->eventLog, args->debugLog );
-            auto result = args->function( args-> parameter );
+            auto result = args->main( args->parameter );
             RemoveThreadFromSession();
             LocalFree( argument );
             return result;
         }
-        typedef HANDLE(*TypeCreateThread)(LPSECURITY_ATTRIBUTES,SIZE_T,LPTHREAD_START_ROUTINE,LPVOID,DWORD,LPDWORD);
+
         HANDLE PatchCreateThread(
             LPSECURITY_ATTRIBUTES   lpThreadAttributes,
             SIZE_T                  dwStackSize,
@@ -86,50 +80,44 @@ namespace AccessMonitor {
             DWORD                   dwCreationFlags,
             LPDWORD                 lpThreadId
         ) {
-            TypeCreateThread function = reinterpret_cast<TypeCreateThread>(original( (PatchFunction)PatchCreateThread ));
             bool resume = !(dwCreationFlags & CREATE_SUSPENDED);
-            auto args = static_cast<ThreadArguments*>( LocalAlloc( LPTR, sizeof( ThreadArguments ) ) );
-            args->function = lpStartAddress;
+            auto args = static_cast<WrapperArguments*>( LocalAlloc( LPTR, sizeof( WrapperArguments ) ) );
+            args->main = lpStartAddress;
             args->parameter = lpParameter;
             args->session = CurrentSessionID();
             args->sessionDirectory = CurrentSessionDirectory();
             args->eventLog = SessionEventLog();
             args->debugLog = SessionDebugLog();
-            HANDLE handle = function( lpThreadAttributes, dwStackSize, threadPatch, args, (dwCreationFlags | CREATE_SUSPENDED), lpThreadId );
-            if (enterMonitor()) {
+            auto handle = patchOriginal( PatchCreateThread )( lpThreadAttributes, dwStackSize, threadWrapper, args, (dwCreationFlags | CREATE_SUSPENDED), lpThreadId );
+            ProcessMonitorGuard guard;
+            if (guard.monitoring()) {
                 auto thread = GetThreadID( GetThreadID( *lpThreadId ) );
                 if (debugLog( PatchExecution )) debugMessage( "CreateThread", handle ) << ", ... ) -> " << thread << record;
-                exitMonitor();
             }
             if (resume) ResumeThread( handle );
             return handle;
         }
-        typedef void(*TypeExitThread)(DWORD);
         void PatchExitThread(
             DWORD   dwExitCode
         ) {
-            TypeExitThread function = reinterpret_cast<TypeExitThread>(original( (PatchFunction)PatchExitThread ));
-            if (enterMonitor()) {
+            ProcessMonitorGuard guard;
+            if (guard.monitoring()) {
                 auto thread = CurrentThreadID();
                 if (debugLog( PatchExecution )) debugMessage( "ExitThread" ) << dwExitCode << " ) on "  << thread << record;
-                exitMonitor();
             }
-            function( dwExitCode );
+            patchOriginal( PatchExitThread )( dwExitCode );
         }
-        typedef BOOL(*TypeTerminateThread)(HANDLE,DWORD);
         BOOL PatchTerminateThread(
             HANDLE  hThread,
             DWORD   dwExitCode
         ) {
-            TypeTerminateThread function = reinterpret_cast<TypeTerminateThread>(original( (PatchFunction)PatchTerminateThread ));
-            if (enterMonitor()) {
+            ProcessMonitorGuard guard;
+            if (guard.monitoring()) {
                 auto thread = GetThreadID( GetThreadId( hThread ) );
                 if (debugLog( PatchExecution )) debugMessage( "TerminateThread" ) << thread << ", "  << dwExitCode << " )" << record;
-                exitMonitor();
             }
-            return function( hThread, dwExitCode );
+            return patchOriginal( PatchTerminateThread )( hThread, dwExitCode );
         }
-        typedef BOOL(*TypeCreateProcessA)(LPCSTR,LPSTR,LPSECURITY_ATTRIBUTES,LPSECURITY_ATTRIBUTES,BOOL,DWORD,LPVOID,LPCSTR,LPSTARTUPINFOA,LPPROCESS_INFORMATION);
         BOOL PatchCreateProcessA(
             LPCSTR                lpApplicationName,
             LPSTR                 lpCommandLine,
@@ -142,18 +130,16 @@ namespace AccessMonitor {
             LPSTARTUPINFOA        lpStartupInfo,
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
-            TypeCreateProcessA function = reinterpret_cast<TypeCreateProcessA>(original( (PatchFunction)PatchCreateProcessA ));
             bool resume = !(dwCreationFlags & CREATE_SUSPENDED);
-            BOOL created = function( lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
-            if (enterMonitor()) {
+            auto created = patchOriginal( PatchCreateProcessA )( lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
+            ProcessMonitorGuard guard;
+            if (guard.monitoring()) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateProcessA", created ) << lpApplicationName << ", " << lpCommandLine << ", ... ) -> " << lpProcessInformation->dwProcessId << record;
                 injectProcess( lpProcessInformation->dwProcessId, lpProcessInformation->dwThreadId );
-                exitMonitor();
             }
             if (resume) ResumeThread( lpProcessInformation->hThread );
             return created;
         }
-        typedef BOOL(*TypeCreateProcessW)(LPCWSTR,LPWSTR,LPSECURITY_ATTRIBUTES,LPSECURITY_ATTRIBUTES,BOOL,DWORD,LPVOID,LPCSTR,LPSTARTUPINFOA,LPPROCESS_INFORMATION);
         BOOL PatchCreateProcessW(
             LPCWSTR               lpApplicationName,
             LPWSTR                lpCommandLine,
@@ -166,18 +152,16 @@ namespace AccessMonitor {
             LPSTARTUPINFOA        lpStartupInfo,
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
-            TypeCreateProcessW function = reinterpret_cast<TypeCreateProcessW>(original( (PatchFunction)PatchCreateProcessW ));
             bool resume = !(dwCreationFlags & CREATE_SUSPENDED);
-            BOOL created = function( lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
-            if (enterMonitor()) {
+            auto created = patchOriginal( PatchCreateProcessW )( lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
+            ProcessMonitorGuard guard;
+            if (guard.monitoring()) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateProcessW", created ) << lpApplicationName << ", " << lpCommandLine << ", ... ) -> " << lpProcessInformation->dwProcessId << record;
                 injectProcess( lpProcessInformation->dwProcessId, lpProcessInformation->dwThreadId );
-                exitMonitor();
             }
             if (resume) ResumeThread( lpProcessInformation->hThread );
             return created;
         }
-        typedef BOOL(*TypeCreateProcessAsUserA)(HANDLE,LPCSTR,LPSTR,LPSECURITY_ATTRIBUTES,LPSECURITY_ATTRIBUTES,BOOL,DWORD,LPVOID,LPCSTR,LPSTARTUPINFOA,LPPROCESS_INFORMATION);
         BOOL PatchCreateProcessAsUserA(
             HANDLE                hToken,
             LPCSTR                lpApplicationName,
@@ -191,18 +175,16 @@ namespace AccessMonitor {
             LPSTARTUPINFOA        lpStartupInfo,
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
-            TypeCreateProcessAsUserA function = reinterpret_cast<TypeCreateProcessAsUserA>(original( (PatchFunction)PatchCreateProcessAsUserA));
             bool resume = !(dwCreationFlags & CREATE_SUSPENDED);
-            BOOL created = function( hToken, lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
-            if (enterMonitor()) {
+            auto created = patchOriginal( PatchCreateProcessAsUserA )( hToken, lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
+            ProcessMonitorGuard guard;
+            if (guard.monitoring()) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateProcessAsUserA", created ) << " ..., " << lpApplicationName << ", " << lpCommandLine << ", ... ) -> " << lpProcessInformation->dwProcessId << record;
                 injectProcess( lpProcessInformation->dwProcessId, lpProcessInformation->dwThreadId );
-                exitMonitor();
             }
             if (resume) ResumeThread( lpProcessInformation->hThread );
             return created;
         }
-        typedef BOOL(*TypeCreateProcessAsUserW)(HANDLE,LPCWSTR,LPWSTR,LPSECURITY_ATTRIBUTES,LPSECURITY_ATTRIBUTES,BOOL,DWORD,LPVOID,LPCSTR,LPSTARTUPINFOA,LPPROCESS_INFORMATION);
         BOOL PatchCreateProcessAsUserW(
             HANDLE                hToken,
             LPCWSTR               lpApplicationName,
@@ -216,18 +198,16 @@ namespace AccessMonitor {
             LPSTARTUPINFOA        lpStartupInfo,
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
-            TypeCreateProcessAsUserW function = reinterpret_cast<TypeCreateProcessAsUserW>(original( (PatchFunction)PatchCreateProcessAsUserW));
             bool resume = !(dwCreationFlags & CREATE_SUSPENDED);
-            BOOL created = function( hToken, lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
-            if (enterMonitor()) {
+            auto created = patchOriginal( PatchCreateProcessAsUserW )( hToken, lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
+            ProcessMonitorGuard guard;
+            if (guard.monitoring()) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateProcessAsUserW", created ) << " ..., " << lpApplicationName << ", " << lpCommandLine << ", ... ) -> " << lpProcessInformation->dwProcessId << record;
                 injectProcess( lpProcessInformation->dwProcessId, lpProcessInformation->dwThreadId );
-                exitMonitor();
             }
             if (resume) ResumeThread( lpProcessInformation->hThread );
             return created;
         }
-        typedef BOOL(*TypeCreateProcessWithLogonW)(LPCWSTR,LPCWSTR,LPCWSTR,DWORD,LPCWSTR,LPWSTR,DWORD,LPVOID,LPCSTR,LPSTARTUPINFOA,LPPROCESS_INFORMATION);
         BOOL PatchCreateProcessWithLogonW(
             LPCWSTR               lpUsername,
             LPCWSTR               lpDomain,
@@ -241,18 +221,16 @@ namespace AccessMonitor {
             LPSTARTUPINFOA        lpStartupInfo,
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
-            TypeCreateProcessWithLogonW function = reinterpret_cast<TypeCreateProcessWithLogonW>(original( (PatchFunction)PatchCreateProcessAsUserW));
             bool resume = !(dwCreationFlags & CREATE_SUSPENDED);
-            BOOL created = function( lpUsername, lpDomain, lpPassword, dwLogonFlags, lpApplicationName, lpCommandLine, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
-            if (enterMonitor()) {
+            auto created = patchOriginal( PatchCreateProcessWithLogonW )( lpUsername, lpDomain, lpPassword, dwLogonFlags, lpApplicationName, lpCommandLine, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
+            ProcessMonitorGuard guard;
+            if (guard.monitoring()) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateProcessWithLogonW", created ) << " ..., " << lpApplicationName << ", " << lpCommandLine << ", ... ) -> " << lpProcessInformation->dwProcessId << record;
                 injectProcess( lpProcessInformation->dwProcessId, lpProcessInformation->dwThreadId );
-                exitMonitor();
             }
             if (resume) ResumeThread( lpProcessInformation->hThread );
             return created;
         }
-        typedef  BOOL(*TypeCreateProcessWithTokenW)(HANDLE,DWORD,LPCWSTR,LPWSTR,DWORD,LPVOID,LPCSTR,LPSTARTUPINFOA,LPPROCESS_INFORMATION);
         BOOL PatchCreateProcessWithTokenW(
             HANDLE                hToken,
             DWORD                 swLogonFlags,
@@ -264,21 +242,19 @@ namespace AccessMonitor {
             LPSTARTUPINFOA        lpStartupInfo,
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
-            TypeCreateProcessWithTokenW function = reinterpret_cast<TypeCreateProcessWithTokenW>(original( (PatchFunction)PatchCreateProcessAsUserW));
             bool resume = !(dwCreationFlags & CREATE_SUSPENDED);
-            BOOL created = function( hToken, swLogonFlags, lpApplicationName, lpCommandLine, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
-            if (enterMonitor()) {
+            auto created = patchOriginal( PatchCreateProcessWithTokenW )( hToken, swLogonFlags, lpApplicationName, lpCommandLine, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
+            ProcessMonitorGuard guard;
+            if (guard.monitoring()) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateProcessWithTokenW", created ) << " ..., " << lpApplicationName << ", " << lpCommandLine << ", ... )" << record;
                 injectProcess( lpProcessInformation->dwProcessId, lpProcessInformation->dwThreadId );
-                exitMonitor();
             }
             if (resume) ResumeThread( lpProcessInformation->hThread );
             return created;
         }
-        typedef void(*TypeExitProcess)(unsigned int);
         void PatchExitProcess( unsigned int exitCode ) {
-            TypeExitProcess function = reinterpret_cast<TypeExitProcess>(original( (PatchFunction)PatchExitProcess));
-            if (enterMonitor()) {
+            ProcessMonitorGuard guard;
+            if (guard.monitoring()) {
                 char fileName[ MaxFileName ];
                 HANDLE handle = OpenProcess( READ_CONTROL, false, GetCurrentProcessId() );
                 if (handle != NULL) {
@@ -286,71 +262,59 @@ namespace AccessMonitor {
                     CloseHandle( handle );
                 } else strcpy( fileName, "Executable path could not be determined." );
                 if (debugLog( PatchExecution )) debugMessage( "ExitProcess" ) << exitCode << " ) - " << fileName << record;
-                exitMonitor();
             }
-            function( exitCode );
+            patchOriginal( PatchExitProcess )( exitCode );
         }
-        typedef BOOL(*TypeTerminateProcess)(HANDLE,DWORD);
         BOOL PatchTerminateProcess( HANDLE handle, DWORD exitCode ) {
-            TypeTerminateProcess function = reinterpret_cast<TypeTerminateProcess>(original( (PatchFunction)PatchTerminateProcess));
-            if (enterMonitor()) {
+            ProcessMonitorGuard guard;
+            if (guard.monitoring()) {
                 char fileName[ MaxFileName ];
                 GetModuleFileNameExA( handle, NULL, fileName, MaxFileName );
                 if (debugLog( PatchExecution )) debugMessage( "TerminateProcess" ) << fileName << ", " << exitCode << " )" << record;
-                exitMonitor();
             }
-            return function( handle, exitCode );
+            return patchOriginal( PatchTerminateProcess )( handle, exitCode );
         }
-        typedef HMODULE(*TypeLoadLibraryA)(LPCSTR);
         HMODULE PatchLoadLibraryA(
             LPCSTR lpLibFileName
         ) {
-            auto function = reinterpret_cast<TypeLoadLibraryA>(original( (PatchFunction)PatchLoadLibraryA));
-            ThreadID thread = GetThreadID( GetCurrentThreadId() );
-            HMODULE library = function( lpLibFileName );
-            if (enterMonitor()) {
+            auto library = patchOriginal( PatchLoadLibraryA )( lpLibFileName );
+            ProcessMonitorGuard guard;
+            if (guard.monitoring()) {
                 ThreadID thread = GetThreadID( GetCurrentThreadId() );
-                exitMonitor();
             }
             return library;
         }
-        typedef HMODULE(*TypeLoadLibraryW)(LPCWSTR);
         HMODULE PatchLoadLibraryW(
             LPCWSTR lpLibFileName
         ) {
-            auto function = reinterpret_cast<TypeLoadLibraryW>(original( (PatchFunction)PatchLoadLibraryW));
-            HMODULE library = function( lpLibFileName );
-            if (enterMonitor()) {
+            auto library = patchOriginal( PatchLoadLibraryW )( lpLibFileName );
+            ProcessMonitorGuard guard;
+            if (guard.monitoring()) {
                 ThreadID thread = GetThreadID( GetCurrentThreadId() );
-                exitMonitor();
             }
             return library;
         }
-        typedef HMODULE(*TypeLoadLibraryExA)(LPCSTR,HANDLE,DWORD);
         HMODULE PatchLoadLibraryExA(
             LPCSTR lpLibFileName,
             HANDLE hFile,
             DWORD  dwFlags
         ) {
-            auto function = reinterpret_cast<TypeLoadLibraryExA>(original( (PatchFunction)PatchLoadLibraryExA));
-            HMODULE library = function( lpLibFileName, hFile, dwFlags );
-            if (enterMonitor()) {
+            auto library = patchOriginal( PatchLoadLibraryExA )( lpLibFileName, hFile, dwFlags );
+            ProcessMonitorGuard guard;
+            if (guard.monitoring()) {
                 ThreadID thread = GetThreadID( GetCurrentThreadId() );
-                exitMonitor();
             }
             return library;
         }
-        typedef HMODULE(*TypeLoadLibraryExW)(LPCWSTR,HANDLE,DWORD);
         HMODULE PatchLoadLibraryExW(
             LPCWSTR lpLibFileName,
             HANDLE hFile,
             DWORD  dwFlags
         ) {
-            auto function = reinterpret_cast<TypeLoadLibraryExW>(original( (PatchFunction)PatchLoadLibraryExW));
-            HMODULE library = function( lpLibFileName, hFile, dwFlags );
-            if (enterMonitor()) {
+            auto library = patchOriginal( PatchLoadLibraryExW )( lpLibFileName, hFile, dwFlags );
+            ProcessMonitorGuard guard;
+            if (guard.monitoring()) {
                 ThreadID thread = GetThreadID( GetCurrentThreadId() );
-                exitMonitor();
             }
             return library;
         }

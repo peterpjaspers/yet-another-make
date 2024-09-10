@@ -25,9 +25,7 @@ namespace AccessMonitor {
     // In that case, patchFunction and unpatchFunction do nothing.
     bool patchFunction( const PatchFunction function ) {
         if (0 < functionToOriginal.count( function )) {
-            auto unpatchedOriginal = original( function );
             LONG error = DetourAttach( (void**)&functionToOriginal[ function ], (void*)function );
-            auto patchedOriginal = original( function );
             if (error == NO_ERROR) return true;
             // Not able to patch requested function, remove it
             functionToOriginal.erase( function );

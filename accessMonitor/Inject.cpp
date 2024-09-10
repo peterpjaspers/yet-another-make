@@ -36,12 +36,13 @@ namespace AccessMonitor {
                             // Communicate session ID and main thread ID via session ID file...
                             recordSessionInfo(sessionDirectory, session, process, thread );
                             if (threadHandle != nullptr) {
-                                auto processPatched = AccessEvent( "ProcessPatched", session, process );
-                                if (ResumeThread( threadHandle ) == 1) {
-                                    // Wait for remote thread to indicate process has been patched...
-                                    if (!EventWait( processPatched )) throw exceptionText( signature, "Failed to synchronize with remote thread" );
-                                } else throw exceptionText( signature, "Failed to resume remote thread" );
-                                ReleaseEvent( processPatched );
+                                // auto processPatched = AccessEvent( "ProcessPatched", session, process );
+                                // if (ResumeThread( threadHandle ) == 1) {
+                                //     // Wait for remote thread to indicate process has been patched...
+                                //     if (!EventWait( processPatched )) throw exceptionText( signature, "Failed to synchronize with remote thread" );
+                                // } else throw exceptionText( signature, "Failed to resume remote thread" );
+                                // ReleaseEvent( processPatched );
+                                if (ResumeThread( threadHandle ) < 0) throw exceptionText( signature, "Failed to resume remote thread" );
                                 CloseHandle( threadHandle );
                             } else throw exceptionText( signature, "Failed to create remote thread" );
                         } else throw exceptionText( signature, "Failed to access LoadLibraryW function pointer" );

@@ -82,14 +82,10 @@ namespace AccessMonitor {
     }
 
     void startMonitoring( std::filesystem::path const& directory, const LogAspects aspects ) {
-        std::filesystem::path tempDir;
-        if (directory.empty()) {
-            tempDir = std::filesystem::temp_directory_path();
-        } else {
-            tempDir = directory;
-        }
-        std::filesystem::create_directory(tempDir / dataDirectory());
-        SessionID session = CreateSession(tempDir);
+        std::filesystem::path tempDir = directory;
+        if (directory.empty()) tempDir = std::filesystem::temp_directory_path();
+        std::filesystem::create_directory( tempDir / dataDirectory() );
+        SessionID session = CreateSession( tempDir );
         SessionDebugLog( createDebugLog() );
         debugLog().enable( aspects );
         debugRecord() << "Start monitoring session " << session << "..." << record;
@@ -109,6 +105,25 @@ namespace AccessMonitor {
         RemoveSession();
         return events;
     }
+
+    MonitorGuard::MonitorGuard( MonitorAccess* monitor ) : access( monitor ) {
+        if (access != nullptr) {
+            int count = access->monitorCount++;
+            if (count == 0) {
+                SessionInitialize();
+                access->errorCode = GetLastError();
+            }
+        }
+    }
+    MonitorGuard::~MonitorGuard() {
+        if (access != nullptr) {
+            int count = --access->monitorCount;
+            if (count == 0) {
+                SetLastError( access->errorCode );
+            }
+        }
+    }
+    bool MonitorGuard::monitoring() { return( (access != nullptr) && (access->monitorCount == 1) ); }
 
 } // namespace AccessMonitor
 

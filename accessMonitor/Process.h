@@ -10,6 +10,9 @@ namespace AccessMonitor {
     typedef unsigned long ThreadID;
     typedef void* EventID;
 
+    // Session ID indicating that a new session is to be created (in the main process).
+    const SessionID CreateNewSession = (SessionID)-1;
+
     // Get ProcessID of current process
     ProcessID CurrentProcessID();
     // Convert OS specific ID of process to ProcessID
