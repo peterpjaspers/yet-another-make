@@ -62,19 +62,18 @@ namespace AccessMonitor {
                     eventFile >> ws >> filePath >> ws;
                     from_stream( eventFile, L"[ %Y-%m-%d %H:%M:%10S ]", lastWriteTime );
                     eventFile >> ws >> accessMode >> ws;
-                    if (eventFile.good()) {
-                        if (0 < collected.count( filePath )) {
-                            auto& access = collected[ filePath ];                            
-                            auto mode = stringToMode( accessMode );
-                            if ((mode & AccessDelete) != 0) access.mode = AccessDelete;
-                            else if ((mode & AccessWrite) != 0) access.mode = AccessWrite;
-                            else if (((mode & AccessRead) != 0) && ((access.mode & AccessDelete) == 0) && ((access.mode & AccessWrite) == 0)) access.mode = AccessRead;
-                            access.modes |= mode;
-                            if ((access.lastWriteTime < lastWriteTime) && ((mode & AccessRead) == 0)) access.lastWriteTime = lastWriteTime;
-                        } else {
-                            collected[ filePath ] = FileAccess( stringToMode( accessMode ), lastWriteTime );
-                        }
-                    } else break; // Presumably file is corrupt, ignore further content...
+                    if (0 < collected.count( filePath )) {
+                        auto& access = collected[ filePath ];                            
+                        auto mode = stringToMode( accessMode );
+                        if ((mode & AccessDelete) != 0) access.mode = AccessDelete;
+                        else if ((mode & AccessWrite) != 0) access.mode = AccessWrite;
+                        else if (((mode & AccessRead) != 0) && ((access.mode & AccessDelete) == 0) && ((access.mode & AccessWrite) == 0)) access.mode = AccessRead;
+                        access.modes |= mode;
+                        if ((access.lastWriteTime < lastWriteTime) && ((mode & AccessRead) == 0)) access.lastWriteTime = lastWriteTime;
+                    } else {
+                        collected[ filePath ] = FileAccess( stringToMode( accessMode ), lastWriteTime );
+                    }
+                    eventFile >> ws;
                 }
                 eventFile.close();
             }

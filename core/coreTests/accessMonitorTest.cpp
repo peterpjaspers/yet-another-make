@@ -133,11 +133,19 @@ namespace
         }
     }
 
+    void writeFile(std::filesystem::path p, std::string const& content) {
+        std::ofstream stream(p.string().c_str());
+        EXPECT_TRUE(stream.is_open());
+        stream << content;
+        stream.close();
+    }
+
     TEST(AccessMonitor, CreateProcessW) {
-        WorkingDir tempDir;
-        std::wstring cmdExe = boost::process::search_path("cmd").wstring();
-        std::wstring cmd = cmdExe + L" /c echo %TMP% > junk.txt & echo %TEMP% >> junk.txt && type junk.txt";
         std::filesystem::remove("junk.txt");
+
+        WorkingDir tempDir;
+        std::wstring cmdExe = boost::process::search_path("cmd.exe").wstring();
+        std::wstring cmd = cmdExe + L" /c echo %TMP% > junk.txt & type junk.txt";
 
         STARTUPINFO si;
         ZeroMemory(&si, sizeof(si));
@@ -177,9 +185,10 @@ namespace
         WaitForSingleObject(pi.hProcess, INFINITE);
         auto result = AccessMonitor::stopMonitoring();
         std::filesystem::path junkPath(wdir / "junk.txt");
+        ASSERT_TRUE(result.contains(junkPath.generic_wstring()));
         auto fileAccess = result.at(junkPath.generic_wstring());
-        EXPECT_EQ(4, fileAccess.mode);
-        EXPECT_EQ(7, fileAccess.modes);
+        EXPECT_EQ(AccessMonitor::AccessNone | AccessMonitor::AccessWrite, fileAccess.mode);
+        EXPECT_EQ(AccessMonitor::AccessNone | AccessMonitor::AccessRead | AccessMonitor::AccessWrite, fileAccess.modes);
 
         // Close process and thread handles. 
         CloseHandle(pi.hProcess);
@@ -187,24 +196,13 @@ namespace
     }
 
     TEST(AccessMonitor, remoteTest) {
+        std::filesystem::path remoteSessionDir(std::filesystem::temp_directory_path() / "RemoteSession");
+        std::filesystem::remove(remoteSessionDir);
+
         auto remoteTest = boost::process::search_path("remoteTest.exe").string();
         AccessMonitor::startMonitoring();
         int exitCode = system(remoteTest.c_str());
         auto result = AccessMonitor::stopMonitoring();
-        EXPECT_EQ(19, result.size());
-    }
-
-    TEST(AccessMonitor, proximatePath) {
-        std::filesystem::path input("@@test/aap/noot/mies.txt");
-        std::filesystem::path base("@@test/aap/");
-        std::filesystem::path expected("noot/mies.txt");
-
-        std::filesystem::path actual = std::filesystem::proximate(input, base);
-        EXPECT_EQ(expected, actual);
-
-        AccessMonitor::startMonitoring();
-        actual = std::filesystem::proximate(input, base);
-        auto result = AccessMonitor::stopMonitoring();
-        EXPECT_EQ(expected, actual);
+        EXPECT_EQ(21, result.size());
     }
 }

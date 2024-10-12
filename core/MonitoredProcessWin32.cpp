@@ -130,6 +130,8 @@ namespace YAM
                         _result.writtenFiles.insert(filePath);
                     }
                 }
+                auto utcFileTime = decltype(fa.lastWriteTime)::clock::to_utc(fa.lastWriteTime);
+                _result.lastWriteTimes.insert({ filePath, utcFileTime });
             }
             std::set_difference(
                 _result.readFiles.begin(), _result.readFiles.end(),

@@ -1,9 +1,10 @@
 #pragma once
 
 #include <string>
+#include <chrono>
+#include <map>
 #include <set>
 #include <filesystem>
-#include <map>
 
 namespace YAM
 {
@@ -15,6 +16,11 @@ namespace YAM
         std::set<std::filesystem::path> readFiles;     // read-accessed files
         std::set<std::filesystem::path> writtenFiles;  // write-accessed files
         std::set<std::filesystem::path> readOnlyFiles; // readFiles except writtenFiles
+        // last-write-times for readOnly and written files.
+        // for readOnlyFiles: the last-write-time of the file at first read-access
+        // for writtenFiles: the last-write-time of the file at last write-access
+        // The map is empty when not supported by the implementation.
+        std::map<std::filesystem::path, std::chrono::utc_clock::time_point> lastWriteTimes;
 
         void toLines(std::string const& str, std::vector<std::string>& lines) {
             auto ss = std::stringstream(str);

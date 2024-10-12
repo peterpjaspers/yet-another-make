@@ -1,13 +1,12 @@
 Todo for R 0.1.0
 Bugs
-- fix (header->free == 1)  throw std::string(signature) + " - Accessing freed page.";
-  Reproduce with coreTests EnduranceTest
 - create test_yam dir and build it. Then rename dir project to project1 and run yam.
   Expected result: build passes, actual result: build fails because stale output
   files in dir project1.
-  This problem can be solved when yamServer was observing the repository when the 
-  renaming took place. It is not easy though.
-  Else it is alpha build: Yam will remove mirror of project and add mirror of
+  Beta build: yamServer was observing the repository when the renaming  took place. 
+  Yam detects that project was renamed to project1. It can then rename the mirror
+  of project to project1. However, renaming a node is not trivial.
+  Alpha build: Yam will remove mirror of project and add mirror of
   project1 and will see no relation between these 2 events. Perhaps heuristics
   can be used to detect that project1 is a rename of project. In that case
   Yam can delete the stale output files. Should only be deleted on user confirm.
@@ -37,7 +36,7 @@ Features
 
 - fileaspect configuration
       - hash = last-write-time (e.g. for generated files in cmd executionhash)
-      - import lib exports hash (hash i/f of dll)
+      - import lib hash = hash of exported symbols (hash i/f of dll)
 - unit-test support
 - packaging support (group containing files-to-be-packaged, buildfile that generates packaging rule)
 - response files
@@ -76,6 +75,12 @@ Out-of-scope:
   Compact: each node has a unique id, references to nodes are ids.
 
 Ideas:
+- replace node name (a path) by a unique id (32 or 64 bit)
+  This reduces storage space requirements for non-file nodes.
+  File nodes have an additional propery filePath [std::filesystem::path]
+  Problems: how to reuse CommandNodes when a buildfile was changed?
+  Now: if node name (path of first output file) matches: reuse
+  Then: if node inputs, outputs and command match: reuse
 - yam creates group hierachy of output files. Hierarchy
   mirrors the directory tree in which outputs are stored.
   E.g. outputs are a/O1, a/O2, a/b/c/O3. 
@@ -91,5 +96,5 @@ Ideas:
 
 More:
 - implement DotIgnoreNode
-- investigate use of std::filesystem::path.string() and intializing paths
+- investigate use of std::filesystem::path.string() and initializing paths
   from a std::string. Shouldn't we use wstring?
