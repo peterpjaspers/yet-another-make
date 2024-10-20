@@ -5,7 +5,7 @@ namespace AccessMonitor {
     // Register patches for OS process creation functions
     void registerProcessesAndThreads();
     // Unregister patches for OS process creation functions
-    void unregisterProcessCreation();
+    void unregisterProcessesAndThreads();
 }
 
 #endif // ACCESS_MONITOR_MONITOR_THREADS_AND_PROCESSES_H

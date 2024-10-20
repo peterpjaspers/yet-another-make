@@ -19,8 +19,6 @@ using namespace std::filesystem;
 // ToDo: Add function calling convention to all externals
 // ToDo: Implenent for Linux and MacOS, current implementation is Windows only...
 
-// ToDo: Drop-out of patch function quickly when not in a session.
-
 namespace AccessMonitor {
 
     namespace {
@@ -44,7 +42,7 @@ namespace AccessMonitor {
         }
         inline wostream& debugMessage( const char* function, bool success ) {
             DWORD errorCode = GetLastError();
-            if (!success && (errorCode != ERROR_SUCCESS)) debugRecord() << L"MonitorFiles - " << function << L" failed with error : " << lasErrorString( errorCode ) << record;
+            if (!success && (errorCode != ERROR_SUCCESS)) debugRecord() << L"MonitorFiles - " << function << L" failed with error : " << lastErrorString( errorCode ) << record;
             return debugMessage( function );
         }
         inline wostream& debugMessage( const char* function, HANDLE handle ) {
@@ -948,7 +946,7 @@ namespace AccessMonitor {
             } else {
                 DWORD errorCode = GetLastError();
                 if (debugLog( WriteTime ) && (errorCode != ERROR_SUCCESS)) {
-                    debugMessage( "GetFileAttributesExW" ) << fileName << " ) failed with error : " << lasErrorString( errorCode ) << record;
+                    debugMessage( "GetFileAttributesExW" ) << fileName << " ) failed with error : " << lastErrorString( errorCode ) << record;
                 }
             }
             return FileTime();
@@ -963,7 +961,7 @@ namespace AccessMonitor {
             } else {
                 DWORD errorCode = GetLastError();
                 if (debugLog( WriteTime ) && (errorCode != ERROR_SUCCESS)) {
-                    debugMessage( "GetFileInformationByHandle" ) << handleCode( handle)  << " ) failed with error : " << lasErrorString( errorCode ) << record;
+                    debugMessage( "GetFileInformationByHandle" ) << handleCode( handle)  << " ) failed with error : " << lastErrorString( errorCode ) << record;
                 }
             }
             return FileTime();
@@ -990,121 +988,77 @@ namespace AccessMonitor {
             return fullFileName;
         }
 
-    }
+        struct Registration {
+            const char* library;
+            const char* name;
+            PatchFunction patch;
+        };
+
+        const vector<Registration> registrations = {
+            { "kernel32", "CreateDirectoryA", (PatchFunction)PatchCreateDirectoryA },
+            { "kernel32", "CreateDirectoryW", (PatchFunction)PatchCreateDirectoryW },
+            { "kernel32", "RemoveDirectoryA", (PatchFunction)PatchRemoveDirectoryA },
+            { "kernel32", "RemoveDirectoryW", (PatchFunction)PatchRemoveDirectoryW },
+            { "kernel32", "CreateFileA", (PatchFunction)PatchCreateFileA },
+            { "kernel32", "CreateFileW", (PatchFunction)PatchCreateFileW },
+            { "kernel32", "CreateFileTransactedA", (PatchFunction)PatchCreateFileTransactedA },
+            { "kernel32", "CreateFileTransactedW", (PatchFunction)PatchCreateFileTransactedW },
+            { "kernel32", "CreateFile2", (PatchFunction)PatchCreateFile2 },
+            { "kernel32", "ReOpenFile", (PatchFunction)PatchReOpenFile },
+            { "kernel32", "ReplaceFileA", (PatchFunction)PatchReplaceFileA },
+            { "kernel32", "ReplaceFileW", (PatchFunction)PatchReplaceFileW },
+            { "kernel32", "OpenFile", (PatchFunction)PatchOpenFile },
+            { "kernel32", "CreateHardLinkA", (PatchFunction)PatchCreateHardLinkA },
+            { "kernel32", "CreateHardLinkW", (PatchFunction)PatchCreateHardLinkW },
+            { "kernel32", "CreateHardLinkTransactedA", (PatchFunction)PatchCreateHardLinkTransactedA },
+            { "kernel32", "CreateHardLinkTransactedW", (PatchFunction)PatchCreateHardLinkTransactedW },
+            { "kernel32", "CreateSymbolicLinkA", (PatchFunction)PatchCreateSymbolicLinkA },
+            { "kernel32", "CreateSymbolicLinkW", (PatchFunction)PatchCreateSymbolicLinkW },
+            { "kernel32", "CreateSymbolicLinkTransactedA", (PatchFunction)PatchCreateSymbolicLinkTransactedA },
+            { "kernel32", "CreateSymbolicLinkTransactedW", (PatchFunction)PatchCreateSymbolicLinkTransactedW },
+            { "kernel32", "DeleteFileA", (PatchFunction)PatchDeleteFileA },
+            { "kernel32", "DeleteFileW", (PatchFunction)PatchDeleteFileW },
+            { "kernel32", "DeleteFileTransactedA", (PatchFunction)PatchDeleteFileTransactedA },
+            { "kernel32", "DeleteFileTransactedW", (PatchFunction)PatchDeleteFileTransactedW },
+            { "kernel32", "CopyFileA", (PatchFunction)PatchCopyFileA },
+            { "kernel32", "CopyFileW", (PatchFunction)PatchCopyFileW },
+            { "kernel32", "CopyFileExA", (PatchFunction)PatchCopyFileExA },
+            { "kernel32", "CopyFileExW", (PatchFunction)PatchCopyFileExW },
+            { "kernel32", "CopyFileTransactedA", (PatchFunction)PatchCopyFileTransactedA },
+            { "kernel32", "CopyFileTransactedW", (PatchFunction)PatchCopyFileTransactedW },
+            { "kernel32", "CopyFile2", (PatchFunction)PatchCopyFile2 },
+            { "kernel32", "MoveFileA", (PatchFunction)PatchMoveFileA },
+            { "kernel32", "MoveFileW", (PatchFunction)PatchMoveFileW },
+            { "kernel32", "MoveFileExA", (PatchFunction)PatchMoveFileExA },
+            { "kernel32", "MoveFileExW", (PatchFunction)PatchMoveFileExW },
+            { "kernel32", "MoveFileWithProgressA", (PatchFunction)PatchMoveFileWithProgressA },
+            { "kernel32", "MoveFileWithProgressW", (PatchFunction)PatchMoveFileWithProgressW },
+            { "kernel32", "FindFirstFileA", (PatchFunction)PatchFindFirstFileA },
+            { "kernel32", "FindFirstFileW", (PatchFunction)PatchFindFirstFileW },
+            { "kernel32", "FindFirstFileExA", (PatchFunction)PatchFindFirstFileExA },
+            { "kernel32", "FindFirstFileExW", (PatchFunction)PatchFindFirstFileExW },
+            { "kernel32", "FindFirstFileTransactedA", (PatchFunction)PatchFindFirstFileTransactedA },
+            { "kernel32", "FindFirstFileTransactedW", (PatchFunction)PatchFindFirstFileTransactedW },
+            { "kernel32", "GetFileAttributesA", (PatchFunction)PatchGetFileAttributesA },
+            { "kernel32", "GetFileAttributesW", (PatchFunction)PatchGetFileAttributesW },
+            { "kernel32", "GetFileAttributesExA", (PatchFunction)PatchGetFileAttributesExA },
+            { "kernel32", "GetFileAttributesExW", (PatchFunction)PatchGetFileAttributesExW },
+            { "kernel32", "GetFileAttributesTransactedA", (PatchFunction)PatchGetFileAttributesTransactedA },
+            { "kernel32", "GetFileAttributesTransactedW", (PatchFunction)PatchGetFileAttributesTransactedW },
+            { "kernel32", "SetFileAttributesA", (PatchFunction)PatchSetFileAttributesA },
+            { "kernel32", "SetFileAttributesW", (PatchFunction)PatchSetFileAttributesW },
+            { "kernel32", "CloseHandle", (PatchFunction)PatchCloseHandle },
+            // { "kernel32", "MoveFileWithProgressTransactedA", (PatchFunction)PatchMoveFileWithProgressTransactedA },
+            // { "kernel32", "MoveFileWithProgressTransactedW", (PatchFunction)PatchMoveFileWithProgressTransactedW },
+        };
+
+    } // namespace (anonymous)
 
     void registerFileAccess() {
-        registerPatch( "CreateDirectoryA", (PatchFunction)PatchCreateDirectoryA );
-        registerPatch( "CreateDirectoryW", (PatchFunction)PatchCreateDirectoryW );
-        registerPatch( "RemoveDirectoryA", (PatchFunction)PatchRemoveDirectoryA );
-        registerPatch( "RemoveDirectoryW", (PatchFunction)PatchRemoveDirectoryW );
-        registerPatch( "CreateFileA", (PatchFunction)PatchCreateFileA );
-        registerPatch( "CreateFileW", (PatchFunction)PatchCreateFileW );
-        registerPatch( "TypeCreateFileTransactedA", (PatchFunction)PatchCreateFileTransactedA );
-        registerPatch( "TypeCreateFileTransactedW", (PatchFunction)PatchCreateFileTransactedW );
-        registerPatch( "CreateFile2", (PatchFunction)PatchCreateFile2 );
-        registerPatch( "ReOpenFile", (PatchFunction)PatchReOpenFile );
-        registerPatch( "ReplaceFileA", (PatchFunction)PatchReplaceFileA );
-        registerPatch( "ReplaceFileW", (PatchFunction)PatchReplaceFileW );
-        registerPatch( "OpenFile", (PatchFunction)PatchOpenFile );
-        registerPatch( "CreateHardLinkA", (PatchFunction)PatchCreateHardLinkA );
-        registerPatch( "CreateHardLinkW", (PatchFunction)PatchCreateHardLinkW );
-        registerPatch( "CreateHardLinkTransactedA", (PatchFunction)PatchCreateHardLinkTransactedA );
-        registerPatch( "CreateHardLinkTransactedW", (PatchFunction)PatchCreateHardLinkTransactedW );
-        registerPatch( "CreateSymbolicLinkA", (PatchFunction)PatchCreateSymbolicLinkA );
-        registerPatch( "CreateSymbolicLinkW", (PatchFunction)PatchCreateSymbolicLinkW );
-        registerPatch( "CreateSymbolicLinkTransactedA", (PatchFunction)PatchCreateSymbolicLinkTransactedA );
-        registerPatch( "CreateSymbolicLinkTransactedW", (PatchFunction)PatchCreateSymbolicLinkTransactedW );
-        registerPatch( "DeleteFileA", (PatchFunction)PatchDeleteFileA );
-        registerPatch( "DeleteFileW", (PatchFunction)PatchDeleteFileW );
-        registerPatch( "DeleteFileTransactedA", (PatchFunction)PatchDeleteFileTransactedA );
-        registerPatch( "DeleteFileTransactedW", (PatchFunction)PatchDeleteFileTransactedW );
-        registerPatch( "CopyFileA", (PatchFunction)PatchCopyFileA );
-        registerPatch( "CopyFileW", (PatchFunction)PatchCopyFileW );
-        registerPatch( "CopyFileExA", (PatchFunction)PatchCopyFileExA );
-        registerPatch( "CopyFileExW", (PatchFunction)PatchCopyFileExW );
-        registerPatch( "CopyFileTransactedA", (PatchFunction)PatchCopyFileTransactedA );
-        registerPatch( "CopyFileTransactedW", (PatchFunction)PatchCopyFileTransactedW );
-        registerPatch( "CopyFile2", (PatchFunction)PatchCopyFile2 );
-        registerPatch( "MoveFileA", (PatchFunction)PatchMoveFileA );
-        registerPatch( "MoveFileW", (PatchFunction)PatchMoveFileW );
-        registerPatch( "MoveFileExA", (PatchFunction)PatchMoveFileExA );
-        registerPatch( "MoveFileExW", (PatchFunction)PatchMoveFileExW );
-        registerPatch( "MoveFileWithProgressA", (PatchFunction)PatchMoveFileWithProgressA );
-        registerPatch( "MoveFileWithProgressW", (PatchFunction)PatchMoveFileWithProgressW );
-        registerPatch( "MoveFileWithProgressTransactedA", (PatchFunction)PatchMoveFileWithProgressTransactedA );
-        registerPatch( "MoveFileWithProgressTransactedW", (PatchFunction)PatchMoveFileWithProgressTransactedW );
-        registerPatch( "FindFirstFileA", (PatchFunction)PatchFindFirstFileA );
-        registerPatch( "FindFirstFileW", (PatchFunction)PatchFindFirstFileW );
-        registerPatch( "FindFirstFileExA", (PatchFunction)PatchFindFirstFileExA );
-        registerPatch( "FindFirstFileExW", (PatchFunction)PatchFindFirstFileExW );
-        registerPatch( "FindFirstFileTransactedA", (PatchFunction)PatchFindFirstFileTransactedA );
-        registerPatch( "FindFirstFileTransactedW", (PatchFunction)PatchFindFirstFileTransactedW );
-        registerPatch( "GetFileAttributesA", (PatchFunction)PatchGetFileAttributesA );
-        registerPatch( "GetFileAttributesW", (PatchFunction)PatchGetFileAttributesW );
-        registerPatch( "GetFileAttributesExA", (PatchFunction)PatchGetFileAttributesExA );
-        registerPatch( "GetFileAttributesExW", (PatchFunction)PatchGetFileAttributesExW );
-        registerPatch( "GetFileAttributesTransactedA", (PatchFunction)PatchGetFileAttributesTransactedA );
-        registerPatch( "GetFileAttributesTransactedW", (PatchFunction)PatchGetFileAttributesTransactedW );
-        registerPatch( "SetFileAttributesA", (PatchFunction)PatchSetFileAttributesA );
-        registerPatch( "SetFileAttributesW", (PatchFunction)PatchSetFileAttributesW );
-        registerPatch( "CloseHandle", (PatchFunction)PatchCloseHandle );
+        for ( const auto reg : registrations ) registerPatch( reg.library, reg.name, reg.patch );
     }
     void unregisterFileAccess() {
-        unregisterPatch( "CreateDirectoryA" );
-        unregisterPatch( "CreateDirectoryW" );
-        unregisterPatch( "RemoveDirectoryA" );
-        unregisterPatch( "RemoveDirectoryW" );
-        unregisterPatch( "CreateFileA" );
-        unregisterPatch( "CreateFileW" );
-        unregisterPatch( "TypeCreateFileTransactedA" );
-        unregisterPatch( "TypeCreateFileTransactedW" );
-        unregisterPatch( "CreateFile2" );
-        unregisterPatch( "ReOpenFile" );
-        unregisterPatch( "ReplaceFileA" );
-        unregisterPatch( "ReplaceFileW" );
-        unregisterPatch( "OpenFile" );
-        unregisterPatch( "CreateHardLinkA" );
-        unregisterPatch( "CreateHardLinkW" );
-        unregisterPatch( "CreateHardLinkTransactedA" );
-        unregisterPatch( "CreateHardLinkTransactedW" );
-        unregisterPatch( "CreateSymbolicLinkA" );
-        unregisterPatch( "CreateSymbolicLinkW" );
-        unregisterPatch( "CreateSymbolicLinkTransactedA" );
-        unregisterPatch( "CreateSymbolicLinkTransactedW" );
-        unregisterPatch( "DeleteFileA" );
-        unregisterPatch( "DeleteFileW" );
-        unregisterPatch( "DeleteFileTransactedA" );
-        unregisterPatch( "DeleteFileTransactedW" );
-        unregisterPatch( "CopyFileA" );
-        unregisterPatch( "CopyFileW" );
-        unregisterPatch( "CopyFileExA" );
-        unregisterPatch( "CopyFileExW" );
-        unregisterPatch( "CopyFileTransactedA" );
-        unregisterPatch( "CopyFileTransactedW" );
-        unregisterPatch( "CopyFile2" );
-        unregisterPatch( "MoveFileA" );
-        unregisterPatch( "MoveFileW" );
-        unregisterPatch( "MoveFileExA" );
-        unregisterPatch( "MoveFileExW" );
-        unregisterPatch( "MoveFileWithProgressA" );
-        unregisterPatch( "MoveFileWithProgressW" );
-        unregisterPatch( "MoveFileWithProgressTransactedA" );
-        unregisterPatch( "MoveFileWithProgressTransactedW" );
-        unregisterPatch( "FindFirstFileA" );
-        unregisterPatch( "FindFirstFileW" );
-        unregisterPatch( "FindFirstFileExA" );
-        unregisterPatch( "FindFirstFileExW" );
-        unregisterPatch( "FindFirstFileTransactedA" );
-        unregisterPatch( "FindFirstFileTransactedW" );
-        unregisterPatch( "GetFileAttributesA" );
-        unregisterPatch( "GetFileAttributesW" );
-        unregisterPatch( "GetFileAttributesExA" );
-        unregisterPatch( "GetFileAttributesExW" );
-        unregisterPatch( "GetFileAttributesTransactedA" );
-        unregisterPatch( "GetFileAttributesTransactedW" );
-        unregisterPatch( "SetFileAttributesA" );
-        unregisterPatch( "SetFileAttributesW" );
-        unregisterPatch( "CloseHandle" );
+        for ( const auto reg : registrations ) unregisterPatch( reg.name );
     }
 
 } // namespace AccessMonitor

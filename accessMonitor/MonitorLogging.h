@@ -7,7 +7,7 @@ namespace AccessMonitor {
 
     static const unsigned long MaxFileName = 1024;
     
-    LogFile* createDebugLog();
+    LogFile* createDebugLog( bool logTimes = true, bool logIntervals = false );
     LogFile& debugLog();
     bool debugLog( const LogAspects aspects );
     LogRecord& debugRecord();
@@ -18,14 +18,11 @@ namespace AccessMonitor {
     LogRecord& eventRecord();
 
     enum MonitorLogAspects {
-        RegisteredFunctions = (1 << 1),
-        ParseLibrary        = (1 << 2),
-        ExportedFunction    = (1 << 3),
-        ImportedFunction    = (1 << 4),
-        PatchedFunction     = (1 << 5),
-        PatchExecution      = (1 << 6),
-        FileAccesses        = (1 << 7),
-        WriteTime           = (1 << 8),
+        RegisteredFunction  = (1 << 1),
+        PatchedFunction     = (1 << 2),
+        PatchExecution      = (1 << 3),
+        FileAccesses        = (1 << 4),
+        WriteTime           = (1 << 5),
     };
 
 } // namespace AccessMonitor

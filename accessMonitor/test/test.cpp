@@ -11,8 +11,6 @@
 #include <thread>
 #include <cstdlib>
 
-// ToDo: Figure out why program crashes when not all file from previous run are deleted.
-
 using namespace AccessMonitor;
 using namespace std;
 using namespace std::filesystem;
@@ -21,12 +19,34 @@ static int sessions = 1;
 static int threads = 1;
 static bool remoteProcess = false;
 
-const std::wstring remoteTestFile( L"C:/Users/philv/Code/yam/yet-another-make/accessMonitor/test/remoteTest.exe" );
+void executeCommand( const char* command ) {
+    STARTUPINFO si;
+    PROCESS_INFORMATION pi;
+    std::memset( &si, 0, sizeof(si) );
+    si.cb = sizeof(si);
+    std::memset( &pi, 0, sizeof(pi) );
+    CreateProcessA(
+        nullptr,
+        const_cast<char*>( command ),
+        nullptr,
+        nullptr,
+        false,
+        0,
+        nullptr,
+        nullptr,
+        &si,
+        &pi
+    );
+    WaitForSingleObject( pi.hProcess, 0 );
+    CloseHandle( pi.hProcess );
+    CloseHandle( pi.hThread );
+}
+
+const std::string remoteTestFile( "C:/Users/philv/Code/yam/yet-another-make/accessMonitor/test/remoteTest.exe" );
 // const std::wstring remoteTestFile( L"D:/Peter/Github/yam/x64/Debug/remoteTest.exe" );
 
 void worker( const path directoryPath ) {
     try {
-        current_path( temp_directory_path() );
         debugRecord() << "std::filesystem::create_directories( " << directoryPath << " )" << record;
         create_directories( directoryPath );
         debugRecord() << "std::ofstream( " << (directoryPath / "junk.txt").c_str() << " )" << record;
@@ -58,49 +78,68 @@ void worker( const path directoryPath ) {
     catch (filesystem_error const& exception) {
         debugRecord() << "Exception  " << exception.what() << "!" << record;
     }
+    catch (string text) {
+        debugRecord() << "Exception " << wstring( text.begin(), text.end() ) << "!" << record;
+    }
     catch (...) {
         debugRecord() << "Exception!" << record;
     }
 }
 
 void doFileAccess() {
-    auto session = CurrentSessionID();
-    if (remoteProcess) {
-        wstringstream command;
-        command
-            << remoteTestFile
-            << L" " 
-            << threads
-            << L" "
-            << uniqueName( L"RemoteSession", session );
-        auto exitCode = system( narrow( command.str() ).c_str() );
-    }
-    auto sessionDir = uniqueName( L"Session", session );
-    if (1 < threads) {
-        vector<thread> workerThreads;
-        for (int i = 0; i < threads; ++i) {
-            wstringstream subdir;
-            subdir << L"fileAccessTest" << i;
-            workerThreads.push_back( thread( worker, path( "." ) / sessionDir / subdir.str() ) );
+    try {
+        auto session = CurrentSessionID();
+        if (remoteProcess) {
+            stringstream command;
+            command
+                << remoteTestFile
+                << " " 
+                << session
+                << " " 
+                << threads
+                << " "
+                << CurrentSessionDirectory().generic_string();
+            debugRecord() << "Executing " << command.str().c_str() << record;
+            // auto exitCode = system( command.str().c_str() );
+            executeCommand( command.str().c_str() );
         }
-        for (int i = 0; i < threads; ++i) workerThreads[ i ].join();
-    } else {
-        worker( path( "." ) / sessionDir / L"fileAccessTest" );
+        path sessionDir( uniqueName( CurrentSessionDirectory() / L"Session", session ) );
+        if (1 < threads) {
+            vector<thread> workerThreads;
+            for (int i = 0; i < threads; ++i) {
+                wstringstream subdir;
+                subdir << L"fileAccessTest" << i;
+                workerThreads.push_back( thread( worker, sessionDir / subdir.str() ) );
+            }
+            for (int i = 0; i < threads; ++i) workerThreads[ i ].join();
+        } else {
+            worker( sessionDir / L"fileAccessTest" );
+        }
+    }
+    catch (filesystem_error const& exception) {
+        debugRecord() << "Exception  " << exception.what() << "!" << record;
+    }
+    catch (string text) {
+        debugRecord() << "Exception " << wstring( text.begin(), text.end() ) << "!" << record;
+    }
+    catch (...) {
+        debugRecord() << "Exception!" << record;
     }
 }
 
 void doMonitoredFileAccess() {
-    startMonitoring( "", PatchedFunction | PatchExecution | FileAccesses | WriteTime );
+    // auto aspects = MonitorLogAspects( RegisteredFunction | PatchedFunction | PatchExecution | FileAccesses );
+    auto aspects = MonitorLogAspects( PatchExecution | FileAccesses );
+    startMonitoring( temp_directory_path(), CreateNewSession, aspects );
     auto session = CurrentSessionID();
     doFileAccess();
-    auto results( stopMonitoring() );
-    // LogFile results...
-    LogFile output( L"TestProgramOutput", session  );
-    for ( auto access : results ) {
+    MonitorEvents events;
+    stopMonitoring( &events );
+    // Log (all) events for this session...
+    LogFile output( temp_directory_path() / uniqueName( L"TestProgramOutput", session, L"txt" )  );
+    for ( auto access : events ) {
         output() << access.first << L" [ " << access.second.lastWriteTime << L" ] " << modeToString( access.second.modes ) << " : " << modeToString( access.second.mode ) << record;
     }
-    output.close();
-
 }
 
 bool condition( const string& argument ) {

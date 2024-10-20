@@ -11,7 +11,9 @@ using namespace std;
 
 namespace AccessMonitor {
 
-    LogFile* createDebugLog() { return new LogFile( "MonitorLog", CurrentSessionID(), CurrentProcessID(), true ); }
+    LogFile* createDebugLog( bool logTimes, bool logIntervals ) {
+        return new LogFile( monitorDebugPath( CurrentSessionDirectory(), CurrentProcessID(), CurrentSessionID() ), logTimes, logIntervals );
+    }
     LogFile& debugLog() {
         static const char* signature = "LogFile& debugLog()";
         auto log = static_cast<LogFile*>(SessionDebugLog());
@@ -20,16 +22,18 @@ namespace AccessMonitor {
     }
     bool debugLog( const LogAspects aspects ) {
         auto log = SessionDebugLog();
-        if ((log == nullptr) || (!log->valid())) return false;
+        if (log == nullptr) return false;
         return (*log)( aspects );
     }
     LogRecord& debugRecord() { return debugLog()(); }
 
-    LogFile* createEventLog() { return new LogFile( monitorEventsPath( CurrentSessionDirectory(), CurrentProcessID(), CurrentSessionID() ) ); }
+    LogFile* createEventLog() {
+        return new LogFile( monitorEventsPath( CurrentSessionDirectory(), CurrentProcessID(), CurrentSessionID() ) );
+    }
     bool recordingEvents() {
         auto log = SessionEventLog();
         if (log == nullptr) return false;
-        return log->valid();
+        return true;
     }
     LogFile& eventLog() {
         static const char* signature = "LogFile& eventLog()";

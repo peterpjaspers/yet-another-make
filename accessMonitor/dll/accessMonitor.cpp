@@ -1,38 +1,46 @@
-
 #define _CRT_SECURE_NO_WARNINGS
 
-#include "../Process.h"
-#include "../Session.h"
 #include "../FileNaming.h"
-#include "../MonitorLogging.h"
-#include "../MonitorFiles.h"
-#include "../MonitorThreadsAndProcesses.h"
+#include "../Session.h"
+#include "../Monitor.h"
+
 #include <windows.h>
+#include <psapi.h>
 
 using namespace AccessMonitor;
 using namespace std;
 using namespace std::filesystem;
 
-namespace {
-
-    void exitHandler() {
-        ProcessID process = CurrentProcessID();
-        SessionID session = CurrentSessionID();
-        debugRecord() << "Stop monitoring session " << session << " in process " << process << "..." << dec << record;
-        remove( sessionInfoPath( temp_directory_path(), process ) );
-        SessionEventLogClose();
-        SessionDebugLogClose();
-    }
-
-} // namespace
+inline wostream& debugMessage() { return debugRecord() << L"AccessMonitor - Exitting process with ID " << CurrentProcessID() << L", executable "; }
 
 BOOL WINAPI DllMain( HINSTANCE dll,  DWORD reason, LPVOID arg ) {
     if (reason == DLL_PROCESS_ATTACH) {
-        registerFileAccess();
-        registerProcessesAndThreads();
-        patch();
-        atexit( exitHandler );
+        ProcessID process( CurrentProcessID() );
+        SessionID session;
+        LogAspects aspects;
+        path directory;
+        retrieveSessionContext( process, session, aspects, directory );
+        startMonitoring( directory, session, aspects );
+        EventSignal( "ProcessPatched", process );
     } else if (reason == DLL_PROCESS_DETACH) {
-        unpatch();
+        if (debugLog( PatchExecution )) {
+            char fileName[ MaxFileName ] = "";
+            int size = 0;
+            HANDLE handle = OpenProcess( READ_CONTROL, false, GetCurrentProcessId() );
+            if (handle != NULL) {
+                // ToDo: Understand how to retrieve process executable name 
+                size = GetModuleFileNameExA( handle, NULL, fileName, MaxFileName );
+                CloseHandle( handle );
+                if (size == 0) {
+                    debugMessage() << L"path could not be determined [ " << GetLastError() << L" ]" << record;
+                } else {
+                    debugMessage() << fileName << record;
+                }
+            } else {
+                debugMessage() << L"unknown, could not access process [ " << GetLastError() << L" ]" << record;
+            }
+        }
+        stopMonitoring( nullptr );
     }
+    return true;
 }

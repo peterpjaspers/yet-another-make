@@ -5,18 +5,21 @@
 
 #include <map>
 
-#pragma comment(lib, "detours.lib")
-
-// ToDo: May need to patch functions other than those exported by kernel32.dll (e.g. ntdll.dll)
-
 using namespace std;
 
 namespace AccessMonitor {
 
     namespace {
 
+        struct Patch {
+            PatchFunction           address;        // Address of function to patch
+            mutable PatchFunction   original;       // Address of trampoline to original function
+            Patch() : address( nullptr ), original( nullptr ) {}
+            Patch( PatchFunction function ) : address( function ), original( nullptr ) {}
+        };
+
         map< string, PatchFunction > registeredPatches;
-        map< PatchFunction, PatchFunction > functionToOriginal;
+        map< PatchFunction, Patch > functionToPatch;
         bool librariesPatched = false;
 
     }
@@ -24,18 +27,23 @@ namespace AccessMonitor {
     // Registered functions may not actually be present (imported) in an executable or DLL.
     // In that case, patchFunction and unpatchFunction do nothing.
     bool patchFunction( const PatchFunction function ) {
-        if (0 < functionToOriginal.count( function )) {
-            LONG error = DetourAttach( (void**)&functionToOriginal[ function ], (void*)function );
+        const auto entry = functionToPatch.find( function );
+        if (entry != functionToPatch.end()) {
+            const auto& patch = entry->second;
+            patch.original = patch.address;
+            LONG error = DetourAttach( (void**)&patch.original, (void*)function );
             if (error == NO_ERROR) return true;
-            // Not able to patch requested function, remove it
-            functionToOriginal.erase( function );
+            // Not able to patch requested function, default to original function address
             if (debugLog( PatchedFunction )) { debugRecord() << L"      DetourAttach failed with " << error << record; }
         }
         return false;
     }
     bool unpatchFunction( const PatchFunction function ) {
-        if (0 < functionToOriginal.count( function )) {
-            LONG error = DetourDetach( (void**)&functionToOriginal[ function ], (void*)function );
+        const auto entry = functionToPatch.find( function );
+        if (entry != functionToPatch.end()) {
+            const auto& patch = entry->second;
+            LONG error = DetourDetach( (void**)&patch.original, (void*)function );
+            patch.original = nullptr;
             if (error == NO_ERROR) return true;
             if (debugLog( PatchedFunction )) { debugRecord() << L"      DetourDetach failed with " << error << record; }
         }
@@ -45,7 +53,7 @@ namespace AccessMonitor {
         for ( auto function : registeredPatches ) {
             if (patchFunction( function.second )) {
                 if (debugLog( PatchedFunction )) { debugRecord() << L"      Patched function " << widen( function.first ) << record; }
-            } else if (0 < functionToOriginal.count( function.second )) {
+            } else if (0 < functionToPatch.count( function.second )) {
                 if (debugLog( PatchedFunction )) { debugRecord() << L"      Unable to patch function " << widen( function.first ) << record; }
             }
         }
@@ -54,39 +62,54 @@ namespace AccessMonitor {
         for ( auto function : registeredPatches ) {
             if (unpatchFunction( function.second )) {
                 if (debugLog( PatchedFunction )) { debugRecord() << L"      Unpatched function " << widen( function.first ) << record; }
-            } else if (0 < functionToOriginal.count( function.second )) {
+            } else if (0 < functionToPatch.count( function.second )) {
                 if (debugLog( PatchedFunction )) { debugRecord() << L"      Unable to unpatch function " << widen( function.first ) << record; }
             }
         }        
     }
 
-    void registerPatch( std::string name, PatchFunction function ) {
+    bool registerPatch( std::string library, std::string name, PatchFunction function ) {
         static const char* signature = "void registerPatch( std::string name, PatchFunction function, std::string library )";
         if (0 < registeredPatches.count( name )) throw string( signature ) + string( " - Function " ) + name + string( " already registered!" );
-        registeredPatches[ name ] = function;
-        HMODULE handle = GetModuleHandleA( "kernel32.dll" );
-        PatchFunction original = reinterpret_cast<PatchFunction>( GetProcAddress( handle, name.c_str() ) );
-        if (original != nullptr) {
-            // Registered function is actually present in this image...
-            functionToOriginal[ function ] = original;
+        HMODULE handle = GetModuleHandleA( library.c_str() );
+        if (handle != nullptr) {
+            auto address = reinterpret_cast<PatchFunction>( GetProcAddress( handle, name.c_str() ) );
+            if (address != nullptr) {
+                // Named function is present in library...
+                registeredPatches[ name ] = function;
+                functionToPatch[ function ] = Patch( address );
+                if (debugLog( RegisteredFunction )) debugRecord() << L"Registered function " << widen( name ) << L" in library " << widen( library ) << record;
+                return true;
+            } else {
+                if (debugLog( RegisteredFunction )) debugRecord() << L"Function " << widen( name ) << L" not present in library " << widen( library ) << L" [ " << GetLastError() << " ]" << record;;
+            }
+        } else {
+            if (debugLog( RegisteredFunction )) debugRecord() << L"Library " << widen( library ) << L" could not be accessed [ " << GetLastError() << " ]" << record;;
         }
-        if (debugLog( RegisteredFunctions )) debugRecord() << L"Registered function " << widen( name ) << record;;
-
+        return false;
     }
     void unregisterPatch( std::string name ) {
         static const char* signature = "void unregisterPatch( std::string name )";
         if (registeredPatches.count( name ) == 0) throw string( signature ) + string( " - Function " ) + name + string( " not registred!" );
-        PatchFunction function = registeredPatches[ name ] ;
+        auto function = registeredPatches[ name ] ;
         registeredPatches.erase( name );
-        functionToOriginal.erase( function );
-        if (debugLog( RegisteredFunctions )) debugRecord() << L"Unregistered function " << widen( name ) << record;;
+        functionToPatch.erase( function );
+        if (debugLog( RegisteredFunction )) debugRecord() << L"Unregistered function " << widen( name ) << record;;
     }
 
     PatchFunction original( PatchFunction function ) {
-        if (functionToOriginal.count( function ) == 0) return nullptr;
-        return functionToOriginal[ function ];
+        const auto entry = functionToPatch.find( function );
+        if (entry == functionToPatch.end()) return nullptr;
+        const auto& patch = entry->second;
+        if (patch.original != nullptr) return patch.original;
+        return patch.address;
     }
-    PatchFunction original( std::string name ) { return original( registeredPatches[ name ] ); }
+    PatchFunction original( std::string name ) {
+        static const char* signature = "PatchFunction original( std::string name )";
+        auto function = registeredPatches[ name ];
+        if (function == nullptr) throw string( signature ) + string( " - Function " ) + name + string( " not registred!" );
+        return original( function );
+    }
 
     void patch() {
         static const char* signature = "void patch()";
@@ -104,7 +127,7 @@ namespace AccessMonitor {
         DetourUpdateThread(GetCurrentThread());
         unpatchAll();
         DetourTransactionCommit();
-        functionToOriginal.clear();
+        functionToPatch.clear();
         librariesPatched = false;
     }
 

@@ -8,9 +8,11 @@ namespace AccessMonitor {
 
     typedef void (*PatchFunction)();
 
-    // Register a patch for the named function
-    void registerPatch( std::string name, PatchFunction function );
-    // Unregister a patch for the named function
+    // Register a patch function for a function in a library.
+    // Returns true if patch function was registered.
+    // Returns false if library could not be accessed or function is not present in library.
+    bool registerPatch( std::string library, std::string name, PatchFunction function );
+    // Unregister a patch for a function
     void unregisterPatch( std::string name );   
 
     // Return original function associated with a named function

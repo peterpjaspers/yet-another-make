@@ -16,17 +16,11 @@ namespace AccessMonitor {
     // Start monitoring file access.
     // If directory != "": store monitor data in 'directory'. 
     // If directory == "": store data in std::filesystem::temp_directory_path.
-    // Take care: child processes spawned between start and stop monitoring 
-    // will store data in std::filesystem::temp_directory_path. For proper 
-    // functioning the spawned processes must use same directory as the parent 
-    // process. Caller must ensure this by setting variables TMP and TEMP in
-    // the environment of the spawned process to the directory used by the 
-    // parent process.
     // The aspects argument defines which aspects to log.
-    void startMonitoring( std::filesystem::path const& directory = "", const LogAspects aspects = (PatchExecution | FileAccesses) );
+    void startMonitoring( const std::filesystem::path& directory, const SessionID session = CreateNewSession, const LogAspects aspects = (PatchExecution | FileAccesses) );
     // Stop monitoring file access.
     // Returns collection of monitored file accesses.
-    MonitorEvents stopMonitoring();
+    void stopMonitoring( MonitorEvents* events );
 
     // A MonitorGuard prevents recursive entry into monitoring code; i.e., a patched function called
     // from monitoring code associated with a patched function will not itself be monitored. Effectively
