@@ -673,38 +673,57 @@ namespace YAM
     }
 
     XXH64_hash_t CommandNode::computeExecutionHash(std::vector<OutputNameFilter> const& filters) const {
-        std::vector<XXH64_hash_t> hashes;
+        XXH64_state_t* state = XXH64_createState();
+        XXH64_reset(state, 0);
+
         auto wdir = _workingDir.lock();
-        if (wdir != nullptr) hashes.push_back(XXH64_string(wdir->name().string()));
-        hashes.push_back(XXH64_string(_script));
+        if (wdir != nullptr) {
+            std::string wdname = wdir->name().generic_string();
+            XXH64_update(state, wdname.data(), wdname.length());
+        }
+        XXH64_update(state, _script.data(), _script.length());
         for (auto const& node : _cmdInputs) {
-            hashes.push_back(XXH64_string(node->name().string()));
+            std::string nname = node->name().string();
+            XXH64_update(state, nname.data(), nname.length());
             auto grpNode = dynamic_pointer_cast<GroupNode>(node);
-            if (grpNode != nullptr) hashes.push_back(grpNode->hash());
+            if (grpNode != nullptr) {
+                XXH64_hash_t grpHash = grpNode->hash();
+                XXH64_update(state, &grpHash, sizeof(XXH64_hash_t));
+            }
         }
         for (auto const& node : _orderOnlyInputs) {
-            hashes.push_back(XXH64_string(node->name().string()));
+            std::string nname = node->name().string();
+            XXH64_update(state, nname.data(), nname.length());
             auto grpNode = dynamic_pointer_cast<GroupNode>(node);
-            if (grpNode != nullptr) hashes.push_back(grpNode->hash());
+            if (grpNode != nullptr) {
+                XXH64_hash_t grpHash = grpNode->hash();
+                XXH64_update(state, &grpHash, sizeof(grpHash));
+            }
         }
         for (auto const& filter : filters) {
-            hashes.push_back(filter._type);
-            hashes.push_back(XXH64_string(filter._symPath.string()));
+            XXH64_update(state, &(filter._type), sizeof(filter._type));
+            std::string fpath = filter._symPath.generic_string();
+            XXH64_update(state, fpath.data(), fpath.length());
         }
         auto entireFile = FileAspect::entireFileAspect().name();
         for (auto const& pair : _mandatoryOutputs) {
-            hashes.push_back(pair.second->hashOf(entireFile));
+            XXH64_hash_t hef = pair.second->hashOf(entireFile);
+            XXH64_update(state, &hef, sizeof(hef));
         }
         for (auto const& pair : _detectedOptionalOutputs) {
-            hashes.push_back(pair.second->hashOf(entireFile));
+            XXH64_hash_t hef = pair.second->hashOf(entireFile);
+            XXH64_update(state, &hef, sizeof(hef));
         }
         FileAspectSet inputAspects = context()->findFileAspectSet(_inputAspectsName);
         for (auto const& pair : _detectedInputs) {
             auto const& node = pair.second;
-            auto& inputAspect = inputAspects.findApplicableAspect(node->name());
-            hashes.push_back(node->hashOf(inputAspect.name()));
+            FileAspect const& inputAspect = inputAspects.findApplicableAspect(node->name());
+            XXH64_hash_t hdi = node->hashOf(inputAspect.name());
+            XXH64_update(state, &hdi, sizeof(hdi));
         }
-        XXH64_hash_t hash = XXH64(hashes.data(), sizeof(XXH64_hash_t) * hashes.size(), 0);
+
+        XXH64_hash_t hash = XXH64_digest(state);
+        XXH64_freeState(state);
         return hash;
     }
 
