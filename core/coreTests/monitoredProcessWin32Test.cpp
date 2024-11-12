@@ -96,9 +96,11 @@ namespace
         EXPECT_TRUE(cmd.wait_for(15000));
         MonitoredProcessResult result = cmd.wait();
         ASSERT_EQ(0, result.exitCode);
-        EXPECT_EQ(1, result.readFiles.size());
-        EXPECT_EQ(0, result.readOnlyFiles.size());
+        EXPECT_EQ(2, result.readFiles.size());
+        EXPECT_EQ(1, result.readOnlyFiles.size());
         EXPECT_EQ(1, result.writtenFiles.size());
+        EXPECT_TRUE(result.readFiles.contains(cmdExe));
+        EXPECT_TRUE(result.readOnlyFiles.contains(cmdExe));
         EXPECT_TRUE(result.readFiles.contains(wdir / "junk.txt"));
         EXPECT_TRUE(result.writtenFiles.contains(wdir / "junk.txt"));
     }

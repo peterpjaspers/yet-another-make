@@ -36,10 +36,8 @@ namespace AccessMonitor {
 
     class LogFile {
     public:
-        LogFile() : logFile( nullptr ), logMutex( nullptr ) {};
-        LogFile( const std::filesystem::path& file, bool time = false, bool interval = false );
-        LogFile( const std::filesystem::path& file, const unsigned long code, bool time = false, bool interval = false );
-        LogFile( const std::filesystem::path& file, const unsigned long code1, const unsigned long code2, bool time = false, bool interval = false );
+        LogFile() = delete;
+        LogFile( const std::filesystem::path& file, bool logTimes = false, bool logIntervals = false );
         LogFile( const LogFile& other ) = delete;
         LogFile( LogFile&& other ) = delete;
         LogFile& operator=( const LogFile& other ) = delete;
@@ -54,13 +52,9 @@ namespace AccessMonitor {
         // Test if logging is enabled for a particular aspect.
         // Returns true is logging is enabled, false otherwise.
         inline bool operator()( const LogAspects aspects ) const;
-        // Test if access to log file is valid (i.e., log file was not closed)
-        inline bool valid() const;
-        // Close the underlying log file.
-        void close();
     private:
-        std::wofstream* logFile;
-        std::mutex* logMutex;
+        std::wofstream logFile;
+        std::mutex logMutex;
         unsigned int tlsRecordIndex;
         LogAspects enabledAspects;
         std::chrono::system_clock::time_point previousTime;
@@ -81,12 +75,8 @@ namespace AccessMonitor {
         return previous;
     }
     inline bool LogFile::operator()( const LogAspects aspects ) const {
-        if (logFile != nullptr && ((enabledAspects & aspects) != 0)) return true;
+        if ((enabledAspects & aspects) != 0) return true;
         return false;
-    }
-    inline bool LogFile::valid() const {
-        if (logFile == nullptr) return false;
-        return logFile->is_open();
     }
 
     class LogRecord : public std::wostringstream {
@@ -112,7 +102,7 @@ namespace AccessMonitor {
     std::string narrow( const std::wstring& string );
 
     // Returns last Windows error as string.
-    std::wstring lasErrorString( unsigned int errorCode );
+    std::wstring lastErrorString( unsigned int errorCode );
 
 } // namespace AccessMonitor
 

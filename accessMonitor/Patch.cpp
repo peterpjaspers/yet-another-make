@@ -1,12 +1,9 @@
 #include "Patch.h"
 #include "MonitorLogging.h"
-
 #include <windows.h>
-#include <imagehlp.h>
+#include "../detours/inc/detours.h"
 
-#include <set>
 #include <map>
-#include <vector>
 
 using namespace std;
 
@@ -15,165 +12,121 @@ namespace AccessMonitor {
     namespace {
 
         struct Patch {
-            const string* library;
-            PatchFunction original;
-            PatchFunction* address;
-            Patch() : library( nullptr ), original( nullptr ), address( nullptr ) {}
+            PatchFunction           address;        // Address of function to patch
+            mutable PatchFunction   original;       // Address of trampoline to original function
+            Patch() : address( nullptr ), original( nullptr ) {}
+            Patch( PatchFunction function ) : address( function ), original( nullptr ) {}
         };
-        map< string, HMODULE > patchedLibraries;
+
         map< string, PatchFunction > registeredPatches;
         map< PatchFunction, Patch > functionToPatch;
         bool librariesPatched = false;
 
     }
 
-    string toUpper( const string& name ) {
-        string upname;
-        for (auto c = name.begin(); c != name.end(); ++c ) upname += toupper( *c );
-        return upname;
-    }
-
-    // Patch a single entry of an import address table (IAT).
-    // 1 - Enable write access to (virtual) memory location of entry
-    // 2 - Write patch value (address of function)
-    // 3 - Restore access mode to (virtual) memory location of entry
-    void patchImportEntry( PatchFunction* address, PatchFunction function ) {
-        DWORD protection = 0;
-        VirtualProtect((void*)address, sizeof( PatchFunction ), PAGE_READWRITE, &protection );
-        *address = function;
-        VirtualProtect((void*)address, sizeof( PatchFunction ), protection, nullptr );
-    }
-
-    // Registered functions may not actually be patched (imported) in an executable or DLL.
-    // In that case, repatchFunction and unpatchFunction do nothing.
-    bool repatchFunction( const PatchFunction function ) {
-        if (0 < functionToPatch.count( function )) {
-            auto patchData = functionToPatch[ function ];
-            patchImportEntry( patchData.address, function );
-            return true;
+    // Registered functions may not actually be present (imported) in an executable or DLL.
+    // In that case, patchFunction and unpatchFunction do nothing.
+    bool patchFunction( const PatchFunction function ) {
+        const auto entry = functionToPatch.find( function );
+        if (entry != functionToPatch.end()) {
+            const auto& patch = entry->second;
+            patch.original = patch.address;
+            LONG error = DetourAttach( (void**)&patch.original, (void*)function );
+            if (error == NO_ERROR) return true;
+            // Not able to patch requested function, default to original function address
+            if (debugLog( PatchedFunction )) { debugRecord() << L"      DetourAttach failed with " << error << record; }
         }
         return false;
     }
     bool unpatchFunction( const PatchFunction function ) {
-        if (0 < functionToPatch.count( function )) {
-            auto patchData = functionToPatch[ function ];
-            if (patchData.original != nullptr) {
-                // Restore to original only if function was not re-patched by some other party
-                if (function == *patchData.address) {
-                    patchImportEntry( patchData.address, patchData.original );
-                    return true;
-                } else {
-                    if (debugLog( PatchedFunction )) { debugRecord() << L"      Function in " << widen( *patchData.library ) << L" was repatched!" << record; }
-                }
-            }
+        const auto entry = functionToPatch.find( function );
+        if (entry != functionToPatch.end()) {
+            const auto& patch = entry->second;
+            LONG error = DetourDetach( (void**)&patch.original, (void*)function );
+            patch.original = nullptr;
+            if (error == NO_ERROR) return true;
+            if (debugLog( PatchedFunction )) { debugRecord() << L"      DetourDetach failed with " << error << record; }
         }
         return false;
     }
     void patchAll() {
-        for ( auto patchFunction : registeredPatches ) {
-            if (repatchFunction( patchFunction.second )) {
-                auto patchData = functionToPatch[ patchFunction.second ];
-                if (debugLog( PatchedFunction )) { debugRecord() << L"      Patched function " << widen( patchFunction.first ) << " in " << widen( *patchData.library ) << record; }
+        for ( auto function : registeredPatches ) {
+            if (patchFunction( function.second )) {
+                if (debugLog( PatchedFunction )) { debugRecord() << L"      Patched function " << widen( function.first ) << record; }
+            } else if (0 < functionToPatch.count( function.second )) {
+                if (debugLog( PatchedFunction )) { debugRecord() << L"      Unable to patch function " << widen( function.first ) << record; }
             }
         }
     }
     void unpatchAll() {
-        for ( auto patchFunction : registeredPatches ) {
-            if (unpatchFunction( patchFunction.second )) {
-                auto patchData = functionToPatch[ patchFunction.second ];
-                if (debugLog( PatchedFunction )) { debugRecord() << L"      Unpatched function " << widen( patchFunction.first ) << " in " << widen( *patchData.library ) << record; }
+        for ( auto function : registeredPatches ) {
+            if (unpatchFunction( function.second )) {
+                if (debugLog( PatchedFunction )) { debugRecord() << L"      Unpatched function " << widen( function.first ) << record; }
+            } else if (0 < functionToPatch.count( function.second )) {
+                if (debugLog( PatchedFunction )) { debugRecord() << L"      Unable to unpatch function " << widen( function.first ) << record; }
             }
         }        
     }
 
-    // Parse Import Address Table (IAT) of named libray.
-    // Parses program executable if name is empty string.
-    // May only be called when no patches are in effect.
-    void parseLibrary( const string& libName ) {
-        static const char* signature = "void parseLibrary( const string& libName )";
-        if (librariesPatched) throw string( signature ) + string( " - Parsing library IATs while libraries are patched!" );
-        auto libraryName = toUpper( libName );
-        if (patchedLibraries.count( libraryName ) == 0)  {
-            if (debugLog( ParseLibrary )) { debugRecord() << L"Parsing " << ((0 < libraryName.size()) ? widen( libraryName.c_str() ) : L"program executable" )<< record; }
-            HMODULE library = LoadLibraryExA( libraryName.c_str(), nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32 );
-            patchedLibraries[ libraryName ] = library;
-            static uint64_t Ordinal = 0x8000000000000000;
-            static uint64_t Last = 0xFFFF;
-            HMODULE imageBase = GetModuleHandleA( (0 < libraryName.size()) ? libraryName.c_str() : nullptr );
-            IMAGE_NT_HEADERS* imageHeaders = (IMAGE_NT_HEADERS*)((char*)imageBase + ((IMAGE_DOS_HEADER*)imageBase)->e_lfanew);
-            IMAGE_DATA_DIRECTORY importsDirectory = imageHeaders->OptionalHeader.DataDirectory[ IMAGE_DIRECTORY_ENTRY_IMPORT ];
-            IMAGE_IMPORT_DESCRIPTOR* importDescriptor = (IMAGE_IMPORT_DESCRIPTOR*)(importsDirectory.VirtualAddress + (char*)imageBase);
-            while ((importDescriptor->Name != 0) && ((importDescriptor->Name & Ordinal) == 0) && (importDescriptor->Name != Last)) {
-                string importLibName( (const char*)(importDescriptor->Name + (char*)imageBase) );
-                string importLibraryName = toUpper( importLibName );
-                HMODULE importLibrary = LoadLibraryExA( importLibraryName.c_str(), nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32 );
-                patchedLibraries[ importLibraryName ] = importLibrary;
-                if (debugLog( ParseLibrary )) { debugRecord() << L"Parsing " << widen( importLibraryName.c_str() ) << L" IAT" << record; }
-                IMAGE_THUNK_DATA* originalFirstThunk = (IMAGE_THUNK_DATA*)((char*)imageBase + importDescriptor->OriginalFirstThunk);
-                IMAGE_THUNK_DATA* firstThunk = (IMAGE_THUNK_DATA*)((char*)imageBase + importDescriptor->FirstThunk);
-                while ((originalFirstThunk->u1.AddressOfData != 0) && ((originalFirstThunk->u1.Ordinal & IMAGE_ORDINAL_FLAG) == 0)) {
-                    IMAGE_IMPORT_BY_NAME* importName = (IMAGE_IMPORT_BY_NAME*)((char*)imageBase + originalFirstThunk->u1.AddressOfData);
-                    string name( (char *)importName->Name );
-                    if (debugLog( ImportedFunction )) { debugRecord() << L"    Imported function " << widen( name ) << record; }
-                    DWORD protection = 0;
-                    if (0 < registeredPatches.count( name )) {
-                        PatchFunction function = registeredPatches[ name ];
-                        Patch& patchData = functionToPatch[ function ];
-                        if (debugLog( PatchedFunction )) { debugRecord() << L"      Located IAT patch function " << widen( name ) << " in " << widen( importLibraryName ) << record; }
-                        patchData.library = &(patchedLibraries.find( importLibraryName )->first);
-                        patchData.address = reinterpret_cast<PatchFunction*>(&firstThunk->u1.Function);
-                        patchData.original = *patchData.address;
-                    }
-                    ++originalFirstThunk;
-                    ++firstThunk;
-                }
-                importDescriptor++;
-            }
-        }
-    } // void parseLibrary( const string& libName )
-    void parseLibrary( const wstring& libName, bool force ) { parseLibrary( narrow( libName ) ); }
-
-    void registerPatch( std::string name, PatchFunction function ) {
+    bool registerPatch( std::string library, std::string name, PatchFunction function ) {
         static const char* signature = "void registerPatch( std::string name, PatchFunction function, std::string library )";
         if (0 < registeredPatches.count( name )) throw string( signature ) + string( " - Function " ) + name + string( " already registered!" );
-        registeredPatches[ name ] = function;
-        if (debugLog( RegisteredFunctions )) debugRecord() << L"Registered function " << widen( name ) << record;;
-
+        HMODULE handle = GetModuleHandleA( library.c_str() );
+        if (handle != nullptr) {
+            auto address = reinterpret_cast<PatchFunction>( GetProcAddress( handle, name.c_str() ) );
+            if (address != nullptr) {
+                // Named function is present in library...
+                registeredPatches[ name ] = function;
+                functionToPatch[ function ] = Patch( address );
+                if (debugLog( RegisteredFunction )) debugRecord() << L"Registered function " << widen( name ) << L" in library " << widen( library ) << record;
+                return true;
+            } else {
+                if (debugLog( RegisteredFunction )) debugRecord() << L"Function " << widen( name ) << L" not present in library " << widen( library ) << L" [ " << GetLastError() << " ]" << record;;
+            }
+        } else {
+            if (debugLog( RegisteredFunction )) debugRecord() << L"Library " << widen( library ) << L" could not be accessed [ " << GetLastError() << " ]" << record;;
+        }
+        return false;
     }
     void unregisterPatch( std::string name ) {
         static const char* signature = "void unregisterPatch( std::string name )";
         if (registeredPatches.count( name ) == 0) throw string( signature ) + string( " - Function " ) + name + string( " not registred!" );
+        auto function = registeredPatches[ name ] ;
         registeredPatches.erase( name );
-        if (debugLog( RegisteredFunctions )) debugRecord() << L"Unregistered function " << widen( name ) << record;;
+        functionToPatch.erase( function );
+        if (debugLog( RegisteredFunction )) debugRecord() << L"Unregistered function " << widen( name ) << record;;
     }
 
-    PatchFunction original( std::string name ) { return functionToPatch[ registeredPatches[ name ] ].original; }
-    PatchFunction original( PatchFunction function ) { return functionToPatch[ function ].original; }
-    PatchFunction patched( std::string name ) { return registeredPatches[ name ]; }
-    const std::string& patchedLibrary( std::string name ) { return *functionToPatch[ registeredPatches[ name ] ].library; }
-    const std::string& patchedLibrary( PatchFunction function ){ return *functionToPatch[ function ].library; }
-
-    bool pathOverridden( std::string name ) {
-        PatchFunction function = patched( name );
-        Patch& patch = functionToPatch[ function ];
-        return( (*patch.address != patch.original) && (*patch.address != function) );
+    PatchFunction original( PatchFunction function ) {
+        const auto entry = functionToPatch.find( function );
+        if (entry == functionToPatch.end()) return nullptr;
+        const auto& patch = entry->second;
+        if (patch.original != nullptr) return patch.original;
+        return patch.address;
+    }
+    PatchFunction original( std::string name ) {
+        static const char* signature = "PatchFunction original( std::string name )";
+        auto function = registeredPatches[ name ];
+        if (function == nullptr) throw string( signature ) + string( " - Function " ) + name + string( " not registred!" );
+        return original( function );
     }
 
     void patch() {
         static const char* signature = "void patch()";
         if (librariesPatched) throw string( signature ) + string( " - Libraries already patched!" );
-        if (debugLog( ParseLibrary )) debugRecord() << L"Parsing libraries..." << record;
-        parseLibrary( "" );
-        if (debugLog( ParseLibrary )) debugRecord() << L"Done Parsing libraries..." << record;
+        DetourTransactionBegin();
+        DetourUpdateThread(GetCurrentThread());
         patchAll();
+        DetourTransactionCommit();
         librariesPatched = true;
     }
     void unpatch() {
         static const char* signature = "void unpatch()";
         if (!librariesPatched) throw string( signature ) + string( " - Libraries not patched!" );
+        DetourTransactionBegin();
+        DetourUpdateThread(GetCurrentThread());
         unpatchAll();
-        for ( auto lib : patchedLibraries ) FreeLibrary( lib.second );
-        patchedLibraries.clear();
+        DetourTransactionCommit();
         functionToPatch.clear();
         librariesPatched = false;
     }

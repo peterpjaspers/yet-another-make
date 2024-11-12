@@ -32,7 +32,6 @@
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <ClCompile Include="..\accessMonitor\Patch.cpp" />
-    <ClCompile Include="..\accessMonitor\PatchProcess.cpp" />
     <ClCompile Include="..\accessMonitor\Process.cpp" />
     <ClCompile Include="..\accessMonitor\Session.cpp" />
   </ItemGroup>
@@ -49,6 +48,11 @@
     <ClInclude Include="..\accessMonitor\PatchProcess.h" />
     <ClInclude Include="..\accessMonitor\Process.h" />
     <ClInclude Include="..\accessMonitor\Session.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\detours\detours.vcxproj">
+      <Project>{d4780f2a-8de5-4274-8447-da35ab615ee1}</Project>
+    </ProjectReference>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

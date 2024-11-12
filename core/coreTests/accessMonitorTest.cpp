@@ -42,7 +42,8 @@ namespace
         unzip.wait();
         auto exitCode = unzip.exit_code();
         EXPECT_EQ(0, exitCode);
-        auto unfilteredResult = AccessMonitor::stopMonitoring();
+        AccessMonitor::MonitorEvents unfilteredResult;
+        AccessMonitor::stopMonitoring(&unfilteredResult);
         AccessMonitor::MonitorEvents result;
         for (auto& pair : unfilteredResult) {
             std::filesystem::path filePath;
@@ -60,8 +61,9 @@ namespace
             }
         }
         std::filesystem::remove_all("generated");
-        // MSBuild tracker does not report read-access in this dll.
+        // MSBuild tracker does not report read-access on these files:
         result.erase(std::wstring(L"C:/Program Files/7-Zip/7z.dll"));
+        result.erase(std::wstring(L"C:/Program Files/7-Zip/7z.exe"));
 
 
         std::string trackerExe = R"("D:\Programs\Microsoft Visual Studio\2022\community\MSBuild\Current\Bin\amd64\Tracker.exe")";
@@ -183,7 +185,8 @@ namespace
 
         // Wait until child process exits.
         WaitForSingleObject(pi.hProcess, INFINITE);
-        auto result = AccessMonitor::stopMonitoring();
+        AccessMonitor::MonitorEvents result;
+        AccessMonitor::stopMonitoring(&result);
         std::filesystem::path junkPath(wdir / "junk.txt");
         ASSERT_TRUE(result.contains(junkPath.generic_wstring()));
         auto fileAccess = result.at(junkPath.generic_wstring());
@@ -200,9 +203,11 @@ namespace
         std::filesystem::remove(remoteSessionDir);
 
         auto remoteTest = boost::process::search_path("remoteTest.exe").string();
-        AccessMonitor::startMonitoring();
+        WorkingDir tempDir;
+        AccessMonitor::startMonitoring(tempDir.dir.string());
         int exitCode = system(remoteTest.c_str());
-        auto result = AccessMonitor::stopMonitoring();
+        AccessMonitor::MonitorEvents result;
+        AccessMonitor::stopMonitoring(&result);
         EXPECT_EQ(21, result.size());
     }
 }

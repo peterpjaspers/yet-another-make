@@ -103,7 +103,8 @@ namespace YAM
             _result.exitCode = _child.exit_code();
             _result.stdOut = _stdout.get();
             _result.stdErr = _stderr.get();
-            auto mfiles = AccessMonitor::stopMonitoring();
+            AccessMonitor::MonitorEvents mfiles;
+            AccessMonitor::stopMonitoring(&mfiles);
             for (auto const& pair : mfiles) {
                 AccessMonitor::FileAccess const& fa(pair.second);
                 std::filesystem::path filePath;

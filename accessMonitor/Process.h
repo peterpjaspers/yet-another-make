@@ -22,7 +22,7 @@ namespace AccessMonitor {
     
     // Request access to (unique) named event for a process.
     // The event is created if it does not already exist.
-    EventID AccessEvent( const std::string& tag, const SessionID session, const ProcessID process );
+    EventID AccessEvent( const std::string& tag, const ProcessID process );
     // Release access to (unique) named event.
     // The event is destroyed when it is no longer accessed.
     void ReleaseEvent( EventID event );
@@ -30,11 +30,11 @@ namespace AccessMonitor {
     // Wait for an event with an otional time-out
     bool EventWait( EventID event, unsigned long milliseconds = ULONG_MAX );
     // Wait for a named event. Named event should be accessed elsewhere prior to this call.
-    bool EventWait( const std::string& tag, const SessionID session, const ProcessID process, unsigned long milliseconds = ULONG_MAX );
+    bool EventWait( const std::string& tag, const ProcessID process, unsigned long milliseconds = ULONG_MAX );
     // Signal an event
     void EventSignal( EventID event );
     // Signal a named event. Named event should be accessed elsewhere prior to this call.
-    void EventSignal( const std::string& tag, const SessionID session, const ProcessID process );
+    void EventSignal( const std::string& tag, const ProcessID process );
 
 } // namespace AccessMonitor
 

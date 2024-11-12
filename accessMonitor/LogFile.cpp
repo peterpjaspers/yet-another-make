@@ -15,43 +15,16 @@ using namespace std::filesystem;
 
 namespace AccessMonitor {
 
-    namespace {
-
-        path uniqueLogFileName( const wstring& name, unsigned long code ) {
-            wstringstream unique;
-            unique << name << L"_" << code << L".log";
-            return temp_directory_path() /unique.str();
-        }
-        path uniqueLogFileName( const wstring& name, unsigned long code1, unsigned long code2 ) {
-            wstringstream unique;
-            unique << name << L"_" << code1 << L"_" << code2 << L".log";
-            return temp_directory_path() /unique.str();
-        }
-
-    }
-    
     LogFile::LogFile( const path& file, bool time, bool interval ) : 
-        enabledAspects( 0 ), logTime( time ), logInterval( interval ), previousTime( chrono::system_clock::now() )
+        logFile( file ), tlsRecordIndex( TlsAlloc() ), enabledAspects( 0 ), logTime( time ), logInterval( interval ), previousTime( chrono::system_clock::now() )
     {
         const char* signature = "LogFile( const path& file, bool time, bool interval )";
-        logFile = new wofstream( file );
-        tlsRecordIndex = TlsAlloc();
         if (tlsRecordIndex == TLS_OUT_OF_INDEXES) throw string( signature ) + " - Could not allocate thread local storage!";
-        logMutex = new mutex;
     }
 
-    LogFile::LogFile( const std::filesystem::path& file, const unsigned long code, bool time, bool interval ) :
-        LogFile( uniqueLogFileName( file.c_str(), code ), time, interval )
-    {}
-    LogFile::LogFile( const std::filesystem::path& file, const unsigned long code1, const unsigned long code2, bool time, bool interval ) :
-        LogFile( uniqueLogFileName( file.c_str(), code1, code2 ), time, interval )
-    {}
-
-    LogFile::~LogFile() { close(); }
-
-    void LogFile::close() {
-        if (logFile != nullptr) { logFile->close(); delete( logFile ); logFile = nullptr; }
-        if (logMutex != nullptr) { delete( logMutex ); logMutex = nullptr; }
+    LogFile::~LogFile() {
+        const lock_guard<mutex> lock( logMutex ); 
+        logFile.close();
     }
 
     // Return logging stream on enabled log.
@@ -73,8 +46,8 @@ namespace AccessMonitor {
     }
 
     void LogFile::record( const wstring& string ) {
-        const lock_guard<mutex> lock( *logMutex ); 
-        *logFile << string << flush;
+        const lock_guard<mutex> lock( logMutex ); 
+        logFile << string << flush;
     }
 
     // Complete log entry and write to log file.
@@ -100,7 +73,7 @@ namespace AccessMonitor {
         return utf16conv.to_bytes( string );
     }
 
-    wstring lasErrorString( unsigned int errorCode ) {
+    wstring lastErrorString( unsigned int errorCode ) {
         LPWSTR buffer = nullptr;
         size_t size =
             FormatMessageW(

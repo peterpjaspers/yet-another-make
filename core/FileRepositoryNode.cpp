@@ -130,7 +130,7 @@ namespace YAM
     }
 
     bool FileRepositoryNode::lexicallyContains(std::filesystem::path const& path) const {
-        bool contains;
+        bool contains = false;
         if (path.is_absolute()) {
             auto pit = path.begin();
             auto rit = _directory.begin();
@@ -139,7 +139,7 @@ namespace YAM
                 else break;
             }
             contains = rit == _directory.end();
-        } else {
+        } else if (_directoryNode != nullptr) {
             auto it = path.begin();
             contains = (it != path.end() && *it == _directoryNode->name());
         }
@@ -181,9 +181,14 @@ namespace YAM
         }
         std::filesystem::path symPath;
         if (contains) {
-            symPath /= repoNameToSymbolicPath(_repoName);
+            std::filesystem::path repoPath(repoNameToSymbolicPath(_repoName));
+            symPath /= repoPath;
             for (; pit != absPath.end(); pit++) {
                 symPath /= *pit;
+            }
+            if (symPath.string().find_first_of(repoPath.string()) != 0) {
+                // invalid absPath
+                symPath = "";
             }
         }
         return symPath;
@@ -210,13 +215,18 @@ namespace YAM
     }
 
     void FileRepositoryNode::removeYourself() {
-        _directoryNode->clear();
-        context()->nodes().removeIfPresent(_fileExecSpecsNode->configFileNode());
-        context()->nodes().removeIfPresent(_fileExecSpecsNode);
-        context()->nodes().removeIfPresent(_directoryNode);
-        _fileExecSpecsNode = nullptr;
-        _directoryNode = nullptr;
-        modified(true);
+        if (_directoryNode != nullptr) {
+            _directoryNode->clear();
+            context()->nodes().removeIfPresent(_fileExecSpecsNode->configFileNode());
+            context()->nodes().removeIfPresent(_fileExecSpecsNode);
+
+            context()->nodes().removeIfPresent(_directoryNode);
+
+
+            _fileExecSpecsNode = nullptr;
+            _directoryNode = nullptr;
+            modified(true);
+        }
     }
 
     XXH64_hash_t FileRepositoryNode::hash() const {

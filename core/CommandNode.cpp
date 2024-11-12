@@ -210,15 +210,17 @@ namespace
     ) {
         auto repo = cmd->context()->findRepositoryContaining(outputPath);
         auto absPath = repo->absolutePathOf(outputPath);
-        bool deleted = deleteFile(absPath);
-        std::stringstream ss;
-        if (!deleted) {
-            ss << "Failed to delete ignored output file " << absPath << std::endl;
-        } else {
-            ss << "Deleted ignored output file " << absPath << std::endl;
+        if (std::filesystem::exists(absPath)) {
+            bool deleted = deleteFile(absPath);
+            std::stringstream ss;
+            if (!deleted) {
+                ss << "Failed to delete ignored output file " << absPath << std::endl;
+            } else {
+                ss << "Deleted ignored output file " << absPath << std::endl;
+            }
+            LogRecord deleteRecord(LogRecord::Progress, ss.str());
+            logBook.add(deleteRecord);
         }
-        LogRecord deleteRecord(LogRecord::Progress, ss.str());
-        logBook.add(deleteRecord);
     }
 
     void logNotDeclaredOutput(

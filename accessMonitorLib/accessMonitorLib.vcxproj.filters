@@ -21,9 +21,6 @@
     <ClCompile Include="..\accessMonitor\Process.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\accessMonitor\PatchProcess.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\accessMonitor\Patch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

@@ -98,16 +98,21 @@ namespace
             janSrcFile << "jan";
             janSrcFile.close();
 
+            std::filesystem::path pietSrcPref = pietSrc->absolutePath().make_preferred();
+            std::filesystem::path janSrcPref = janSrc->absolutePath().make_preferred();
+            std::filesystem::path pietOutPref = pietOut->absolutePath().make_preferred();
+            std::filesystem::path janOutPref = janOut->absolutePath().make_preferred();
+            std::filesystem::path pietjanOutPref = pietjanOut->absolutePath().make_preferred();
             {
                 std::stringstream script;
-                script << "type " << pietSrc->absolutePath().string() << " > " << pietOut->absolutePath().string();
+                script << "type " << pietSrcPref.string() << " > " << pietOutPref.string();
                 pietCmd->workingDirectory(homeRepo->directoryNode());
                 pietCmd->mandatoryOutputs({ pietOut });
                 pietCmd->script(script.str());
             }
             {
                 std::stringstream script;
-                script << "type " << janSrc->absolutePath().string() << " > " << janOut->absolutePath().string();
+                script << "type " << janSrcPref.string() << " > " << janOutPref.string();
                 janCmd->workingDirectory(homeRepo->directoryNode());
                 janCmd->mandatoryOutputs({ janOut });
                 janCmd->script(script.str());
@@ -124,12 +129,12 @@ namespace
                 //pietjanCmd->orderOnlyInputs({ pietOut, janOut });
                 std::stringstream script;
                 script
-                    << "type " << pietOut->absolutePath().string() << " > " << pietjanOut->absolutePath().string() << std::endl
-                    << "type " << janOut->absolutePath().string() << " >> " << pietjanOut->absolutePath().string() << std::endl
-                    << "echo optional1 > " << pietjanOut->absolutePath().parent_path() / "optional1.txt" << std::endl
-                    << "echo optional2 > " << pietjanOut->absolutePath().parent_path() / "optional2.txt" << std::endl
-                    << "echo ignore1 > " << pietjanOut->absolutePath().parent_path() / "ignore1.txt" << std::endl
-                    << "echo ignore2 > " << pietjanOut->absolutePath().parent_path() / "ignore2.txt" << std::endl;
+                    << "type " << pietOutPref.string() << " > " << pietjanOutPref.string() << std::endl
+                    << "type " << janOutPref.string() << " >> " << pietjanOutPref.string() << std::endl
+                    << "echo optional1 > " << pietjanOutPref.parent_path() / "optional1.txt" << std::endl
+                    << "echo optional2 > " << pietjanOutPref.parent_path() / "optional2.txt" << std::endl
+                    << "echo ignore1 > " << pietjanOutPref.parent_path() / "ignore1.txt" << std::endl
+                    << "echo ignore2 > " << pietjanOutPref.parent_path() / "ignore2.txt" << std::endl;
 
                 pietjanCmd->script(script.str());
             }
@@ -544,7 +549,9 @@ namespace
 
         // Execution fails because pietCmd produces same output file as janCmd.
         std::stringstream script;
-        script << "type " << cmds.pietSrc->absolutePath().string() << " > " << cmds.janOut->absolutePath().string();
+        std::filesystem::path pietSrcPref = cmds.pietSrc->absolutePath().make_preferred();
+        std::filesystem::path janOutPref = cmds.janOut->absolutePath().make_preferred();
+        script << "type " << pietSrcPref.string() << " > " << janOutPref.string();
         cmds.pietCmd->script(script.str());
         EXPECT_TRUE(cmds.execute());
         EXPECT_EQ(Node::State::Failed, cmds.pietCmd->state());

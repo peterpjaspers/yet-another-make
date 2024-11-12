@@ -1,0 +1,1 @@
+lib /out:detours.lib /verbose detours.obj creatwth.obj image.obj modules.obj disolarm.obj disolarm64.obj disolia64.obj disolx64.obj disolx86.obj disasm.obj

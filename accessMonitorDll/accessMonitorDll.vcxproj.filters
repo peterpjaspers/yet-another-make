@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\accessMonitor\accessMonitor.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\accessMonitor\FileAccess.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -42,13 +39,16 @@
     <ClCompile Include="..\accessMonitor\Patch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\accessMonitor\PatchProcess.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\accessMonitor\Process.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\accessMonitor\RemoteSession.cpp">
+    <ClCompile Include="..\accessMonitor\dll\accessMonitor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\accessMonitor\Session.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\accessMonitor\Monitor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

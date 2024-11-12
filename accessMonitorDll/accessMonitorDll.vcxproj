@@ -19,22 +19,22 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\accessMonitor\accessMonitor.cpp" />
+    <ClCompile Include="..\accessMonitor\dll\accessMonitor.cpp" />
     <ClCompile Include="..\accessMonitor\FileAccess.cpp" />
     <ClCompile Include="..\accessMonitor\FileNaming.cpp" />
     <ClCompile Include="..\accessMonitor\Inject.cpp" />
     <ClCompile Include="..\accessMonitor\LogFile.cpp">
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">_SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
+    <ClCompile Include="..\accessMonitor\Monitor.cpp" />
     <ClCompile Include="..\accessMonitor\MonitorFiles.cpp" />
     <ClCompile Include="..\accessMonitor\MonitorLogging.cpp" />
     <ClCompile Include="..\accessMonitor\MonitorThreadsAndProcesses.cpp">
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <ClCompile Include="..\accessMonitor\Patch.cpp" />
-    <ClCompile Include="..\accessMonitor\PatchProcess.cpp" />
     <ClCompile Include="..\accessMonitor\Process.cpp" />
-    <ClCompile Include="..\accessMonitor\RemoteSession.cpp" />
+    <ClCompile Include="..\accessMonitor\Session.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\accessMonitor\FileAccess.h" />
@@ -49,6 +49,11 @@
     <ClInclude Include="..\accessMonitor\PatchProcess.h" />
     <ClInclude Include="..\accessMonitor\Process.h" />
     <ClInclude Include="..\accessMonitor\Session.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\detours\detours.vcxproj">
+      <Project>{d4780f2a-8de5-4274-8447-da35ab615ee1}</Project>
+    </ProjectReference>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
@@ -156,6 +161,7 @@
       <SubSystem>
       </SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

@@ -1,11 +1,9 @@
 #include "Monitor.h"
-#include "MonitorLogging.h"
 #include "Process.h"
 #include "Session.h"
 #include "FileNaming.h"
 #include "MonitorFiles.h"
 #include "MonitorThreadsAndProcesses.h"
-#include "PatchProcess.h"
 
 #include <windows.h>
 #include <fstream>
@@ -26,10 +24,10 @@ namespace AccessMonitor {
             if (exists( sessionData )) {
                 // Session directory already exists, presumably due to a previous session 
                 // Remove all data session left behind...
-                std::error_code ec;
-                remove_all( sessionData, ec);
+                error_code ec;
+                remove_all( sessionData, ec );
             }
-            create_directory( sessionData );
+            create_directories( sessionData );
         }
 
         // Collect events from monitor event files in a session.
@@ -50,9 +48,8 @@ namespace AccessMonitor {
         //
         // Last write time is collapsed to the lastest last write time.
         //
-        MonitorEvents collectMonitorEvents( path const& sessionDirectory, const SessionID session ) {
-            const path sessionData( sessionDataPath(sessionDirectory, session ) );
-            MonitorEvents collected;
+        void collectMonitorEvents( path const& sessionDirectory, const SessionID session, MonitorEvents& collected ) {
+            const path sessionData( sessionDataPath( sessionDirectory, session ) );
             for (auto const& entry : directory_iterator( sessionData )) {
                 auto eventFile = wifstream( entry.path() );
                 path filePath;
@@ -60,6 +57,9 @@ namespace AccessMonitor {
                 wstring accessMode;
                 while (!eventFile.eof()) {
                     eventFile >> ws >> filePath >> ws;
+                    if (filePath.filename() == "7z.exe") {
+                        bool stop = true;
+                    }
                     from_stream( eventFile, L"[ %Y-%m-%d %H:%M:%10S ]", lastWriteTime );
                     eventFile >> ws >> accessMode >> ws;
                     if (0 < collected.count( filePath )) {
@@ -77,38 +77,58 @@ namespace AccessMonitor {
                 }
                 eventFile.close();
             }
-            return collected;
         }
+
+        mutex monitorMutex;
     }
 
-    void startMonitoring(std::filesystem::path const& directory) {
-        std::filesystem::path tempDir;
-        if (directory.empty()) {
-            tempDir = std::filesystem::temp_directory_path();
-        } else {
-            tempDir = directory;
-        }
-        std::filesystem::create_directory(tempDir / dataDirectory());
-        SessionID session = CreateSession(tempDir);
+    void startMonitoring( const std::filesystem::path& directory, SessionID session, const LogAspects aspects ) {
+        const lock_guard<mutex> lock( monitorMutex );
+        session = CreateSession( directory, session );
+        createSessionDirectory( directory, session );
+        create_directory( directory / dataDirectory() );
         SessionDebugLog( createDebugLog() );
-        debugLog().enable( PatchedFunction | ParseLibrary | PatchExecution | FileAccesses | WriteTime );
+        debugLog().enable( aspects );
         debugRecord() << "Start monitoring session " << session << "..." << record;
-        createSessionDirectory( tempDir, session );
         SessionEventLog( createEventLog() );
-        patchProcess();
+        if (SessionCount() == 1) {
+            registerFileAccess();
+            registerProcessesAndThreads();
+            patch();
+        }
     }
 
-    MonitorEvents stopMonitoring() {
-        auto session = CurrentSessionID();
-        path const& sessionDirectory = CurrentSessionDirectory();
+    void stopMonitoring( MonitorEvents* events ) {
+        const lock_guard<mutex> lock( monitorMutex );
+        auto session( CurrentSessionID() );
+        const auto& sessionDirectory( CurrentSessionDirectory() );
         debugRecord() << "Stop monitoring session " << session << "..." << record;
+        if (SessionCount() == 1) {
+            unpatch();
+            unregisterProcessesAndThreads();
+            unregisterFileAccess();
+        }
         SessionEventLogClose();
-        auto events = collectMonitorEvents( sessionDirectory, session );
-        unpatchProcess();
         SessionDebugLogClose();
+        // ToDo: Avoid collecting events (with potetially a lot of file IO) while monitor mutex is locked
+        //       Make sure session ID is not reused untile all monitor events have been collected.
+        if (events != nullptr) collectMonitorEvents( sessionDirectory, session, *events );
         RemoveSession();
-        return events;
     }
+
+    MonitorGuard::MonitorGuard( MonitorAccess* monitor ) : access( monitor ) {
+        if (access != nullptr) {
+            auto count( access->monitorCount++ );
+            if (count == 0) access->errorCode = GetLastError();
+        }
+    }
+    MonitorGuard::~MonitorGuard() {
+        if (access != nullptr) {
+            auto count( --access->monitorCount );
+            if (count == 0) SetLastError( access->errorCode );
+        }
+    }
+    bool MonitorGuard::monitoring() { return( (access != nullptr) && (access->monitorCount == 1) ); }
 
 } // namespace AccessMonitor
 
