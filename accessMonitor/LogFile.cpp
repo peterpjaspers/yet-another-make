@@ -73,7 +73,8 @@ namespace AccessMonitor {
         return utf16conv.to_bytes( string );
     }
 
-    wstring lastErrorString( unsigned int errorCode ) {
+    wstring errorString( unsigned int errorCode ) {
+        // Convert Windows error code to message
         LPWSTR buffer = nullptr;
         size_t size =
             FormatMessageW(

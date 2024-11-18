@@ -12,32 +12,38 @@ using namespace std;
 namespace AccessMonitor {
 
     LogFile* createDebugLog( bool logTimes, bool logIntervals ) {
-        return new LogFile( monitorDebugPath( CurrentSessionDirectory(), CurrentProcessID(), CurrentSessionID() ), logTimes, logIntervals );
+        auto session( Session::current() );
+        return new LogFile( monitorDebugPath( session->directory(), CurrentProcessID(), session->id() ), logTimes, logIntervals );
     }
     LogFile& debugLog() {
         static const char* signature = "LogFile& debugLog()";
-        auto log = static_cast<LogFile*>(SessionDebugLog());
+        auto log = Session::current()->debugLog();
         if (log == nullptr) throw string( signature ) + " - No debug log defined for session";
         return( *log );
     }
     bool debugLog( const LogAspects aspects ) {
-        auto log = SessionDebugLog();
+        auto session( Session::current() );
+        if (session == nullptr) return false;
+        auto log = session->debugLog();
         if (log == nullptr) return false;
         return (*log)( aspects );
     }
     LogRecord& debugRecord() { return debugLog()(); }
 
     LogFile* createEventLog() {
-        return new LogFile( monitorEventsPath( CurrentSessionDirectory(), CurrentProcessID(), CurrentSessionID() ) );
+        auto session( Session::current() );
+        return new LogFile( monitorEventsPath( session->directory(), CurrentProcessID(), session->id() ) );
     }
     bool recordingEvents() {
-        auto log = SessionEventLog();
+        auto session( Session::current() );
+        if (session == nullptr) return false;
+        auto log = session->eventLog();
         if (log == nullptr) return false;
         return true;
     }
     LogFile& eventLog() {
         static const char* signature = "LogFile& eventLog()";
-        auto log = SessionEventLog();
+        auto log = Session::current()->eventLog();
         if (log == nullptr) throw string( signature ) + " - No event log defined for session";
         return( *log );
     }

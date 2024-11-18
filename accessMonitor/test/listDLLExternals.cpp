@@ -43,8 +43,6 @@ namespace AccessMonitor {
     
     
     // Enumerate all DLLs with a matching path
-    // ToDo: Regular expression match
-    // ToDo: char and wchar variants
     std::vector<ModuleFile> EnumerateModules( std::string match ) {
         static const unsigned int MaxModules = 100;
         std::vector<ModuleFile> dlls;

@@ -10,7 +10,7 @@ using namespace std::filesystem;
 
 path directory( temp_directory_path() );
 
-void worker( const path& dataDirectory ) {
+void fileAccess( const path& dataDirectory ) {
     create_directories( dataDirectory );
     ofstream file( dataDirectory / "junk.txt" );
     file << "Hello world!\n";
@@ -26,15 +26,15 @@ void worker( const path& dataDirectory ) {
 
 void doFileAccess( int threads, const path& directory ) {
     if (1 < threads) {
-        vector<thread> workerThreads;
+        vector<thread> workers;
         for (int i = 0; i < threads; ++i) {
             wstringstream subdir;
             subdir << L"fileAccessTest" << i;
-            workerThreads.push_back( thread( worker, path( "." ) / directory / subdir.str() ) );
+            workers.push_back( thread( fileAccess, path( "." ) / directory / subdir.str() ) );
         }
-        for (int i = 0; i < threads; ++i) workerThreads[ i ].join();
+        for (int i = 0; i < threads; ++i) workers[ i ].join();
     } else {
-        worker( path( "." ) / directory / L"fileAccessTest" );
+        fileAccess( path( "." ) / directory / L"fileAccessTest" );
     }
 }
 

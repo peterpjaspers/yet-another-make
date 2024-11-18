@@ -14,10 +14,12 @@ namespace AccessMonitor {
     typedef std::map<std::wstring,FileAccess> MonitorEvents;
 
     // Start monitoring file access.
-    // If directory != "": store monitor data in 'directory'. 
-    // If directory == "": store data in std::filesystem::temp_directory_path.
-    // The aspects argument defines which aspects to log.
-    void startMonitoring( const std::filesystem::path& directory, const SessionID session = CreateNewSession, const LogAspects aspects = (PatchExecution | FileAccesses) );
+    // Session related result files are store in the given directory.
+    // The aspects argument defines which (debug) aspects to log.
+    void startMonitoring( const std::filesystem::path& directory, const LogAspects aspects = (PatchExecution | FileAccesses) );
+    // Start monitoring file access in a remote process.
+    // Extends the session referred to by context to the remote process.
+    void startMonitoring( const SessionContext& context );
     // Stop monitoring file access.
     // Returns collection of monitored file accesses.
     void stopMonitoring( MonitorEvents* events );
@@ -34,7 +36,7 @@ namespace AccessMonitor {
         MonitorGuard() = delete;
         MonitorGuard( MonitorAccess* monitor );
         ~MonitorGuard();
-        bool monitoring();
+        inline bool operator()() { return( (access != nullptr) && (access->monitorCount == 1) ); }
     };
 
 } // namespace AccessMonitor

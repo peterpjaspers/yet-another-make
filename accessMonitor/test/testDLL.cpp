@@ -4,8 +4,10 @@
 
 #include <string>
 #include <filesystem>
+#include <iostream>
 #include <fstream>
 #include <thread>
+#include <mutex>
 #include <windows.h>
 
 // Simulate DLL load in remote process to enable debug...
@@ -17,7 +19,10 @@ using namespace std::filesystem;
 const std::wstring patchDLLFile( L"C:/Users/philv/Code/yam/yet-another-make/accessMonitor/dll/accessMonitor64.dll" );
 // const std::wstring patchDLLFile( L"D:/Peter/github/yam/x64/Debug/dll/accessMonitorDLL.dll" );
 
+mutex suspend;
+
 void doFileAccess( const path directoryPath ) {
+    lock_guard<mutex> lock( suspend );
     create_directories( directoryPath );
     ofstream file( directoryPath / "junk.txt" );
     file << "Hello world!\n";
@@ -35,9 +40,13 @@ void doFileAccess( const path directoryPath ) {
 }
 
 int main( int argc, char* argv[] ) {
+    SessionID id( 1 );
+    // Create thread to act as main thread, it will wait on the suspend mutex pending DLL load.
+    suspend.lock();
+    std::thread worker( doFileAccess, uniqueName( temp_directory_path() / L"DLLSession", id ) );
     // Manually create a (simulated remote) session and its data directory...
-    SessionID session = 1;
-    const path sessionData( sessionDataPath( temp_directory_path(), session ) );
+    Session session( { temp_directory_path(), id, (RegisteredFunction | PatchedFunction | PatchExecution | FileAccesses | WriteTime) } );
+    const path sessionData( sessionDataPath( temp_directory_path(), session.id() ) );
     if (exists( sessionData )) {
         error_code ec;
         remove_all( sessionData, ec );
@@ -46,13 +55,14 @@ int main( int argc, char* argv[] ) {
     auto process = CurrentProcessID();
     auto thread = CurrentThreadID();
     auto patched = AccessEvent( "ProcessPatched", process );
-    auto data = recordSessionContext( process, session, (RegisteredFunction | PatchedFunction | PatchExecution | FileAccesses | WriteTime), temp_directory_path() );
+    auto data( session.recordContext( process ) );
     HMODULE library = LoadLibraryW( patchDLLFile.c_str() );
     auto error = GetLastError();
     if (error != 0) cout << "LoadLibraryW failed with error " << error << endl;
     EventWait( patched );
-    releaseSessionContext( data );
+    Session::releaseContext( data );
     ReleaseEvent( patched );
-    std::thread worker( doFileAccess, uniqueName( temp_directory_path() / L"DLLSession", session ) );
+    // Now allow the "main" thread to continue
+    suspend.unlock();
     worker.join();
 }

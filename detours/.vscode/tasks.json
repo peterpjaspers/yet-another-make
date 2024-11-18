@@ -1,7 +1,7 @@
+// Define tasks for building X86, ARM, ARM64, IA64 versions of detours library
+// Define tasks for building optimized versions of detours library
+// Remove superfluous include libraries (don't know which)
 {
-    // Define tasks for building X86, ARM, ARM64, IA64 versions of detours library
-    // Define tasks for building optimized versions of detours library
-    // Remove superfluous include libraries (don't know which)
 	"version": "2.0.0",
 	"tasks": [
 		{
@@ -10,6 +10,33 @@
 			"command": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/bin/Hostx64/x64/cl.exe",
 			"args": [
 				"-std:c++20", "-U NDEBUG", "-D _AMD64_=1", "-Od", "-EHs","-GA","-Zi","-MTd", "-c",
+				"-IC:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/include",
+				"-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/ucrt",
+				"-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/um",
+				"-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/shared",
+				"${workspaceFolder}/src/detours.cpp",
+				"${workspaceFolder}/src/creatwth.cpp",
+				"${workspaceFolder}/src/image.cpp",
+				"${workspaceFolder}/src/modules.cpp",
+				"${workspaceFolder}/src/disolarm.cpp",
+				"${workspaceFolder}/src/disolarm64.cpp",
+			    "${workspaceFolder}/src/disolia64.cpp",
+			    "${workspaceFolder}/src/disolx64.cpp",
+				"${workspaceFolder}/src/disolx86.cpp",
+				"${workspaceFolder}/src/disasm.cpp",
+            ],
+			"options": {
+				"cwd": "${workspaceFolder}/lib"
+			},
+			"group": "build",
+			"detail": "compiler: \"C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/bin/Hostx64/x64/cl.exe\""
+		},
+		{
+			"type": "cppbuild",
+			"label": "Microsoft build detours (optimized)",
+			"command": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/bin/Hostx64/x64/cl.exe",
+			"args": [
+				"-std:c++20", "-D NDEBUG", "-D _AMD64_=1", "-O1", "-EHs","-GA","-MT", "-c",
 				"-IC:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/include",
 				"-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/ucrt",
 				"-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/um",

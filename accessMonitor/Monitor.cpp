@@ -1,4 +1,5 @@
 #include "Monitor.h"
+#include "Patch.h"
 #include "Process.h"
 #include "Session.h"
 #include "FileNaming.h"
@@ -12,15 +13,13 @@
 using namespace std;
 using namespace std::filesystem;
 
-// ToDo: Clean-up Session ID files (created when injecting patch DLL in spawned process).
-
 namespace AccessMonitor {
 
     namespace {
 
         // Create data directory for a session
-        void createSessionDirectory( path const& sessionDirectory, const SessionID session ) {
-            const path sessionData( sessionDataPath(sessionDirectory, session ) );
+        void createSessionDirectory( path const& directory, const SessionID session ) {
+            const path sessionData( sessionDataPath(directory, session ) );
             if (exists( sessionData )) {
                 // Session directory already exists, presumably due to a previous session 
                 // Remove all data session left behind...
@@ -48,8 +47,8 @@ namespace AccessMonitor {
         //
         // Last write time is collapsed to the lastest last write time.
         //
-        void collectMonitorEvents( path const& sessionDirectory, const SessionID session, MonitorEvents& collected ) {
-            const path sessionData( sessionDataPath( sessionDirectory, session ) );
+        void collectMonitorEvents( const path& directory, const SessionID session, MonitorEvents& collected ) {
+            const path sessionData( sessionDataPath( directory, session ) );
             for (auto const& entry : directory_iterator( sessionData )) {
                 auto eventFile = wifstream( entry.path() );
                 path filePath;
@@ -75,43 +74,63 @@ namespace AccessMonitor {
                 }
                 eventFile.close();
             }
+            error_code ec;
+            remove_all( sessionData, ec );
         }
 
         mutex monitorMutex;
     }
 
-    void startMonitoring( const std::filesystem::path& directory, SessionID session, const LogAspects aspects ) {
+    void startMonitoring( const path& directory, const LogAspects aspects ) {
         const lock_guard<mutex> lock( monitorMutex );
-        session = CreateSession( directory, session );
-        createSessionDirectory( directory, session );
+        Session* session( new Session( directory, aspects ) );
+        createSessionDirectory( directory, session->id() );
         create_directory( directory / dataDirectory() );
-        SessionDebugLog( createDebugLog() );
-        debugLog().enable( aspects );
-        debugRecord() << "Start monitoring session " << session << "..." << record;
-        SessionEventLog( createEventLog() );
-        if (SessionCount() == 1) {
+        session->debugLog( createDebugLog() );
+        session->debugLog()->enable( aspects );
+        debugRecord() << "Start monitoring session " << session->id() << "..." << record;
+        session->eventLog( createEventLog() );
+        if (Session::count() == 1) {
             registerFileAccess();
             registerProcessesAndThreads();
             patch();
         }
     }
 
+    void startMonitoring( const SessionContext& context ) {
+        const lock_guard<mutex> lock( monitorMutex );
+        Session* session( new Session( context ) );
+        createSessionDirectory( context.directory, session->id() );
+        create_directory( context.directory / dataDirectory() );
+        session->debugLog( createDebugLog() );
+        session->debugLog()->enable( context.aspects );
+        debugRecord() << "Extend monitoring session " << session->id() << "..." << record;
+        session->eventLog( createEventLog() );
+        if (Session::count() == 1) {
+            registerFileAccess();
+            registerProcessesAndThreads();
+            patch();
+        }
+    }
+    
+
     void stopMonitoring( MonitorEvents* events ) {
         const lock_guard<mutex> lock( monitorMutex );
-        auto session( CurrentSessionID() );
-        const auto& sessionDirectory( CurrentSessionDirectory() );
-        debugRecord() << "Stop monitoring session " << session << "..." << record;
-        if (SessionCount() == 1) {
+        auto session( Session::current() );
+        const auto id( session->id() );
+        const auto directory( session->directory() );
+        debugRecord() << "Stop monitoring session " << id << "..." << record;
+        if (Session::count() == 1) {
             unpatch();
             unregisterProcessesAndThreads();
             unregisterFileAccess();
         }
-        SessionEventLogClose();
-        SessionDebugLogClose();
-        // ToDo: Avoid collecting events (with potetially a lot of file IO) while monitor mutex is locked
-        //       Make sure session ID is not reused untile all monitor events have been collected.
-        if (events != nullptr) collectMonitorEvents( sessionDirectory, session, *events );
-        RemoveSession();
+        session->eventClose();
+        session->debugClose();
+        delete session;
+        // Hold on to terminated session ID while collecting session results.
+        if (events != nullptr) collectMonitorEvents( directory, id, *events );
+        Session::release( id );
     }
 
     MonitorGuard::MonitorGuard( MonitorAccess* monitor ) : access( monitor ) {
@@ -126,7 +145,6 @@ namespace AccessMonitor {
             if (count == 0) SetLastError( access->errorCode );
         }
     }
-    bool MonitorGuard::monitoring() { return( (access != nullptr) && (access->monitorCount == 1) ); }
 
 } // namespace AccessMonitor
 

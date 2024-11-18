@@ -3,42 +3,10 @@
 
 #include "Process.h"
 #include "LogFile.h"
-#include "Patch.h"
 
 #include <filesystem>
 
 namespace AccessMonitor {
-
-    // Session ID indicating that a new session is to be created (in the main process).
-    const SessionID CreateNewSession = (SessionID)-1;
-
-
-    // Get SessionID of session associated with current thread
-    SessionID CurrentSessionID();
-    // Get directory for session data storage associated with current thread.
-    const std::filesystem::path& CurrentSessionDirectory();
-    // Create a new session on current thread or open an existing session (in a remote process).
-    // Store session data in given directory.
-    // Creates a new session with CreateNewSession as session argument.
-    SessionID CreateSession( const std::filesystem::path& directory, const SessionID session = CreateNewSession );
-    // Remove session from current thread
-    void RemoveSession();
-    // Add current thread to session
-    void AddThreadToSession( const std::filesystem::path& directory, const SessionID session, LogFile* eventLog = nullptr, LogFile* debugLog = nullptr );
-    // Remove current thread from session 
-    void RemoveThreadFromSession();
-
-    // Return number of active sessions
-    int SessionCount();
-
-    // Set/get event log for current session.
-    void SessionEventLog( LogFile* log );
-    LogFile* SessionEventLog();
-    void SessionEventLogClose();
-    // Set/get debug log for current session.
-    void SessionDebugLog( LogFile* log );
-    LogFile* SessionDebugLog();
-    void SessionDebugLogClose();
 
     struct MonitorAccess {
         int monitorCount;
@@ -46,19 +14,74 @@ namespace AccessMonitor {
         inline MonitorAccess() : monitorCount( 0 ), errorCode( 0 ) {};
     };
 
-    // Return file monitoring access data.
-    MonitorAccess* SessionFileAccess();
-    // Return thread and process monitoring access data.
-    MonitorAccess* SessionThreadAndProcessAccess();
+    // Context in which a session operates.
+    struct SessionContext {
+        std::filesystem::path   directory;
+        SessionID               session;
+        LogAspects              aspects;
+        SessionContext() : directory( "" ), session( 0 ), aspects( 0 ) {}
+        SessionContext( const std::filesystem::path dir, const SessionID sid, const LogAspects dasp ) :
+            session( sid ), directory( dir ), aspects( dasp ) {}
+    };
 
-    // Record session conetxt for a (remote) process.
-    // Recorded session context should released after being retrieved in the remote process.
-    void* recordSessionContext( const ProcessID process, const SessionID session, const LogAspects apspects, const std::filesystem::path& dir );
-    // Release recorded session context, freeing memory resources.
-    void releaseSessionContext( void* map );
-    // Retrieve session context in a (remote) process.
-    void retrieveSessionContext( const ProcessID process, SessionID& session, LogAspects& aspects, std::filesystem::path& dir );
+    class Session {
+        SessionContext  context;
+        LogFile*        events;
+        LogFile*        debug;
+    public:
+        Session() = delete;
+        // Create a new session in the current process.
+        // The thread creating the session is added to the session.
+        Session( const std::filesystem::path& directory, const LogAspects aspects = 0 );
+        // Create a session from an existing session.
+        // Typically used to extend the session in which a process was spawned to the spawned process.
+        Session( const SessionContext& context );
+        // Remove session from current thread
+        ~Session();
+        // Release session ID for re-use.
+        // Called after collecting session associated results when a session is terminated.
+        static void release( SessionID id );
+        // Return session for current thread.
+        static Session* current();
+        // Return number of currently active sessions.
+        static int count();
+        // Return ID associated with this session.
+        SessionID id() const;
+        // Return directory for session data storage associated with current thread.
+        const std::filesystem::path& directory() const;
+        // Add current thread to session.
+        void addThread() const;
+        // Remove current thread from session.
+        void removeThread() const;
+        // Set and/or close session event log.
+        // If the session has an event log, it is closed (typically by with a nnullptr argument).
+        void eventLog( LogFile* file );
+        // Return session event log.
+        LogFile* eventLog() const;
+        // Close the session event log.
+        void eventClose();
+        // Set and/or close session debug log.
+        // If the session has an dbug log, it is closed (typically by with a nnullptr argument).
+        void debugLog( LogFile* file );
+        // Return session debug log.
+        LogFile* debugLog() const;
+        // Close the session debug log.
+        void debugClose();
+        // Return monitor access for file access in this session.
+        static MonitorAccess* fileAccess();
+        // Return monitor access for process access in this session.
+        static MonitorAccess* processAccess();
+        // Record session context for a (spawned/remote) process.
+        // The recorded session context may be retrieved in the (remote) process with a call to retrieveContext.
+        void* recordContext( const ProcessID process ) const;
+        // Release session context record, freeing memory resources.
+        // Session context record should released after being retrieved in the (remote) process.
+        static void releaseContext( void* context );
+        // Retreive session context for/in a (spawned/remote) process recorded by a call to recordContext.
+        // The retrieved context may be used to extend a session to the (remote) process.
+        static const SessionContext retrieveContext( const ProcessID process = CurrentProcessID() );
 
+    };
 
 } // namespace AccessMonitor
 

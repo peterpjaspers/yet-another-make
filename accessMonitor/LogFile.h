@@ -101,8 +101,8 @@ namespace AccessMonitor {
     // Convert wide string to ANSI string
     std::string narrow( const std::wstring& string );
 
-    // Returns last Windows error as string.
-    std::wstring lastErrorString( unsigned int errorCode );
+    // Convert OS error code to human readable error message.
+    std::wstring errorString( unsigned int errorCode );
 
 } // namespace AccessMonitor
 

@@ -19,12 +19,14 @@ static int sessions = 1;
 static int threads = 1;
 static bool remoteProcess = false;
 
+// Execute a command in a seperate process...
 void executeCommand( const char* command ) {
     STARTUPINFO si;
     PROCESS_INFORMATION pi;
     std::memset( &si, 0, sizeof(si) );
     si.cb = sizeof(si);
     std::memset( &pi, 0, sizeof(pi) );
+    // Create the process with all settings to default values...
     CreateProcessA(
         nullptr,
         const_cast<char*>( command ),
@@ -37,6 +39,7 @@ void executeCommand( const char* command ) {
         &si,
         &pi
     );
+    // Wait for the process to complete...
     WaitForSingleObject( pi.hProcess, 0 );
     CloseHandle( pi.hProcess );
     CloseHandle( pi.hThread );
@@ -88,22 +91,22 @@ void worker( const path directoryPath ) {
 
 void doFileAccess() {
     try {
-        auto session = CurrentSessionID();
+        auto session( Session::current() );
         if (remoteProcess) {
             stringstream command;
             command
                 << remoteTestFile
                 << " " 
-                << session
+                << session->id()
                 << " " 
                 << threads
                 << " "
-                << CurrentSessionDirectory().generic_string();
+                << session->directory().generic_string();
             debugRecord() << "Executing " << command.str().c_str() << record;
             // auto exitCode = system( command.str().c_str() );
             executeCommand( command.str().c_str() );
         }
-        path sessionDir( uniqueName( CurrentSessionDirectory() / L"Session", session ) );
+        path sessionDir( uniqueName( session->directory() / L"Session", session->id() ) );
         if (1 < threads) {
             vector<thread> workerThreads;
             for (int i = 0; i < threads; ++i) {
@@ -130,13 +133,14 @@ void doFileAccess() {
 void doMonitoredFileAccess() {
     // auto aspects = MonitorLogAspects( RegisteredFunction | PatchedFunction | PatchExecution | FileAccesses );
     auto aspects = MonitorLogAspects( PatchExecution | FileAccesses );
-    startMonitoring( temp_directory_path(), CreateNewSession, aspects );
-    auto session = CurrentSessionID();
+    startMonitoring( temp_directory_path(), aspects );
+    auto session( Session::current() );
+    auto id( session->id() );
     doFileAccess();
     MonitorEvents events;
     stopMonitoring( &events );
     // Log (all) events for this session...
-    LogFile output( temp_directory_path() / uniqueName( L"TestProgramOutput", session, L"txt" )  );
+    LogFile output( temp_directory_path() / uniqueName( L"TestProgramOutput", id, L"txt" )  );
     for ( auto access : events ) {
         output() << access.first << L" [ " << access.second.lastWriteTime << L" ] " << modeToString( access.second.modes ) << " : " << modeToString( access.second.mode ) << record;
     }
