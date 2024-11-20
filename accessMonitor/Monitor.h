@@ -37,6 +37,8 @@ namespace AccessMonitor {
         MonitorGuard( MonitorAccess* monitor );
         ~MonitorGuard();
         inline bool operator()() { return( (access != nullptr) && (access->monitorCount == 1) ); }
+        inline unsigned long count() { return access->monitorCount; }
+        inline unsigned long error() { return access->errorCode; }
     };
 
 } // namespace AccessMonitor

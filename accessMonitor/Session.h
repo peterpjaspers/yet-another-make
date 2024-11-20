@@ -9,7 +9,7 @@
 namespace AccessMonitor {
 
     struct MonitorAccess {
-        int monitorCount;
+        unsigned long monitorCount;
         unsigned long errorCode;
         inline MonitorAccess() : monitorCount( 0 ), errorCode( 0 ) {};
     };

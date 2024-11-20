@@ -5,10 +5,7 @@ using namespace std::chrono;
 
 namespace AccessMonitor {
 
-    FileAccess::FileAccess() : mode( AccessNone ), modes( AccessNone ) {}
-    FileAccess::FileAccess( const FileAccessMode& accessMode, const FileTime& time ) : mode( accessMode), modes( accessMode), lastWriteTime( time ) {}
-
-    wstring modeToString( FileAccessMode mode ) {
+    wstring fileAccessModeToString( FileAccessMode mode ) {
         auto string = wstring( L"" );
         if ((mode & AccessRead) != 0) string += L"Read";
         if ((mode & AccessWrite) != 0) string += L"Write";
@@ -17,7 +14,7 @@ namespace AccessMonitor {
         return string;
     }
 
-    FileAccessMode stringToMode( const wstring& modeString ) {
+    FileAccessMode stringToFileAccessMode( const wstring& modeString ) {
         FileAccessMode mode( AccessNone );
         wstring string( modeString );
         while (0 < string.size()) {
@@ -30,5 +27,32 @@ namespace AccessMonitor {
         return( mode );
     }
 
+    FileAccess::FileAccess() {
+        state.mode = AccessNone;
+        state.modes = AccessNone;
+        state.success = 1;
+        state.failures = 0;
+    }
+    FileAccess::FileAccess( const FileAccessMode accessMode, const FileTime time, const bool success ) {
+        state.mode = accessMode;
+        state.modes = accessMode;
+        state.success = ((success) ? 1 : 0 );
+        state.failures = ((success) ? 0 : 1 );
+        lastWriteTime = time;
+    }
+    void FileAccess::mode( const FileAccessMode mode, const FileTime time, const bool success ) {
+        if (success) {
+            if ((mode & AccessDelete) != 0) state.mode = AccessDelete;
+            else if ((mode & AccessWrite) != 0) state.mode = AccessWrite;
+            else if (((mode & AccessRead) != 0) && ((state.mode & AccessDelete) == 0) && ((state.mode & AccessWrite) == 0)) state.mode = AccessRead;
+            state.modes |= mode;
+            state.success = 1;
+        } else {
+            state.mode = mode;
+            state.success = 0;
+            state.failures = 1;
+        }
+        if ((lastWriteTime < time) && ((mode & AccessRead) == 0)) lastWriteTime = time;
+    }
 
 }

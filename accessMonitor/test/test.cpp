@@ -52,6 +52,9 @@ void worker( const path directoryPath ) {
     try {
         debugRecord() << "std::filesystem::create_directories( " << directoryPath << " )" << record;
         create_directories( directoryPath );
+        debugRecord() << "std::ifstream( " << (directoryPath / "nonExisting.txt").c_str() << " )" << record;
+        ifstream ifile( directoryPath / "nonExisting.txt" );
+        ifile.close();
         debugRecord() << "std::ofstream( " << (directoryPath / "junk.txt").c_str() << " )" << record;
         ofstream file( directoryPath / "junk.txt" );
         file << "Hello world!\n";
@@ -142,7 +145,12 @@ void doMonitoredFileAccess() {
     // Log (all) events for this session...
     LogFile output( temp_directory_path() / uniqueName( L"TestProgramOutput", id, L"txt" )  );
     for ( auto access : events ) {
-        output() << access.first << L" [ " << access.second.lastWriteTime << L" ] " << modeToString( access.second.modes ) << " : " << modeToString( access.second.mode ) << record;
+        FileAccess fileAccess( access.second );
+        output()
+            << access.first
+            << L" [ " << fileAccess.writeTime() << L" ] "
+            << fileAccessModeToString( fileAccess.modes() ) << (fileAccess.failures() ? " (one or more failures)" : "" )
+            << " : " << fileAccessModeToString( fileAccess.mode() ) << (fileAccess.success() ? "" : " failed" ) << record;
     }
 }
 

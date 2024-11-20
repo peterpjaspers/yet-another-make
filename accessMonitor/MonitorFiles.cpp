@@ -17,8 +17,6 @@ using namespace std::filesystem;
 // Lempel-Ziv (LZ) functions are not implemented.
 
 // ToDo: Implenent for Linux and MacOS, current implementation is Windows only...
-// ToDo: Add status in file access event to indicate success or failure os requested file access.
-//       This will alow application to deduce that accessed file actually exists.
 
 namespace AccessMonitor {
 
@@ -32,9 +30,13 @@ namespace AccessMonitor {
         FileAccessMode requestedAccessMode( DWORD desiredAccess );
         FileAccessMode requestedAccessMode( UINT desiredAccess );
 
-        wstring fileAccess( const string& fileName, FileAccessMode mode );
-        wstring fileAccess( const wstring& fileName, FileAccessMode mode );
-        wstring fileAccess( HANDLE handle, FileAccessMode mode = AccessNone );
+        wstring fullName( HANDLE handle );
+        wstring fullName( const wchar_t* fileName );
+        wstring fullName( const char* fileName );
+
+        wstring fileAccessFull( const wstring& fullFileName, FileAccessMode mode, bool success = true );
+        wstring fileAccess( const wstring& fileName, FileAccessMode mode, bool success = true );
+        wstring fileAccess( const string& fileName, FileAccessMode mode, bool success = true );
 
         inline uint64_t handleCode( HANDLE handle ) { return reinterpret_cast<uint64_t>( handle ); }
 
@@ -49,6 +51,9 @@ namespace AccessMonitor {
         inline wostream& debugMessage( const char* function, HANDLE handle ) {
             return debugMessage( function, (handle != INVALID_HANDLE_VALUE) );
         }
+        inline bool successful( bool success, unsigned long error ) {
+            return( success || (error == ERROR_SUCCESS) );
+        }
 
         BOOL PatchCreateDirectoryA(
             LPCSTR                pathName,
@@ -58,7 +63,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateDirectoryA", created ) << pathName << L", ... )" << record;
-                fileAccess( pathName, AccessWrite );
+                fileAccess( pathName, AccessWrite, successful( created, guard.error() ) );
             }
             return created;
         }
@@ -70,7 +75,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateDirectoryW", created ) << pathName << L", ... )" << record;
-                fileAccess( pathName, AccessWrite );
+                fileAccess( pathName, AccessWrite, successful( created, guard.error() ) );
             }
             return created;
         }
@@ -83,7 +88,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateDirectoryExA", created ) << newDirectory << L", ... )" << record;
-                fileAccess( newDirectory, AccessWrite );
+                fileAccess( newDirectory, AccessWrite, successful( created, guard.error() ) );
             }
             return created;
         }
@@ -96,7 +101,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateDirectoryExA", created ) << newDirectory << L", ... )" << record;
-                fileAccess( newDirectory, AccessWrite );
+                fileAccess( newDirectory, AccessWrite, successful( created, guard.error() ) );
             }
             return created;
         }
@@ -107,7 +112,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "RemoveDirectoryA", removed ) << pathName << L", ... )" << record;
-                fileAccess( pathName, AccessDelete );
+                fileAccess( pathName, AccessDelete, successful( removed, guard.error() ) );
             }
             return removed;
         }
@@ -118,7 +123,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "RemoveDirectoryW", removed ) << pathName << L", ... )" << record;
-                fileAccess( pathName, AccessDelete );
+                fileAccess( pathName, AccessDelete, successful( removed, guard.error() ) );
             }
             return removed;
         }
@@ -135,7 +140,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateFileA", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
-                fileAccess( handle, requestedAccessMode( dwDesiredAccess ) );
+                fileAccess( fileName, requestedAccessMode( dwDesiredAccess ), (handle != INVALID_HANDLE_VALUE) );
             }
             return handle;
         }
@@ -153,7 +158,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateFileW", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
-                fileAccess( handle, requestedAccessMode( dwDesiredAccess ) );
+                fileAccess( fileName, requestedAccessMode( dwDesiredAccess ), (handle != INVALID_HANDLE_VALUE) );
             }
             return handle;
         }
@@ -173,7 +178,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateFileTransactedA", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
-                fileAccess( handle, requestedAccessMode( dwDesiredAccess ) );
+                fileAccess( fileName, requestedAccessMode( dwDesiredAccess ), (handle != INVALID_HANDLE_VALUE) );
 
             }
             return handle;
@@ -194,7 +199,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateFileTransactedW", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
-                fileAccess( handle, requestedAccessMode( dwDesiredAccess ) );
+                fileAccess( fileName, requestedAccessMode( dwDesiredAccess ), (handle != INVALID_HANDLE_VALUE) );
             }
             return handle;
         }
@@ -209,7 +214,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateFile2", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
-                fileAccess( handle, requestedAccessMode( dwDesiredAccess ) );
+                fileAccess( fileName, requestedAccessMode( dwDesiredAccess ), (handle != INVALID_HANDLE_VALUE) );
             }
             return handle;
         }
@@ -222,8 +227,9 @@ namespace AccessMonitor {
             auto handle = patchOriginal( PatchReOpenFile )( hOriginalFile, dwDesiredAccess, dwShareMode, dwFlagsAndAttributes );
             FileGuard guard;
             if ( guard() ) {
-                auto fileName = fileAccess( handle, requestedAccessMode( dwDesiredAccess ) );
+                auto fileName = fullName( hOriginalFile );
                 if (debugLog( PatchExecution )) debugMessage( "ReOpenFile", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
+                fileAccess( fileName, requestedAccessMode( dwDesiredAccess ), (handle != INVALID_HANDLE_VALUE) );
             }
             return handle;
         }
@@ -236,7 +242,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "OpenFile", (handle != HFILE_ERROR) ) << fileName << L", ... ) -> " << handle << record;
-                fileAccess( fileName, requestedAccessMode( uStyle ) );
+                fileAccess( fileName, requestedAccessMode( uStyle ), (handle != HFILE_ERROR) );
             }
             return handle;
 
@@ -246,7 +252,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "DeleteFileA", deleted ) << fileName << L", ... )" << record;
-                fileAccess( fileName, AccessDelete );
+                fileAccess( fileName, AccessDelete, successful( deleted, guard.error() ) );
             }
             return deleted;
         }
@@ -255,7 +261,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "DeleteFileW", deleted ) << fileName << L", ... )" << record;
-                fileAccess( fileName, AccessDelete );
+                fileAccess( fileName, AccessDelete, successful( deleted, guard.error() ) );
             }
             return deleted;
         }
@@ -264,7 +270,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "DeleteFileTransactedA", deleted ) << fileName << L", ... )" << record;
-                fileAccess( fileName, AccessDelete );
+                fileAccess( fileName, AccessDelete, successful( deleted, guard.error() ) );
             }
             return deleted;
         }
@@ -273,7 +279,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "DeleteFileTransactedW", deleted ) << fileName << L", ... )" << record;
-                fileAccess( fileName, AccessDelete );
+                fileAccess( fileName, AccessDelete, successful( deleted, guard.error() ) );
             }
             return deleted;
         }
@@ -286,8 +292,8 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CopyFileA", copied ) << existingFileName << L", " << newFileName << L", ... )" << record;
-                fileAccess( existingFileName, AccessRead );
-                fileAccess( newFileName, AccessWrite );
+                fileAccess( existingFileName, AccessRead, successful( copied, guard.error() ) );
+                fileAccess( newFileName, AccessWrite, successful( copied, guard.error() ) );
             }
             return copied;
         }
@@ -300,8 +306,8 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CopyFileW", copied ) << existingFileName << L", " << newFileName << L", ... )" << record;
-                fileAccess( existingFileName, AccessRead );
-                fileAccess( newFileName, AccessWrite );
+                fileAccess( existingFileName, AccessRead, successful( copied, guard.error() ) );
+                fileAccess( newFileName, AccessWrite, successful( copied, guard.error() ) );
             }
             return copied;
         }
@@ -317,8 +323,8 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CopyFileExA", copied ) << existingFileName << L", " << newFileName << L", ... )" << record;
-                fileAccess( existingFileName, AccessRead );
-                fileAccess( newFileName, AccessWrite );
+                fileAccess( existingFileName, AccessRead, successful( copied, guard.error() ) );
+                fileAccess( newFileName, AccessWrite, successful( copied, guard.error() ) );
             }
             return copied;
         }
@@ -334,8 +340,8 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CopyFileExW", copied ) << existingFileName << L", " << newFileName << L", ... )" << record;
-                fileAccess( existingFileName, AccessRead );
-                fileAccess( newFileName, AccessWrite );
+                fileAccess( existingFileName, AccessRead, successful( copied, guard.error() ) );
+                fileAccess( newFileName, AccessWrite, successful( copied, guard.error() ) );
             }
             return copied;
         }
@@ -352,8 +358,8 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CopyFileTransactedA", copied ) << existingFileName << L", " << newFileName << L", ... )" << record;
-                fileAccess( existingFileName, AccessRead );
-                fileAccess( newFileName, AccessWrite );
+                fileAccess( existingFileName, AccessRead, successful( copied, guard.error() ) );
+                fileAccess( newFileName, AccessWrite, successful( copied, guard.error() ) );
             }
             return copied;
         }
@@ -370,8 +376,8 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CopyFileTransactedW", copied ) << existingFileName << L", " << newFileName << L", ... )" << record;
-                fileAccess( existingFileName, AccessRead );
-                fileAccess( newFileName, AccessWrite );
+                fileAccess( existingFileName, AccessRead, successful( copied, guard.error() ) );
+                fileAccess( newFileName, AccessWrite, successful( copied, guard.error() ) );
             }
             return copied;
         }
@@ -383,9 +389,9 @@ namespace AccessMonitor {
             auto result = patchOriginal( PatchCopyFile2 )( existingFileName, newFileName, pExtendedParameters );
             FileGuard guard;
             if ( guard() ) {
-                if (debugLog( PatchExecution )) debugMessage( "CopyFile2", result== S_OK) << existingFileName << L", " << newFileName << L", ... )" << record;
-                fileAccess( existingFileName, AccessRead );
-                fileAccess( newFileName, AccessWrite );
+                if (debugLog( PatchExecution )) debugMessage( "CopyFile2", (result == S_OK)) << existingFileName << L", " << newFileName << L", ... )" << record;
+                fileAccess( existingFileName, AccessRead, (result == S_OK) );
+                fileAccess( newFileName, AccessWrite, (result == S_OK) );
             }
             return result;
         }
@@ -401,9 +407,9 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "ReplaceFileA", replaced ) << lpReplacedFileName << L", " << lpReplacementFileName << L", ... )" << record;
-                fileAccess( lpReplacementFileName, AccessRead );
-                fileAccess( lpReplacedFileName, AccessWrite );
-                if (lpBackupFileName!= nullptr) fileAccess( lpBackupFileName, AccessWrite );
+                fileAccess( lpReplacementFileName, AccessRead, successful( replaced, guard.error() ) );
+                fileAccess( lpReplacedFileName, AccessWrite, successful( replaced, guard.error() ) );
+                if (lpBackupFileName!= nullptr) fileAccess( lpBackupFileName, AccessWrite, successful( replaced, guard.error() ) );
             }
             return replaced;
         }
@@ -419,9 +425,9 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "ReplaceFileW", replaced ) << lpReplacedFileName << L", " << lpReplacementFileName << L", ... )" << record;
-                fileAccess( lpReplacementFileName, AccessRead );
-                fileAccess( lpReplacedFileName, AccessWrite );
-                if (lpBackupFileName!= nullptr) fileAccess( lpBackupFileName, AccessWrite );
+                fileAccess( lpReplacementFileName, AccessRead, successful( replaced, guard.error() ) );
+                fileAccess( lpReplacedFileName, AccessWrite, successful( replaced, guard.error() ) );
+                if (lpBackupFileName!= nullptr) fileAccess( lpBackupFileName, AccessWrite, successful( replaced, guard.error() ) );
             }
             return replaced;
         }
@@ -433,8 +439,8 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "MoveFileA", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
-                fileAccess( existingFileName, AccessDelete );
-                fileAccess( newFileName, AccessWrite );
+                fileAccess( existingFileName, AccessDelete, successful( moved, guard.error() ) );
+                fileAccess( newFileName, AccessWrite, successful( moved, guard.error() ) );
             }
             return moved;
         }       
@@ -446,8 +452,8 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "MoveFileW", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
-                fileAccess( existingFileName, AccessDelete );
-                fileAccess( newFileName, AccessWrite );
+                fileAccess( existingFileName, AccessDelete, successful( moved, guard.error() ) );
+                fileAccess( newFileName, AccessWrite, successful( moved, guard.error() ) );
             }
             return moved;
         }
@@ -460,8 +466,8 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "MoveFileExA", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
-                fileAccess( existingFileName, AccessDelete );
-                fileAccess( newFileName, AccessWrite );
+                fileAccess( existingFileName, AccessDelete, successful( moved, guard.error() ) );
+                fileAccess( newFileName, AccessWrite, successful( moved, guard.error() ) );
             }
             return moved;
         }       
@@ -474,8 +480,8 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "MoveFileExW", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
-                fileAccess( existingFileName, AccessDelete );
-                fileAccess( newFileName, AccessWrite );
+                fileAccess( existingFileName, AccessDelete, successful( moved, guard.error() ) );
+                fileAccess( newFileName, AccessWrite, successful( moved, guard.error() ) );
             }
             return moved;
         }       
@@ -490,8 +496,8 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "MoveFileWithProgressA", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
-                fileAccess( existingFileName, AccessDelete );
-                fileAccess( newFileName, AccessWrite );
+                fileAccess( existingFileName, AccessDelete, successful( moved, guard.error() ) );
+                fileAccess( newFileName, AccessWrite, successful( moved, guard.error() ) );
             }
             return moved;
         }
@@ -506,42 +512,8 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "MoveFileWithProgressW", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
-                fileAccess( existingFileName, AccessDelete );
-                fileAccess( newFileName, AccessWrite );
-            }
-            return moved;
-        }
-        BOOL PatchMoveFileWithProgressTransactedA(
-            LPCSTR             existingFileName,
-            LPCSTR             newFileName,
-            LPPROGRESS_ROUTINE lpProgressRoutine,
-            LPVOID             lpData,
-            DWORD              dwFlags,
-            HANDLE             hTransaction
-        ) {
-            auto moved = patchOriginal( PatchMoveFileWithProgressTransactedA )( existingFileName, newFileName, lpProgressRoutine, lpData, dwFlags, hTransaction );
-            FileGuard guard;
-            if ( guard() ) {
-                if (debugLog( PatchExecution )) debugMessage( "PatchMoveFileWithProgressTransactedA", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
-                fileAccess( existingFileName, AccessDelete );
-                fileAccess( newFileName, AccessWrite );
-            }
-            return moved;
-        }
-        BOOL PatchMoveFileWithProgressTransactedW(
-            LPCWSTR             existingFileName,
-            LPCWSTR             newFileName,
-            LPPROGRESS_ROUTINE lpProgressRoutine,
-            LPVOID             lpData,
-            DWORD              dwFlags,
-            HANDLE             hTransaction
-        ) {
-            auto moved = patchOriginal( PatchMoveFileWithProgressTransactedW )( existingFileName, newFileName, lpProgressRoutine, lpData, dwFlags, hTransaction );
-            FileGuard guard;
-            if ( guard() ) {
-                if (debugLog( PatchExecution )) debugMessage( "PatchMoveFileWithProgressTransactedW", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
-                fileAccess( existingFileName, AccessDelete );
-                fileAccess( newFileName, AccessWrite );
+                fileAccess( existingFileName, AccessDelete, successful( moved, guard.error() ) );
+                fileAccess( newFileName, AccessWrite, successful( moved, guard.error() ) );
             }
             return moved;
         }
@@ -553,7 +525,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "FindFirstFileA", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
-                fileAccess( fileName, AccessRead );
+                fileAccess( fileName, AccessRead, (handle != INVALID_HANDLE_VALUE) );
             }
             return handle;
         }        
@@ -565,7 +537,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "FindFirstFileW", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
-                fileAccess( fileName, AccessRead );
+                fileAccess( fileName, AccessRead, (handle != INVALID_HANDLE_VALUE) );
             }
             return handle;
         }
@@ -581,7 +553,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "FindFirstFileExA", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
-                fileAccess( fileName, AccessRead );
+                fileAccess( fileName, AccessRead, (handle != INVALID_HANDLE_VALUE) );
             }
             return handle;
         }
@@ -597,7 +569,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "FindFirstFileExW", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
-                fileAccess( fileName, AccessRead );
+                fileAccess( fileName, AccessRead, (handle != INVALID_HANDLE_VALUE) );
             }
             return handle;
         }
@@ -614,7 +586,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "FindFirstFileTransactedA", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
-                fileAccess( fileName, AccessRead );
+                fileAccess( fileName, AccessRead, (handle != INVALID_HANDLE_VALUE) );
             }
             return handle;
         }
@@ -631,7 +603,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "FindFirstFileTransactedW", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
-                fileAccess( fileName, AccessRead );
+                fileAccess( fileName, AccessRead, (handle != INVALID_HANDLE_VALUE) );
             }
             return handle;
         }
@@ -642,7 +614,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "GetFileAttributesA", (attributes != INVALID_FILE_ATTRIBUTES) ) << fileName << L", ... )" << record;
-                fileAccess( fileName, AccessRead );
+                fileAccess( fileName, AccessRead, (attributes != INVALID_FILE_ATTRIBUTES) );
             }
             return attributes;
         }
@@ -653,7 +625,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "GetFileAttributesW", (attributes != INVALID_FILE_ATTRIBUTES) ) << fileName << L", ... )" << record;
-                fileAccess( fileName, AccessRead );
+                fileAccess( fileName, AccessRead, (attributes != INVALID_FILE_ATTRIBUTES) );
             }
             return attributes;
         }
@@ -666,7 +638,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "GetFileAttributesExA", got ) << fileName << L", ... )" << record;
-                fileAccess( fileName, AccessRead );
+                fileAccess( fileName, AccessRead, successful( got, guard.error() ) );
             }
             return got;
         }
@@ -680,7 +652,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "GetFileAttributesExW", got ) << fileName << L", ... )" << record;
-                fileAccess( fileName, AccessRead );
+                fileAccess( fileName, AccessRead, successful( got, guard.error() ) );
             }
             return got;
         }
@@ -694,7 +666,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "GetFileAttributesTransactedA", got ) << fileName << L", ... )" << record;
-                fileAccess( fileName, AccessRead );
+                fileAccess( fileName, AccessRead, successful( got, guard.error() ) );
             }
             return got;
         }
@@ -708,7 +680,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "GetFileAttributesTransactedW", got ) << fileName << L", ... )" << record;
-                fileAccess( fileName, AccessRead );
+                fileAccess( fileName, AccessRead, successful( got, guard.error() ) );
             }
             return got;
         }
@@ -720,7 +692,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "PatchSetFileAttributesA", set ) << fileName << L", ... )" << record;
-                fileAccess( fileName, AccessWrite );
+                fileAccess( fileName, AccessWrite, successful( set, guard.error() ) );
             }
             return set;
         }
@@ -732,7 +704,7 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "PatchSetFileAttributesW", set ) << fileName << L", ... )" << record;
-                fileAccess( fileName, AccessWrite );
+                fileAccess( fileName, AccessWrite, successful( set, guard.error() ) );
             }
             return set;
         }
@@ -745,8 +717,8 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateHardLinkA", created )  << lpFileName << L", " << lpExistingFileName << ",  ... )" << record;
-                fileAccess( lpFileName, AccessWrite );
-                fileAccess( lpExistingFileName, AccessRead );
+                fileAccess( lpFileName, AccessWrite, successful( created, guard.error() ) );
+                fileAccess( lpExistingFileName, AccessRead, successful( created, guard.error() ) );
             }
             return created;
         }
@@ -759,8 +731,8 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateHardLinkW", created )  << lpFileName << L", " << lpExistingFileName << ",  ... )" << record;
-                fileAccess( lpFileName, AccessWrite );
-                fileAccess( lpExistingFileName, AccessRead );
+                fileAccess( lpFileName, AccessWrite, successful( created, guard.error() ) );
+                fileAccess( lpExistingFileName, AccessRead, successful( created, guard.error() ) );
             }
             return created;
         }
@@ -774,8 +746,8 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateHardLinkTransactedA", created ) << lpFileName << L", " << lpExistingFileName << ",  ... )" << record;
-                fileAccess( lpFileName, AccessWrite );
-                fileAccess( lpExistingFileName, AccessRead );
+                fileAccess( lpFileName, AccessWrite, successful( created, guard.error() ) );
+                fileAccess( lpExistingFileName, AccessRead, successful( created, guard.error() ) );
             }
             return created;
         }
@@ -789,8 +761,8 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateHardLinkTransactedW", created ) << lpFileName << L", " << lpExistingFileName << ",  ... )" << record;
-                fileAccess( lpFileName, AccessWrite );
-                fileAccess( lpExistingFileName, AccessRead );
+                fileAccess( lpFileName, AccessWrite, successful( created, guard.error() ) );
+                fileAccess( lpExistingFileName, AccessRead, successful( created, guard.error() ) );
             }
             return created;
         }
@@ -803,8 +775,8 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateSymbolicLinkA", created ) << lpSymlinkFileName << L", " << lpTargetFileName << L", " << dwFlags << " )" << record;
-                fileAccess( lpSymlinkFileName, AccessWrite );
-                fileAccess( lpTargetFileName, AccessRead );
+                fileAccess( lpSymlinkFileName, AccessWrite, successful( created, guard.error() ) );
+                fileAccess( lpTargetFileName, AccessRead, successful( created, guard.error() ) );
             }
             return created;
         }
@@ -817,8 +789,8 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateSymbolicLinkW", created ) << lpSymlinkFileName << L", " << lpTargetFileName << L", " << dwFlags << " )" << record;
-                fileAccess( lpSymlinkFileName, AccessWrite );
-                fileAccess( lpTargetFileName, AccessRead );
+                fileAccess( lpSymlinkFileName, AccessWrite, successful( created, guard.error() ) );
+                fileAccess( lpTargetFileName, AccessRead, successful( created, guard.error() ) );
             }
             return created;
         }
@@ -832,8 +804,8 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateSymbolicLinkTransactedA", created ) << lpSymlinkFileName << L", " << lpTargetFileName << L", " << dwFlags << " )" << record;
-                fileAccess( lpSymlinkFileName, AccessWrite );
-                fileAccess( lpTargetFileName, AccessRead );
+                fileAccess( lpSymlinkFileName, AccessWrite, successful( created, guard.error() ) );
+                fileAccess( lpTargetFileName, AccessRead, successful( created, guard.error() ) );
             }
             return created;
         }
@@ -847,19 +819,17 @@ namespace AccessMonitor {
             FileGuard guard;
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateSymbolicLinkTransactedW", created ) << lpSymlinkFileName << L", " << lpTargetFileName << L", " << dwFlags << " )" << record;
-                fileAccess( lpSymlinkFileName, AccessWrite );
-                fileAccess( lpTargetFileName, AccessRead );
+                fileAccess( lpSymlinkFileName, AccessWrite, successful( created, guard.error() ) );
+                fileAccess( lpTargetFileName, AccessRead, successful( created, guard.error() ) );
             }
             return created;
         }
         BOOL PatchCloseHandle( HANDLE handle ) {
             FileGuard guard;
             if ( guard() ) {
-                // Record last write time when closing file opened for write (also for WithProgress calls)
-                wstring fileName = fileAccess( handle, AccessNone );
-                if  (fileName != L"") {
-                    if (debugLog( PatchExecution )) debugMessage( "CloseHandle" ) << handleCode( handle ) << L" ) on " << fileName.c_str() << record;
-                }
+                // Record last write time when closing an actual file opened for write (also for WithProgress calls)
+                auto fileName = fullName( handle );
+                fileAccessFull( fileName, AccessNone );
             }
             return patchOriginal( PatchCloseHandle )( handle );
         }
@@ -901,10 +871,8 @@ namespace AccessMonitor {
             wstring simplePath = fileName;
             if ((simplePath.size() <= MAX_PATH) && simplePath.starts_with(L"\\\\?\\")) simplePath = &fileName[4];
             if (simplePath.starts_with(L"\\\\.\\")) simplePath = &fileName[4];
-            std::erase(simplePath, '"');
-            simplePath.insert(0, L"\"");
-            simplePath.append(L"\"");
-            return path(simplePath).generic_wstring();
+            erase(simplePath, '"');
+            return path( simplePath ).generic_wstring();
         }
 
         // Extract file name from handle to opened file
@@ -928,12 +896,9 @@ namespace AccessMonitor {
         wstring fullName( const char* fileName ) {
             return fullName( widen( string( fileName ) ).c_str() );
         }
-        wstring fullName( const wstring& fileName ) {
-            return fullName( fileName.c_str() );
-        }
 
-        void recordEvent( const wstring& file, FileAccessMode mode, const FileTime& time ) {
-            if (recordingEvents()) eventRecord() << file << L" [" << time << L"] " << modeToString(mode) << record;
+        void recordEvent( const wstring& file, FileAccessMode mode, const FileTime& time, bool success ) {
+            if (recordingEvents()) eventRecord() << file << L" [" << time << L"] " << fileAccessModeToString(mode) << " " << success << record;
         }
 
         FileTime getLastWriteTime( const wstring& fileName ) {
@@ -967,26 +932,21 @@ namespace AccessMonitor {
             }
             return FileTime();
         }
+
         // Register file access mode on file path
-        wstring fileAccess( const wstring& fileName, FileAccessMode mode ) {
+        wstring fileAccessFull( const wstring& fullFileName, FileAccessMode mode, bool success ) {
+            if (fullFileName != L"") {
+                if (debugLog( FileAccesses )) debugRecord() << L"MonitorFiles - " << fileAccessModeToString( mode ) << L" access on file " << fullFileName << record;
+                recordEvent( fullFileName, mode, getLastWriteTime( fullFileName ), success );
+            }
+            return fullFileName;
+        }
+        wstring fileAccess( const wstring& fileName, FileAccessMode mode, bool success ) {
             auto fullFileName = fullName( fileName.c_str() );
-            if (fullFileName != L"") {
-                if (debugLog( FileAccesses )) debugRecord() << L"MonitorFiles - " << modeToString( mode ) << L" access by name on file " << fullFileName << record;
-                recordEvent( fullFileName, mode, getLastWriteTime( fileName ) );
-            }
-            return fullFileName;
+            return fileAccessFull( fullFileName, mode, success );
         }
-        wstring fileAccess( const string& fileName, FileAccessMode mode ) {
-            return fileAccess( widen( fileName ), mode );
-        }
-        // Register file access mode on (file) handle
-        wstring fileAccess( HANDLE handle, FileAccessMode mode ) {
-            auto fullFileName = fullName( handle );
-            if (fullFileName != L"") {
-                if (debugLog( FileAccesses )) debugRecord() << L"MonitorFiles - " << modeToString( mode ) << L" access by handle " << handleCode( handle) << " on file " << fullFileName << record;
-                recordEvent( fullFileName, mode, getLastWriteTime( handle ) );
-            }
-            return fullFileName;
+        wstring fileAccess( const string& fileName, FileAccessMode mode, bool success ) {
+            return fileAccess( widen( fileName ), mode, success );
         }
 
         struct Registration {
@@ -1049,8 +1009,6 @@ namespace AccessMonitor {
             { "kernel32", "SetFileAttributesA", (PatchFunction)PatchSetFileAttributesA },
             { "kernel32", "SetFileAttributesW", (PatchFunction)PatchSetFileAttributesW },
             { "kernel32", "CloseHandle", (PatchFunction)PatchCloseHandle },
-            // { "kernel32", "MoveFileWithProgressTransactedA", (PatchFunction)PatchMoveFileWithProgressTransactedA },
-            // { "kernel32", "MoveFileWithProgressTransactedW", (PatchFunction)PatchMoveFileWithProgressTransactedW },
         };
 
     } // namespace (anonymous)

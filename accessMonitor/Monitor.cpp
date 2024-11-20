@@ -54,28 +54,24 @@ namespace AccessMonitor {
                 path filePath;
                 FileTime lastWriteTime;
                 wstring accessMode;
+                bool success;
                 while (!eventFile.eof()) {
                     eventFile >> ws >> filePath >> ws;
                     from_stream( eventFile, L"[ %Y-%m-%d %H:%M:%10S ]", lastWriteTime );
-                    eventFile >> ws >> accessMode >> ws;
+                    eventFile >> ws >> accessMode >> ws >> success;
                     if (eventFile.good()) {
                         if (0 < collected.count( filePath )) {
-                            auto& access = collected[ filePath ];                            
-                            auto mode = stringToMode( accessMode );
-                            if ((mode & AccessDelete) != 0) access.mode = AccessDelete;
-                            else if ((mode & AccessWrite) != 0) access.mode = AccessWrite;
-                            else if (((mode & AccessRead) != 0) && ((access.mode & AccessDelete) == 0) && ((access.mode & AccessWrite) == 0)) access.mode = AccessRead;
-                            access.modes |= mode;
-                            if ((access.lastWriteTime < lastWriteTime) && ((mode & AccessRead) == 0)) access.lastWriteTime = lastWriteTime;
+                            collected[ filePath ].mode( stringToFileAccessMode( accessMode ), lastWriteTime, success );                            
                         } else {
-                            collected[ filePath ] = FileAccess( stringToMode( accessMode ), lastWriteTime );
+                            collected[ filePath ] = FileAccess( stringToFileAccessMode( accessMode ), lastWriteTime, success );
                         }
                     } else break; // Presumably file is corrupt, ignore further content...
                 }
                 eventFile.close();
             }
-            error_code ec;
-            remove_all( sessionData, ec );
+            // ToDo: Do not remove event files while compiled in debug
+            // error_code ec;
+            // remove_all( sessionData, ec );
         }
 
         mutex monitorMutex;
