@@ -871,7 +871,6 @@ namespace AccessMonitor {
             wstring simplePath = fileName;
             if ((simplePath.size() <= MAX_PATH) && simplePath.starts_with(L"\\\\?\\")) simplePath = &fileName[4];
             if (simplePath.starts_with(L"\\\\.\\")) simplePath = &fileName[4];
-            erase(simplePath, '"');
             return path( simplePath ).generic_wstring();
         }
 
@@ -879,10 +878,8 @@ namespace AccessMonitor {
         // Will return empty string if handle does not refer to a file
         wstring fullName( HANDLE handle ) {
             wchar_t fileNameString[ MaxFileName ];
-            if ( GetFinalPathNameByHandleW( handle, fileNameString, MaxFileName, 0 ) ) {
-                return simplify(fileNameString);
-            }
-            return path("").generic_wstring();
+            if ( !GetFinalPathNameByHandleW( handle, fileNameString, MaxFileName, 0 ) ) return L"";
+            return simplify(fileNameString);
         }
         // Expand file name to full path (according to Windows semantics)
         // Returns empty string if file name expansion fails.

@@ -51,19 +51,20 @@ namespace AccessMonitor {
             const path sessionData( sessionDataPath( directory, session ) );
             for (auto const& entry : directory_iterator( sessionData )) {
                 auto eventFile = wifstream( entry.path() );
-                path filePath;
+                wstring filePath;
                 FileTime lastWriteTime;
-                wstring accessMode;
+                wstring modeString;
                 bool success;
                 while (!eventFile.eof()) {
                     eventFile >> ws >> filePath >> ws;
                     from_stream( eventFile, L"[ %Y-%m-%d %H:%M:%10S ]", lastWriteTime );
-                    eventFile >> ws >> accessMode >> ws >> success;
+                    eventFile >> ws >> modeString >> ws >> success;
+                    auto mode( stringToFileAccessMode( modeString ) );
                     if (eventFile.good()) {
                         if (0 < collected.count( filePath )) {
-                            collected[ filePath ].mode( stringToFileAccessMode( accessMode ), lastWriteTime, success );                            
+                            collected[ filePath ].mode( mode, lastWriteTime, success );                            
                         } else {
-                            collected[ filePath ] = FileAccess( stringToFileAccessMode( accessMode ), lastWriteTime, success );
+                            collected[ filePath ] = FileAccess( mode, lastWriteTime, success );
                         }
                     } else break; // Presumably file is corrupt, ignore further content...
                 }

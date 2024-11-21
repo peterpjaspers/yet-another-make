@@ -12,6 +12,10 @@ path directory( temp_directory_path() );
 
 void fileAccess( const path& dataDirectory ) {
     create_directories( dataDirectory );
+    ifstream ifile( dataDirectory / "nonExisting.txt" );
+    ifile.close();
+    ifstream ifile( dataDirectory / "moreJunk.txt" );
+    ifile.close();
     ofstream file( dataDirectory / "junk.txt" );
     file << "Hello world!\n";
     file.close();
