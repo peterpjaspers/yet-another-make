@@ -90,7 +90,7 @@ namespace AccessMonitor {
     }
     void unregisterPatch( std::string name ) {
         static const char* signature = "void unregisterPatch( std::string name )";
-        if (registeredPatches.count( name ) == 0) throw string( signature ) + string( " - Function " ) + name + string( " not registred!" );
+        if (registeredPatches.count( name ) == 0) throw runtime_error( string( signature ) + " - Function " + name + " not registred!" );
         auto function = registeredPatches[ name ] ;
         registeredPatches.erase( name );
         functionToPatch.erase( function );
@@ -107,13 +107,13 @@ namespace AccessMonitor {
     PatchFunction original( std::string name ) {
         static const char* signature = "PatchFunction original( std::string name )";
         auto function = registeredPatches[ name ];
-        if (function == nullptr) throw string( signature ) + string( " - Function " ) + name + string( " not registred!" );
+        if (function == nullptr) throw runtime_error( string( signature ) + " - Function " + name + " not registred!" );
         return original( function );
     }
 
     void patch() {
         static const char* signature = "void patch()";
-        if (librariesPatched) throw string( signature ) + string( " - Libraries already patched!" );
+        if (librariesPatched) throw runtime_error( string( signature ) + " - Libraries already patched!" );
         DetourTransactionBegin();
         DetourUpdateThread(GetCurrentThread());
         patchAll();
@@ -122,7 +122,7 @@ namespace AccessMonitor {
     }
     void unpatch() {
         static const char* signature = "void unpatch()";
-        if (!librariesPatched) throw string( signature ) + string( " - Libraries not patched!" );
+        if (!librariesPatched) throw runtime_error( string( signature ) + " - Libraries not patched!" );
         DetourTransactionBegin();
         DetourUpdateThread(GetCurrentThread());
         unpatchAll();

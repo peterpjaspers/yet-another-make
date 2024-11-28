@@ -38,7 +38,7 @@ namespace AccessMonitor {
     // Generate exception with function name and  Windows last error code
     void errorException( const std::string function ) {
         DWORD error = GetLastError();
-        if (0 < error) throw ( function + errorString( error ) );
+        if (0 < error) throw runtime_error( function + errorString( error ) );
     }
     
     
@@ -98,7 +98,7 @@ int main( int argc, char* argv[] ) {
     string library = ( (1 < argc) ? argv[ 1 ] : "" );
     if (library != "") {
         HANDLE lib = LoadLibraryA( library.c_str() );
-        if (lib == nullptr) throw "Could not load library!";
+        if (lib == nullptr) throw runtime_error( string( "Could not load library" ) + library.c_str() + "!" );
     }
     auto dlls = EnumerateModules( "" );
     for ( auto dll : dlls ){

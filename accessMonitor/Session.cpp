@@ -3,6 +3,7 @@
 #include <set>
 #include <map>
 #include <mutex>
+#include <iostream>
 #include <windows.h>
 
 using namespace std;
@@ -34,7 +35,7 @@ namespace AccessMonitor {
             MonitorAccess   fileGuard;
             MonitorAccess   processGuard;
             ThreadContext() = delete;
-            ThreadContext( SessionID id ) : session( id ) {}
+            ThreadContext( SessionID id, LogFile* eventLog = nullptr, LogFile* debugLog = nullptr ) : session( id ) {}
         };
         inline ThreadContext* threadContext() { return( static_cast<ThreadContext*>(TlsGetValue(tlsSessionIndex)) ); }
 
@@ -43,12 +44,12 @@ namespace AccessMonitor {
     Session::Session( const std::filesystem::path& directory, const LogAspects aspects ) : events( nullptr ), debug( nullptr ) {
         static const char* signature = "Session::Session( const std::filesystem::path& dir, const LogAspects dasp = 0 )";
         auto ctx( threadContext() );
-        if (ctx != nullptr) throw string( signature ) + " - Thread already active on a session!";
+        if (ctx != nullptr) throw runtime_error( string( signature ) + " - Thread already active on a session!" );
         // Create new session in root process...
         const lock_guard<mutex> lock( sessionMutex );
-        if (remoteSession != nullptr) throw string( signature ) + " - Invalid call in remote session!";
+        if (remoteSession != nullptr) throw runtime_error( string( signature ) + " - Invalid call in remote session!" );
         if (tlsSessionIndex == -1) tlsSessionIndex = TlsAlloc();
-        if (tlsSessionIndex == TLS_OUT_OF_INDEXES) throw string( signature ) + " - Could not allocate thread local storage index!";
+        if (tlsSessionIndex == TLS_OUT_OF_INDEXES) throw runtime_error( string( signature ) + " - Could not allocate thread local storage index!" );
         SessionID newID;
         if (0 < freeSessions.size()) {
             newID = freeSessions.back();
@@ -65,33 +66,42 @@ namespace AccessMonitor {
     Session::Session( const SessionContext& ctx ) : context( ctx ), events( nullptr ), debug( nullptr ) {
         static const char* signature = "Session::Session( const SessionContext& ctx )";
         const lock_guard<mutex> lock( sessionMutex );
-        if (0 < count()) throw string( signature ) + " - One or more session already active!";
+        if (0 < count()) throw runtime_error( string( signature ) + " - One or more session already active!" );
         tlsSessionIndex = TlsAlloc();
-        if (tlsSessionIndex == TLS_OUT_OF_INDEXES) throw string( signature ) + " - Could not allocate thread local storage index!";
-        context.directory = ctx.directory;
-        context.session = ctx.session;
-        context.aspects = ctx.aspects;
+        if (tlsSessionIndex == TLS_OUT_OF_INDEXES) throw runtime_error( string( signature ) + " - Could not allocate thread local storage index!" );
         sessions.insert( { context.session, this } );
         remoteSession = this;
         addThread();
     }
     Session::~Session() {
         const lock_guard<mutex> lock( sessionMutex );
-        SessionID freeID = context.session;
-        sessions.erase( freeID );
-        terminatedSessions.insert( freeID );
-        if (this == remoteSession) remoteSession = nullptr;
+        SessionID id = context.session;
+        if (sessions.count( id ) == 0) _terminate();
+        terminatedSessions.erase( id );
+        freeSessions.push_back( id );
         if (count() == 0) {
             // Removing last active session...
             TlsFree( tlsSessionIndex );
             tlsSessionIndex = -1;
         }
     }
-    void Session::release( SessionID id ) {
-        static const char* signature = "void Session::release( SessionID id )";
-        if (terminatedSessions.find( id ) == terminatedSessions.end()) throw string(signature) + " - Session not terminated!";
-        terminatedSessions.erase( id );
-        freeSessions.push_back( id );
+    void Session::_terminate() {
+        SessionID id = context.session;
+        sessions.erase( id );
+        terminatedSessions.insert( id );
+        if (this == remoteSession) remoteSession = nullptr;
+        delete events;
+        events = nullptr;
+        if (debug != nullptr) {
+            delete debug;
+            debug = nullptr;
+        }
+    }
+    void Session::terminate() {
+        static const char* signature = "void Session::terminate()";
+        const lock_guard<mutex> lock( sessionMutex );
+        if (sessions.count( context.session ) == 0) throw runtime_error( string(signature) + " - Session already terminated!" );
+        _terminate();
     }
     Session* Session::current() {
         static const char* signature = "Session* Session::current()";
@@ -107,37 +117,36 @@ namespace AccessMonitor {
         return( session->second );
     }
     int Session::count() { return sessions.size(); }
-    SessionID Session::id() const { return context.session; }
     const std::filesystem::path& Session::directory() const { return context.directory; }
+    SessionID Session::id() const { return context.session; }
+    LogAspects Session::aspects() const { return context.aspects; }
     void Session::addThread() const {
         static const char* signature = "void Session::addThread() const";
         auto context( threadContext() );
-        if (context != nullptr) throw string( signature ) + " - Thread already active on a session!";
+        if (context != nullptr) throw runtime_error( string( signature ) + " - Thread already active on a session!" );
         TlsSetValue( tlsSessionIndex, new ThreadContext( id() ) );
     };
     void Session::removeThread() const {
         static const char* signature = "void Session::removeThread() const";
         auto context( threadContext() );
-        if (context == nullptr) throw string( signature ) + " - Thread not active on a session!";
-        if (context->session != id()) throw string( signature ) + " - Invalid session ID!";
+        if (context == nullptr) throw runtime_error( string( signature ) + " - Thread not active on a session!" );
+        if (context->session != id()) throw runtime_error( string( signature ) + " - Invalid session ID!" );
         delete context;
         TlsSetValue( tlsSessionIndex, nullptr );
 
     }
-    void Session::eventLog( LogFile* file ) { events = file; }
+    void Session::eventLog( LogFile* file ) {
+        static const char* signature = "void Session::debugLog( LogFile* file )";
+        if (events != nullptr) throw runtime_error( string( signature ) + " - Event log already defined for session!" );
+        events = file;
+    }
     LogFile* Session::eventLog() const { return events; }
-    void Session::eventClose() {
-        auto log = events;
-        events = nullptr;
-        delete log;
+    void Session::debugLog( LogFile* file ) {
+        static const char* signature = "void Session::debugLog( LogFile* file )";
+        if (debug != nullptr) throw runtime_error( string( signature ) + " - Debug log already defined for session!" );
+        debug = file;
     }
-    void Session::debugLog( LogFile* file ) { debug = file; }
     LogFile* Session::debugLog() const { return debug; }
-    void Session::debugClose() {
-        auto log = debug;
-        debug = nullptr;
-        delete log;
-    }
     MonitorAccess* Session::fileAccess() {
         auto context( threadContext() );
         if (context == nullptr) {
@@ -167,9 +176,9 @@ namespace AccessMonitor {
         const char* signature( "void recordSessionContext( const path& dir, const ProcessID process, const SessionID session, ThreadID thread )" );
         auto map = CreateFileMappingA( INVALID_HANDLE_VALUE, nullptr,   PAGE_READWRITE, 0, sizeof( SessionConextData ), sessionInfoMapName( process ).c_str() );
         auto error = GetLastError();
-        if (map == nullptr) throw string( signature ) + " - Could not create file mapping!";
+        if (map == nullptr) throw runtime_error( string( signature ) + " - Could not create file mapping!" );
         auto address = MapViewOfFile( map, FILE_MAP_ALL_ACCESS, 0, 0, sizeof( SessionConextData ) );
-        if (address == nullptr) throw string( signature ) + " - Could not open mapping!";
+        if (address == nullptr) throw runtime_error( string( signature ) + " - Could not open mapping!" );
         auto data = static_cast<SessionConextData*>( address );
         data->session = context.session;
         data->aspects = context.aspects;
@@ -182,9 +191,9 @@ namespace AccessMonitor {
     const SessionContext Session::retrieveContext( const ProcessID process ) {
         const char* signature( "const SessionContext Session::retreive( const ProcessID process )" );
         auto map = OpenFileMappingA( FILE_MAP_ALL_ACCESS, false, sessionInfoMapName( process ).c_str() );
-        if (map == nullptr) throw string( signature ) + " - Could not create file mapping!";
+        if (map == nullptr) throw runtime_error( string( signature ) + " - Could not create file mapping!" );
         void* address = MapViewOfFile( map, FILE_MAP_ALL_ACCESS, 0, 0, sizeof( SessionConextData ) );
-        if (address == nullptr) throw string( signature ) + " - Could not open mapping!";
+        if (address == nullptr) throw runtime_error( string( signature ) + " - Could not open mapping!" );
         auto data = static_cast<const SessionConextData*>( address );
         SessionContext context( data->directory, data->session, data->aspects );
         UnmapViewOfFile( address );

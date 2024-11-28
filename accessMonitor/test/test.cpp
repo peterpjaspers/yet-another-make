@@ -8,6 +8,7 @@
 #include <string>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <thread>
 #include <cstdlib>
 
@@ -50,48 +51,45 @@ const std::string remoteTestFile( "C:/Users/philv/Code/yam/yet-another-make/acce
 
 void worker( const path directoryPath ) {
     try {
-        debugRecord() << "std::filesystem::create_directories( " << directoryPath << " )" << record;
+        if (debugLog( General )) debugRecord() << "std::filesystem::create_directories( " << directoryPath << " )" << record;
         create_directories( directoryPath );
-        debugRecord() << "std::ifstream( " << (directoryPath / "nonExisting.txt").c_str() << " )" << record;
+        if (debugLog( General )) debugRecord() << "std::ifstream( " << (directoryPath / "nonExisting.txt").c_str() << " )" << record;
         ifstream nefile( directoryPath / "nonExisting.txt" );
         nefile.close();
-        debugRecord() << "std::ifstream( " << (directoryPath / "moreJunk.txt").c_str() << " )" << record;
+        if (debugLog( General )) debugRecord() << "std::ifstream( " << (directoryPath / "moreJunk.txt").c_str() << " )" << record;
         ifstream ifile( directoryPath / "moreJunk.txt" );
         ifile.close();
-        debugRecord() << "std::ofstream( " << (directoryPath / "junk.txt").c_str() << " )" << record;
+        if (debugLog( General )) debugRecord() << "std::ofstream( " << (directoryPath / "junk.txt").c_str() << " )" << record;
         ofstream file( directoryPath / "junk.txt" );
         file << "Hello world!\n";
         file.close();
-        this_thread::sleep_for(chrono::milliseconds(rand() % 17));;
-        debugRecord() << "std::ofstream( " << (directoryPath / "moreJunk.txt").c_str() << " )" << record;
+        this_thread::sleep_for(chrono::milliseconds(rand() % 17));
+        if (debugLog( General )) debugRecord() << "std::ofstream( " << (directoryPath / "moreJunk.txt").c_str() << " )" << record;
         ofstream anotherFile( directoryPath / "moreJunk.txt" );
         anotherFile << "Hello again!\n";
         anotherFile.close();
-        debugRecord() << "Determine canonical path of " << (directoryPath / "morejunk.txt").c_str() << record;
+        if (debugLog( General )) debugRecord() << "Determine canonical path of " << (directoryPath / "morejunk.txt").c_str() << record;
         auto canon = canonical( directoryPath / "morejunk.txt" );
-        debugRecord() << "Canonical path is " << canon.c_str() << record;
+        if (debugLog( General )) debugRecord() << "Canonical path is " << canon.c_str() << record;
         CopyFileW( (directoryPath / "moreJunk.txt").c_str(), (directoryPath / "evenMoreJunk.txt").c_str(), false );
-        debugRecord() << "std::filesystem::remove( " << (directoryPath / "junk.txt").c_str() << " )" << record;
+        if (debugLog( General )) debugRecord() << "std::filesystem::remove( " << (directoryPath / "junk.txt").c_str() << " )" << record;
         remove( directoryPath / "junk.txt" );
-        debugRecord() << "std::filesystem::rename( " << (directoryPath / "moreJunk.txt").c_str() << ", " << (directoryPath / "yetMorejunk.txt").c_str() << " )" << record;
+        if (debugLog( General )) debugRecord() << "std::filesystem::rename( " << (directoryPath / "moreJunk.txt").c_str() << ", " << (directoryPath / "yetMorejunk.txt").c_str() << " )" << record;
         rename( directoryPath / "moreJunk.txt", directoryPath / "yetMoreJunk.txt" );
-        debugRecord() << "std::filesystem::remove_all( " << directoryPath << " )" << record;
+        if (debugLog( General )) debugRecord() << "std::filesystem::remove_all( " << directoryPath << " )" << record;
         error_code ec;
         remove_all( directoryPath, ec );
-        debugRecord() << "std::filesystem::create_directories( " << directoryPath << " )" << record;
+        if (debugLog( General )) debugRecord() << "std::filesystem::create_directories( " << directoryPath << " )" << record;
         create_directories( directoryPath );
         file = ofstream( directoryPath / "junk.txt" );
         file << "Hello world!\n";
         file.close();
     }
-    catch (filesystem_error const& exception) {
-        debugRecord() << "Exception  " << exception.what() << "!" << record;
-    }
-    catch (string text) {
-        debugRecord() << "Exception " << wstring( text.begin(), text.end() ) << "!" << record;
+    catch (exception const& exception) {
+        if (debugLog( General )) debugRecord() << "Exception  " << exception.what() << "!" << record;
     }
     catch (...) {
-        debugRecord() << "Exception!" << record;
+        if (debugLog( General )) debugRecord() << "Exception!" << record;
     }
 }
 
@@ -108,7 +106,7 @@ void doFileAccess() {
                 << threads
                 << " "
                 << session->directory().generic_string();
-            debugRecord() << "Executing " << command.str().c_str() << record;
+            if (debugLog( General )) debugRecord() << "Executing " << command.str().c_str() << record;
             // auto exitCode = system( command.str().c_str() );
             executeCommand( command.str().c_str() );
         }
@@ -125,36 +123,41 @@ void doFileAccess() {
             worker( sessionDir / L"fileAccessTest" );
         }
     }
-    catch (filesystem_error const& exception) {
-        debugRecord() << "Exception  " << exception.what() << "!" << record;
-    }
-    catch (string text) {
-        debugRecord() << "Exception " << wstring( text.begin(), text.end() ) << "!" << record;
+    catch (exception const& exception) {
+        if (debugLog( General )) debugRecord() << "Exception  " << exception.what() << "!" << record;
     }
     catch (...) {
-        debugRecord() << "Exception!" << record;
+        if (debugLog( General )) debugRecord() << "Exception!" << record;
     }
 }
 
 void doMonitoredFileAccess() {
-    // auto aspects = MonitorLogAspects( RegisteredFunction | PatchedFunction | PatchExecution | FileAccesses );
-    auto aspects = MonitorLogAspects( PatchExecution | FileAccesses );
-    startMonitoring( temp_directory_path(), aspects );
-    auto session( Session::current() );
-    auto id( session->id() );
-    doFileAccess();
-    MonitorEvents events;
-    stopMonitoring( &events );
-    // Log (all) events for this session...
-    LogFile output( temp_directory_path() / uniqueName( L"TestProgramOutput", id, L"txt" )  );
-    for ( auto access : events ) {
-        wstring fileName( access.first );
-        FileAccess fileAccess( access.second );
-        output()
-            << fileName
-            << L" [ " << fileAccess.writeTime() << L" ] "
-            << fileAccessModeToString( fileAccess.modes() ) << (fileAccess.failures() ? " (one or more failures)" : "" )
-            << " : " << fileAccessModeToString( fileAccess.mode() ) << (fileAccess.success() ? "" : " failed" ) << record;
+    try {
+        // auto aspects = MonitorLogAspects( General | RegisteredFunction | PatchedFunction | PatchExecution | FileAccesses );
+        auto aspects = MonitorLogAspects( General | PatchExecution | FileAccesses );
+        startMonitoring( temp_directory_path(), aspects );
+        auto session( Session::current() );
+        auto id( session->id() );
+        doFileAccess();
+        MonitorEvents events;
+        stopMonitoring( &events );
+        // Log (all) events for this session...
+        LogFile output( temp_directory_path() / uniqueName( L"TestProgramOutput", id, L"txt" )  );
+        for ( auto access : events ) {
+            wstring fileName( access.first );
+            FileAccess fileAccess( access.second );
+            output()
+                << fileName
+                << L" [ " << fileAccess.writeTime() << L" ] "
+                << fileAccessModeToString( fileAccess.modes() ) << (fileAccess.failures() ? " (one or more failures)" : "" )
+                << " : " << fileAccessModeToString( fileAccess.mode() ) << (fileAccess.success() ? "" : " failed" ) << record;
+        }
+    }
+    catch (exception const& exception) {
+        cout << "Exception  " << exception.what() << "!" << endl;
+    }
+    catch (...) {
+        cout << "Exception!" << endl;
     }
 }
 

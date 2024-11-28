@@ -1,7 +1,6 @@
 #include "LogFile.h"
 
 #include <fstream>
-#include <iostream>
 #include <clocale>
 #include <codecvt>
 #include <cstdlib>
@@ -19,14 +18,12 @@ namespace AccessMonitor {
         logFile( file ), tlsRecordIndex( TlsAlloc() ), enabledAspects( 0 ), logTime( time ), logInterval( interval ), previousTime( chrono::system_clock::now() )
     {
         const char* signature = "LogFile( const path& file, bool time, bool interval )";
-        if (tlsRecordIndex == TLS_OUT_OF_INDEXES) throw string( signature ) + " - Could not allocate thread local storage!";
+        if (tlsRecordIndex == TLS_OUT_OF_INDEXES) throw runtime_error( string( signature ) + " - Could not allocate thread local storage!" );
     }
-
     LogFile::~LogFile() {
-        const lock_guard<mutex> lock( logMutex ); 
+        const lock_guard<mutex> lock( logMutex );
         logFile.close();
     }
-
     // Return logging stream on enabled log.
     LogRecord& LogFile::operator()() {
         static const char* signature = "LogRecord& LogFile::operator()()";

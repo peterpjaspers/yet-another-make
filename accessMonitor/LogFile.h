@@ -40,9 +40,9 @@ namespace AccessMonitor {
         LogFile( const std::filesystem::path& file, bool logTimes = false, bool logIntervals = false );
         LogFile( const LogFile& other ) = delete;
         LogFile( LogFile&& other ) = delete;
+        ~LogFile();
         LogFile& operator=( const LogFile& other ) = delete;
         LogFile& operator=( LogFile&& other ) = delete;
-        ~LogFile();
         // Return a (wide) string stream in which to compose a log record.
         LogRecord& operator()();
         // Enable logging one or more aspects.

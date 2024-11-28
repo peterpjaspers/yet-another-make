@@ -2,7 +2,6 @@
 #define ACCESS_MONITOR_PATCH_H
 
 #include <string>
-#include <iostream>
 
 namespace AccessMonitor {
 

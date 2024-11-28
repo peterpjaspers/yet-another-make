@@ -9,10 +9,10 @@ using namespace std::filesystem;
 
 namespace AccessMonitor {
     
-    string exceptionText( const string& signature, const string& message ) {
+    runtime_error injectException( const string& signature, const string& message ) {
         stringstream ss;
         ss << signature << " - " << message << "! [ " << GetLastError() << " ]";
-        return ss.str();
+        return runtime_error( ss.str() );
     }
 
     // Injects a DLL library in a (remote) process via a remote thread in the target process
@@ -36,18 +36,18 @@ namespace AccessMonitor {
                             auto context( session->recordContext( process ) );
                             auto completed = AccessEvent( "ProcessPatched", process );
                             if (threadHandle != nullptr) {
-                                if (ResumeThread( threadHandle ) < 0) throw exceptionText( signature, "Failed to resume remote thread" );
+                                if (ResumeThread( threadHandle ) < 0) throw injectException( signature, "Failed to resume remote thread" );
                                 EventWait( completed );
                                 CloseHandle( threadHandle );
-                            } else throw exceptionText( signature, "Failed to create remote thread" );
+                            } else throw injectException( signature, "Failed to create remote thread" );
                             ReleaseEvent( completed );
                             Session::releaseContext( context );
-                        } else throw exceptionText( signature, "Failed to access LoadLibraryW function pointer" );
-                    } else throw exceptionText( signature, "Failed to access Kernel32 module" );
-                } else throw exceptionText( signature, "Failed to write to remote memory" );
-            } else throw exceptionText( signature, "Failed to allocate remote memory" );
+                        } else throw injectException( signature, "Failed to access LoadLibraryW function pointer" );
+                    } else throw injectException( signature, "Failed to access Kernel32 module" );
+                } else throw injectException( signature, "Failed to write to remote memory" );
+            } else throw injectException( signature, "Failed to allocate remote memory" );
             CloseHandle( processHandle );
-        } else throw exceptionText( signature, "Failed to open target process" );
+        } else throw injectException( signature, "Failed to open target process" );
     }
 
 } // namespace accessMonitor

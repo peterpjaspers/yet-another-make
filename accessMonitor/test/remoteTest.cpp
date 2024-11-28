@@ -2,7 +2,6 @@
 #include <string>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <thread>
 
 using namespace std;
@@ -12,8 +11,8 @@ path directory( temp_directory_path() );
 
 void fileAccess( const path& dataDirectory ) {
     create_directories( dataDirectory );
-    ifstream ifile( dataDirectory / "nonExisting.txt" );
-    ifile.close();
+    ifstream nefile( dataDirectory / "nonExisting.txt" );
+    nefile.close();
     ifstream ifile( dataDirectory / "moreJunk.txt" );
     ifile.close();
     ofstream file( dataDirectory / "junk.txt" );
@@ -49,17 +48,12 @@ wstring uniqueName( const wstring& name, unsigned long code ) {
 }
 
 int main( int argc, char* argv[] ) {
-    try {
-        int session = 1;
-        int threads = 1;
-        if (3 < argc) directory = argv[ 3 ];
-        if (2 < argc) threads = atoi( argv[ 2 ] );
-        if (1 < argc) session = atoi( argv[ 1 ] );
-        doFileAccess( threads, ( directory / uniqueName( L"RemoteSession", session ) ) );
-    }
-    catch (string message) {
-        cout << "Exception raised : " << message << endl;
-    }
+    int session = 1;
+    int threads = 1;
+    if (3 < argc) directory = argv[ 3 ];
+    if (2 < argc) threads = atoi( argv[ 2 ] );
+    if (1 < argc) session = atoi( argv[ 1 ] );
+    doFileAccess( threads, ( directory / uniqueName( L"RemoteSession", session ) ) );
     return( 0 );
 };
 

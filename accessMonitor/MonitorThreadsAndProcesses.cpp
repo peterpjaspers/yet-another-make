@@ -40,7 +40,7 @@ namespace AccessMonitor {
         void injectProcess( LPPROCESS_INFORMATION processInfo ) {
             const char* signature( "void injectProcess( LPPROCESS_INFORMATION processInfo )" );
             ProcessID process = GetProcessID( processInfo->dwProcessId );
-            debugRecord() << L"MonitorThreadsAndProcesses - Injecting DLL " << wstring( patchDLLFile.begin(), patchDLLFile.end() ) << " in process with ID " << process << "..." << record;
+            if (debugLog( General )) debugRecord() << L"MonitorThreadsAndProcesses - Injecting DLL " << wstring( patchDLLFile.begin(), patchDLLFile.end() ) << " in process with ID " << process << "..." << record;
             inject( patchDLLFile, process, Session::current() );
         }
 
@@ -278,12 +278,14 @@ namespace AccessMonitor {
                         // ToDo: Understand how to retrieve process executable name 
                         size = GetModuleFileNameExA( handle, NULL, fileName, MaxFileName );
                         CloseHandle( handle );
-                        if (size == 0) {
-                            debugMessage( "ExitProcess" ) << exitCode << L" ) Executable path could not be determined [ " << GetLastError() << L" ]" << record;
-                        } else {
-                            debugMessage( "ExitProcess" ) << exitCode << L" ) Executable " << fileName << record;
+                        if (debugLog( PatchExecution )) {
+                            if (size == 0) {
+                                debugMessage( "ExitProcess" ) << exitCode << L" ) Executable path could not be determined [ " << GetLastError() << L" ]" << record;
+                            } else {
+                                debugMessage( "ExitProcess" ) << exitCode << L" ) Executable " << fileName << record;
+                            }
                         }
-                    } else {
+                    } else if (debugLog( PatchExecution )) {
                         debugMessage( "ExitProcess" ) << exitCode  << L" ) Failed to access process [ " << GetLastError() << L" ]" << record;
                     }
                 }
