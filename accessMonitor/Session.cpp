@@ -28,12 +28,11 @@ namespace AccessMonitor {
         }
         
         // Single session associated with all threads in a remote process.
-        Session* remoteSession = nullptr;
+        Session* remoteSession( nullptr );
 
         struct ThreadContext {
             SessionID       session;
-            MonitorAccess   fileGuard;
-            MonitorAccess   processGuard;
+            MonitorAccess   access;
             ThreadContext() = delete;
             ThreadContext( SessionID id, LogFile* eventLog = nullptr, LogFile* debugLog = nullptr ) : session( id ) {}
         };
@@ -66,7 +65,7 @@ namespace AccessMonitor {
     Session::Session( const SessionContext& ctx ) : context( ctx ), events( nullptr ), debug( nullptr ) {
         static const char* signature = "Session::Session( const SessionContext& ctx )";
         const lock_guard<mutex> lock( sessionMutex );
-        if (0 < count()) throw runtime_error( string( signature ) + " - One or more session already active!" );
+        if (0 < count()) throw runtime_error( string( signature ) + " - One or more sessions already active!" );
         tlsSessionIndex = TlsAlloc();
         if (tlsSessionIndex == TLS_OUT_OF_INDEXES) throw runtime_error( string( signature ) + " - Could not allocate thread local storage index!" );
         sessions.insert( { context.session, this } );
@@ -90,10 +89,10 @@ namespace AccessMonitor {
         sessions.erase( id );
         terminatedSessions.insert( id );
         if (this == remoteSession) remoteSession = nullptr;
-        delete events;
+        delete events; // Closes event log file
         events = nullptr;
         if (debug != nullptr) {
-            delete debug;
+            delete debug; // Closes debug log file
             debug = nullptr;
         }
     }
@@ -147,21 +146,13 @@ namespace AccessMonitor {
         debug = file;
     }
     LogFile* Session::debugLog() const { return debug; }
-    MonitorAccess* Session::fileAccess() {
+    MonitorAccess* Session::monitorAccess() {
         auto context( threadContext() );
         if (context == nullptr) {
             if (Session::current() == nullptr) return nullptr;
             context = threadContext();
         }
-        return &context->fileGuard;
-    }
-    MonitorAccess* Session::processAccess() {
-        auto context( threadContext() );
-        if (context == nullptr) {
-            if (Session::current() == nullptr) return nullptr;
-            context = threadContext();
-        }
-        return &context->processGuard;
+        return &context->access;
     }
 
     // Session context passeed to spawned process to enable creating (opening) a session in a remote process.

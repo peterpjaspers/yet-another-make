@@ -50,13 +50,13 @@ namespace AccessMonitor {
     bool recordingEvents() {
         auto session( Session::current() );
         if (session == nullptr) return false;
-        auto log = session->eventLog();
+        auto log( session->eventLog() );
         if (log == nullptr) return false;
         return true;
     }
     LogFile& eventLog() {
         static const char* signature = "LogFile& eventLog()";
-        auto log = Session::current()->eventLog();
+        auto log( Session::current()->eventLog() );
         if (log == nullptr) throw runtime_error( string( signature ) + " - No event log defined for session" );
         return( *log );
     }

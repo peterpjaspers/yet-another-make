@@ -9,8 +9,9 @@
 using namespace std;
 using namespace std::filesystem;
 
-// ToDo: Conditionally compile logging code while compiling in debug controlled via NDEBUG
 // ToDo: Free (delete) LogRecord for each thread.
+//       Low priority because only a problen for threads that start and stop monioring
+//       and therefore not a problem for threads in a thread pool.
 
 namespace AccessMonitor {
 
@@ -27,13 +28,13 @@ namespace AccessMonitor {
     // Return logging stream on enabled log.
     LogRecord& LogFile::operator()() {
         static const char* signature = "LogRecord& LogFile::operator()()";
-        LogRecord* record = static_cast<LogRecord*>( TlsGetValue( tlsRecordIndex ) );
+        auto record( static_cast<LogRecord*>( TlsGetValue( tlsRecordIndex ) ) );
         if (record == nullptr) {
             record = new LogRecord( *this );
             TlsSetValue( tlsRecordIndex, record );
         }
         if (logTime || logInterval) {
-            auto time = chrono::system_clock::now();
+            auto time( chrono::system_clock::now() );
             if (logTime) (*record) << time << " : ";
             if (logInterval) (*record) << "[ " << fixed << setprecision( 3 ) << setw( 6 ) <<
                 chrono::duration_cast<chrono::microseconds >(time - previousTime).count() / 1000.0 << " ms ] ";

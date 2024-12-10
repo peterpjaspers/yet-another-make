@@ -7,6 +7,7 @@
 
 #include <filesystem>
 #include <map>
+#include <windows.h>
 
 namespace AccessMonitor {
 
@@ -26,17 +27,21 @@ namespace AccessMonitor {
 
     // A MonitorGuard prevents recursive entry into monitoring code; i.e., a patched function called
     // from monitoring code associated with a patched function will not itself be monitored. Effectively
-    // only patched functions called from the application are actually monitored. The guard also esures
-    // that the monitoring session is initialized (during the first call to a patched function in a
-    // process spawned in a monitoring session).
+    // only patched functions called from the application are actually monitored.
     class MonitorGuard {
     private:
         MonitorAccess* access;
     public:
         MonitorGuard() = delete;
-        MonitorGuard( MonitorAccess* monitor );
-        ~MonitorGuard();
-        inline bool operator()() { return( (access != nullptr) && (access->monitorCount == 1) ); }
+        inline MonitorGuard( MonitorAccess* monitor ) : access( monitor ) {
+            auto count( access->monitorCount++ );
+            if (count == 0) access->errorCode = GetLastError();
+        }
+        inline ~MonitorGuard() {
+            auto count( --access->monitorCount );
+            if (count == 0) SetLastError( access->errorCode );
+        }
+        inline bool operator()() { return( access->monitorCount == 1 ); }
         inline unsigned long count() { return access->monitorCount; }
         inline unsigned long error() { return access->errorCode; }
     };

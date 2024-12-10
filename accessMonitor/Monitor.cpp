@@ -4,10 +4,8 @@
 #include "Session.h"
 #include "FileNaming.h"
 #include "MonitorFiles.h"
-#include "MonitorThreadsAndProcesses.h"
+#include "MonitorProcesses.h"
 
-#include <windows.h>
-#include <iostream>
 #include <fstream>
 #include <filesystem>
 
@@ -48,10 +46,13 @@ namespace AccessMonitor {
         //
         // Last write time is collapsed to the lastest last write time.
         //
-        void collectMonitorEvents( const path& directory, const SessionID session, MonitorEvents& collected ) {
+        void collectMonitorEvents( const path& directory, const SessionID session, MonitorEvents& collected, bool cleanUp ) {
             const path sessionData( sessionDataPath( directory, session ) );
-            for (auto const& entry : directory_iterator( sessionData )) {
-                wifstream eventFile( entry.path().generic_string() );
+            // for (auto const& entry : directory_iterator( sessionData )) {
+            error_code error;
+            for (auto const& entry : directory_iterator( sessionData, (directory_options::none | directory_options::skip_permission_denied), error )) {
+                auto eventFileName( entry.path().generic_string() );
+                wifstream eventFile( eventFileName );
                 wstring filePath;
                 FileTime lastWriteTime;
                 wstring modeString;
@@ -71,11 +72,11 @@ namespace AccessMonitor {
                 }
                 eventFile.close();
             }
-#ifndef _DEBUG_ACCESS_MONITOR
-            // Remove all event files when not debugging
-            error_code ec;
-            remove_all( sessionData, ec );
-#endif
+            if (cleanUp) {
+                // Remove all event files when not debugging
+                error_code ec;
+                remove_all( sessionData, ec );
+            }
         }
 
         mutex monitorMutex;
@@ -95,7 +96,7 @@ namespace AccessMonitor {
         session->eventLog( createEventLog( directory, session->id() ) );
         if (Session::count() == 1) {
             registerFileAccess();
-            registerProcessesAndThreads();
+            registerProcessAccess();
             patch();
         }
     }
@@ -103,8 +104,6 @@ namespace AccessMonitor {
     void startMonitoring( const SessionContext& context ) {
         const lock_guard<mutex> lock( monitorMutex );
         Session* session( new Session( context ) );
-        createSessionDirectory( context.directory, context.session );
-        create_directory( context.directory / dataDirectory() );
         auto debugLogFile( createDebugLog( context.directory, context.session ) );
         if (debugLogFile != nullptr) {
             session->debugLog( debugLogFile );
@@ -114,12 +113,11 @@ namespace AccessMonitor {
         session->eventLog( createEventLog( context.directory, context.session ) );
         if (Session::count() == 1) {
             registerFileAccess();
-            registerProcessesAndThreads();
+            registerProcessAccess();
             patch();
         }
     }
     
-
     void stopMonitoring( MonitorEvents* events ) {
         const lock_guard<mutex> lock( monitorMutex );
         auto session( Session::current() );
@@ -127,32 +125,18 @@ namespace AccessMonitor {
         const auto directory( session->directory() );
         if (debugLog( General )) debugRecord() << "Stop monitoring session " << id << "..." << record;
         bool lastSession( Session::count() == 1 );
-cout << "Terminate session..." << endl;
-        session->terminate();
+        bool cleanUp( !debugLog( General ) ); // Clean-up event files when not debugging
         if (lastSession) {
-cout << "Unpatch..." << endl;
             unpatch();
-            unregisterProcessesAndThreads();
+            unregisterProcessAccess();
             unregisterFileAccess();
         }
+        session->terminate();
         // Hold on to terminated session ID while collecting session results.
-cout << "Collect events..." << endl;
-        if (events != nullptr) collectMonitorEvents( directory, id, *events );
-cout << "Delete session..." << endl;
+        monitorMutex.unlock();
+        if (events != nullptr) collectMonitorEvents( directory, id, *events, cleanUp );
+        monitorMutex.lock();
         delete session;
-    }
-
-    MonitorGuard::MonitorGuard( MonitorAccess* monitor ) : access( monitor ) {
-        if (access != nullptr) {
-            auto count( access->monitorCount++ );
-            if (count == 0) access->errorCode = GetLastError();
-        }
-    }
-    MonitorGuard::~MonitorGuard() {
-        if (access != nullptr) {
-            auto count( --access->monitorCount );
-            if (count == 0) SetLastError( access->errorCode );
-        }
     }
 
 } // namespace AccessMonitor

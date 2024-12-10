@@ -7,6 +7,12 @@ namespace AccessMonitor {
 
     typedef void (*PatchFunction)();
 
+    struct Registration {
+        const char* library;
+        const char* name;
+        PatchFunction patch;
+    };
+
     // Register a patch function for a function in a library.
     // Returns true if patch function was registered.
     // Returns false if library could not be accessed or function is not present in library.

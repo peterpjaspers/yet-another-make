@@ -1,5 +1,5 @@
 #include "Monitor.h"
-#include "MonitorThreadsAndProcesses.h"
+#include "MonitorProcesses.h"
 #include "Process.h"
 #include "Session.h"
 #include "MonitorLogging.h"
@@ -11,6 +11,7 @@
 #include <winternl.h>
 #include <psapi.h>
 #include <fstream>
+#include <iostream>
 #include "../detours/inc/detours.h"
 
 // ToDo: Use GetBinaryType to determine whether to inject 32-bit or 64-bit DLL
@@ -24,11 +25,6 @@ namespace AccessMonitor {
 
     namespace {
 
-        class ProcessGuard : public MonitorGuard {
-        public:
-            ProcessGuard() : MonitorGuard( Session::processAccess() ) {}
-        };
-
         const std::string patchDLLFile( "C:/Users/philv/Code/yam/yet-another-make/accessMonitor/dll/accessMonitor64" );
 
         string exceptionText( const string& signature, const string& message ) {
@@ -40,16 +36,16 @@ namespace AccessMonitor {
         void injectProcess( LPPROCESS_INFORMATION processInfo ) {
             const char* signature( "void injectProcess( LPPROCESS_INFORMATION processInfo )" );
             ProcessID process = GetProcessID( processInfo->dwProcessId );
-            if (debugLog( General )) debugRecord() << L"MonitorThreadsAndProcesses - Injecting DLL " << wstring( patchDLLFile.begin(), patchDLLFile.end() ) << " in process with ID " << process << "..." << record;
+            if (debugLog( General )) debugRecord() << L"MonitorProcesses - Injecting DLL " << wstring( patchDLLFile.begin(), patchDLLFile.end() ) << " in process with ID " << process << "..." << record;
             inject( patchDLLFile, process, Session::current() );
         }
 
         inline wostream& debugMessage( const char* function ) {
-            return debugRecord() << L"MonitorThreadsAndProcesses - " << function << "( ";
+            return debugRecord() << L"MonitorProcesses - " << function << "( ";
         }
         inline wostream& debugMessage( const char* function, bool success ) {
             DWORD errorCode = GetLastError();
-            if (!success) debugRecord() << L"MonitorThreadsAndProcesses - " << function << L" failed with  error : " << errorString( errorCode ) << record;
+            if (!success) debugRecord() << L"MonitorProcesses - " << function << L" failed with  error : " << errorString( errorCode ) << record;
             return debugMessage( function );
         }
         inline wostream& debugMessage( const char* function, HANDLE handle ) {
@@ -104,7 +100,7 @@ namespace AccessMonitor {
             args->parameter = lpParameter;
             args->session = Session::current();
             auto handle = patchOriginal( PatchCreateThread )( lpThreadAttributes, dwStackSize, threadWrapper, args, (dwCreationFlags | CREATE_SUSPENDED), lpThreadId );
-            ProcessGuard guard;
+            MonitorGuard guard( Session::monitorAccess());
             if ( guard() ) {
                 auto thread = GetThreadID( GetThreadID( *lpThreadId ) );
                 if (debugLog( PatchExecution )) debugMessage( "CreateThread", handle ) << ", ... ) with ID " << thread << record;
@@ -115,7 +111,7 @@ namespace AccessMonitor {
         void PatchExitThread(
             DWORD   dwExitCode
         ) {
-            ProcessGuard guard;
+            MonitorGuard guard( Session::monitorAccess());
             if ( guard() ) {
                 auto thread = CurrentThreadID();
                 if (debugLog( PatchExecution )) debugMessage( "ExitThread" ) << dwExitCode << " ) with ID "  << thread << record;
@@ -126,7 +122,7 @@ namespace AccessMonitor {
             HANDLE  hThread,
             DWORD   dwExitCode
         ) {
-            ProcessGuard guard;
+            MonitorGuard guard( Session::monitorAccess());
             if ( guard() ) {
                 auto thread = GetThreadID( GetThreadId( hThread ) );
                 if (debugLog( PatchExecution )) debugMessage( "TerminateThread" ) << thread << ", "  << dwExitCode << " )" << record;
@@ -146,7 +142,7 @@ namespace AccessMonitor {
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
             auto created = patchOriginal( PatchCreateProcessA )( lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
-            ProcessGuard guard;
+            MonitorGuard guard( Session::monitorAccess());
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateProcessA", created ) << appNameA( lpApplicationName ) << lpCommandLine << "  ... ) with ID " << lpProcessInformation->dwProcessId << record;
                 injectProcess( lpProcessInformation );
@@ -166,13 +162,8 @@ namespace AccessMonitor {
             LPSTARTUPINFOW        lpStartupInfo,
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
-            // auto created = DetourCreateProcessWithDllExW(
-            //     lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles,
-            //     dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation,
-            //     patchDLLFile.c_str(), patchOriginal( PatchCreateProcessW )
-            // );
             auto created = patchOriginal( PatchCreateProcessW )( lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
-            ProcessGuard guard;
+            MonitorGuard guard( Session::monitorAccess());
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateProcessW", created ) << appNameW( lpApplicationName ) << lpCommandLine << ", ... ) with ID " << lpProcessInformation->dwProcessId << record;
                 injectProcess( lpProcessInformation );
@@ -194,7 +185,7 @@ namespace AccessMonitor {
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
             auto created = patchOriginal( PatchCreateProcessAsUserA )( hToken, lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
-            ProcessGuard guard;
+            MonitorGuard guard( Session::monitorAccess());
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateProcessAsUserA", created ) << appNameA( lpApplicationName ) << lpCommandLine << ", ... ) with ID " << lpProcessInformation->dwProcessId << record;
                 injectProcess( lpProcessInformation );
@@ -216,7 +207,7 @@ namespace AccessMonitor {
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
             auto created = patchOriginal( PatchCreateProcessAsUserW )( hToken, lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
-            ProcessGuard guard;
+            MonitorGuard guard( Session::monitorAccess());
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateProcessAsUserW", created ) << appNameW( lpApplicationName )  << lpCommandLine << ", ... ) with ID " << lpProcessInformation->dwProcessId << record;
                 injectProcess( lpProcessInformation );
@@ -238,7 +229,7 @@ namespace AccessMonitor {
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
             auto created = patchOriginal( PatchCreateProcessWithLogonW )( lpUsername, lpDomain, lpPassword, dwLogonFlags, lpApplicationName, lpCommandLine, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
-            ProcessGuard guard;
+            MonitorGuard guard( Session::monitorAccess());
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateProcessWithLogonW", created ) << appNameW( lpApplicationName )  << lpCommandLine << ", ... ) with ID " << lpProcessInformation->dwProcessId << record;
                 injectProcess( lpProcessInformation );
@@ -258,7 +249,7 @@ namespace AccessMonitor {
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
             auto created = patchOriginal( PatchCreateProcessWithTokenW )( hToken, swLogonFlags, lpApplicationName, lpCommandLine, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
-            ProcessGuard guard;
+            MonitorGuard guard( Session::monitorAccess());
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateProcessWithTokenW", created ) << appNameW( lpApplicationName )  << lpCommandLine << ", ... )" << record;
                 injectProcess( lpProcessInformation );
@@ -268,7 +259,7 @@ namespace AccessMonitor {
         }
 
         void PatchExitProcess( unsigned int exitCode ) {
-            ProcessGuard guard;
+            MonitorGuard guard( Session::monitorAccess());
             if ( guard() ) {
                 if (debugLog( PatchExecution )) {
                     char fileName[ MaxFileName ] = "";
@@ -296,7 +287,7 @@ namespace AccessMonitor {
             LPCSTR lpLibFileName
         ) {
             auto library = patchOriginal( PatchLoadLibraryA )( lpLibFileName );
-            ProcessGuard guard;
+            MonitorGuard guard( Session::monitorAccess());
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "LoadLibraryA" ) << lpLibFileName << L" )" << record;
             }
@@ -306,7 +297,7 @@ namespace AccessMonitor {
             LPCWSTR lpLibFileName
         ) {
             auto library = patchOriginal( PatchLoadLibraryW )( lpLibFileName );
-            ProcessGuard guard;
+            MonitorGuard guard( Session::monitorAccess());
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "LoadLibraryW" ) << lpLibFileName << L" )" << record;
             }
@@ -318,7 +309,7 @@ namespace AccessMonitor {
             DWORD  dwFlags
         ) {
             auto library = patchOriginal( PatchLoadLibraryExA )( lpLibFileName, hFile, dwFlags );
-            ProcessGuard guard;
+            MonitorGuard guard( Session::monitorAccess());
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "LoadLibraryExA" ) << lpLibFileName  << ", ... )" << record;
             }
@@ -330,43 +321,37 @@ namespace AccessMonitor {
             DWORD  dwFlags
         ) {
             auto library = patchOriginal( PatchLoadLibraryExW )( lpLibFileName, hFile, dwFlags );
-            ProcessGuard guard;
+            MonitorGuard guard( Session::monitorAccess());
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "LoadLibraryExW" ) << lpLibFileName << L", ... )" << record;
             }
             return library;
         }
 
-        struct Registration {
-            const char* library;
-            const char* name;
-            PatchFunction patch;
-        };
-
-        const vector<Registration> registrations = {
-            { "kernel32", "CreateThread", (PatchFunction)PatchCreateThread },
-            { "kernel32", "ExitThread", (PatchFunction)PatchExitThread },
-            { "kernel32", "TerminateThread", (PatchFunction)PatchTerminateThread },
-            { "kernel32", "CreateProcessA", (PatchFunction)PatchCreateProcessA },
-            { "kernel32", "CreateProcessW", (PatchFunction)PatchCreateProcessW },
-            { "kernel32", "CreateProcessAsUserA", (PatchFunction)PatchCreateProcessAsUserA },
-            { "kernel32", "CreateProcessAsUserW", (PatchFunction)PatchCreateProcessAsUserW },
-            { "Advapi32", "CreateProcessWithLogonW", (PatchFunction)PatchCreateProcessWithLogonW },
-            { "Advapi32", "CreateProcessWithTokenW", (PatchFunction)PatchCreateProcessWithTokenW },
-            { "kernel32", "ExitProcess", (PatchFunction)PatchExitProcess },
-            { "kernel32", "LoadLibraryA", (PatchFunction)PatchLoadLibraryA },
-            { "kernel32", "LoadLibraryW", (PatchFunction)PatchLoadLibraryW },
-            { "kernel32", "LoadLibraryExA", (PatchFunction)PatchLoadLibraryExA },
-            { "kernel32", "LoadLibraryExW", (PatchFunction)PatchLoadLibraryExW },
+        const vector<Registration> processRegistrations = {
+            { "kernel32", "CreateThread",               (PatchFunction)PatchCreateThread },
+            { "kernel32", "ExitThread",                 (PatchFunction)PatchExitThread },
+            { "kernel32", "TerminateThread",            (PatchFunction)PatchTerminateThread },
+            { "kernel32", "CreateProcessA",             (PatchFunction)PatchCreateProcessA },
+            { "kernel32", "CreateProcessW",             (PatchFunction)PatchCreateProcessW },
+            { "kernel32", "CreateProcessAsUserA",       (PatchFunction)PatchCreateProcessAsUserA },
+            { "kernel32", "CreateProcessAsUserW",       (PatchFunction)PatchCreateProcessAsUserW },
+            { "Advapi32", "CreateProcessWithLogonW",    (PatchFunction)PatchCreateProcessWithLogonW },
+            { "Advapi32", "CreateProcessWithTokenW",    (PatchFunction)PatchCreateProcessWithTokenW },
+            { "kernel32", "ExitProcess",                (PatchFunction)PatchExitProcess },
+            { "kernel32", "LoadLibraryA",               (PatchFunction)PatchLoadLibraryA },
+            { "kernel32", "LoadLibraryW",               (PatchFunction)PatchLoadLibraryW },
+            { "kernel32", "LoadLibraryExA",             (PatchFunction)PatchLoadLibraryExA },
+            { "kernel32", "LoadLibraryExW",             (PatchFunction)PatchLoadLibraryExW },
         };
 
     } // namespace (anonymous)
 
-    void registerProcessesAndThreads() {
-        for ( const auto reg : registrations ) registerPatch( reg.library, reg.name, reg.patch );
+    void registerProcessAccess() {
+        for ( const auto reg : processRegistrations ) registerPatch( reg.library, reg.name, reg.patch );
     }
-    void unregisterProcessesAndThreads() {
-        for ( const auto reg : registrations ) unregisterPatch( reg.name );
+    void unregisterProcessAccess() {
+        for ( const auto reg : processRegistrations ) unregisterPatch( reg.name );
     }
 
 } // namespace AccessMonitor

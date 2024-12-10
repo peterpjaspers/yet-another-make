@@ -4,6 +4,7 @@
 #include "../detours/inc/detours.h"
 
 #include <map>
+#include <iostream>
 
 using namespace std;
 
@@ -12,40 +13,49 @@ namespace AccessMonitor {
     namespace {
 
         struct Patch {
-            PatchFunction           address;        // Address of function to patch
-            mutable PatchFunction   original;       // Address of trampoline to original function
+            PatchFunction   address;        // Address of target function to patch
+            PatchFunction   original;       // Address of trampoline to original target function
             Patch() : address( nullptr ), original( nullptr ) {}
             Patch( PatchFunction function ) : address( function ), original( nullptr ) {}
+            Patch( const Patch& patch ) : address( patch.address ), original( patch.original ) {}
         };
 
         map< string, PatchFunction > registeredPatches;
         map< PatchFunction, Patch > functionToPatch;
         bool librariesPatched = false;
 
+        inline void testFunctionFailure( const char* signature, const char* function, long error ) {
+            if (error != NO_ERROR) throw runtime_error( string( signature ) + " - " + function + " failed : " + to_string( error ) );
+        }
     }
 
     // Registered functions may not actually be present (imported) in an executable or DLL.
     // In that case, patchFunction and unpatchFunction do nothing.
     bool patchFunction( const PatchFunction function ) {
+        const char* signature( "bool patchFunction( const PatchFunction function )" );
         const auto entry = functionToPatch.find( function );
         if (entry != functionToPatch.end()) {
-            const auto& patch = entry->second;
+            auto& patch = entry->second;
             patch.original = patch.address;
-            LONG error = DetourAttach( (void**)&patch.original, (void*)function );
-            if (error == NO_ERROR) return true;
-            // Not able to patch requested function, default to original function address
-            if (debugLog( PatchedFunction )) { debugRecord() << L"      DetourAttach failed with " << error << record; }
+            long error = DetourAttach( (void**)&patch.original, (void*)function );
+cout << "Attaching " << patch.address << " to " << function << " with " << patch.original << endl;
+            testFunctionFailure( signature, "DetourAttach", error );
+            return true;
         }
         return false;
     }
     bool unpatchFunction( const PatchFunction function ) {
+        const char* signature( "bool unpatchFunction( const PatchFunction function )" );
         const auto entry = functionToPatch.find( function );
         if (entry != functionToPatch.end()) {
-            const auto& patch = entry->second;
-            LONG error = DetourDetach( (void**)&patch.original, (void*)function );
-            patch.original = nullptr;
-            if (error == NO_ERROR) return true;
-            if (debugLog( PatchedFunction )) { debugRecord() << L"      DetourDetach failed with " << error << record; }
+            auto& patch = entry->second;
+cout << "Detaching " << patch.address << " from " << function << " with " << patch.original << endl;
+            if (patch.original != nullptr) {
+                long error = DetourDetach( (void**)&patch.original, (void*)function );
+                patch.original = nullptr;
+                testFunctionFailure( signature, "DetourDettach", error );
+                return true;
+            }
         }
         return false;
     }
@@ -75,6 +85,7 @@ namespace AccessMonitor {
         if (handle != nullptr) {
             auto address = reinterpret_cast<PatchFunction>( GetProcAddress( handle, name.c_str() ) );
             if (address != nullptr) {
+cout << "Registered " << name << " at " << address << " for " << function << endl;
                 // Named function is present in library...
                 registeredPatches[ name ] = function;
                 functionToPatch[ function ] = Patch( address );
@@ -114,19 +125,29 @@ namespace AccessMonitor {
     void patch() {
         static const char* signature = "void patch()";
         if (librariesPatched) throw runtime_error( string( signature ) + " - Libraries already patched!" );
-        DetourTransactionBegin();
-        DetourUpdateThread(GetCurrentThread());
+        auto retained = DetourSetRetainRegions( true );
+        auto ignored = DetourSetIgnoreTooSmall( false );
+        long error( 0 );
+        error = DetourTransactionBegin();
+        testFunctionFailure( signature, "DetourTransactionBegin", error );
+        error = DetourUpdateThread(GetCurrentThread());
+        testFunctionFailure( signature, "DetourUpdateThread", error );
         patchAll();
-        DetourTransactionCommit();
+        error = DetourTransactionCommit();
+        testFunctionFailure( signature, "DetourTransactionCommit", error );
         librariesPatched = true;
     }
     void unpatch() {
         static const char* signature = "void unpatch()";
         if (!librariesPatched) throw runtime_error( string( signature ) + " - Libraries not patched!" );
-        DetourTransactionBegin();
-        DetourUpdateThread(GetCurrentThread());
+        long error( 0 );
+        error = DetourTransactionBegin();
+        testFunctionFailure( signature, "DetourTransactionBegin", error );
+        error = DetourUpdateThread(GetCurrentThread());
+        testFunctionFailure( signature, "DetourUpdateThread", error );
         unpatchAll();
-        DetourTransactionCommit();
+        error = DetourTransactionCommit();
+        testFunctionFailure( signature, "DetourTransactionCommit", error );
         functionToPatch.clear();
         librariesPatched = false;
     }

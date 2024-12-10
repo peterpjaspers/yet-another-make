@@ -14,7 +14,8 @@ namespace AccessMonitor {
 #ifdef _DEBUG_ACCESS_MONITOR
     bool debugLog( const LogAspects aspects );
 #else
-    // Supress debug logging (as fast as possible) when optimized...
+    // Supress debug logging unconditionally.
+    // All debug logging code will be completely removed by the optimizing compiler.
     inline bool debugLog( const LogAspects aspects ) { return false; }
 #endif
     LogRecord& debugRecord();

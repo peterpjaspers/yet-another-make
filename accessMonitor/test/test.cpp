@@ -86,10 +86,10 @@ void worker( const path directoryPath ) {
         file.close();
     }
     catch (exception const& exception) {
-        if (debugLog( General )) debugRecord() << "Exception  " << exception.what() << "!" << record;
+        if (debugLog( General )) debugRecord() << "Exception  " << exception.what() << " in worker!" << record;
     }
     catch (...) {
-        if (debugLog( General )) debugRecord() << "Exception!" << record;
+        if (debugLog( General )) debugRecord() << "Exception[ " << GetLastError() << " ] in worker!" << record;
     }
 }
 
@@ -110,7 +110,7 @@ void doFileAccess() {
             // auto exitCode = system( command.str().c_str() );
             executeCommand( command.str().c_str() );
         }
-        path sessionDir( uniqueName( session->directory() / L"Session", session->id() ) );
+        path sessionDir( session->directory() / uniqueName( L"Session", session->id() ) );
         if (1 < threads) {
             vector<thread> workerThreads;
             for (int i = 0; i < threads; ++i) {
@@ -124,25 +124,26 @@ void doFileAccess() {
         }
     }
     catch (exception const& exception) {
-        if (debugLog( General )) debugRecord() << "Exception  " << exception.what() << "!" << record;
+        if (debugLog( General )) debugRecord() << "Exception  " << exception.what() << " in doFileAccess!" << record;
     }
     catch (...) {
-        if (debugLog( General )) debugRecord() << "Exception!" << record;
+        if (debugLog( General )) debugRecord() << "Exception[ " << GetLastError() << " ] in doFileAccess!" << record;
     }
 }
 
 void doMonitoredFileAccess() {
     try {
+        path temp( temp_directory_path() );
         // auto aspects = MonitorLogAspects( General | RegisteredFunction | PatchedFunction | PatchExecution | FileAccesses );
-        auto aspects = MonitorLogAspects( General | PatchExecution | FileAccesses );
-        startMonitoring( temp_directory_path(), aspects );
+        auto aspects = MonitorLogAspects( General | PatchExecution | PatchedFunction | FileAccesses );
+        startMonitoring( temp, aspects );
         auto session( Session::current() );
         auto id( session->id() );
         doFileAccess();
         MonitorEvents events;
         stopMonitoring( &events );
         // Log (all) events for this session...
-        LogFile output( temp_directory_path() / uniqueName( L"TestProgramOutput", id, L"txt" )  );
+        LogFile output( temp / uniqueName( L"TestProgramOutput", id, L"txt" )  );
         for ( auto access : events ) {
             wstring fileName( access.first );
             FileAccess fileAccess( access.second );
@@ -154,10 +155,10 @@ void doMonitoredFileAccess() {
         }
     }
     catch (exception const& exception) {
-        cout << "Exception  " << exception.what() << "!" << endl;
+        cout << "Exception  " << exception.what() << " in doMonitoredFileAccess!" << endl;
     }
     catch (...) {
-        cout << "Exception!" << endl;
+        cout << "Exception[ " << GetLastError() << " ] in doMonitoredFileAccess!" << endl;
     }
 }
 
@@ -168,16 +169,28 @@ bool condition( const string& argument ) {
 }
 
 int main( int argc, char* argv[] ) {
-    sessions = 1;
-    threads = 1;
-    remoteProcess = false;
-    if (3 < argc) { remoteProcess = condition( argv[ 3 ] ); }
-    if (2 < argc) { threads = atoi( argv[ 2 ] ); }
-    if (threads <= 1) threads = 1;
-    if (1 < argc) { sessions = atoi( argv[ 1 ] ); }
-    if (sessions <= 1) sessions = 1;
-    vector<thread> sessionThreads;
-    for (int i = 0; i < sessions; ++i) sessionThreads.push_back( thread( doMonitoredFileAccess ) );
-    for (int i = 0; i < sessions; ++i) sessionThreads[ i ].join();
+    try {
+        sessions = 1;
+        threads = 1;
+        remoteProcess = false;
+        if (3 < argc) { remoteProcess = condition( argv[ 3 ] ); }
+        if (2 < argc) { threads = atoi( argv[ 2 ] ); }
+        if (threads <= 1) threads = 1;
+        if (1 < argc) { sessions = atoi( argv[ 1 ] ); }
+        if (sessions <= 1) sessions = 1;
+        if (1 < sessions) {
+            vector<thread> sessionThreads;
+            for (int i = 0; i < sessions; ++i) sessionThreads.push_back( thread( doMonitoredFileAccess ) );
+            for (int i = 0; i < sessions; ++i) sessionThreads[ i ].join();
+        } else {
+            doMonitoredFileAccess();
+        }
+    }
+    catch (exception const& exception) {
+        cout << "Exception  " << exception.what() << " in main!" << endl;
+    }
+    catch (...) {
+        cout << "Exception[ " << GetLastError() << " ] in main!" << endl;
+    }
 };
 

@@ -7,8 +7,6 @@
 using namespace std;
 using namespace std::filesystem;
 
-path directory( temp_directory_path() );
-
 void fileAccess( const path& dataDirectory ) {
     create_directories( dataDirectory );
     ifstream nefile( dataDirectory / "nonExisting.txt" );
@@ -28,16 +26,18 @@ void fileAccess( const path& dataDirectory ) {
 }
 
 void doFileAccess( int threads, const path& directory ) {
+    path root( directory );
+    if (directory.is_relative()) root = path( "." ) / directory;
     if (1 < threads) {
         vector<thread> workers;
         for (int i = 0; i < threads; ++i) {
             wstringstream subdir;
             subdir << L"fileAccessTest" << i;
-            workers.push_back( thread( fileAccess, path( "." ) / directory / subdir.str() ) );
+            workers.push_back( thread( fileAccess, root / subdir.str() ) );
         }
         for (int i = 0; i < threads; ++i) workers[ i ].join();
     } else {
-        fileAccess( path( "." ) / directory / L"fileAccessTest" );
+        fileAccess( root / L"fileAccessTest" );
     }
 }
 
@@ -48,6 +48,7 @@ wstring uniqueName( const wstring& name, unsigned long code ) {
 }
 
 int main( int argc, char* argv[] ) {
+    path directory( temp_directory_path() );
     int session = 1;
     int threads = 1;
     if (3 < argc) directory = argv[ 3 ];

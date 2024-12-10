@@ -5,6 +5,7 @@
 #include <string>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <thread>
 #include <mutex>
 #include <windows.h>
@@ -42,10 +43,11 @@ int main( int argc, char* argv[] ) {
     SessionID id( 1 );
     // Create thread to act as main thread, it will wait on the suspend mutex pending DLL load.
     suspend.lock();
-    std::thread worker( doFileAccess, uniqueName( temp_directory_path() / L"DLLSession", id ) );
+    path temp( temp_directory_path() );
+    std::thread worker( doFileAccess, temp / uniqueName( L"DLLSession", id ) );
     // Manually create a (simulated remote) session and its data directory...
-    Session session( { temp_directory_path(), id, (RegisteredFunction | PatchedFunction | PatchExecution | FileAccesses | WriteTime) } );
-    const path sessionData( sessionDataPath( temp_directory_path(), session.id() ) );
+    Session session( { temp, id, (RegisteredFunction | PatchedFunction | PatchExecution | FileAccesses | WriteTime) } );
+    const path sessionData( sessionDataPath( temp, session.id() ) );
     if (exists( sessionData )) {
         error_code ec;
         remove_all( sessionData, ec );
