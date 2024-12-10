@@ -38,7 +38,6 @@ namespace AccessMonitor {
             auto& patch = entry->second;
             patch.original = patch.address;
             long error = DetourAttach( (void**)&patch.original, (void*)function );
-cout << "Attaching " << patch.address << " to " << function << " with " << patch.original << endl;
             testFunctionFailure( signature, "DetourAttach", error );
             return true;
         }
@@ -49,7 +48,6 @@ cout << "Attaching " << patch.address << " to " << function << " with " << patch
         const auto entry = functionToPatch.find( function );
         if (entry != functionToPatch.end()) {
             auto& patch = entry->second;
-cout << "Detaching " << patch.address << " from " << function << " with " << patch.original << endl;
             if (patch.original != nullptr) {
                 long error = DetourDetach( (void**)&patch.original, (void*)function );
                 patch.original = nullptr;
@@ -85,7 +83,6 @@ cout << "Detaching " << patch.address << " from " << function << " with " << pat
         if (handle != nullptr) {
             auto address = reinterpret_cast<PatchFunction>( GetProcAddress( handle, name.c_str() ) );
             if (address != nullptr) {
-cout << "Registered " << name << " at " << address << " for " << function << endl;
                 // Named function is present in library...
                 registeredPatches[ name ] = function;
                 functionToPatch[ function ] = Patch( address );
