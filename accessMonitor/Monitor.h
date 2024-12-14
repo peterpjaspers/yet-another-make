@@ -34,16 +34,20 @@ namespace AccessMonitor {
     public:
         MonitorGuard() = delete;
         inline MonitorGuard( MonitorAccess* monitor ) : access( monitor ) {
-            auto count( access->monitorCount++ );
-            if (count == 0) access->errorCode = GetLastError();
+            if (access != nullptr) {
+                auto count( access->monitorCount++ );
+                if (count == 0) access->errorCode = GetLastError();
+            }
         }
         inline ~MonitorGuard() {
-            auto count( --access->monitorCount );
-            if (count == 0) SetLastError( access->errorCode );
+            if (access != nullptr) {
+                auto count( --access->monitorCount );
+                if (count == 0) SetLastError( access->errorCode );
+            }
         }
-        inline bool operator()() { return( access->monitorCount == 1 ); }
-        inline unsigned long count() { return access->monitorCount; }
-        inline unsigned long error() { return access->errorCode; }
+        inline bool operator()() { return( (access != nullptr) && (access->monitorCount == 1 ) ); }
+        inline unsigned long count() { return( (access != nullptr) ? access->monitorCount : 0 ); }
+        inline unsigned long error() { return( (access != nullptr) ? access->errorCode : 0 ); }
     };
 
 } // namespace AccessMonitor

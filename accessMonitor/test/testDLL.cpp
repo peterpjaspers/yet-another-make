@@ -46,8 +46,9 @@ int main( int argc, char* argv[] ) {
     path temp( temp_directory_path() );
     std::thread worker( doFileAccess, temp / uniqueName( L"DLLSession", id ) );
     // Manually create a (simulated remote) session and its data directory...
-    Session session( { temp, id, (RegisteredFunction | PatchedFunction | PatchExecution | FileAccesses | WriteTime) } );
-    const path sessionData( sessionDataPath( temp, session.id() ) );
+    SessionContext context( { temp, id, (RegisteredFunction | PatchedFunction | PatchExecution | FileAccesses | WriteTime) } );
+    auto session( Session::start( context ) );
+    const path sessionData( sessionDataPath( temp, session->id() ) );
     if (exists( sessionData )) {
         error_code ec;
         remove_all( sessionData, ec );
@@ -56,7 +57,7 @@ int main( int argc, char* argv[] ) {
     auto process = CurrentProcessID();
     auto thread = CurrentThreadID();
     auto patched = AccessEvent( "ProcessPatched", process );
-    auto data( session.recordContext( process ) );
+    auto data( session->recordContext( process ) );
     HMODULE library = LoadLibraryW( patchDLLFile.c_str() );
     auto error = GetLastError();
     if (error != 0) cout << "LoadLibraryW failed with error " << error << endl;
@@ -66,4 +67,5 @@ int main( int argc, char* argv[] ) {
     // Now allow the "main" thread to continue
     suspend.unlock();
     worker.join();
+    session->stop();
 }

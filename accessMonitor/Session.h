@@ -29,27 +29,32 @@ namespace AccessMonitor {
         LogFile*        events;     // Events log file for all events from all threads in this session
         LogFile*        debug;      // Debug log file when access monitor logging is enabled
     public:
-        Session() = delete;
-        // Create a new session in the current process.
+        static const SessionID MaxSessionID = 100;
+        inline Session() : context( { "", 0, 0 } ), events( nullptr ), debug( nullptr ) {};
+        // Start a new session in the current process.
         // The thread creating the session is added to the session.
-        Session( const std::filesystem::path& directory, const LogAspects aspects = 0 );
-        // Create a session from an existing session.
+        static Session* start( const std::filesystem::path& directory, const LogAspects aspects = 0 );
+        // Start a session in a remote process of an existing session.
         // Typically used to extend the session in which a process was spawned to the spawned process.
-        Session( const SessionContext& context );
+        static Session* start( const SessionContext& context );
         // Terminate session. Closes event log and (optionally) debug log.
         void terminate();
-        // Delete session.
-        ~Session();
+        // Check if a session is terminated.
+        bool terminated();
+        // Stop a session.
+        void stop();
+        // Return session associated with a session ID.
+        static Session* session( SessionID id );
         // Return session for current thread.
         static Session* current();
         // Return number of currently active sessions.
         static int count();
         // Return directory for monitored event data storage for this session.
-        const std::filesystem::path& directory() const;
+        inline const std::filesystem::path& directory() const { return( context.directory ); }
         // Return ID associated with this session.
-        SessionID id() const;
+        inline SessionID id() const { return( context.session ); }
         // Return debug log aspects effective in this session.
-        LogAspects aspects() const;
+        inline LogAspects aspects() const { return( context.aspects ); }
         // Add current thread to session.
         void addThread() const;
         // Remove current thread from session.
@@ -75,6 +80,7 @@ namespace AccessMonitor {
         // Retreive session context for/in a (spawned/remote) process recorded by a call to recordContext.
         // The retrieved context may be used to extend a session to the (remote) process.
         static const SessionContext retrieveContext( const ProcessID process = CurrentProcessID() );
+        static SessionID initialize();
     private:
         void _terminate();
     };

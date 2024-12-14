@@ -84,7 +84,7 @@ namespace AccessMonitor {
 
     void startMonitoring( const path& directory, const LogAspects aspects ) {
         const lock_guard<mutex> lock( monitorMutex );
-        Session* session( new Session( directory, aspects ) );
+        Session* session( Session::start( directory, aspects ) );
         createSessionDirectory( directory, session->id() );
         create_directory( directory / dataDirectory() );
         auto debugLogFile( createDebugLog( directory, session->id() ) );
@@ -103,7 +103,7 @@ namespace AccessMonitor {
 
     void startMonitoring( const SessionContext& context ) {
         const lock_guard<mutex> lock( monitorMutex );
-        Session* session( new Session( context ) );
+        Session* session( Session::start( context ) );
         auto debugLogFile( createDebugLog( context.directory, context.session ) );
         if (debugLogFile != nullptr) {
             session->debugLog( debugLogFile );
@@ -124,19 +124,18 @@ namespace AccessMonitor {
         const auto id( session->id() );
         const auto directory( session->directory() );
         if (debugLog( General )) debugRecord() << "Stop monitoring session " << id << "..." << record;
-        bool lastSession( Session::count() == 1 );
-        bool cleanUp( !debugLog( General ) ); // Clean-up event files when not debugging
-        if (lastSession) {
+        if (Session::count() == 1) {
             unpatch();
             unregisterProcessAccess();
             unregisterFileAccess();
         }
+        bool cleanUp( !debugLog( General ) ); // Clean-up event files when not debugging
         session->terminate();
         // Hold on to terminated session ID while collecting session results.
         monitorMutex.unlock();
         if (events != nullptr) collectMonitorEvents( directory, id, *events, cleanUp );
         monitorMutex.lock();
-        delete session;
+        session->stop();
     }
 
 } // namespace AccessMonitor
