@@ -39,4 +39,13 @@ namespace YAM
         }
         return nPath;
     }
+
+    std::filesystem::path FileSystem::toLower(std::filesystem::path const& path) {
+        std::string lower = path.string();
+        std::transform(
+            lower.begin(), lower.end(),
+            lower.begin(),
+            [](unsigned char c) { return std::tolower(c); });
+        return std::filesystem::path(lower);
+    }
 }

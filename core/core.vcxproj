@@ -109,6 +109,7 @@
     <ClInclude Include="BuildFileDependenciesCompiler.h" />
     <ClInclude Include="BuildOptions.h" />
     <ClInclude Include="BuildScopeFinder.h" />
+    <ClInclude Include="Path.h" />
     <ClInclude Include="ForEachNode.h" />
     <ClInclude Include="PercentageFlagsCompiler.h" />
     <ClInclude Include="FileExecSpecsNode.h" />
@@ -215,6 +216,7 @@
     <ClCompile Include="BuildFileDependenciesCompiler.cpp" />
     <ClCompile Include="BuildOptions.cpp" />
     <ClCompile Include="BuildScopeFinder.cpp" />
+    <ClCompile Include="Path.cpp" />
     <ClCompile Include="ForEachNode.cpp" />
     <ClCompile Include="PercentageFlagsCompiler.cpp" />
     <ClCompile Include="FileExecSpecsNode.cpp" />

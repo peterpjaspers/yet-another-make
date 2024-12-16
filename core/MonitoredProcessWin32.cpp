@@ -107,11 +107,17 @@ namespace YAM
             AccessMonitor::stopMonitoring(&mfiles);
             for (auto const& pair : mfiles) {
                 AccessMonitor::FileAccess const& fa(pair.second);
+                std::filesystem::path path = pair.first;
                 std::filesystem::path filePath;
+                // get canonical path to make sure that casing matches 
+                // the casing as stored in the filesystem.
+                try {
+                    filePath = std::filesystem::canonical(path);
+                }  catch (std::filesystem::filesystem_error) {
+                    filePath = path;
+                }
                 if (pair.first.starts_with(L"//?")) {
-                    filePath = pair.first.substr(3);
-                } else {
-                    filePath = pair.first;
+                    filePath = filePath.string().substr(3);
                 }
                 if (
                     !Glob::isGlob(filePath) &&

@@ -27,6 +27,12 @@ namespace YAM
         //     does not  exist return lowercased path.
         //
         static std::filesystem::path canonicalPath(std::filesystem::path const& path);
+
+        // Return lower-case version of path.
+        // This implementation only works for plain ascii paths.
+        // Converting a path to lower-case is non-trivial.See 
+        // https://stackoverflow.com/questions/313970/how-to-convert-an-instance-of-stdstring-to-lower-case?rq=2
+        static std::filesystem::path toLower(std::filesystem::path const& path);
     };
 }
 
