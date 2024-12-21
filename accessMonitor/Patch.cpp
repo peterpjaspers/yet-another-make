@@ -1,10 +1,10 @@
 #include "Patch.h"
 #include "MonitorLogging.h"
+
 #include <windows.h>
 #include "../detours/inc/detours.h"
 
 #include <map>
-#include <iostream>
 
 using namespace std;
 

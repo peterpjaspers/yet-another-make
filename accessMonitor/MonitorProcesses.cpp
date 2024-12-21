@@ -11,7 +11,6 @@
 #include <winternl.h>
 #include <psapi.h>
 #include <fstream>
-#include <iostream>
 #include "../detours/inc/detours.h"
 
 // ToDo: Use GetBinaryType to determine whether to inject 32-bit or 64-bit DLL

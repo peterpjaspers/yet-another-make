@@ -48,12 +48,10 @@ namespace AccessMonitor {
         //
         void collectMonitorEvents( const path& directory, const SessionID session, MonitorEvents& collected, bool cleanUp ) {
             const path sessionData( sessionDataPath( directory, session ) );
-            // for (auto const& entry : directory_iterator( sessionData )) {
-            error_code error;
-            for (auto const& entry : directory_iterator( sessionData, (directory_options::none | directory_options::skip_permission_denied), error )) {
+            for (auto const& entry : directory_iterator( sessionData )) {
                 auto eventFileName( entry.path().generic_string() );
                 wifstream eventFile( eventFileName );
-                wstring filePath;
+                path filePath;
                 FileTime lastWriteTime;
                 wstring modeString;
                 bool success;
@@ -71,14 +69,11 @@ namespace AccessMonitor {
                     } else break; // Presumably file is corrupt, ignore further content...
                 }
                 eventFile.close();
+                if (cleanUp) remove( eventFileName );
             }
-            if (cleanUp) {
-                // Remove all event files when not debugging
-                error_code ec;
-                remove_all( sessionData, ec );
-            }
+            if (cleanUp) remove( sessionData );
         }
-
+        // Provide exclusive access to monitor administration
         mutex monitorMutex;
     }
 

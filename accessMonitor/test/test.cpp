@@ -41,7 +41,7 @@ void executeCommand( const char* command ) {
         &pi
     );
     // Wait for the process to complete...
-    WaitForSingleObject( pi.hProcess, 0 );
+    WaitForSingleObject( pi.hProcess, INFINITE );
     CloseHandle( pi.hProcess );
     CloseHandle( pi.hThread );
 }
@@ -145,7 +145,7 @@ void doMonitoredFileAccess() {
         // Log (all) events for this session...
         LogFile output( temp / uniqueName( L"TestProgramOutput", id, L"txt" )  );
         for ( auto access : events ) {
-            wstring fileName( access.first );
+            wstring fileName( access.first.generic_wstring() );
             FileAccess fileAccess( access.second );
             output()
                 << fileName

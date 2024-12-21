@@ -881,6 +881,7 @@ namespace AccessMonitor {
         BOOL PatchCloseHandle( HANDLE handle ) {
             MonitorGuard guard( Session::monitorAccess());
             if ( guard() ) {
+                if (debugLog( PatchExecution )) debugMessage( "CloseHandle" ) << handleCode( handle ) << " )" << record;
                 // Record last write time when closing an actual file opened for write (also for WithProgress calls)
                 auto fileName = fullName( handle );
                 fileAccessFull( fileName, AccessNone );
@@ -949,7 +950,7 @@ namespace AccessMonitor {
         }
 
         void recordEvent( const wstring& file, FileAccessMode mode, const FileTime& time, bool success ) {
-            if (recordingEvents()) eventRecord() << file << L" [" << time << L"] " << fileAccessModeToString(mode) << " " << success << record;
+            if (recordingEvents()) eventRecord() << path( file ) << L" [" << time << L"] " << fileAccessModeToString(mode) << " " << success << record;
         }
 
         FileTime getLastWriteTime( const wstring& fileName ) {
