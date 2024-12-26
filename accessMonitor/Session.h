@@ -41,6 +41,8 @@ namespace AccessMonitor {
         void terminate();
         // Check if a session is terminated.
         bool terminated();
+        // Check if a session is free.
+        bool free();
         // Stop a session.
         void stop();
         // Return session associated with a session ID.

@@ -18,7 +18,7 @@ namespace AccessMonitor {
         SessionID maxID( Session::initialize() );
         set<SessionID> activeSessions;
         set<SessionID> terminatedSessions;
-        vector<SessionID> freeSessions;
+        set<SessionID> freeSessions;
         // Single session associated with all threads in a remote process.
         Session* remoteSession( nullptr );
 
@@ -60,8 +60,8 @@ namespace AccessMonitor {
             if (maxID == MaxSessionID) throw runtime_error( string( signature ) + " - Maximum number of sessions exceeded!" );
             newID = ++maxID;
         } else {
-            newID = freeSessions.back();
-            freeSessions.pop_back();
+            newID = *freeSessions.begin();
+            freeSessions.erase( newID);
         }
         auto session( Session::session( newID ));
         activeSessions.insert( newID );
@@ -100,15 +100,16 @@ namespace AccessMonitor {
         if (terminated()) throw runtime_error( string(signature) + " - Session already terminated!" );
         _terminate();
     }
-    inline bool Session::terminated() { return( terminatedSessions.contains( id() ) ); }
+    inline bool Session::terminated() { return( terminatedSessions.contains( context.session ) ); }
+    inline bool Session::free() { return( freeSessions.contains( context.session ) ); }
     void Session::stop() {
         const lock_guard<mutex> lock( sessionMutex );
         if (!terminated()) _terminate();
-        auto sessionID( id() );
-        terminatedSessions.erase( sessionID );
-        freeSessions.push_back( sessionID );
-        if (count() == 0) {
-            // Removing last active session...
+        terminatedSessions.erase( context.session );
+        freeSessions.insert( context.session );
+        removeThread();
+        if (freeSessions.size() == Session::MaxSessionID) {
+            // Stopped last active session...
             TlsFree( tlsSessionIndex );
             tlsSessionIndex = -1;
         }
@@ -125,6 +126,7 @@ namespace AccessMonitor {
         }
         auto session( Session::session( context->session ) );
         if (session->terminated()) return nullptr;
+        if (session->free()) return nullptr;
         return( session );
     }
     inline int Session::count() { return ( activeSessions.size() ); }
@@ -132,13 +134,13 @@ namespace AccessMonitor {
         static const char* signature = "void Session::addThread() const";
         auto context( threadContext() );
         if (context != nullptr) throw runtime_error( string( signature ) + " - Thread already active on a session!" );
-        TlsSetValue( tlsSessionIndex, new ThreadContext( id() ) );
+        TlsSetValue( tlsSessionIndex, new ThreadContext( this->context.session ) );
     };
     void Session::removeThread() const {
         static const char* signature = "void Session::removeThread() const";
         auto context( threadContext() );
         if (context == nullptr) throw runtime_error( string( signature ) + " - Thread not active on a session!" );
-        if (context->session != id()) throw runtime_error( string( signature ) + " - Invalid session ID!" );
+        if (context->session != this->context.session) throw runtime_error( string( signature ) + " - Invalid session ID!" );
         delete context;
         TlsSetValue( tlsSessionIndex, nullptr );
 
@@ -156,11 +158,9 @@ namespace AccessMonitor {
     }
     LogFile* Session::debugLog() const { return debug; }
     MonitorAccess* Session::monitorAccess() {
+        if (Session::current() == nullptr) return nullptr;
         auto context( threadContext() );
-        if (context == nullptr) {
-            if (Session::current() == nullptr) return nullptr;
-            context = threadContext();
-        }
+        if (context == nullptr) return nullptr;
         return &context->access;
     }
 
