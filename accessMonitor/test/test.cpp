@@ -134,8 +134,7 @@ void doFileAccess() {
 void doMonitoredFileAccess() {
     try {
         path temp( temp_directory_path() );
-        // auto aspects = MonitorLogAspects( General | RegisteredFunction | PatchedFunction | PatchExecution | FileAccesses );
-        auto aspects = MonitorLogAspects( General | PatchExecution | PatchedFunction | FileAccesses );
+        auto aspects = MonitorLogAspects( General | RegisteredFunction | PatchedFunction | PatchExecution | FileAccesses );
         startMonitoring( temp, aspects );
         auto session( Session::current() );
         auto id( session->id() );

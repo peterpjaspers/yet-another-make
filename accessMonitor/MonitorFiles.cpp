@@ -886,7 +886,7 @@ namespace AccessMonitor {
                 auto fileName = fullName( handle );
                 fileAccessFull( fileName, AccessNone );
             }
-            return  patchOriginal( PatchCloseHandle, IndexCloseHandle )( handle );
+            return patchOriginal( PatchCloseHandle, IndexCloseHandle )( handle );
         }
 
         // Convert Windows access mode value to FileAccessMode value

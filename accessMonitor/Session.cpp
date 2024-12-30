@@ -13,12 +13,14 @@ namespace AccessMonitor {
     namespace {
     
         unsigned int tlsSessionIndex = -1;
+        unsigned long SessionIDMask = (Session::MaxSessionID - 1);
+        unsigned long TerminatedBit = (1 << (Session::SessionIDBits + 1));
+        unsigned long FreeBit = (1 << (Session::SessionIDBits + 2));
         mutex sessionMutex;
         Session sessions[ Session::MaxSessionID ];
-        SessionID maxID( Session::initialize() );
-        set<SessionID> activeSessions;
-        set<SessionID> terminatedSessions;
-        set<SessionID> freeSessions;
+        unsigned long usedCount( Session::initialize() );
+        int activeCount = 0;
+        vector<SessionID> freeSessions;
         // Single session associated with all threads in a remote process.
         Session* remoteSession( nullptr );
 
@@ -41,51 +43,55 @@ namespace AccessMonitor {
 
     SessionID Session::initialize() {
         for (SessionID id = 1; id <= Session::MaxSessionID; ++id) {
-            auto session( Session::session( id ) );
-            session->context.session = id;
+            auto session = &sessions[ id - 1 ];
+            session->context.session = (id | FreeBit);
         }
         return 0;
     }
+    // Create new session in root process...
     Session* Session::start( const std::filesystem::path& directory, const LogAspects aspects ) {
         static const char* signature = "Session* Session::start( const std::filesystem::path& dir, const LogAspects dasp = 0 )";
         auto ctx( threadContext() );
         if (ctx != nullptr) throw runtime_error( string( signature ) + " - Thread already active on a session!" );
-        // Create new session in root process...
         const lock_guard<mutex> lock( sessionMutex );
         if (remoteSession != nullptr) throw runtime_error( string( signature ) + " - Invalid call in remote session!" );
         if (tlsSessionIndex == -1) tlsSessionIndex = TlsAlloc();
         if (tlsSessionIndex == TLS_OUT_OF_INDEXES) throw runtime_error( string( signature ) + " - Could not allocate thread local storage index!" );
         SessionID newID;
         if ( freeSessions.empty() ) {
-            if (maxID == MaxSessionID) throw runtime_error( string( signature ) + " - Maximum number of sessions exceeded!" );
-            newID = ++maxID;
+            if ( usedCount == MaxSessionID ) throw runtime_error( string( signature ) + " - Maximum number of sessions exceeded!" );
+            newID = ++usedCount;
         } else {
-            newID = *freeSessions.begin();
-            freeSessions.erase( newID);
+            newID = freeSessions.back();
+            freeSessions.pop_back();
         }
-        auto session( Session::session( newID ));
-        activeSessions.insert( newID );
+        auto session( Session::session( newID ) );
+        session->context.session &= ~FreeBit;
+        activeCount += 1;
         session->context.directory = directory;
         session->context.aspects = aspects;
         session->addThread();
         return( session );
     }
+    // Extend session in remote process...
     Session* Session::start( const SessionContext& ctx ) {
         static const char* signature = "Session* Session::start( const SessionContext& ctx )";
         const lock_guard<mutex> lock( sessionMutex );
-        if (0 < count()) throw runtime_error( string( signature ) + " - Cannot extend session while sessions are active!" );
+        if (0 < activeCount) throw runtime_error( string( signature ) + " - Cannot extend session while sessions are active!" );
         tlsSessionIndex = TlsAlloc();
         if (tlsSessionIndex == TLS_OUT_OF_INDEXES) throw runtime_error( string( signature ) + " - Could not allocate thread local storage index!" );
         auto session( Session::session( ctx.session ) );
-        activeSessions.insert( ctx.session );
-        session->context = ctx;
+        session->context.session &= ~FreeBit;
+        activeCount += 1;
+        session->context.directory = ctx.directory;
+        session->context.aspects = ctx.aspects;
         remoteSession = session;
         session->addThread();
         return( session );
     }
     void Session::_terminate() {
-        activeSessions.erase( context.session );
-        terminatedSessions.insert( context.session );
+        context.session |= TerminatedBit;
+        activeCount -= 1;
         if (this == remoteSession) remoteSession = nullptr;
         delete events; // Closes event log file
         events = nullptr;
@@ -100,13 +106,14 @@ namespace AccessMonitor {
         if (terminated()) throw runtime_error( string(signature) + " - Session already terminated!" );
         _terminate();
     }
-    inline bool Session::terminated() { return( terminatedSessions.contains( context.session ) ); }
-    inline bool Session::free() { return( freeSessions.contains( context.session ) ); }
+    inline bool Session::terminated() const { return( (context.session & TerminatedBit ) == TerminatedBit ); }
+    inline bool Session::free() const { return( (context.session & FreeBit ) == FreeBit ); }
     void Session::stop() {
         const lock_guard<mutex> lock( sessionMutex );
         if (!terminated()) _terminate();
-        terminatedSessions.erase( context.session );
-        freeSessions.insert( context.session );
+        context.session &= ~TerminatedBit;
+        context.session |= FreeBit;
+        freeSessions.push_back( id() );
         removeThread();
         if (freeSessions.size() == Session::MaxSessionID) {
             // Stopped last active session...
@@ -114,7 +121,11 @@ namespace AccessMonitor {
             tlsSessionIndex = -1;
         }
     }
-    inline Session* Session::session( const SessionID id ) { return &sessions[ id - 1 ]; }
+    Session* Session::session( const SessionID id ) {
+        static const char* signature = "Session* Session::session( const SessionID id )";
+        if (usedCount < id) throw runtime_error( string(signature) + " - Invalid session ID!" );
+        return &sessions[ id - 1 ];
+    }
     Session* Session::current() {
         static const char* signature = "Session* Session::current()";
         auto context( threadContext() );
@@ -129,18 +140,22 @@ namespace AccessMonitor {
         if (session->free()) return nullptr;
         return( session );
     }
-    inline int Session::count() { return ( activeSessions.size() ); }
+    int Session::count() { return ( activeCount ); }
+    const std::filesystem::path& Session::directory() const { return( context.directory ); }
+    SessionID Session::id() const { return( context.session & SessionIDMask ); }
     void Session::addThread() const {
         static const char* signature = "void Session::addThread() const";
         auto context( threadContext() );
         if (context != nullptr) throw runtime_error( string( signature ) + " - Thread already active on a session!" );
-        TlsSetValue( tlsSessionIndex, new ThreadContext( this->context.session ) );
+        if (terminated()) throw runtime_error( string( signature ) + " - Adding thread to terminated session!" );
+        if (free()) throw runtime_error( string( signature ) + " - Adding thread to freed session!" );
+        TlsSetValue( tlsSessionIndex, new ThreadContext( id() ) );
     };
     void Session::removeThread() const {
         static const char* signature = "void Session::removeThread() const";
         auto context( threadContext() );
         if (context == nullptr) throw runtime_error( string( signature ) + " - Thread not active on a session!" );
-        if (context->session != this->context.session) throw runtime_error( string( signature ) + " - Invalid session ID!" );
+        if (context->session != id()) throw runtime_error( string( signature ) + " - Invalid session ID!" );
         delete context;
         TlsSetValue( tlsSessionIndex, nullptr );
 
