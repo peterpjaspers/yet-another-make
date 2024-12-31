@@ -1,26 +1,24 @@
 #include "Monitor.h"
+#include "Patch.h"
 #include "Process.h"
 #include "Session.h"
 #include "FileNaming.h"
 #include "MonitorFiles.h"
-#include "MonitorThreadsAndProcesses.h"
+#include "MonitorProcesses.h"
 
-#include <windows.h>
 #include <fstream>
 #include <filesystem>
 
 using namespace std;
 using namespace std::filesystem;
 
-// ToDo: Clean-up Session ID files (created when injecting patch DLL in spawned process).
-
 namespace AccessMonitor {
 
     namespace {
 
         // Create data directory for a session
-        void createSessionDirectory( path const& sessionDirectory, const SessionID session ) {
-            const path sessionData( sessionDataPath(sessionDirectory, session ) );
+        void createSessionDirectory( path const& directory, const SessionID session ) {
+            const path sessionData( sessionDataPath(directory, session ) );
             if (exists( sessionData )) {
                 // Session directory already exists, presumably due to a previous session 
                 // Remove all data session left behind...
@@ -44,91 +42,100 @@ namespace AccessMonitor {
         // Delete  Delete Delete Delete Delete
         //
         // where the top row indicates the previous collapsed mode state
-        // and the left row the next event mode.
+        // and the left column the mode of the event being processed.
         //
         // Last write time is collapsed to the lastest last write time.
         //
-        void collectMonitorEvents( path const& sessionDirectory, const SessionID session, MonitorEvents& collected ) {
-            const path sessionData( sessionDataPath( sessionDirectory, session ) );
-            for (auto const& entry : directory_iterator( sessionData )) {
-                auto eventFile = wifstream( entry.path() );
+        void collectMonitorEvents( const path& directory, const SessionID session, MonitorEvents& collected, bool cleanUp ) {
+            const path sessionData( sessionDataPath( directory, session ) );
+            // for (auto const& entry : directory_iterator( sessionData )) {
+            error_code error;
+            for (auto const& entry : directory_iterator( sessionData, (directory_options::none | directory_options::skip_permission_denied), error )) {
+                auto eventFile = wifstream(entry.path());
                 path filePath;
                 FileTime lastWriteTime;
-                wstring accessMode;
+                wstring modeString;
+                bool success;
                 while (!eventFile.eof()) {
                     eventFile >> ws >> filePath >> ws;
-                    if (filePath.filename() == "7z.exe") {
-                        bool stop = true;
-                    }
                     from_stream( eventFile, L"[ %Y-%m-%d %H:%M:%10S ]", lastWriteTime );
-                    eventFile >> ws >> accessMode >> ws;
-                    if (0 < collected.count( filePath )) {
-                        auto& access = collected[ filePath ];                            
-                        auto mode = stringToMode( accessMode );
-                        if ((mode & AccessDelete) != 0) access.mode = AccessDelete;
-                        else if ((mode & AccessWrite) != 0) access.mode = AccessWrite;
-                        else if (((mode & AccessRead) != 0) && ((access.mode & AccessDelete) == 0) && ((access.mode & AccessWrite) == 0)) access.mode = AccessRead;
-                        access.modes |= mode;
-                        if ((access.lastWriteTime < lastWriteTime) && ((mode & AccessRead) == 0)) access.lastWriteTime = lastWriteTime;
-                    } else {
-                        collected[ filePath ] = FileAccess( stringToMode( accessMode ), lastWriteTime );
-                    }
-                    eventFile >> ws;
+                    eventFile >> ws >> modeString >> ws >> success;
+                    auto mode( stringToFileAccessMode( modeString ) );
+                    if (eventFile.good()) {
+                        if (0 < collected.count( filePath )) {
+                            collected[ filePath ].mode( mode, lastWriteTime, success );                            
+                        } else {
+                            collected[ filePath ] = FileAccess( mode, lastWriteTime, success );
+                        }
+                    } else break; // Presumably file is corrupt, ignore further content...
                 }
                 eventFile.close();
+            }
+            if (cleanUp) {
+                // Remove all event files when not debugging
+                error_code ec;
+                remove_all( sessionData, ec );
             }
         }
 
         mutex monitorMutex;
     }
 
-    void startMonitoring( const std::filesystem::path& directory, SessionID session, const LogAspects aspects ) {
+    void startMonitoring( const path& directory, const LogAspects aspects ) {
         const lock_guard<mutex> lock( monitorMutex );
-        session = CreateSession( directory, session );
-        createSessionDirectory( directory, session );
+        Session* session( Session::start( directory, aspects ) );
+        createSessionDirectory( directory, session->id() );
         create_directory( directory / dataDirectory() );
-        SessionDebugLog( createDebugLog() );
-        debugLog().enable( aspects );
-        debugRecord() << "Start monitoring session " << session << "..." << record;
-        SessionEventLog( createEventLog() );
-        if (SessionCount() == 1) {
+        auto debugLogFile( createDebugLog( directory, session->id() ) );
+        if (debugLogFile != nullptr) {
+            session->debugLog( debugLogFile );
+            debugLogFile->enable( aspects );
+        }
+        if (debugLog( General )) debugRecord() << "Start monitoring session " << session->id() << "..." << record;
+        session->eventLog( createEventLog( directory, session->id() ) );
+        if (Session::count() == 1) {
             registerFileAccess();
-            registerProcessesAndThreads();
+            registerProcessAccess();
             patch();
         }
     }
 
+    void startMonitoring( const SessionContext& context ) {
+        const lock_guard<mutex> lock( monitorMutex );
+        Session* session( Session::start( context ) );
+        auto debugLogFile( createDebugLog( context.directory, context.session ) );
+        if (debugLogFile != nullptr) {
+            session->debugLog( debugLogFile );
+            debugLogFile->enable( context.aspects );
+        }
+        if (debugLog( General )) debugRecord() << "Extend monitoring session " << session->id() << "..." << record;
+        session->eventLog( createEventLog( context.directory, context.session ) );
+        if (Session::count() == 1) {
+            registerFileAccess();
+            registerProcessAccess();
+            patch();
+        }
+    }
+    
     void stopMonitoring( MonitorEvents* events ) {
         const lock_guard<mutex> lock( monitorMutex );
-        auto session( CurrentSessionID() );
-        const auto& sessionDirectory( CurrentSessionDirectory() );
-        debugRecord() << "Stop monitoring session " << session << "..." << record;
-        if (SessionCount() == 1) {
+        auto session( Session::current() );
+        const auto id( session->id() );
+        const auto directory( session->directory() );
+        if (debugLog( General )) debugRecord() << "Stop monitoring session " << id << "..." << record;
+        if (Session::count() == 1) {
             unpatch();
-            unregisterProcessesAndThreads();
+            unregisterProcessAccess();
             unregisterFileAccess();
         }
-        SessionEventLogClose();
-        SessionDebugLogClose();
-        // ToDo: Avoid collecting events (with potetially a lot of file IO) while monitor mutex is locked
-        //       Make sure session ID is not reused untile all monitor events have been collected.
-        if (events != nullptr) collectMonitorEvents( sessionDirectory, session, *events );
-        RemoveSession();
+        bool cleanUp( !debugLog( General ) ); // Clean-up event files when not debugging
+        session->terminate();
+        // Hold on to terminated session ID while collecting session results.
+        monitorMutex.unlock();
+        if (events != nullptr) collectMonitorEvents( directory, id, *events, cleanUp );
+        monitorMutex.lock();
+        session->stop();
     }
-
-    MonitorGuard::MonitorGuard( MonitorAccess* monitor ) : access( monitor ) {
-        if (access != nullptr) {
-            auto count( access->monitorCount++ );
-            if (count == 0) access->errorCode = GetLastError();
-        }
-    }
-    MonitorGuard::~MonitorGuard() {
-        if (access != nullptr) {
-            auto count( --access->monitorCount );
-            if (count == 0) SetLastError( access->errorCode );
-        }
-    }
-    bool MonitorGuard::monitoring() { return( (access != nullptr) && (access->monitorCount == 1) ); }
 
 } // namespace AccessMonitor
 

@@ -7,6 +7,7 @@
 
 #include <filesystem>
 #include <map>
+#include <windows.h>
 
 namespace AccessMonitor {
 
@@ -14,27 +15,39 @@ namespace AccessMonitor {
     typedef std::map<std::wstring,FileAccess> MonitorEvents;
 
     // Start monitoring file access.
-    // If directory != "": store monitor data in 'directory'. 
-    // If directory == "": store data in std::filesystem::temp_directory_path.
-    // The aspects argument defines which aspects to log.
-    void startMonitoring( const std::filesystem::path& directory, const SessionID session = CreateNewSession, const LogAspects aspects = (PatchExecution | FileAccesses) );
+    // Session related result files are store in the given directory.
+    // The aspects argument defines which (debug) aspects to log.
+    void startMonitoring( const std::filesystem::path& directory, const LogAspects aspects = (PatchExecution | FileAccesses) );
+    // Start monitoring file access in a remote process.
+    // Extends the session referred to by context to the remote process.
+    void startMonitoring( const SessionContext& context );
     // Stop monitoring file access.
     // Returns collection of monitored file accesses.
     void stopMonitoring( MonitorEvents* events );
 
     // A MonitorGuard prevents recursive entry into monitoring code; i.e., a patched function called
     // from monitoring code associated with a patched function will not itself be monitored. Effectively
-    // only patched functions called from the application are actually monitored. The guard also esures
-    // that the monitoring session is initialized (during the first call to a patched function in a
-    // process spawned in a monitoring session).
+    // only patched functions called from the application are actually monitored.
     class MonitorGuard {
     private:
         MonitorAccess* access;
     public:
         MonitorGuard() = delete;
-        MonitorGuard( MonitorAccess* monitor );
-        ~MonitorGuard();
-        bool monitoring();
+        inline MonitorGuard( MonitorAccess* monitor ) : access( monitor ) {
+            if (access != nullptr) {
+                auto count( access->monitorCount++ );
+                if (count == 0) access->errorCode = GetLastError();
+            }
+        }
+        inline ~MonitorGuard() {
+            if (access != nullptr) {
+                auto count( --access->monitorCount );
+                if (count == 0) SetLastError( access->errorCode );
+            }
+        }
+        inline bool operator()() { return( (access != nullptr) && (access->monitorCount == 1 ) ); }
+        inline unsigned long count() { return( (access != nullptr) ? access->monitorCount : 0 ); }
+        inline unsigned long error() { return( (access != nullptr) ? access->errorCode : 0 ); }
     };
 
 } // namespace AccessMonitor

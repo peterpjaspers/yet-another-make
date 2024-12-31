@@ -85,11 +85,12 @@ namespace
 
     TEST(MonitoredProcessWin32, fileDependencies) {
         WorkingDir tempDir;
-        std::string cmdExe = boost::process::search_path("cmd").string();
+        std::string cmdExeStr = boost::process::search_path("cmd").string();
+        std::filesystem::path cmdExe = std::filesystem::canonical(cmdExeStr);
         std::map<std::string, std::string> env;
 
         MonitoredProcessWin32 cmd(
-            cmdExe,
+            cmdExe.string(),
             " /c echo rubbish > junk.txt & type junk.txt",
             wdir,
             env);

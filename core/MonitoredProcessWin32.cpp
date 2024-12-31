@@ -124,20 +124,20 @@ namespace YAM
                     !isSubpath(filePath, _tempDir) &&
                     std::filesystem::is_regular_file(filePath)
                 ) {
-                    if (fa.modes & AccessMonitor::AccessDelete) {
+                    if (fa.modes() & AccessMonitor::AccessDelete) {
                         // ignore
                     }
-                    if (fa.modes & AccessMonitor::AccessNone) {
+                    if (fa.modes() & AccessMonitor::AccessNone) {
                         _result.readFiles.insert(filePath);
                     }
-                    if (fa.modes & AccessMonitor::AccessRead) {
+                    if (fa.modes() & AccessMonitor::AccessRead) {
                         _result.readFiles.insert(filePath);
                     }
-                    if (fa.modes & AccessMonitor::AccessWrite) {
+                    if (fa.modes() & AccessMonitor::AccessWrite) {
                         _result.writtenFiles.insert(filePath);
                     }
                 }
-                auto utcFileTime = decltype(fa.lastWriteTime)::clock::to_utc(fa.lastWriteTime);
+                auto utcFileTime = decltype(fa.writeTime())::clock::to_utc(fa.writeTime());
                 _result.lastWriteTimes.insert({ filePath, utcFileTime });
             }
             std::set_difference(

@@ -33,9 +33,6 @@
     <ClCompile Include="..\accessMonitor\MonitorLogging.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\accessMonitor\MonitorThreadsAndProcesses.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\accessMonitor\Patch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -49,6 +46,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\accessMonitor\Monitor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\accessMonitor\MonitorProcesses.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

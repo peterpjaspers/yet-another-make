@@ -1,231 +1,205 @@
 #include "Session.h"
 
 #include <set>
+#include <map>
 #include <mutex>
+#include <iostream>
 #include <windows.h>
 
 using namespace std;
 using namespace filesystem;
 
-// ToDo: Refactor code to make use of an object class Session.
-
 namespace AccessMonitor {
 
     namespace {
     
-        // Context in which monitor data is gathered for a session.
-        // In the main process there may be multiple sessions with corresponding event and debug logs.
-        // In a remote process there is only a single session and consequently only a single event and debug log.
-        // The monitor access guards are unique per thread.
-        // The monitor context is accessed via Thread Local Storage (TLS) to avoid synchronization.
-        struct SessionContext {
-            const path      directory;
-            const SessionID session;
-            const ProcessID process;
-            const ThreadID  thread;
-            LogFile*        eventLog;
-            LogFile*        debugLog;
-            MonitorAccess   fileGuard;
-            MonitorAccess   threadAndProcessGuard;
-            SessionContext( const path dir, const SessionID sid, const ProcessID pid, const ThreadID tid ) :
-                session( sid ), directory( dir ), process( pid ), thread( tid ) {}
-        };
-
         unsigned int tlsSessionIndex = -1;
         mutex sessionMutex;
-        set<SessionID> sessions;
-        set<SessionID> freeSessions;
-        SessionID nextSession = 1;
+        Session sessions[ Session::MaxSessionID ];
+        SessionID maxID( Session::initialize() );
+        set<SessionID> activeSessions;
+        set<SessionID> terminatedSessions;
+        vector<SessionID> freeSessions;
+        // Single session associated with all threads in a remote process.
+        Session* remoteSession( nullptr );
 
+        // Name of memory map used to pass session context to remote process.
         inline string sessionInfoMapName( const ProcessID process ) {
             stringstream unique;
             unique << "RemoteProcessSessionData" << "_" << process;
             return unique.str();
         }
 
-        // Session context passeed to spawned process to enable creating (opening) a session in a remote process.
-        // See recordSessionContext and retrieveSessionContext..
-        struct SessionConextData {
-            SessionID   session;                // The session in which the process was spawned
-            LogAspects  aspects;           // The debugging aspects to be applied in the spawned process
-            char        directory[ MAX_PATH ];  // The directory in which monitor data is stored
+        struct ThreadContext {
+            SessionID       session;
+            MonitorAccess   access;
+            ThreadContext() = delete;
+            ThreadContext( SessionID id, LogFile* eventLog = nullptr, LogFile* debugLog = nullptr ) : session( id ) {}
         };
-
-        SessionContext* remoteSessionContext = nullptr;
+        inline ThreadContext* threadContext() { return( static_cast<ThreadContext*>(TlsGetValue(tlsSessionIndex)) ); }
 
     }
 
-    // Retrieve monitor context for current thread.
-    // Throws exception with given signature if thread is not active on a session.
-    SessionContext* sessionContext( const char* signature ) {
-        auto context = static_cast<SessionContext*>(TlsGetValue(tlsSessionIndex));
-        if (context == nullptr) {
-            if (remoteSessionContext != nullptr) {
-                // Executing in a thread that was not explicitly created in a session (i.e., main thread).
-                AddThreadToSession( remoteSessionContext->directory, remoteSessionContext->session, remoteSessionContext->eventLog, remoteSessionContext->debugLog );
-                return sessionContext( signature );
-            }
-            throw string(signature) + " - Thread not active on a session!";
+    SessionID Session::initialize() {
+        for (SessionID id = 1; id <= Session::MaxSessionID; ++id) {
+            auto session( Session::session( id ) );
+            session->context.session = id;
         }
-        return context;
+        return 0;
     }
-
-    SessionID CurrentSessionID() {
-        auto context = sessionContext( "SessionID CurrentSessionID()" );
-        return context->session;
-    }
-    const std::filesystem::path& CurrentSessionDirectory() {
-        auto context = sessionContext( "const std::filesystem::path& CurrentSessionDirectory()" );
-        return context->directory;
-    }
-    SessionID CreateSession( const std::filesystem::path& directory, const SessionID session ) {
-        static const char* signature = "SessionID CreateSession( std::filesystem::path const& directory, SessionID session, ProcessID process, ThreadID thread )";
-        auto context = static_cast<SessionContext*>(TlsGetValue(tlsSessionIndex));
-        if (context != nullptr) throw string( signature ) + " - Thread already active on a session!";
-        if (session == CreateNewSession) {
-            // Create new session in root process...
-            const lock_guard<mutex> lock( sessionMutex );
-            if (tlsSessionIndex == (DWORD)-1) tlsSessionIndex = TlsAlloc();
-            if (tlsSessionIndex == TLS_OUT_OF_INDEXES) throw string( signature ) + " - Could not allocate thread local storage index!";
-            SessionID newSession;
-            if (0 < freeSessions.size()) {
-                newSession = *freeSessions.begin();
-                freeSessions.erase( freeSessions.begin() );
-            } else {
-                newSession = nextSession++;
-            }
-            sessions.insert( newSession );
-            AddThreadToSession( directory, newSession );
-            return newSession;
-        } else {
-            // Create session in spawned (remote) process.
-            // Session was created in a parent of the spawned.
-            sessions.insert( session );
-            if (tlsSessionIndex == (DWORD)-1) tlsSessionIndex = TlsAlloc();
-            if (tlsSessionIndex == TLS_OUT_OF_INDEXES) throw string( signature ) + " - Could not allocate thread local storage index!";
-            AddThreadToSession( directory, session );
-            remoteSessionContext = sessionContext( signature );
-            return session;
-        }
-    }
-    void RemoveSession() {
-        static const char* signature = "void RemoveSession()";
-        auto context = static_cast<SessionContext*>(TlsGetValue(tlsSessionIndex));
-        if (context == nullptr) throw string( signature ) + " - Thread not active on a session!";
+    Session* Session::start( const std::filesystem::path& directory, const LogAspects aspects ) {
+        static const char* signature = "Session* Session::start( const std::filesystem::path& dir, const LogAspects dasp = 0 )";
+        auto ctx( threadContext() );
+        if (ctx != nullptr) throw runtime_error( string( signature ) + " - Thread already active on a session!" );
+        // Create new session in root process...
         const lock_guard<mutex> lock( sessionMutex );
-        SessionID freeSession = context->session;
-        sessions.erase( freeSession );
-        freeSessions.insert( freeSession );
-        LocalFree( static_cast<HLOCAL>( context ) );
-        TlsSetValue( tlsSessionIndex, nullptr );
-        if (SessionCount() == 0) {
+        if (remoteSession != nullptr) throw runtime_error( string( signature ) + " - Invalid call in remote session!" );
+        if (tlsSessionIndex == -1) tlsSessionIndex = TlsAlloc();
+        if (tlsSessionIndex == TLS_OUT_OF_INDEXES) throw runtime_error( string( signature ) + " - Could not allocate thread local storage index!" );
+        SessionID newID;
+        if ( freeSessions.empty() ) {
+            if (maxID == MaxSessionID) throw runtime_error( string( signature ) + " - Maximum number of sessions exceeded!" );
+            newID = ++maxID;
+        } else {
+                newID = freeSessions.back();
+                freeSessions.pop_back();
+            }
+        auto session( Session::session( newID ));
+        activeSessions.insert( newID );
+        session->context.directory = directory;
+        session->context.aspects = aspects;
+        session->addThread();
+        return( session );
+    }
+    Session* Session::start( const SessionContext& ctx ) {
+        static const char* signature = "Session* Session::start( const SessionContext& ctx )";
+        const lock_guard<mutex> lock( sessionMutex );
+        if (0 < count()) throw runtime_error( string( signature ) + " - Cannot extend session while sessions are active!" );
+        tlsSessionIndex = TlsAlloc();
+        if (tlsSessionIndex == TLS_OUT_OF_INDEXES) throw runtime_error( string( signature ) + " - Could not allocate thread local storage index!" );
+        auto session( Session::session( ctx.session ) );
+        activeSessions.insert( ctx.session );
+        session->context = ctx;
+        remoteSession = session;
+        session->addThread();
+        return( session );
+    }
+    void Session::_terminate() {
+        activeSessions.erase( context.session );
+        terminatedSessions.insert( context.session );
+        if (this == remoteSession) remoteSession = nullptr;
+        delete events; // Closes event log file
+        events = nullptr;
+        if (debug != nullptr) {
+            delete debug; // Closes debug log file
+            debug = nullptr;
+        }
+    }
+    void Session::terminate() {
+        static const char* signature = "void Session::terminate()";
+        const lock_guard<mutex> lock( sessionMutex );
+        if (terminated()) throw runtime_error( string(signature) + " - Session already terminated!" );
+        _terminate();
+    }
+    inline bool Session::terminated() { return( terminatedSessions.contains( id() ) ); }
+    void Session::stop() {
+        const lock_guard<mutex> lock( sessionMutex );
+        if (!terminated()) _terminate();
+        auto sessionID( id() );
+        terminatedSessions.erase( sessionID );
+        freeSessions.push_back( sessionID );
+        if (count() == 0) {
             // Removing last active session...
             TlsFree( tlsSessionIndex );
-            tlsSessionIndex = (DWORD)-1;
+            tlsSessionIndex = -1;
         }
     }
-    int SessionCount() { return sessions.size(); }
-
-    void AddThreadToSession( const std::filesystem::path& directory, const SessionID session, LogFile* eventLog, LogFile* debugLog ) {
-        static const char* signature = "void AddThreadToSession( const std::filesystem::path& directory, const SessionID session, LogFile* eventLog, LogFile* debugLog )";
-        auto context = static_cast<SessionContext*>(TlsGetValue(tlsSessionIndex));
-        if (context != nullptr) throw string( signature ) + " - Thread already active on a session!";
-        auto tlsData = LocalAlloc(LPTR , sizeof( SessionContext ) );
-        context = new( tlsData ) SessionContext( directory, session, CurrentProcessID(), CurrentThreadID() );
-        context->eventLog = eventLog;
-        context->debugLog = debugLog;
-        TlsSetValue( tlsSessionIndex, context );
+    inline Session* Session::session( const SessionID id ) { return &sessions[ id - 1 ]; }
+    Session* Session::current() {
+        static const char* signature = "Session* Session::current()";
+        auto context( threadContext() );
+        if (context == nullptr) {
+            if (remoteSession == nullptr) return nullptr;
+            // Executing in a thread that was not explicitly created in a (remote) session (e.g., main thread).
+            remoteSession->addThread();
+            return remoteSession;
+        }
+        auto session( Session::session( context->session ) );
+        if (session->terminated()) return nullptr;
+        return( session );
     }
-    void RemoveThreadFromSession() {
-        auto context = sessionContext( "void RemoveThreadFromSession()" );
-        LocalFree( static_cast<HLOCAL>( context ) );
+    inline int Session::count() { return ( activeSessions.size() ); }
+    void Session::addThread() const {
+        static const char* signature = "void Session::addThread() const";
+        auto context( threadContext() );
+        if (context != nullptr) throw runtime_error( string( signature ) + " - Thread already active on a session!" );
+        TlsSetValue( tlsSessionIndex, new ThreadContext( id() ) );
+    };
+    void Session::removeThread() const {
+        static const char* signature = "void Session::removeThread() const";
+        auto context( threadContext() );
+        if (context == nullptr) throw runtime_error( string( signature ) + " - Thread not active on a session!" );
+        if (context->session != id()) throw runtime_error( string( signature ) + " - Invalid session ID!" );
+        delete context;
         TlsSetValue( tlsSessionIndex, nullptr );
-    }
 
-    void SessionEventLog( LogFile* log ) {
-        auto context = sessionContext( "void SessionEventLog( void* log )" );
-        context->eventLog = log;
-        if (remoteSessionContext != nullptr) remoteSessionContext->eventLog;
     }
-    LogFile* SessionEventLog() {
-        auto context = sessionContext( "LogFile* SessionEventLog()" );
-        return context->eventLog;
+    void Session::eventLog( LogFile* file ) {
+        static const char* signature = "void Session::debugLog( LogFile* file )";
+        if (events != nullptr) throw runtime_error( string( signature ) + " - Event log already defined for session!" );
+        events = file;
     }
-    void SessionEventLogClose() {
-        auto context = sessionContext( "void SessionEventLogClose()" );
-        if ((context != nullptr) && (context->eventLog != nullptr)) {
-            auto log = context->eventLog;
-            context->eventLog = nullptr;
-            delete log;
+    LogFile* Session::eventLog() const { return events; }
+    void Session::debugLog( LogFile* file ) {
+        static const char* signature = "void Session::debugLog( LogFile* file )";
+        if (debug != nullptr) throw runtime_error( string( signature ) + " - Debug log already defined for session!" );
+        debug = file;
+    }
+    LogFile* Session::debugLog() const { return debug; }
+    MonitorAccess* Session::monitorAccess() {
+        auto context( threadContext() );
+        if (context == nullptr) {
+            if (Session::current() == nullptr) return nullptr;
+            context = threadContext();
         }
+        return &context->access;
     }
 
-    void SessionDebugLog( LogFile* log ) {
-        auto context = sessionContext( "void SessionDebugLog( void* log )" );
-        context->debugLog = log;
-        if (remoteSessionContext != nullptr) remoteSessionContext->debugLog;
-    }
-    LogFile* SessionDebugLog() {
-        auto context = sessionContext( "LogFile* SessionDebugLog()" );
-        return context->debugLog;
-    }
-    void SessionDebugLogClose() {
-        auto context = sessionContext( "void SessionDebugLogClose()" );
-        if ((context != nullptr) && (context->debugLog != nullptr)) {
-            auto log = context->debugLog;
-            context->debugLog = nullptr;
-            delete log;
-        }
-    }
+    // Session context passeed to spawned process to enable creating (opening) a session in a remote process.
+    // See recordSessionContext and retrieveSessionContext..
+    struct SessionConextData {
+        SessionID   session;                // The session in which the process was spawned
+        LogAspects  aspects;           // The debugging aspects to be applied in the spawned process
+        char        directory[ MAX_PATH ];  // The directory in which monitor data is stored
+    };
 
-    MonitorAccess* SessionFileAccess() {
-        auto context = static_cast<SessionContext*>(TlsGetValue(tlsSessionIndex));
-        if ((context == nullptr) && (remoteSessionContext != nullptr)) {
-            AddThreadToSession( remoteSessionContext->directory, remoteSessionContext->session, remoteSessionContext->eventLog, remoteSessionContext->debugLog );
-        }
-        if (context != nullptr) return &context->fileGuard;
-        return nullptr;
-    }
-
-    MonitorAccess* SessionThreadAndProcessAccess() {
-        auto context = static_cast<SessionContext*>(TlsGetValue(tlsSessionIndex));
-        if ((context == nullptr) && (remoteSessionContext != nullptr)) {
-            AddThreadToSession( remoteSessionContext->directory, remoteSessionContext->session, remoteSessionContext->eventLog, remoteSessionContext->debugLog );
-        }
-        if (context != nullptr) return &context->threadAndProcessGuard;
-        return nullptr;
-    }
-
-    // Record session ID and main thread ID of a (remote) process.
-    void* recordSessionContext( const ProcessID process, const SessionID session, const LogAspects aspects, const path& dir ) {
+    void* Session::recordContext( const ProcessID process ) const {
         const char* signature( "void recordSessionContext( const path& dir, const ProcessID process, const SessionID session, ThreadID thread )" );
         auto map = CreateFileMappingA( INVALID_HANDLE_VALUE, nullptr,   PAGE_READWRITE, 0, sizeof( SessionConextData ), sessionInfoMapName( process ).c_str() );
         auto error = GetLastError();
-        if (map == nullptr) throw string( signature ) + " - Could not create file mapping!";
+        if (map == nullptr) throw runtime_error( string( signature ) + " - Could not create file mapping!" );
         auto address = MapViewOfFile( map, FILE_MAP_ALL_ACCESS, 0, 0, sizeof( SessionConextData ) );
-        if (address == nullptr) throw string( signature ) + " - Could not open mapping!";
-        auto context = static_cast<SessionConextData*>( address );
-        context->session = session;
-        context->aspects = aspects;
-        const auto dirString = dir.generic_string();
-        memcpy( context->directory, dirString.c_str(), dirString.size() );
+        if (address == nullptr) throw runtime_error( string( signature ) + " - Could not open mapping!" );
+        auto data = static_cast<SessionConextData*>( address );
+        data->session = id();
+        data->aspects = context.aspects;
+        const auto dirString = context.directory.generic_string();
+        memcpy( data->directory, dirString.c_str(), dirString.size() );
         UnmapViewOfFile( address );
         return map;
     }
-    void releaseSessionContext( void* map ) { CloseHandle( map ); }
-    // Retrieve session ID and main thread ID of a (remote) process
-    void retrieveSessionContext( const ProcessID process, SessionID& session, LogAspects& aspects, path& dir ) {
-        const char* signature( "void retrieveSessionContext( const path& dir, const ProcessID process, SessionID& session, ThreadID& thread )" );
+    void Session::releaseContext( void* context ) { CloseHandle( context ); }
+    const SessionContext Session::retrieveContext( const ProcessID process ) {
+        const char* signature( "const SessionContext Session::retreive( const ProcessID process )" );
         auto map = OpenFileMappingA( FILE_MAP_ALL_ACCESS, false, sessionInfoMapName( process ).c_str() );
-        if (map == nullptr) throw string( signature ) + " - Could not create file mapping!";
+        if (map == nullptr) throw runtime_error( string( signature ) + " - Could not create file mapping!" );
         void* address = MapViewOfFile( map, FILE_MAP_ALL_ACCESS, 0, 0, sizeof( SessionConextData ) );
-        if (address == nullptr) throw string( signature ) + " - Could not open mapping!";
-        auto context = static_cast<const SessionConextData*>( address );
-        session = context->session;
-        aspects = context->aspects;
-        dir = context->directory;
+        if (address == nullptr) throw runtime_error( string( signature ) + " - Could not open mapping!" );
+        auto data = static_cast<const SessionConextData*>( address );
+        SessionContext context( data->directory, data->session, data->aspects );
         UnmapViewOfFile( address );
         CloseHandle( map );
+        return( context );
     }
 
 } // namespace AccessMonitor

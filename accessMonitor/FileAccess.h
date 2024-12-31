@@ -6,7 +6,7 @@
 
 namespace AccessMonitor {
 
-    typedef unsigned long FileAccessMode;
+    typedef uint16_t FileAccessMode;
     typedef std::chrono::time_point<std::chrono::file_clock> FileTime;
 
     static const FileAccessMode AccessNone = (1 << 0);
@@ -14,18 +14,29 @@ namespace AccessMonitor {
     static const FileAccessMode AccessWrite = (1 << 2);
     static const FileAccessMode AccessDelete = (1 << 3);
 
-    struct FileAccess {
-        FileAccessMode  mode;           // Collapsed file access mode
-        FileAccessMode  modes;          // All access modes to file
+    class FileAccess {
+        struct {
+            uint64_t mode       : 8;    // Effective (collapsed) file access mode
+            uint64_t modes      : 8;    // All access modes to file
+            uint64_t success    : 1;    // Success or failure of effective file access
+            uint64_t failures   : 1;    // One or more file accesses failed
+        } state;
         FileTime        lastWriteTime;  // Last write time on file
+    public:
         FileAccess();
-        FileAccess( const FileAccessMode& mode, const FileTime& time );
+        FileAccess( const FileAccessMode accessMode, const FileTime time, const bool success = true );
+        inline FileAccessMode mode() const { return state.mode; }
+        inline FileAccessMode modes() const { return state.modes; }
+        inline bool success() const { return state.success; }
+        inline bool failures() const { return state.failures; }
+        inline FileTime writeTime() const { return lastWriteTime; }
+        void mode( const FileAccessMode mode, const FileTime time, const bool success = true );
     };
 
     // Convert file access mode to human readable string
-    std::wstring modeToString( FileAccessMode mode );
+    std::wstring fileAccessModeToString( FileAccessMode mode );
     // Convert human readable string to file access mode
-    FileAccessMode stringToMode( const std::wstring& modeString );
+    FileAccessMode stringToFileAccessMode( const std::wstring& modeString );
 
 }
 

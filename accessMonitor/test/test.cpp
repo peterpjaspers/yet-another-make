@@ -8,6 +8,7 @@
 #include <string>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <thread>
 #include <cstdlib>
 
@@ -19,12 +20,14 @@ static int sessions = 1;
 static int threads = 1;
 static bool remoteProcess = false;
 
+// Execute a command in a seperate process...
 void executeCommand( const char* command ) {
     STARTUPINFOA si;
     PROCESS_INFORMATION pi;
     std::memset( &si, 0, sizeof(si) );
     si.cb = sizeof(si);
     std::memset( &pi, 0, sizeof(pi) );
+    // Create the process with all settings to default values...
     CreateProcessA(
         nullptr,
         const_cast<char*>( command ),
@@ -37,73 +40,77 @@ void executeCommand( const char* command ) {
         &si,
         &pi
     );
+    // Wait for the process to complete...
     WaitForSingleObject( pi.hProcess, 0 );
     CloseHandle( pi.hProcess );
     CloseHandle( pi.hThread );
 }
 
-const std::string remoteTestFile( "C:/Users/philv/Code/yam/yet-another-make/accessMonitor/test/remoteTest.exe" );
-// const std::wstring remoteTestFile( L"D:/Peter/Github/yam/x64/Debug/remoteTest.exe" );
+//const std::string remoteTestFile( "C:/Users/philv/Code/yam/yet-another-make/accessMonitor/test/remoteTest.exe" );
+const std::string remoteTestFile( "D:/Peter/Github/yam/x64/Debug/remoteTest.exe" );
 
 void worker( const path directoryPath ) {
     try {
-        debugRecord() << "std::filesystem::create_directories( " << directoryPath << " )" << record;
+        if (debugLog( General )) debugRecord() << "std::filesystem::create_directories( " << directoryPath << " )" << record;
         create_directories( directoryPath );
-        debugRecord() << "std::ofstream( " << (directoryPath / "junk.txt").c_str() << " )" << record;
+        if (debugLog( General )) debugRecord() << "std::ifstream( " << (directoryPath / "nonExisting.txt").c_str() << " )" << record;
+        ifstream nefile( directoryPath / "nonExisting.txt" );
+        nefile.close();
+        if (debugLog( General )) debugRecord() << "std::ifstream( " << (directoryPath / "moreJunk.txt").c_str() << " )" << record;
+        ifstream ifile( directoryPath / "moreJunk.txt" );
+        ifile.close();
+        if (debugLog( General )) debugRecord() << "std::ofstream( " << (directoryPath / "junk.txt").c_str() << " )" << record;
         ofstream file( directoryPath / "junk.txt" );
         file << "Hello world!\n";
         file.close();
-        this_thread::sleep_for(chrono::milliseconds(rand() % 17));;
-        debugRecord() << "std::ofstream( " << (directoryPath / "moreJunk.txt").c_str() << " )" << record;
+        this_thread::sleep_for(chrono::milliseconds(rand() % 17));
+        if (debugLog( General )) debugRecord() << "std::ofstream( " << (directoryPath / "moreJunk.txt").c_str() << " )" << record;
         ofstream anotherFile( directoryPath / "moreJunk.txt" );
         anotherFile << "Hello again!\n";
         anotherFile.close();
-        debugRecord() << "Determine canonical path of " << (directoryPath / "morejunk.txt").c_str() << record;
+        if (debugLog( General )) debugRecord() << "Determine canonical path of " << (directoryPath / "morejunk.txt").c_str() << record;
         auto canon = canonical( directoryPath / "morejunk.txt" );
-        debugRecord() << "Canaonical path is " << canon.c_str() << record;
+        if (debugLog( General )) debugRecord() << "Canonical path is " << canon.c_str() << record;
         CopyFileW( (directoryPath / "moreJunk.txt").c_str(), (directoryPath / "evenMoreJunk.txt").c_str(), false );
-        debugRecord() << "std::filesystem::remove( " << (directoryPath / "junk.txt").c_str() << " )" << record;
+        if (debugLog( General )) debugRecord() << "std::filesystem::remove( " << (directoryPath / "junk.txt").c_str() << " )" << record;
         remove( directoryPath / "junk.txt" );
-        debugRecord() << "std::filesystem::rename( " << (directoryPath / "moreJunk.txt").c_str() << ", " << (directoryPath / "yetMorejunk.txt").c_str() << " )" << record;
+        if (debugLog( General )) debugRecord() << "std::filesystem::rename( " << (directoryPath / "moreJunk.txt").c_str() << ", " << (directoryPath / "yetMorejunk.txt").c_str() << " )" << record;
         rename( directoryPath / "moreJunk.txt", directoryPath / "yetMoreJunk.txt" );
-        debugRecord() << "std::filesystem::remove_all( " << directoryPath << " )" << record;
+        if (debugLog( General )) debugRecord() << "std::filesystem::remove_all( " << directoryPath << " )" << record;
         error_code ec;
         remove_all( directoryPath, ec );
-        debugRecord() << "std::filesystem::create_directories( " << directoryPath << " )" << record;
+        if (debugLog( General )) debugRecord() << "std::filesystem::create_directories( " << directoryPath << " )" << record;
         create_directories( directoryPath );
         file = ofstream( directoryPath / "junk.txt" );
         file << "Hello world!\n";
         file.close();
     }
-    catch (filesystem_error const& exception) {
-        debugRecord() << "Exception  " << exception.what() << "!" << record;
-    }
-    catch (string text) {
-        debugRecord() << "Exception " << wstring( text.begin(), text.end() ) << "!" << record;
+    catch (exception const& exception) {
+        if (debugLog( General )) debugRecord() << "Exception  " << exception.what() << " in worker!" << record;
     }
     catch (...) {
-        debugRecord() << "Exception!" << record;
+        if (debugLog( General )) debugRecord() << "Exception[ " << GetLastError() << " ] in worker!" << record;
     }
 }
 
 void doFileAccess() {
     try {
-        auto session = CurrentSessionID();
+        auto session( Session::current() );
         if (remoteProcess) {
             stringstream command;
             command
                 << remoteTestFile
                 << " " 
-                << session
+                << session->id()
                 << " " 
                 << threads
                 << " "
-                << CurrentSessionDirectory().generic_string();
-            debugRecord() << "Executing " << command.str().c_str() << record;
+                << session->directory().generic_string();
+            if (debugLog( General )) debugRecord() << "Executing " << command.str().c_str() << record;
             // auto exitCode = system( command.str().c_str() );
             executeCommand( command.str().c_str() );
         }
-        path sessionDir( uniqueName( CurrentSessionDirectory() / L"Session", session ) );
+        path sessionDir( session->directory() / uniqueName( L"Session", session->id() ) );
         if (1 < threads) {
             vector<thread> workerThreads;
             for (int i = 0; i < threads; ++i) {
@@ -116,29 +123,42 @@ void doFileAccess() {
             worker( sessionDir / L"fileAccessTest" );
         }
     }
-    catch (filesystem_error const& exception) {
-        debugRecord() << "Exception  " << exception.what() << "!" << record;
-    }
-    catch (string text) {
-        debugRecord() << "Exception " << wstring( text.begin(), text.end() ) << "!" << record;
+    catch (exception const& exception) {
+        if (debugLog( General )) debugRecord() << "Exception  " << exception.what() << " in doFileAccess!" << record;
     }
     catch (...) {
-        debugRecord() << "Exception!" << record;
+        if (debugLog( General )) debugRecord() << "Exception[ " << GetLastError() << " ] in doFileAccess!" << record;
     }
 }
 
 void doMonitoredFileAccess() {
-    // auto aspects = MonitorLogAspects( RegisteredFunction | PatchedFunction | PatchExecution | FileAccesses );
-    auto aspects = MonitorLogAspects( PatchExecution | FileAccesses );
-    startMonitoring( temp_directory_path(), CreateNewSession, aspects );
-    auto session = CurrentSessionID();
-    doFileAccess();
-    MonitorEvents events;
-    stopMonitoring( &events );
-    // Log (all) events for this session...
-    LogFile output( temp_directory_path() / uniqueName( L"TestProgramOutput", session, L"txt" )  );
-    for ( auto access : events ) {
-        output() << access.first << L" [ " << access.second.lastWriteTime << L" ] " << modeToString( access.second.modes ) << " : " << modeToString( access.second.mode ) << record;
+    try {
+        path temp( temp_directory_path() );
+        // auto aspects = MonitorLogAspects( General | RegisteredFunction | PatchedFunction | PatchExecution | FileAccesses );
+        auto aspects = MonitorLogAspects( General | PatchExecution | PatchedFunction | FileAccesses );
+        startMonitoring( temp, aspects );
+        auto session( Session::current() );
+        auto id( session->id() );
+        doFileAccess();
+        MonitorEvents events;
+        stopMonitoring( &events );
+        // Log (all) events for this session...
+        LogFile output( temp / uniqueName( L"TestProgramOutput", id, L"txt" )  );
+        for ( auto access : events ) {
+            wstring fileName( access.first );
+            FileAccess fileAccess( access.second );
+            output()
+                << fileName
+                << L" [ " << fileAccess.writeTime() << L" ] "
+                << fileAccessModeToString( fileAccess.modes() ) << (fileAccess.failures() ? " (one or more failures)" : "" )
+                << " : " << fileAccessModeToString( fileAccess.mode() ) << (fileAccess.success() ? "" : " failed" ) << record;
+        }
+    }
+    catch (exception const& exception) {
+        cout << "Exception  " << exception.what() << " in doMonitoredFileAccess!" << endl;
+    }
+    catch (...) {
+        cout << "Exception[ " << GetLastError() << " ] in doMonitoredFileAccess!" << endl;
     }
 }
 
@@ -149,16 +169,28 @@ bool condition( const string& argument ) {
 }
 
 int main( int argc, char* argv[] ) {
-    sessions = 1;
-    threads = 1;
-    remoteProcess = false;
-    if (3 < argc) { remoteProcess = condition( argv[ 3 ] ); }
-    if (2 < argc) { threads = atoi( argv[ 2 ] ); }
-    if (threads <= 1) threads = 1;
-    if (1 < argc) { sessions = atoi( argv[ 1 ] ); }
-    if (sessions <= 1) sessions = 1;
-    vector<thread> sessionThreads;
-    for (int i = 0; i < sessions; ++i) sessionThreads.push_back( thread( doMonitoredFileAccess ) );
-    for (int i = 0; i < sessions; ++i) sessionThreads[ i ].join();
+    try {
+        sessions = 1;
+        threads = 1;
+        remoteProcess = false;
+        if (3 < argc) { remoteProcess = condition( argv[ 3 ] ); }
+        if (2 < argc) { threads = atoi( argv[ 2 ] ); }
+        if (threads <= 1) threads = 1;
+        if (1 < argc) { sessions = atoi( argv[ 1 ] ); }
+        if (sessions <= 1) sessions = 1;
+        if (1 < sessions) {
+            vector<thread> sessionThreads;
+            for (int i = 0; i < sessions; ++i) sessionThreads.push_back( thread( doMonitoredFileAccess ) );
+            for (int i = 0; i < sessions; ++i) sessionThreads[ i ].join();
+        } else {
+            doMonitoredFileAccess();
+        }
+    }
+    catch (exception const& exception) {
+        cout << "Exception  " << exception.what() << " in main!" << endl;
+    }
+    catch (...) {
+        cout << "Exception[ " << GetLastError() << " ] in main!" << endl;
+    }
 };
 

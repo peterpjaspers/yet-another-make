@@ -24,7 +24,7 @@
     <ClCompile Include="..\accessMonitor\Patch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\accessMonitor\MonitorThreadsAndProcesses.cpp">
+    <ClCompile Include="..\accessMonitor\MonitorProcesses.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\accessMonitor\MonitorLogging.cpp">

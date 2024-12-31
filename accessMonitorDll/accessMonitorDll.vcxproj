@@ -29,9 +29,7 @@
     <ClCompile Include="..\accessMonitor\Monitor.cpp" />
     <ClCompile Include="..\accessMonitor\MonitorFiles.cpp" />
     <ClCompile Include="..\accessMonitor\MonitorLogging.cpp" />
-    <ClCompile Include="..\accessMonitor\MonitorThreadsAndProcesses.cpp">
-      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-    </ClCompile>
+    <ClCompile Include="..\accessMonitor\MonitorProcesses.cpp" />
     <ClCompile Include="..\accessMonitor\Patch.cpp" />
     <ClCompile Include="..\accessMonitor\Process.cpp" />
     <ClCompile Include="..\accessMonitor\Session.cpp" />

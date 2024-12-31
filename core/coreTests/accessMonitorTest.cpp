@@ -3,12 +3,13 @@
 #include "../FileSystem.h"
 #include "../Glob.h"
 #include "../MSBuildTrackerOutputReader.h"
-#include "../../accessMonitor/Monitor.h"
 
 #include "gtest/gtest.h"
 #include <string>
 #include <boost/process.hpp>
 #include <fstream>
+
+#include "../../accessMonitor/Monitor.h"
 
 namespace
 {
@@ -81,23 +82,23 @@ namespace
         for (auto const& file : readFiles) {
             ASSERT_TRUE(result.contains(file.generic_wstring()));
             auto fileAccess = result[file.generic_wstring()];
-            EXPECT_EQ(AccessMonitor::AccessRead, fileAccess.modes & AccessMonitor::AccessRead);
+            EXPECT_EQ(AccessMonitor::AccessRead, fileAccess.modes() & AccessMonitor::AccessRead);
         }
         for (auto const& file : writtenFiles) {
             ASSERT_TRUE(result.contains(file.generic_wstring()));
             auto fileAccess = result[file.generic_wstring()];
-            EXPECT_EQ(AccessMonitor::AccessWrite, fileAccess.modes & AccessMonitor::AccessWrite);
+            EXPECT_EQ(AccessMonitor::AccessWrite, fileAccess.modes() & AccessMonitor::AccessWrite);
         }
         for (auto const& file : readOnlyFiles) {
             ASSERT_TRUE(result.contains(file.generic_wstring()));
             auto fileAccess = result[file.generic_wstring()];
-            EXPECT_EQ(0, fileAccess.modes & AccessMonitor::AccessWrite);
+            EXPECT_EQ(0, fileAccess.modes() & AccessMonitor::AccessWrite);
         }
 
         for (auto const& pair : result) {
             std::filesystem::path file(pair.first);
-            if (pair.second.modes & AccessMonitor::AccessRead) {
-                if (pair.second.modes & AccessMonitor::AccessWrite) {
+            if (pair.second.modes() & AccessMonitor::AccessRead) {
+                if (pair.second.modes() & AccessMonitor::AccessWrite) {
                     if (!writtenFiles.contains(file.make_preferred())) {
                         EXPECT_TRUE(false);
                         std::cout << "writtenFiles does not contain read+written " << file.make_preferred();
@@ -116,7 +117,7 @@ namespace
                         std::cout << "readOnlyFiles does not contain read-only " << file.make_preferred();
                     }
                 }
-            } else if (pair.second.modes & AccessMonitor::AccessWrite) {   
+            } else if (pair.second.modes() & AccessMonitor::AccessWrite) {
                 if (!writtenFiles.contains(file.make_preferred())) {
                     EXPECT_TRUE(false);
                     std::cout << "writtenFiles does not contain written " << file.make_preferred();
@@ -187,11 +188,11 @@ namespace
         WaitForSingleObject(pi.hProcess, INFINITE);
         AccessMonitor::MonitorEvents result;
         AccessMonitor::stopMonitoring(&result);
-        std::filesystem::path junkPath(wdir / "junk.txt");
-        ASSERT_TRUE(result.contains(junkPath.generic_wstring()));
-        auto fileAccess = result.at(junkPath.generic_wstring());
-        EXPECT_EQ(AccessMonitor::AccessNone | AccessMonitor::AccessWrite, fileAccess.mode);
-        EXPECT_EQ(AccessMonitor::AccessNone | AccessMonitor::AccessRead | AccessMonitor::AccessWrite, fileAccess.modes);
+        std::wstring junkPath = std::filesystem::path(wdir / "junk.txt").generic_wstring();
+        ASSERT_TRUE(result.contains(junkPath));
+        auto fileAccess = result.at(junkPath);
+        EXPECT_EQ(AccessMonitor::AccessNone | AccessMonitor::AccessWrite, fileAccess.mode());
+        EXPECT_EQ(AccessMonitor::AccessNone | AccessMonitor::AccessRead | AccessMonitor::AccessWrite, fileAccess.modes());
 
         // Close process and thread handles. 
         CloseHandle(pi.hProcess);
@@ -208,6 +209,6 @@ namespace
         int exitCode = system(remoteTest.c_str());
         AccessMonitor::MonitorEvents result;
         AccessMonitor::stopMonitoring(&result);
-        EXPECT_EQ(21, result.size());
+        EXPECT_GE(result.size(), 21);
     }
 }

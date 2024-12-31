@@ -2,16 +2,17 @@
 #include <string>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <thread>
 
 using namespace std;
 using namespace std::filesystem;
 
-path directory( temp_directory_path() );
-
-void worker( const path& dataDirectory ) {
+void fileAccess( const path& dataDirectory ) {
     create_directories( dataDirectory );
+    ifstream nefile( dataDirectory / "nonExisting.txt" );
+    nefile.close();
+    ifstream ifile( dataDirectory / "moreJunk.txt" );
+    ifile.close();
     ofstream file( dataDirectory / "junk.txt" );
     file << "Hello world!\n";
     file.close();
@@ -25,16 +26,18 @@ void worker( const path& dataDirectory ) {
 }
 
 void doFileAccess( int threads, const path& directory ) {
+    path root( directory );
+    if (directory.is_relative()) root = path( "." ) / directory;
     if (1 < threads) {
-        vector<thread> workerThreads;
+        vector<thread> workers;
         for (int i = 0; i < threads; ++i) {
             wstringstream subdir;
             subdir << L"fileAccessTest" << i;
-            workerThreads.push_back( thread( worker, path( "." ) / directory / subdir.str() ) );
+            workers.push_back( thread( fileAccess, root / subdir.str() ) );
         }
-        for (int i = 0; i < threads; ++i) workerThreads[ i ].join();
+        for (int i = 0; i < threads; ++i) workers[ i ].join();
     } else {
-        worker( path( "." ) / directory / L"fileAccessTest" );
+        fileAccess( root / L"fileAccessTest" );
     }
 }
 
@@ -45,17 +48,13 @@ wstring uniqueName( const wstring& name, unsigned long code ) {
 }
 
 int main( int argc, char* argv[] ) {
-    try {
-        int session = 1;
-        int threads = 1;
-        if (3 < argc) directory = argv[ 3 ];
-        if (2 < argc) threads = atoi( argv[ 2 ] );
-        if (1 < argc) session = atoi( argv[ 1 ] );
-        doFileAccess( threads, ( directory / uniqueName( L"RemoteSession", session ) ) );
-    }
-    catch (string message) {
-        cout << "Exception raised : " << message << endl;
-    }
+    path directory( temp_directory_path() );
+    int session = 1;
+    int threads = 1;
+    if (3 < argc) directory = argv[ 3 ];
+    if (2 < argc) threads = atoi( argv[ 2 ] );
+    if (1 < argc) session = atoi( argv[ 1 ] );
+    doFileAccess( threads, ( directory / uniqueName( L"RemoteSession", session ) ) );
     return( 0 );
 };
 

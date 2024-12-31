@@ -1,7 +1,6 @@
 #include "LogFile.h"
 
 #include <fstream>
-#include <iostream>
 #include <clocale>
 #include <codecvt>
 #include <cstdlib>
@@ -10,8 +9,9 @@
 using namespace std;
 using namespace std::filesystem;
 
-// ToDo: Conditionally compile logging code while compiling in debug controlled via NDEBUG
 // ToDo: Free (delete) LogRecord for each thread.
+//       Low priority because only a problen for threads that start and stop monioring
+//       and therefore not a problem for threads in a thread pool.
 
 namespace AccessMonitor {
 
@@ -19,24 +19,22 @@ namespace AccessMonitor {
         logFile( file ), tlsRecordIndex( TlsAlloc() ), enabledAspects( 0 ), logTime( time ), logInterval( interval ), previousTime( chrono::system_clock::now() )
     {
         const char* signature = "LogFile( const path& file, bool time, bool interval )";
-        if (tlsRecordIndex == TLS_OUT_OF_INDEXES) throw string( signature ) + " - Could not allocate thread local storage!";
+        if (tlsRecordIndex == TLS_OUT_OF_INDEXES) throw runtime_error( string( signature ) + " - Could not allocate thread local storage!" );
     }
-
     LogFile::~LogFile() {
-        const lock_guard<mutex> lock( logMutex ); 
+        const lock_guard<mutex> lock( logMutex );
         logFile.close();
     }
-
     // Return logging stream on enabled log.
     LogRecord& LogFile::operator()() {
         static const char* signature = "LogRecord& LogFile::operator()()";
-        LogRecord* record = static_cast<LogRecord*>( TlsGetValue( tlsRecordIndex ) );
+        auto record( static_cast<LogRecord*>( TlsGetValue( tlsRecordIndex ) ) );
         if (record == nullptr) {
             record = new LogRecord( *this );
             TlsSetValue( tlsRecordIndex, record );
         }
         if (logTime || logInterval) {
-            auto time = chrono::system_clock::now();
+            auto time( chrono::system_clock::now() );
             if (logTime) (*record) << time << " : ";
             if (logInterval) (*record) << "[ " << fixed << setprecision( 3 ) << setw( 6 ) <<
                 chrono::duration_cast<chrono::microseconds >(time - previousTime).count() / 1000.0 << " ms ] ";
@@ -73,7 +71,8 @@ namespace AccessMonitor {
         return utf16conv.to_bytes( string );
     }
 
-    wstring lastErrorString( unsigned int errorCode ) {
+    wstring errorString( unsigned int errorCode ) {
+        // Convert Windows error code to message
         LPWSTR buffer = nullptr;
         size_t size =
             FormatMessageW(

@@ -3,26 +3,35 @@
 
 #include "LogFile.h"
 
+#include <filesystem>
+
 namespace AccessMonitor {
 
     static const unsigned long MaxFileName = 1024;
     
-    LogFile* createDebugLog( bool logTimes = true, bool logIntervals = false );
+    LogFile* createDebugLog( const std::filesystem::path& dir, unsigned long code, bool logTimes = true, bool logIntervals = false );
     LogFile& debugLog();
+#ifdef _DEBUG_ACCESS_MONITOR
     bool debugLog( const LogAspects aspects );
+#else
+    // Supress debug logging unconditionally.
+    // All debug logging code will be completely removed by the optimizing compiler.
+    inline bool debugLog( const LogAspects aspects ) { return false; }
+#endif
     LogRecord& debugRecord();
 
-    LogFile* createEventLog();
+    LogFile* createEventLog( const std::filesystem::path& dir, unsigned long code );
     LogFile& eventLog();
     bool recordingEvents();
     LogRecord& eventRecord();
 
     enum MonitorLogAspects {
-        RegisteredFunction  = (1 << 1),
-        PatchedFunction     = (1 << 2),
-        PatchExecution      = (1 << 3),
-        FileAccesses        = (1 << 4),
-        WriteTime           = (1 << 5),
+        General             = (1 << 1),
+        RegisteredFunction  = (1 << 2),
+        PatchedFunction     = (1 << 3),
+        PatchExecution      = (1 << 4),
+        FileAccesses        = (1 << 5),
+        WriteTime           = (1 << 6),
     };
 
 } // namespace AccessMonitor
