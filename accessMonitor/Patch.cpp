@@ -1,10 +1,10 @@
 #include "Patch.h"
 #include "MonitorLogging.h"
+
 #include <windows.h>
 #include "../detours/inc/detours.h"
 
 #include <map>
-#include <iostream>
 
 using namespace std;
 
@@ -66,9 +66,7 @@ namespace AccessMonitor {
         for ( auto entry : registeredPatches ) {
             auto& name( entry.first );
             auto& registration( entry.second );
-            if (patchFunction( registration.index )) {
-                if (debugLog( PatchedFunction )) { debugRecord() << L"      Patched function " << widen( name ) << record; }
-            } else {
+            if (!patchFunction( registration.index )) {
                 if (debugLog( PatchedFunction )) { debugRecord() << L"      Unable to patch function " << widen( name ) << record; }
             }
         }
@@ -77,9 +75,7 @@ namespace AccessMonitor {
         for ( auto entry : registeredPatches ) {
             auto& registration( entry.second );
             auto& name( entry.first );
-            if (unpatchFunction( registration.index )) {
-                if (debugLog( PatchedFunction )) { debugRecord() << L"      Unpatched function " << widen( name ) << record; }
-            } else {
+            if (!unpatchFunction( registration.index )) {
                 if (debugLog( PatchedFunction )) { debugRecord() << L"      Unable to unpatch function " << widen( name ) << record; }
             }
         }        

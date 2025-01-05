@@ -114,7 +114,7 @@ namespace AccessMonitor {
             LPSECURITY_ATTRIBUTES securityAttributes
         ) {
             auto created =  patchOriginal( PatchCreateDirectoryA, IndexCreateDirectoryA )( pathName, securityAttributes );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateDirectoryA", created ) << pathName << L", ... )" << record;
                 fileAccess( pathName, AccessWrite, successful( created, guard.error() ) );
@@ -126,7 +126,7 @@ namespace AccessMonitor {
             LPSECURITY_ATTRIBUTES  securityAttributes
         ) {
             auto created =  patchOriginal( PatchCreateDirectoryW, IndexCreateDirectoryW )( pathName, securityAttributes );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateDirectoryW", created ) << pathName << L", ... )" << record;
                 fileAccess( pathName, AccessWrite, successful( created, guard.error() ) );
@@ -139,7 +139,7 @@ namespace AccessMonitor {
             LPSECURITY_ATTRIBUTES securityAttributes
         ) {
             auto created =  patchOriginal( PatchCreateDirectoryExA, IndexCreateDirectoryExA )( templateDirectory, newDirectory, securityAttributes );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateDirectoryExA", created ) << newDirectory << L", ... )" << record;
                 fileAccess( newDirectory, AccessWrite, successful( created, guard.error() ) );
@@ -152,7 +152,7 @@ namespace AccessMonitor {
             LPSECURITY_ATTRIBUTES securityAttributes
         ) {
             auto created =  patchOriginal( PatchCreateDirectoryExW, IndexCreateDirectoryExW )( templateDirectory, newDirectory, securityAttributes );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateDirectoryExA", created ) << newDirectory << L", ... )" << record;
                 fileAccess( newDirectory, AccessWrite, successful( created, guard.error() ) );
@@ -163,7 +163,7 @@ namespace AccessMonitor {
             LPCSTR pathName
         ) {
             auto removed =  patchOriginal( PatchRemoveDirectoryA, IndexRemoveDirectoryA )( pathName );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "RemoveDirectoryA", removed ) << pathName << L", ... )" << record;
                 fileAccess( pathName, AccessDelete, successful( removed, guard.error() ) );
@@ -174,7 +174,7 @@ namespace AccessMonitor {
             LPCWSTR pathName
         ) {
             auto removed =  patchOriginal( PatchRemoveDirectoryW, IndexRemoveDirectoryW )( pathName );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "RemoveDirectoryW", removed ) << pathName << L", ... )" << record;
                 fileAccess( pathName, AccessDelete, successful( removed, guard.error() ) );
@@ -191,7 +191,7 @@ namespace AccessMonitor {
             HANDLE                hTemplateFile
         ) {
             auto handle =  patchOriginal( PatchCreateFileA, IndexCreateFileA )( fileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateFileA", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
                 fileAccess( fileName, requestedAccessMode( dwDesiredAccess ), (handle != INVALID_HANDLE_VALUE) );
@@ -209,7 +209,7 @@ namespace AccessMonitor {
             HANDLE                hTemplateFile
         ) {
             auto handle =  patchOriginal( PatchCreateFileW, IndexCreateFileW )( fileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateFileW", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
                 fileAccess( fileName, requestedAccessMode( dwDesiredAccess ), (handle != INVALID_HANDLE_VALUE) );
@@ -229,7 +229,7 @@ namespace AccessMonitor {
             PVOID                 lpExtendedParameter
         ) {
             auto handle =  patchOriginal( PatchCreateFileTransactedA, IndexCreateFileTransactedA )( fileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile, hTransaction, pusMiniVersion, lpExtendedParameter );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateFileTransactedA", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
                 fileAccess( fileName, requestedAccessMode( dwDesiredAccess ), (handle != INVALID_HANDLE_VALUE) );
@@ -250,7 +250,7 @@ namespace AccessMonitor {
             PVOID                 lpExtendedParameter
         ) {
             auto handle =  patchOriginal( PatchCreateFileTransactedW, IndexCreateFileTransactedW )( fileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile, hTransaction, pusMiniVersion, lpExtendedParameter );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateFileTransactedW", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
                 fileAccess( fileName, requestedAccessMode( dwDesiredAccess ), (handle != INVALID_HANDLE_VALUE) );
@@ -265,7 +265,7 @@ namespace AccessMonitor {
             LPCREATEFILE2_EXTENDED_PARAMETERS pCreateExParams
         ) {
             auto handle =  patchOriginal( PatchCreateFile2, IndexCreateFile2 )( fileName, dwDesiredAccess, dwShareMode, dwCreationDisposition, pCreateExParams );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateFile2", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
                 fileAccess( fileName, requestedAccessMode( dwDesiredAccess ), (handle != INVALID_HANDLE_VALUE) );
@@ -279,7 +279,7 @@ namespace AccessMonitor {
             DWORD  dwFlagsAndAttributes
         ) {
             auto handle =  patchOriginal( PatchReOpenFile, IndexReOpenFile )( hOriginalFile, dwDesiredAccess, dwShareMode, dwFlagsAndAttributes );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 auto fileName = fullName( hOriginalFile );
                 if (debugLog( PatchExecution )) debugMessage( "ReOpenFile", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
@@ -293,7 +293,7 @@ namespace AccessMonitor {
             UINT       uStyle
         ) {
             auto handle =  patchOriginal( PatchOpenFile, IndexOpenFile )( fileName, lpReOpenBuff, uStyle );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "OpenFile", (handle != HFILE_ERROR) ) << fileName << L", ... ) -> " << handle << record;
                 fileAccess( fileName, requestedAccessMode( uStyle ), (handle != HFILE_ERROR) );
@@ -303,7 +303,7 @@ namespace AccessMonitor {
         }
         BOOL PatchDeleteFileA( LPCSTR fileName ) {
             auto deleted =  patchOriginal( PatchDeleteFileA, IndexDeleteFileA )( fileName );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "DeleteFileA", deleted ) << fileName << L", ... )" << record;
                 fileAccess( fileName, AccessDelete, successful( deleted, guard.error() ) );
@@ -312,7 +312,7 @@ namespace AccessMonitor {
         }
         BOOL PatchDeleteFileW( LPCWSTR fileName ) {
             auto deleted =  patchOriginal( PatchDeleteFileW, IndexDeleteFileW )( fileName );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "DeleteFileW", deleted ) << fileName << L", ... )" << record;
                 fileAccess( fileName, AccessDelete, successful( deleted, guard.error() ) );
@@ -321,7 +321,7 @@ namespace AccessMonitor {
         }
         BOOL PatchDeleteFileTransactedA( LPCSTR fileName, HANDLE hTransaction ) {
             auto deleted =  patchOriginal( PatchDeleteFileTransactedA, IndexDeleteFileTransactedA )( fileName, hTransaction );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "DeleteFileTransactedA", deleted ) << fileName << L", ... )" << record;
                 fileAccess( fileName, AccessDelete, successful( deleted, guard.error() ) );
@@ -330,7 +330,7 @@ namespace AccessMonitor {
         }
         BOOL PatchDeleteFileTransactedW( LPCWSTR fileName, HANDLE hTransaction ) {
             auto deleted =  patchOriginal( PatchDeleteFileTransactedW, IndexDeleteFileTransactedW )( fileName, hTransaction );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "DeleteFileTransactedW", deleted ) << fileName << L", ... )" << record;
                 fileAccess( fileName, AccessDelete, successful( deleted, guard.error() ) );
@@ -343,7 +343,7 @@ namespace AccessMonitor {
             BOOL   failIfExists
         ) {
             auto copied =  patchOriginal( PatchCopyFileA, IndexCopyFileA )( existingFileName, newFileName, failIfExists );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CopyFileA", copied ) << existingFileName << L", " << newFileName << L", ... )" << record;
                 fileAccess( existingFileName, AccessRead, successful( copied, guard.error() ) );
@@ -357,7 +357,7 @@ namespace AccessMonitor {
             BOOL    failIfExists
         ) {
             auto copied =  patchOriginal( PatchCopyFileW, IndexCopyFileW )( existingFileName, newFileName, failIfExists );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CopyFileW", copied ) << existingFileName << L", " << newFileName << L", ... )" << record;
                 fileAccess( existingFileName, AccessRead, successful( copied, guard.error() ) );
@@ -374,7 +374,7 @@ namespace AccessMonitor {
             DWORD              dwCopyFlags
         ) {
             auto copied =  patchOriginal( PatchCopyFileExA, IndexCopyFileExA )( existingFileName, newFileName, lpProgressRoutine, lpData, pbCancel, dwCopyFlags );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CopyFileExA", copied ) << existingFileName << L", " << newFileName << L", ... )" << record;
                 fileAccess( existingFileName, AccessRead, successful( copied, guard.error() ) );
@@ -391,7 +391,7 @@ namespace AccessMonitor {
             DWORD              dwCopyFlags
         ) {
             auto copied =  patchOriginal( PatchCopyFileExW, IndexCopyFileExW )( existingFileName, newFileName, lpProgressRoutine, lpData, pbCancel, dwCopyFlags );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CopyFileExW", copied ) << existingFileName << L", " << newFileName << L", ... )" << record;
                 fileAccess( existingFileName, AccessRead, successful( copied, guard.error() ) );
@@ -409,7 +409,7 @@ namespace AccessMonitor {
             HANDLE             hTransaction
         ) {
             auto copied =  patchOriginal( PatchCopyFileTransactedA, IndexCopyFileTransactedA )( existingFileName, newFileName, lpProgressRoutine,lpData, pbCancel, dwCopyFlags, hTransaction );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CopyFileTransactedA", copied ) << existingFileName << L", " << newFileName << L", ... )" << record;
                 fileAccess( existingFileName, AccessRead, successful( copied, guard.error() ) );
@@ -427,7 +427,7 @@ namespace AccessMonitor {
             HANDLE             hTransaction
         ) {
             auto copied =  patchOriginal( PatchCopyFileTransactedW, IndexCopyFileTransactedW )( existingFileName, newFileName, lpProgressRoutine,lpData, pbCancel, dwCopyFlags, hTransaction );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CopyFileTransactedW", copied ) << existingFileName << L", " << newFileName << L", ... )" << record;
                 fileAccess( existingFileName, AccessRead, successful( copied, guard.error() ) );
@@ -441,7 +441,7 @@ namespace AccessMonitor {
             COPYFILE2_EXTENDED_PARAMETERS* pExtendedParameters
         ) {
             auto result =  patchOriginal( PatchCopyFile2, IndexCopyFile2 )( existingFileName, newFileName, pExtendedParameters );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CopyFile2", (result == S_OK)) << existingFileName << L", " << newFileName << L", ... )" << record;
                 fileAccess( existingFileName, AccessRead, (result == S_OK) );
@@ -458,7 +458,7 @@ namespace AccessMonitor {
             LPVOID  lpReserved
         ) {
             auto replaced =  patchOriginal( PatchReplaceFileA, IndexReplaceFileA )( lpReplacedFileName, lpReplacementFileName, lpBackupFileName, dwReplaceFlags, lpExclude, lpReserved );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "ReplaceFileA", replaced ) << lpReplacedFileName << L", " << lpReplacementFileName << L", ... )" << record;
                 fileAccess( lpReplacementFileName, AccessRead, successful( replaced, guard.error() ) );
@@ -476,7 +476,7 @@ namespace AccessMonitor {
             LPVOID  lpReserved
         ) {
             auto replaced =  patchOriginal( PatchReplaceFileW, IndexReplaceFileW )( lpReplacedFileName, lpReplacementFileName, lpBackupFileName, dwReplaceFlags, lpExclude, lpReserved );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "ReplaceFileW", replaced ) << lpReplacedFileName << L", " << lpReplacementFileName << L", ... )" << record;
                 fileAccess( lpReplacementFileName, AccessRead, successful( replaced, guard.error() ) );
@@ -490,7 +490,7 @@ namespace AccessMonitor {
             LPCSTR newFileName
         ) {
             auto moved =  patchOriginal( PatchMoveFileA, IndexMoveFileA )( existingFileName, newFileName );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "MoveFileA", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
                 fileAccess( existingFileName, AccessDelete, successful( moved, guard.error() ) );
@@ -503,7 +503,7 @@ namespace AccessMonitor {
             LPCWSTR newFileName
         ) {
             auto moved =  patchOriginal( PatchMoveFileW, IndexMoveFileW )( existingFileName, newFileName );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "MoveFileW", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
                 fileAccess( existingFileName, AccessDelete, successful( moved, guard.error() ) );
@@ -517,7 +517,7 @@ namespace AccessMonitor {
             DWORD   flags
         ) {
             auto moved =  patchOriginal( PatchMoveFileExA, IndexMoveFileExA )( existingFileName, newFileName, flags );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "MoveFileExA", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
                 fileAccess( existingFileName, AccessDelete, successful( moved, guard.error() ) );
@@ -531,7 +531,7 @@ namespace AccessMonitor {
             DWORD   flags
         ) {
             auto moved =  patchOriginal( PatchMoveFileExW, IndexMoveFileExW )( existingFileName, newFileName, flags );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "MoveFileExW", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
                 fileAccess( existingFileName, AccessDelete, successful( moved, guard.error() ) );
@@ -547,7 +547,7 @@ namespace AccessMonitor {
             DWORD              dwFlags
         ) {
             auto moved =  patchOriginal( PatchMoveFileWithProgressA, IndexMoveFileWithProgressA )( existingFileName, newFileName, lpProgressRoutine, lpData, dwFlags );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "MoveFileWithProgressA", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
                 fileAccess( existingFileName, AccessDelete, successful( moved, guard.error() ) );
@@ -563,7 +563,7 @@ namespace AccessMonitor {
             DWORD              dwFlags
         ) {
             auto moved =  patchOriginal( PatchMoveFileWithProgressW, IndexMoveFileWithProgressW )( existingFileName, newFileName, lpProgressRoutine, lpData, dwFlags );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "MoveFileWithProgressW", moved ) << existingFileName << L", " << newFileName << L", ... )" << record;
                 fileAccess( existingFileName, AccessDelete, successful( moved, guard.error() ) );
@@ -576,7 +576,7 @@ namespace AccessMonitor {
             LPWIN32_FIND_DATAA lpFindFileData
         ) {
             auto handle =  patchOriginal( PatchFindFirstFileA, IndexFindFirstFileA )( fileName, lpFindFileData );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "FindFirstFileA", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
                 fileAccess( fileName, AccessRead, (handle != INVALID_HANDLE_VALUE) );
@@ -588,7 +588,7 @@ namespace AccessMonitor {
             LPWIN32_FIND_DATAW lpFindFileData
         ) {
             auto handle =  patchOriginal( PatchFindFirstFileW, IndexFindFirstFileW )( fileName, lpFindFileData );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "FindFirstFileW", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
                 fileAccess( fileName, AccessRead, (handle != INVALID_HANDLE_VALUE) );
@@ -604,7 +604,7 @@ namespace AccessMonitor {
             DWORD              dwAdditionalFlags
         ) {
             auto handle =  patchOriginal( PatchFindFirstFileExA, IndexFindFirstFileExA )( fileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "FindFirstFileExA", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
                 fileAccess( fileName, AccessRead, (handle != INVALID_HANDLE_VALUE) );
@@ -620,7 +620,7 @@ namespace AccessMonitor {
             DWORD              dwAdditionalFlags
         ) {
             auto handle =  patchOriginal( PatchFindFirstFileExW, IndexFindFirstFileExW )( fileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "FindFirstFileExW", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
                 fileAccess( fileName, AccessRead, (handle != INVALID_HANDLE_VALUE) );
@@ -637,7 +637,7 @@ namespace AccessMonitor {
             HANDLE             hTransaction
         ) {
             auto handle =  patchOriginal( PatchFindFirstFileTransactedA, IndexFindFirstFileTransactedA )( fileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags, hTransaction );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "FindFirstFileTransactedA", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
                 fileAccess( fileName, AccessRead, (handle != INVALID_HANDLE_VALUE) );
@@ -654,7 +654,7 @@ namespace AccessMonitor {
             HANDLE             hTransaction
         ) {
             auto handle =  patchOriginal( PatchFindFirstFileTransactedW, IndexFindFirstFileTransactedW )( fileName, fInfoLevelId, lpFindFileData, fSearchOp, lpSearchFilter, dwAdditionalFlags, hTransaction );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "FindFirstFileTransactedW", handle ) << fileName << L", ... ) -> " << handleCode( handle ) << record;
                 fileAccess( fileName, AccessRead, (handle != INVALID_HANDLE_VALUE) );
@@ -665,7 +665,7 @@ namespace AccessMonitor {
             LPCSTR fileName
         ) {
             auto attributes =  patchOriginal( PatchGetFileAttributesA, IndexGetFileAttributesA )( fileName );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "GetFileAttributesA", (attributes != INVALID_FILE_ATTRIBUTES) ) << fileName << L", ... )" << record;
                 fileAccess( fileName, AccessRead, (attributes != INVALID_FILE_ATTRIBUTES) );
@@ -676,7 +676,7 @@ namespace AccessMonitor {
             LPCWSTR fileName
         ) {
             auto attributes =  patchOriginal( PatchGetFileAttributesW, IndexGetFileAttributesW )( fileName );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "GetFileAttributesW", (attributes != INVALID_FILE_ATTRIBUTES) ) << fileName << L", ... )" << record;
                 fileAccess( fileName, AccessRead, (attributes != INVALID_FILE_ATTRIBUTES) );
@@ -689,7 +689,7 @@ namespace AccessMonitor {
             LPVOID                 lpFileInformation
         ) {
             auto got =  patchOriginal( PatchGetFileAttributesExA, IndexGetFileAttributesExA )( fileName, fInfoLevelId, lpFileInformation );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "GetFileAttributesExA", got ) << fileName << L", ... )" << record;
                 fileAccess( fileName, AccessRead, successful( got, guard.error() ) );
@@ -703,7 +703,7 @@ namespace AccessMonitor {
 
         ) {
             auto got =  patchOriginal( PatchGetFileAttributesExW, IndexGetFileAttributesExW )( fileName, fInfoLevelId, lpFileInformation );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "GetFileAttributesExW", got ) << fileName << L", ... )" << record;
                 fileAccess( fileName, AccessRead, successful( got, guard.error() ) );
@@ -717,7 +717,7 @@ namespace AccessMonitor {
             HANDLE                 hTransaction
         ) {
             bool got =  patchOriginal( PatchGetFileAttributesTransactedA, IndexGetFileAttributesTransactedA )( fileName, fInfoLevelId, lpFileInformation, hTransaction );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "GetFileAttributesTransactedA", got ) << fileName << L", ... )" << record;
                 fileAccess( fileName, AccessRead, successful( got, guard.error() ) );
@@ -731,7 +731,7 @@ namespace AccessMonitor {
             HANDLE                 hTransaction
         ) {
             auto got =  patchOriginal( PatchGetFileAttributesTransactedW, IndexGetFileAttributesTransactedW )( fileName, fInfoLevelId, lpFileInformation, hTransaction );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "GetFileAttributesTransactedW", got ) << fileName << L", ... )" << record;
                 fileAccess( fileName, AccessRead, successful( got, guard.error() ) );
@@ -743,7 +743,7 @@ namespace AccessMonitor {
             DWORD  dwFileAttributes
         ) {
             auto set =  patchOriginal( PatchSetFileAttributesA, IndexSetFileAttributesA )( fileName, dwFileAttributes );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "PatchSetFileAttributesA", set ) << fileName << L", ... )" << record;
                 fileAccess( fileName, AccessWrite, successful( set, guard.error() ) );
@@ -755,7 +755,7 @@ namespace AccessMonitor {
             DWORD  dwFileAttributes
         ) {
             auto set =  patchOriginal( PatchSetFileAttributesW, IndexSetFileAttributesW )( fileName, dwFileAttributes );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "PatchSetFileAttributesW", set ) << fileName << L", ... )" << record;
                 fileAccess( fileName, AccessWrite, successful( set, guard.error() ) );
@@ -768,7 +768,7 @@ namespace AccessMonitor {
             LPSECURITY_ATTRIBUTES lpSecurityAttributes
         ) {
             auto created =  patchOriginal( PatchCreateHardLinkA, IndexCreateHardLinkA )( lpFileName, lpExistingFileName, lpSecurityAttributes );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateHardLinkA", created )  << lpFileName << L", " << lpExistingFileName << ",  ... )" << record;
                 fileAccess( lpFileName, AccessWrite, successful( created, guard.error() ) );
@@ -782,7 +782,7 @@ namespace AccessMonitor {
             LPSECURITY_ATTRIBUTES lpSecurityAttributes
         ) {
             auto created =  patchOriginal( PatchCreateHardLinkW, IndexCreateHardLinkW )( lpFileName, lpExistingFileName, lpSecurityAttributes );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateHardLinkW", created )  << lpFileName << L", " << lpExistingFileName << ",  ... )" << record;
                 fileAccess( lpFileName, AccessWrite, successful( created, guard.error() ) );
@@ -797,7 +797,7 @@ namespace AccessMonitor {
             HANDLE                hTransaction
         ) {
             auto created =  patchOriginal( PatchCreateHardLinkTransactedA, IndexCreateHardLinkTransactedA )( lpFileName, lpExistingFileName, lpSecurityAttributes, hTransaction );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateHardLinkTransactedA", created ) << lpFileName << L", " << lpExistingFileName << ",  ... )" << record;
                 fileAccess( lpFileName, AccessWrite, successful( created, guard.error() ) );
@@ -812,7 +812,7 @@ namespace AccessMonitor {
             HANDLE                hTransaction
         ) {
             auto created =  patchOriginal( PatchCreateHardLinkTransactedW, IndexCreateHardLinkTransactedW )( lpFileName, lpExistingFileName, lpSecurityAttributes, hTransaction );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateHardLinkTransactedW", created ) << lpFileName << L", " << lpExistingFileName << ",  ... )" << record;
                 fileAccess( lpFileName, AccessWrite, successful( created, guard.error() ) );
@@ -826,7 +826,7 @@ namespace AccessMonitor {
             DWORD  dwFlags
         ) {
             auto created =  patchOriginal( PatchCreateSymbolicLinkA, IndexCreateSymbolicLinkA )( lpSymlinkFileName, lpTargetFileName, dwFlags );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateSymbolicLinkA", created ) << lpSymlinkFileName << L", " << lpTargetFileName << L", " << dwFlags << " )" << record;
                 fileAccess( lpSymlinkFileName, AccessWrite, successful( created, guard.error() ) );
@@ -840,7 +840,7 @@ namespace AccessMonitor {
             DWORD   dwFlags
         ) {
             auto created =  patchOriginal( PatchCreateSymbolicLinkW, IndexCreateSymbolicLinkW )( lpSymlinkFileName, lpTargetFileName, dwFlags );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateSymbolicLinkW", created ) << lpSymlinkFileName << L", " << lpTargetFileName << L", " << dwFlags << " )" << record;
                 fileAccess( lpSymlinkFileName, AccessWrite, successful( created, guard.error() ) );
@@ -855,7 +855,7 @@ namespace AccessMonitor {
             HANDLE hTransaction
         ) {
             auto created =  patchOriginal( PatchCreateSymbolicLinkTransactedA, IndexCreateSymbolicLinkTransactedA )( lpSymlinkFileName, lpTargetFileName, dwFlags, hTransaction );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateSymbolicLinkTransactedA", created ) << lpSymlinkFileName << L", " << lpTargetFileName << L", " << dwFlags << " )" << record;
                 fileAccess( lpSymlinkFileName, AccessWrite, successful( created, guard.error() ) );
@@ -870,7 +870,7 @@ namespace AccessMonitor {
             HANDLE hTransaction
         ) {
             auto created =  patchOriginal( PatchCreateSymbolicLinkTransactedW, IndexCreateSymbolicLinkTransactedW )( lpSymlinkFileName, lpTargetFileName, dwFlags, hTransaction );
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CreateSymbolicLinkTransactedW", created ) << lpSymlinkFileName << L", " << lpTargetFileName << L", " << dwFlags << " )" << record;
                 fileAccess( lpSymlinkFileName, AccessWrite, successful( created, guard.error() ) );
@@ -879,13 +879,14 @@ namespace AccessMonitor {
             return created;
         }
         BOOL PatchCloseHandle( HANDLE handle ) {
-            MonitorGuard guard( Session::monitorAccess());
+            MonitorGuard guard( Session::monitorAccess() );
             if ( guard() ) {
+                if (debugLog( PatchExecution )) debugMessage( "CloseHandle" ) << handleCode( handle ) << " )" << record;
                 // Record last write time when closing an actual file opened for write (also for WithProgress calls)
                 auto fileName = fullName( handle );
                 fileAccessFull( fileName, AccessNone );
             }
-            return  patchOriginal( PatchCloseHandle, IndexCloseHandle )( handle );
+            return patchOriginal( PatchCloseHandle, IndexCloseHandle )( handle );
         }
 
         // Convert Windows access mode value to FileAccessMode value
@@ -949,7 +950,7 @@ namespace AccessMonitor {
         }
 
         void recordEvent( const wstring& file, FileAccessMode mode, const FileTime& time, bool success ) {
-            if (recordingEvents()) eventRecord() << path(file) << L" [" << time << L"] " << fileAccessModeToString(mode) << " " << success << record;
+            if (recordingEvents()) eventRecord() << path( file ) << L" [" << time << L"] " << fileAccessModeToString(mode) << " " << success << record;
         }
 
         FileTime getLastWriteTime( const wstring& fileName ) {

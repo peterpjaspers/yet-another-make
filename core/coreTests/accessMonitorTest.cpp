@@ -48,8 +48,8 @@ namespace
         AccessMonitor::MonitorEvents result;
         for (auto& pair : unfilteredResult) {
             std::filesystem::path filePath;
-            if (pair.first.starts_with(L"//?")) {
-                filePath = pair.first.substr(3);
+            if (pair.first.string().starts_with("//?")) {
+                filePath = pair.first.string().substr(3);
             } else {
                 filePath = pair.first;
             }

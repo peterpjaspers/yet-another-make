@@ -41,7 +41,7 @@ void executeCommand( const char* command ) {
         &pi
     );
     // Wait for the process to complete...
-    WaitForSingleObject( pi.hProcess, 0 );
+    WaitForSingleObject( pi.hProcess, INFINITE );
     CloseHandle( pi.hProcess );
     CloseHandle( pi.hThread );
 }
@@ -134,8 +134,7 @@ void doFileAccess() {
 void doMonitoredFileAccess() {
     try {
         path temp( temp_directory_path() );
-        // auto aspects = MonitorLogAspects( General | RegisteredFunction | PatchedFunction | PatchExecution | FileAccesses );
-        auto aspects = MonitorLogAspects( General | PatchExecution | PatchedFunction | FileAccesses );
+        auto aspects = MonitorLogAspects( General | RegisteredFunction | PatchedFunction | PatchExecution | FileAccesses );
         startMonitoring( temp, aspects );
         auto session( Session::current() );
         auto id( session->id() );
@@ -145,7 +144,7 @@ void doMonitoredFileAccess() {
         // Log (all) events for this session...
         LogFile output( temp / uniqueName( L"TestProgramOutput", id, L"txt" )  );
         for ( auto access : events ) {
-            wstring fileName( access.first );
+            wstring fileName( access.first.generic_wstring() );
             FileAccess fileAccess( access.second );
             output()
                 << fileName

@@ -12,7 +12,7 @@
 namespace AccessMonitor {
 
     // Collection of monitoring events, maps accessed file name to access data
-    typedef std::map<std::wstring,FileAccess> MonitorEvents;
+    typedef std::map<std::filesystem::path,FileAccess> MonitorEvents;
 
     // Start monitoring file access.
     // Session related result files are store in the given directory.

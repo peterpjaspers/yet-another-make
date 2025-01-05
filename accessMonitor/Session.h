@@ -29,9 +29,10 @@ namespace AccessMonitor {
         LogFile*        events;     // Events log file for all events from all threads in this session
         LogFile*        debug;      // Debug log file when access monitor logging is enabled
     public:
-        static const SessionID MaxSessionID = 100;
+        static const unsigned SessionIDBits = 7;
+        static const SessionID MaxSessionID = (1 << SessionIDBits);
         inline Session() : context( { "", 0, 0 } ), events( nullptr ), debug( nullptr ) {};
-        // Start a new session in the current process.
+        // Start a new session in the current/root process.
         // The thread creating the session is added to the session.
         static Session* start( const std::filesystem::path& directory, const LogAspects aspects = 0 );
         // Start a session in a remote process of an existing session.
@@ -40,7 +41,9 @@ namespace AccessMonitor {
         // Terminate session. Closes event log and (optionally) debug log.
         void terminate();
         // Check if a session is terminated.
-        bool terminated();
+        bool terminated() const;
+        // Check if a session is free.
+        bool free() const;
         // Stop a session.
         void stop();
         // Return session associated with a session ID.
@@ -49,10 +52,8 @@ namespace AccessMonitor {
         static Session* current();
         // Return number of currently active sessions.
         static int count();
-        // Return directory for monitored event data storage for this session.
-        inline const std::filesystem::path& directory() const { return( context.directory ); }
-        // Return ID associated with this session.
-        inline SessionID id() const { return( context.session ); }
+        const std::filesystem::path& directory() const;
+        SessionID id() const;
         // Return debug log aspects effective in this session.
         inline LogAspects aspects() const { return( context.aspects ); }
         // Add current thread to session.

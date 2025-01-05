@@ -107,7 +107,7 @@ namespace YAM
             AccessMonitor::stopMonitoring(&mfiles);
             for (auto const& pair : mfiles) {
                 AccessMonitor::FileAccess const& fa(pair.second);
-                std::filesystem::path path = pair.first;
+                std::filesystem::path const& path = pair.first;
                 std::filesystem::path filePath;
                 // get canonical path to make sure that casing matches 
                 // the casing as stored in the filesystem.
@@ -116,7 +116,7 @@ namespace YAM
                 }  catch (std::filesystem::filesystem_error) {
                     filePath = path;
                 }
-                if (pair.first.starts_with(L"//?")) {
+                if (filePath.string().starts_with("//?")) {
                     filePath = filePath.string().substr(3);
                 }
                 if (

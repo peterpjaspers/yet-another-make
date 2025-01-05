@@ -13,6 +13,9 @@ using namespace std::filesystem;
 
 BOOL WINAPI DllMain( HINSTANCE dll,  DWORD reason, LPVOID arg ) {
     if (reason == DLL_PROCESS_ATTACH) {
+        //while (true) {
+        //    bool stop = true;
+        //}
         ProcessID process( CurrentProcessID() );
         startMonitoring( Session::retrieveContext( process ) );
         EventSignal( "ProcessPatched", process );
