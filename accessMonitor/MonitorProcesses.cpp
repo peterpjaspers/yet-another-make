@@ -129,22 +129,24 @@ namespace AccessMonitor {
             DWORD   dwExitCode
         ) {
             MonitorGuard guard( Session::monitorAccess() );
+            auto original( patchOriginal( PatchExitThread, IndexExitThread ) );
             if ( guard() ) {
                 auto thread = CurrentThreadID();
                 if (debugLog( PatchExecution )) debugMessage( "ExitThread" ) << dwExitCode << " ) with ID "  << thread << record;
             }
-            patchOriginal( PatchExitThread, IndexExitThread )( dwExitCode );
+            original( dwExitCode );
         }
         BOOL PatchTerminateThread(
             HANDLE  hThread,
             DWORD   dwExitCode
         ) {
             MonitorGuard guard( Session::monitorAccess() );
+            auto original( patchOriginal( PatchTerminateThread, IndexTerminateThread ) );
             if ( guard() ) {
                 auto thread = GetThreadID( GetThreadId( hThread ) );
                 if (debugLog( PatchExecution )) debugMessage( "TerminateThread" ) << thread << ", "  << dwExitCode << " )" << record;
             }
-            return patchOriginal( PatchTerminateThread, IndexTerminateThread )( hThread, dwExitCode );
+            return original( hThread, dwExitCode );
         }
         BOOL PatchCreateProcessA(
             LPCSTR                lpApplicationName,
@@ -277,6 +279,7 @@ namespace AccessMonitor {
 
         void PatchExitProcess( unsigned int exitCode ) {
             MonitorGuard guard( Session::monitorAccess() );
+            auto original( patchOriginal( PatchExitProcess, IndexExitProcess) );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) {
                     char fileName[ MaxFileName ] = "";
@@ -298,7 +301,7 @@ namespace AccessMonitor {
                     }
                 }
             }
-            patchOriginal( PatchExitProcess, IndexExitProcess)( exitCode );
+            original( exitCode );
         }
         HMODULE PatchLoadLibraryA(
             LPCSTR lpLibFileName

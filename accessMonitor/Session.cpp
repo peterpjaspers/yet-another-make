@@ -80,7 +80,7 @@ namespace AccessMonitor {
         if (0 < activeCount) throw runtime_error( string( signature ) + " - Cannot extend session while sessions are active!" );
         tlsSessionIndex = TlsAlloc();
         if (tlsSessionIndex == TLS_OUT_OF_INDEXES) throw runtime_error( string( signature ) + " - Could not allocate thread local storage index!" );
-        auto session( Session::session( ctx.session ) );
+        auto session( &sessions[ ctx.session - 1 ] );
         session->context.session &= ~FreeBit;
         activeCount += 1;
         session->context.directory = ctx.directory;
@@ -123,7 +123,7 @@ namespace AccessMonitor {
     }
     Session* Session::session( const SessionID id ) {
         static const char* signature = "Session* Session::session( const SessionID id )";
-        if (usedCount < id) throw runtime_error( string(signature) + " - Invalid session ID!" );
+        if ((remoteSession == nullptr) && (usedCount < id)) throw runtime_error( string(signature) + " - Invalid session ID!" );
         return &sessions[ id - 1 ];
     }
     Session* Session::current() {

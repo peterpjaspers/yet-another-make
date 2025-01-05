@@ -880,13 +880,14 @@ namespace AccessMonitor {
         }
         BOOL PatchCloseHandle( HANDLE handle ) {
             MonitorGuard guard( Session::monitorAccess() );
+            auto original( patchOriginal( PatchCloseHandle, IndexCloseHandle ) );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CloseHandle" ) << handleCode( handle ) << " )" << record;
                 // Record last write time when closing an actual file opened for write (also for WithProgress calls)
                 auto fileName = fullName( handle );
                 fileAccessFull( fileName, AccessNone );
             }
-            return patchOriginal( PatchCloseHandle, IndexCloseHandle )( handle );
+            return original( handle );
         }
 
         // Convert Windows access mode value to FileAccessMode value
