@@ -46,32 +46,43 @@ namespace AccessMonitor {
         //
         // Last write time is collapsed to the lastest last write time.
         //
-        void collectMonitorEvents( const path& directory, const SessionID session, MonitorEvents& collected, bool cleanUp ) {
-            const path sessionData( sessionDataPath( directory, session ) );
-            for (auto const& entry : directory_iterator( sessionData )) {
-                auto eventFileName( entry.path().generic_string() );
-                wifstream eventFile( eventFileName );
+        void collectMonitorEvents(const path& directory, const SessionID session, MonitorEvents& collected, bool cleanUp) {
+            const path sessionData(sessionDataPath(directory, session));
+            for (auto const& entry : directory_iterator(sessionData)) {
+                wifstream eventFile(entry.path().generic_string());
                 path filePath;
                 FileTime lastWriteTime;
                 wstring modeString;
                 bool success;
                 while (!eventFile.eof()) {
                     eventFile >> ws >> filePath >> ws;
-                    from_stream( eventFile, L"[ %Y-%m-%d %H:%M:%10S ]", lastWriteTime );
+                    from_stream(eventFile, L"[ %Y-%m-%d %H:%M:%10S ]", lastWriteTime);
                     eventFile >> ws >> modeString >> ws >> success;
-                    auto mode( stringToFileAccessMode( modeString ) );
+                    auto mode(stringToFileAccessMode(modeString));
                     if (eventFile.good()) {
-                        if (0 < collected.count( filePath )) {
-                            collected[ filePath ].mode( mode, lastWriteTime, success );                            
+                        if (0 < collected.count(filePath)) {
+                            collected[filePath].mode(mode, lastWriteTime, success);
                         } else {
-                            collected[ filePath ] = FileAccess( mode, lastWriteTime, success );
+                            collected[filePath] = FileAccess(mode, lastWriteTime, success);
                         }
                     } else break; // Presumably file is corrupt, ignore further content...
                 }
                 eventFile.close();
-                if (cleanUp) remove( eventFileName );
+                if (cleanUp) {
+                    try {
+                        remove(entry.path());
+                    } catch (std::filesystem::filesystem_error er) {
+                        auto error = er.what();
+                    }
+                }
             }
-            if (cleanUp) remove( sessionData );
+            if (cleanUp) {
+                try {
+                    remove(sessionData);
+                } catch (std::filesystem::filesystem_error er) {
+                    auto error = er.what();
+                }
+            }
         }
         // Provide exclusive access to monitor administration
         mutex monitorMutex;
