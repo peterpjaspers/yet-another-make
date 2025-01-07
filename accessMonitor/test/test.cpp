@@ -18,6 +18,7 @@ using namespace std::filesystem;
 
 static int sessions = 1;
 static int threads = 1;
+static int iterations = 0;
 static bool remoteProcess = false;
 
 // Execute a command in a seperate process...
@@ -131,7 +132,7 @@ void doFileAccess() {
     }
 }
 
-void doMonitoredFileAccess() {
+void doMonitoredFileAccess( int iteration = 0 ) {
     try {
         path temp( temp_directory_path() );
         auto aspects = MonitorLogAspects( General | RegisteredFunction | PatchedFunction | PatchExecution | FileAccesses );
@@ -142,7 +143,11 @@ void doMonitoredFileAccess() {
         MonitorEvents events;
         stopMonitoring( &events );
         // Log (all) events for this session...
-        LogFile output( temp / uniqueName( L"TestProgramOutput", id, L"txt" )  );
+        auto logName( ( iteration == 0 ) ?
+            uniqueName( L"TestProgramOutput", id, L"txt" ) :
+            uniqueName( L"TestProgramOutput", id, iteration, L"txt" )
+        );
+        LogFile output( temp / logName );
         for ( auto access : events ) {
             wstring fileName( access.first.generic_wstring() );
             FileAccess fileAccess( access.second );
@@ -161,6 +166,11 @@ void doMonitoredFileAccess() {
     }
 }
 
+void doMultipleMonitoredFileAccess() {
+    if ( 1 < iterations ) for (int i = 0; i < iterations; ++i) doMonitoredFileAccess( i + 1 );
+    else doMonitoredFileAccess();
+}
+
 bool condition( const string& argument ) {
     if ((argument == "t") || (argument == "T")) return true;
     if ((argument == "true") || (argument == "TRUE")) return true;
@@ -169,20 +179,18 @@ bool condition( const string& argument ) {
 
 int main( int argc, char* argv[] ) {
     try {
-        sessions = 1;
-        threads = 1;
-        remoteProcess = false;
-        if (3 < argc) { remoteProcess = condition( argv[ 3 ] ); }
+        if (4 < argc) { remoteProcess = condition( argv[ 4 ] ); }
+        if (3 < argc) { iterations = atoi( argv[ 3 ] ); }
         if (2 < argc) { threads = atoi( argv[ 2 ] ); }
         if (threads <= 1) threads = 1;
         if (1 < argc) { sessions = atoi( argv[ 1 ] ); }
         if (sessions <= 1) sessions = 1;
         if (1 < sessions) {
             vector<thread> sessionThreads;
-            for (int i = 0; i < sessions; ++i) sessionThreads.push_back( thread( doMonitoredFileAccess ) );
+            for (int i = 0; i < sessions; ++i) sessionThreads.push_back( thread( doMultipleMonitoredFileAccess ) );
             for (int i = 0; i < sessions; ++i) sessionThreads[ i ].join();
         } else {
-            doMonitoredFileAccess();
+            doMultipleMonitoredFileAccess();
         }
     }
     catch (exception const& exception) {

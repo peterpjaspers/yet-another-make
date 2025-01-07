@@ -65,7 +65,7 @@ namespace AccessMonitor {
                         } else {
                             collected[filePath] = FileAccess(mode, lastWriteTime, success);
                         }
-                    } else break; // Presumably file is corrupt, ignore further content...
+                    } else break; // Presumably file is corrupt or an invalid event file, ignore further content...
                 }
                 eventFile.close();
                 if (cleanUp) {

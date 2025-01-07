@@ -18,7 +18,7 @@ namespace AccessMonitor {
     LogFile::LogFile( const path& file, bool time, bool interval ) : 
         logFile( file ), tlsRecordIndex( TlsAlloc() ), enabledAspects( 0 ), logTime( time ), logInterval( interval ), previousTime( chrono::system_clock::now() )
     {
-        const char* signature = "LogFile( const path& file, bool time, bool interval )";
+        const char* signature("LogFile( const path& file, bool time, bool interval )" );
         if (tlsRecordIndex == TLS_OUT_OF_INDEXES) throw runtime_error( string( signature ) + " - Could not allocate thread local storage!" );
     }
     LogFile::~LogFile() {
@@ -27,7 +27,7 @@ namespace AccessMonitor {
     }
     // Return logging stream on enabled log.
     LogRecord& LogFile::operator()() {
-        static const char* signature = "LogRecord& LogFile::operator()()";
+        static const char* signature( "LogRecord& LogFile::operator()()" );
         auto record( static_cast<LogRecord*>( TlsGetValue( tlsRecordIndex ) ) );
         if (record == nullptr) {
             record = new LogRecord( *this );
@@ -45,12 +45,12 @@ namespace AccessMonitor {
 
     void LogFile::record( const wstring& string ) {
         const lock_guard<mutex> lock( logMutex ); 
-        logFile << string << flush;
+        if (logFile.is_open()) logFile << string << flush;
     }
 
     // Complete log entry and write to log file.
     wostream& record( wostream& stream ) {
-        LogRecord& logRecord = static_cast<LogRecord&>( stream );
+        auto& logRecord( static_cast<LogRecord&>( stream ) );
         logRecord << "\n";
         logRecord.record( logRecord.str() );
         logRecord.str( L"" );
@@ -59,7 +59,7 @@ namespace AccessMonitor {
 
     // Convert ANSI string to wide character string.
     wstring widen(const string& src) {
-        std::size_t len = src.size();
+        auto len( src.size() );
         wstring dst(len, 0);
         mbstowcs(&dst[0], src.c_str(), len);
         return dst;
