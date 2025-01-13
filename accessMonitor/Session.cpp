@@ -157,6 +157,8 @@ namespace AccessMonitor {
         if (context == nullptr) throw runtime_error( string( signature ) + " - Thread not active on a session!" );
         if (context->session != id()) throw runtime_error( string( signature ) + " - Invalid session ID!" );
         delete context;
+        if (debug != nullptr) debug->removeThread();
+        if (events != nullptr) events->removeThread();
         TlsSetValue( tlsSessionIndex, nullptr );
 
     }

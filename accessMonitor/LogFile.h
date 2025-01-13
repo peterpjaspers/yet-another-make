@@ -52,6 +52,8 @@ namespace AccessMonitor {
         // Test if logging is enabled for a particular aspect.
         // Returns true is logging is enabled, false otherwise.
         inline bool operator()( const LogAspects aspects ) const;
+        // Remove current thread from access to log file.
+        void removeThread() const;
     private:
         std::wofstream logFile;
         std::mutex logMutex;

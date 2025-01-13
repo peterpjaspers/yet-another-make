@@ -24,6 +24,7 @@ namespace AccessMonitor {
     LogFile::~LogFile() {
         const lock_guard<mutex> lock( logMutex );
         logFile.close();
+        TlsFree( tlsRecordIndex );
     }
     // Return logging stream on enabled log.
     LogRecord& LogFile::operator()() {
@@ -41,6 +42,11 @@ namespace AccessMonitor {
             previousTime = time;
         }
         return( *record );
+    }
+    void LogFile::removeThread() const {
+        auto record( static_cast<LogRecord*>( TlsGetValue( tlsRecordIndex ) ) );
+        if (record != nullptr) free( record );
+        TlsSetValue( tlsRecordIndex, nullptr );
     }
 
     void LogFile::record( const wstring& string ) {

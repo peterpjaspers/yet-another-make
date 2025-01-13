@@ -16,9 +16,9 @@ using namespace AccessMonitor;
 using namespace std;
 using namespace std::filesystem;
 
-static int sessions = 1;
-static int threads = 1;
-static int iterations = 0;
+static int sessions = 1;        // Number of simultaneous sessions
+static int threads = 1;         // Number of threads in each session
+static int iterations = 1;      // Number of successive start/stop monitoring requests in each session
 static bool remoteProcess = false;
 
 // Execute a command in a seperate process...
@@ -132,7 +132,7 @@ void doFileAccess() {
     }
 }
 
-void doMonitoredFileAccess( int iteration = 0 ) {
+void doMonitoredFileAccess( int iteration ) {
     try {
         path temp( temp_directory_path() );
         auto aspects = MonitorLogAspects( General | RegisteredFunction | PatchedFunction | PatchExecution | FileAccesses );
@@ -168,7 +168,7 @@ void doMonitoredFileAccess( int iteration = 0 ) {
 
 void doMultipleMonitoredFileAccess() {
     if ( 1 < iterations ) for (int i = 0; i < iterations; ++i) doMonitoredFileAccess( i + 1 );
-    else doMonitoredFileAccess();
+    else doMonitoredFileAccess( 0 );
 }
 
 bool condition( const string& argument ) {
