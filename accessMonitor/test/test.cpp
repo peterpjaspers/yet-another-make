@@ -132,22 +132,22 @@ void doFileAccess() {
     }
 }
 
-void doMonitoredFileAccess( int iteration ) {
+void doMonitoredFileAccess( int thread, int iteration ) {
     try {
         path temp( temp_directory_path() );
         auto aspects = MonitorLogAspects( General | RegisteredFunction | PatchedFunction | PatchExecution | FileAccesses );
         startMonitoring( temp, aspects );
         auto session( Session::current() );
-        auto id( session->id() );
         doFileAccess();
         MonitorEvents events;
         stopMonitoring( &events );
         // Log (all) events for this session...
-        auto logName( ( iteration == 0 ) ?
-            uniqueName( L"TestProgramOutput", id, L"txt" ) :
-            uniqueName( L"TestProgramOutput", id, iteration, L"txt" )
-        );
-        LogFile output( temp / logName );
+        wstringstream logName;
+        logName << L"TestProgramOutput";
+        if ( 0 < thread ) logName << L"_" << thread;
+        if ( 0 < iteration ) logName << L"_" << iteration;
+        logName << L".txt";
+        LogFile output( temp / logName.str() );
         for ( auto access : events ) {
             wstring fileName( access.first.generic_wstring() );
             FileAccess fileAccess( access.second );
@@ -166,9 +166,9 @@ void doMonitoredFileAccess( int iteration ) {
     }
 }
 
-void doMultipleMonitoredFileAccess() {
-    if ( 1 < iterations ) for (int i = 0; i < iterations; ++i) doMonitoredFileAccess( i + 1 );
-    else doMonitoredFileAccess( 0 );
+void doMultipleMonitoredFileAccess( int thread ) {
+    if ( 1 < iterations ) for (int i = 0; i < iterations; ++i) doMonitoredFileAccess( thread, (i + 1) );
+    else doMonitoredFileAccess( thread, 0 );
 }
 
 bool condition( const string& argument ) {
@@ -187,10 +187,10 @@ int main( int argc, char* argv[] ) {
         if (sessions <= 1) sessions = 1;
         if (1 < sessions) {
             vector<thread> sessionThreads;
-            for (int i = 0; i < sessions; ++i) sessionThreads.push_back( thread( doMultipleMonitoredFileAccess ) );
+            for (int i = 0; i < sessions; ++i) sessionThreads.push_back( thread( doMultipleMonitoredFileAccess, (i + 1) ) );
             for (int i = 0; i < sessions; ++i) sessionThreads[ i ].join();
         } else {
-            doMultipleMonitoredFileAccess();
+            doMultipleMonitoredFileAccess( 0 );
         }
     }
     catch (exception const& exception) {
