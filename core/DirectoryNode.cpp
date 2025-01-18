@@ -127,12 +127,11 @@ namespace YAM
         auto it = _content.find(symGenDirPath);
         if (it == _content.end()) {
             std::filesystem::path absGenDirPath = absolutePath() / symGenDirPath.filename();
-            if (std::filesystem::exists(absGenDirPath)) {
-                if (!std::filesystem::is_directory(absGenDirPath)) {
-                    throw std::runtime_error(absGenDirPath.string() + " is not a directory");
-                }
-            } else {
-                std::filesystem::create_directory(absGenDirPath);
+            std::error_code ec; 
+            std::filesystem::create_directory(absGenDirPath, ec);
+            if (ec) {
+                auto msg = ec.message();
+                //throw std::runtime_error(absGenDirPath.string() + " is not a directory");
             }
             genDir = std::make_shared<DirectoryNode>(context(), symGenDirPath, this);
             context()->nodes().add(genDir);

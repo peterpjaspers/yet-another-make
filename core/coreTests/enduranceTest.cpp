@@ -21,6 +21,8 @@
 #include <fstream>
 #include <boost/process.hpp>
 
+#include "../../accessMonitor/Monitor.h"
+
 namespace
 {
     using namespace YAM;
@@ -40,6 +42,13 @@ namespace
         return content;
     }
 
+    class WorkingDir {
+    public:
+        std::filesystem::path dir;
+        WorkingDir() : dir(FileSystem::createUniqueDirectory()) {}
+        ~WorkingDir() { std::filesystem::remove_all(dir); }
+    };
+
     class TestDriver
     {
     public:
@@ -47,6 +56,7 @@ namespace
         std::filesystem::path repoDir;
         Builder builder;
         ExecutionContext* context;
+        WorkingDir wdir;
 
         TestDriver()
             : repoName("test_0")
@@ -60,10 +70,17 @@ namespace
             logAspects.push_back(LogRecord::BuildStateUpdate);
             context->logBook()->aspects(logAspects);
             // make test a bit more deterministic
-            context->threadPool().size(1);
+            //context->threadPool().size(1);
+
+            // Workaround concurrency isse in start/stopMonitoring until
+            // Phil fixed this.
+            // TODO: remove when fixed
+            AccessMonitor::startMonitoring(wdir.dir);
         }
 
         ~TestDriver() {
+            AccessMonitor::MonitorEvents result;
+            AccessMonitor::stopMonitoring(&result);
         }
 
         void startExecuteRequest(
@@ -105,6 +122,9 @@ namespace
             auto request = std::make_shared< BuildRequest>();
             request->repoDirectory(repoDir);
             request->repoName(repoName);
+            BuildOptions options;
+            options._threads = context->threadPool().size();
+            request->options(options);
             return executeRequest(request);
         }
 
@@ -174,7 +194,7 @@ namespace
             auto& stats = driver.context->statistics();
             stats.registerNodes = true;
             driver.removeRepos();
-            for (int nBuilds = 0; nBuilds < 2; nBuilds++) {
+            for (int nBuilds = 0; nBuilds < 20; nBuilds++) {
                 stats.reset();
                 std::cout << "\nStarting build " << nRestarts << "." << nBuilds << std::endl;
                 std::shared_ptr<BuildResult> result = driver.build();

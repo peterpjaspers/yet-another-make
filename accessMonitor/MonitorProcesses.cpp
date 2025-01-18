@@ -95,10 +95,13 @@ namespace AccessMonitor {
         };
 
         DWORD threadWrapper( void* argument ) {
+            DWORD result = 0;
             auto args = static_cast<const WrapperArguments*>( argument );
-            args->session->addThread();
-            auto result = args->main( args->parameter );
-            args->session->removeThread();
+            if (args->session != nullptr) {
+                args->session->addThread();
+                result = args->main(args->parameter);
+                args->session->removeThread();
+            }
             LocalFree( argument );
             return result;
         }

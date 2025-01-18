@@ -61,6 +61,7 @@ Features
 - scalability measurements
 - documentation
 - inform Mike Shal
+- own the generated directories (remove when no longer refd by buildfiles)
 
 Out-of-scope:
 - distributed build
