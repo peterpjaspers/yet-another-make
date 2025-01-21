@@ -14,10 +14,12 @@ using namespace std::filesystem;
 BOOL WINAPI DllMain( HINSTANCE dll,  DWORD reason, LPVOID arg ) {
     if (reason == DLL_PROCESS_ATTACH) {
         ProcessID process( CurrentProcessID() );
+        enableMonitoring();
         startMonitoring( Session::retrieveContext( process ) );
         EventSignal( "ProcessPatched", process );
     } else if (reason == DLL_PROCESS_DETACH) {
         stopMonitoring( nullptr );
+        disableMonitoring();
     }
     return true;
 }

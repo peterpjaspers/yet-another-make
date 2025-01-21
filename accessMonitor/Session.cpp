@@ -185,7 +185,7 @@ namespace AccessMonitor {
     // See recordSessionContext and retrieveSessionContext..
     struct SessionConextData {
         SessionID   session;                // The session in which the process was spawned
-        LogAspects  aspects;           // The debugging aspects to be applied in the spawned process
+        LogAspects  aspects;                // The debugging aspects to be applied in the spawned process
         char        directory[ MAX_PATH ];  // The directory in which monitor data is stored
     };
 

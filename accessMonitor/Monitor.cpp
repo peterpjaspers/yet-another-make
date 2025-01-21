@@ -55,8 +55,11 @@ namespace AccessMonitor {
                 FileTime lastWriteTime;
                 wstring modeString;
                 bool success;
-                while (!eventFile.eof()) {
-                    eventFile >> ws >> filePath >> ws;
+                int lineNr( 1 );
+                while (true) {
+                    eventFile >> ws;
+                    if (eventFile.eof()) break;
+                    eventFile >> filePath >> ws;
                     from_stream( eventFile, L"[ %Y-%m-%d %H:%M:%10S ]", lastWriteTime );
                     eventFile >> ws >> modeString >> ws >> success;
                     auto mode( stringToFileAccessMode( modeString ) );
@@ -66,7 +69,11 @@ namespace AccessMonitor {
                         } else {
                             collected[ filePath ] = FileAccess( mode, lastWriteTime, success );
                         }
-                    } else break; // Presumably file is corrupt or an invalid event file, ignore further content...
+                    } else {
+                        // Presumably file is corrupt or an invalid event file, ignore further content...
+                        break;
+                    }
+                    lineNr += 1;
                 }
                 eventFile.close();
                 if (cleanUp) remove( eventFileName );
@@ -75,6 +82,17 @@ namespace AccessMonitor {
         }
         // Provide exclusive access to monitor administration
         mutex monitorMutex;
+    }
+
+    void enableMonitoring() {
+        registerFileAccess();
+        registerProcessAccess();
+        patch();
+    }
+    void disableMonitoring() {
+        unpatch();
+        unregisterProcessAccess();
+        unregisterFileAccess();
     }
 
     void startMonitoring( const path& directory, const LogAspects aspects ) {
@@ -89,13 +107,7 @@ namespace AccessMonitor {
         }
         if (debugLog( General )) debugRecord() << "Start monitoring session " << session->id() << "..." << record;
         session->eventLog( createEventLog( directory, session->id() ) );
-        if (Session::count() == 1) {
-            registerFileAccess();
-            registerProcessAccess();
-            patch();
-        }
     }
-
     void startMonitoring( const SessionContext& context ) {
         const lock_guard<mutex> lock( monitorMutex );
         Session* session( Session::start( context ) );
@@ -106,24 +118,13 @@ namespace AccessMonitor {
         }
         if (debugLog( General )) debugRecord() << "Extend monitoring session " << session->id() << "..." << record;
         session->eventLog( createEventLog( context.directory, context.session ) );
-        if (Session::count() == 1) {
-            registerFileAccess();
-            registerProcessAccess();
-            patch();
-        }
     }
-    
     void stopMonitoring( MonitorEvents* events ) {
         const lock_guard<mutex> lock( monitorMutex );
         auto session( Session::current() );
         const auto id( session->id() );
         const auto directory( session->directory() );
         if (debugLog( General )) debugRecord() << "Stop monitoring session " << id << "..." << record;
-        if (Session::count() == 1) {
-            unpatch();
-            unregisterProcessAccess();
-            unregisterFileAccess();
-        }
         bool cleanUp( !debugLog( General ) ); // Clean-up event files when not debugging
         session->terminate();
         // Hold on to terminated session ID while collecting session results.

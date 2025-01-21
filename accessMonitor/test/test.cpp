@@ -21,32 +21,6 @@ static int threads = 1;         // Number of threads in each session
 static int iterations = 1;      // Number of successive start/stop monitoring requests in each session
 static bool remoteProcess = false;
 
-// Execute a command in a seperate process...
-void executeCommand( const char* command ) {
-    STARTUPINFO si;
-    PROCESS_INFORMATION pi;
-    std::memset( &si, 0, sizeof(si) );
-    si.cb = sizeof(si);
-    std::memset( &pi, 0, sizeof(pi) );
-    // Create the process with all settings to default values...
-    CreateProcessA(
-        nullptr,
-        const_cast<char*>( command ),
-        nullptr,
-        nullptr,
-        false,
-        0,
-        nullptr,
-        nullptr,
-        &si,
-        &pi
-    );
-    // Wait for the process to complete...
-    WaitForSingleObject( pi.hProcess, INFINITE );
-    CloseHandle( pi.hProcess );
-    CloseHandle( pi.hThread );
-}
-
 const std::string remoteTestFile( "C:/Users/philv/Code/yam/yet-another-make/accessMonitor/test/remoteTest.exe" );
 // const std::wstring remoteTestFile( L"D:/Peter/Github/yam/x64/Debug/remoteTest.exe" );
 
@@ -94,24 +68,36 @@ void worker( const path directoryPath ) {
     }
 }
 
-void doFileAccess() {
+void doFileAccess( const string& directory, const int index ) {
     try {
-        auto session( Session::current() );
+        string command;
+        STARTUPINFO si;
+        PROCESS_INFORMATION pi;
         if (remoteProcess) {
-            stringstream command;
-            command
-                << remoteTestFile
-                << " " 
-                << session->id()
-                << " " 
-                << threads
-                << " "
-                << session->directory().generic_string();
-            if (debugLog( General )) debugRecord() << "Executing " << command.str().c_str() << record;
+            stringstream commandStream;
+            commandStream << remoteTestFile << " " << index << " " << threads << " " << directory;
+            command = commandStream.str();
+            if (debugLog( General )) debugRecord() << "Starting remote process " << command.c_str() << record;
             // auto exitCode = system( command.str().c_str() );
-            executeCommand( command.str().c_str() );
+            std::memset( &si, 0, sizeof(si) );
+            si.cb = sizeof(si);
+            std::memset( &pi, 0, sizeof(pi) );
+            // Create the process with all settings to default values...
+            CreateProcessA(
+                nullptr,
+                const_cast<char*>( command.c_str() ),
+                nullptr,
+                nullptr,
+                false,
+                0,
+                nullptr,
+                nullptr,
+                &si,
+                &pi
+            );
         }
-        path sessionDir( session->directory() / uniqueName( L"Session", session->id() ) );
+        path sessionDir( directory );
+        sessionDir /= uniqueName( L"Session", index );
         if (1 < threads) {
             vector<thread> workerThreads;
             for (int i = 0; i < threads; ++i) {
@@ -122,6 +108,13 @@ void doFileAccess() {
             for (int i = 0; i < threads; ++i) workerThreads[ i ].join();
         } else {
             worker( sessionDir / L"fileAccessTest" );
+        }
+        if (remoteProcess) {
+            // Wait for remote process to complete...
+            WaitForSingleObject( pi.hProcess, INFINITE );
+            CloseHandle( pi.hProcess );
+            CloseHandle( pi.hThread );
+            if (debugLog( General )) debugRecord() << "Remote process " << command.c_str() << " completed..." << record;
         }
     }
     catch (exception const& exception) {
@@ -138,10 +131,10 @@ void doMonitoredFileAccess( int thread, int iteration ) {
         auto aspects = MonitorLogAspects( General | RegisteredFunction | PatchedFunction | PatchExecution | FileAccesses );
         startMonitoring( temp, aspects );
         auto session( Session::current() );
-        doFileAccess();
+        doFileAccess( session->directory().generic_string(), session->id() );
         MonitorEvents events;
         stopMonitoring( &events );
-        // Log (all) events for this session...
+        // Log (all) events for monitoring session...
         wstringstream logName;
         logName << L"TestProgramOutput";
         if ( 0 < thread ) logName << L"_" << thread;
@@ -185,6 +178,7 @@ int main( int argc, char* argv[] ) {
         if (threads <= 1) threads = 1;
         if (1 < argc) { sessions = atoi( argv[ 1 ] ); }
         if (sessions <= 1) sessions = 1;
+        enableMonitoring();
         if (1 < sessions) {
             vector<thread> sessionThreads;
             for (int i = 0; i < sessions; ++i) sessionThreads.push_back( thread( doMultipleMonitoredFileAccess, (i + 1) ) );
@@ -192,6 +186,9 @@ int main( int argc, char* argv[] ) {
         } else {
             doMultipleMonitoredFileAccess( 0 );
         }
+        doFileAccess( temp_directory_path().generic_string(), 47 );
+        disableMonitoring();
+        // force exception { void (*f)() = 0; f(); }
     }
     catch (exception const& exception) {
         cout << "Exception  " << exception.what() << " in main!" << endl;
