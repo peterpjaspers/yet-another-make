@@ -71,7 +71,7 @@ void worker( const path directoryPath ) {
 void doFileAccess( const string& directory, const int index ) {
     try {
         string command;
-        STARTUPINFO si;
+        STARTUPINFOA si;
         PROCESS_INFORMATION pi;
         if (remoteProcess) {
             stringstream commandStream;
