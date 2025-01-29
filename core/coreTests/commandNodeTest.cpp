@@ -18,6 +18,8 @@
 #include <stdlib.h>
 #include <fstream>
 
+#include "../../accessMonitor/Monitor.h"
+
 namespace
 {
     using namespace YAMTest;
@@ -156,10 +158,13 @@ namespace
             EXPECT_EQ(Node::State::Dirty, pietjanOut->state());
             EXPECT_EQ(Node::State::Dirty, pietSrc->state());
             EXPECT_EQ(Node::State::Dirty, janSrc->state());
+
+            AccessMonitor::enableMonitoring();
         }
 
         ~Commands() {
             clean();
+            AccessMonitor::disableMonitoring();
         }
 
         void clean() {
@@ -252,8 +257,9 @@ namespace
         EXPECT_EQ("pietjan", readFile(cmds.pietjanOut->absolutePath()));
         EXPECT_EQ("optional1 ", readFile(optional1->absolutePath()));
         EXPECT_EQ("optional2 ", readFile(optional2->absolutePath()));
-        EXPECT_FALSE(std::filesystem::exists(cmds.pietjanOut->name().parent_path() / "ignore1.txt"));
-        EXPECT_FALSE(std::filesystem::exists(cmds.pietjanOut->name().parent_path() / "ignore2.txt"));
+        auto generatedDir = cmds.pietjanOut->absolutePath().parent_path();
+        EXPECT_FALSE(std::filesystem::exists(generatedDir / "ignore1.txt"));
+        EXPECT_FALSE(std::filesystem::exists(generatedDir / "ignore2.txt"));
     }
 
     TEST(CommandNode, cleanBuildNoSources) {

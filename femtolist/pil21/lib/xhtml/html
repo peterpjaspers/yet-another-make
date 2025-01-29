@@ -1,0 +1,8 @@
+<!DOCTYPE html>
+<html lang="¦LANG¦">
+<head>
+   <meta name="viewport" content="width=device-width"/>
+   ¦(run PRG)¦</head>
+<body¦(and ATTR (htStyle @))¦>
+   ¦(run PRG)¦</body>
+</html>

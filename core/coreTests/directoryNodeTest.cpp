@@ -14,6 +14,8 @@
 
 #include <chrono>
 
+#include "../../accessMonitor/Monitor.h"
+
 namespace
 {
     using namespace YAM;
@@ -33,9 +35,11 @@ namespace
         auto dirNode = repo->directoryNode();
         EXPECT_EQ(Node::State::Dirty, dirNode->state());
 
+        AccessMonitor::enableMonitoring();
         bool completed = YAMTest::executeNode(dirNode.get());
         EXPECT_TRUE(completed);
         verify(&testTree, dirNode.get());
+        AccessMonitor::disableMonitoring();
     }
 
     TEST(DirectoryNode, update_threeDeepDirectoryTree) {
@@ -49,6 +53,8 @@ namespace
         auto repos = std::make_shared<RepositoriesNode>(&context, repo);
         context.repositoriesNode(repos);
         auto dirNode = repo->directoryNode();
+
+        AccessMonitor::enableMonitoring();
         bool completed = YAMTest::executeNode(dirNode.get());
         EXPECT_TRUE(completed);
 
@@ -100,6 +106,8 @@ namespace
         EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode.get()));
         EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode_S1.get()));
         EXPECT_TRUE(context.statistics().updatedDirectories.contains(dirNode_S1_S2.get()));
+
+        AccessMonitor::disableMonitoring();
     }
 
     TEST(DirectoryNode, findChild) {
@@ -113,6 +121,8 @@ namespace
         auto repos = std::make_shared<RepositoriesNode>(&context, repo);
         context.repositoriesNode(repos);
         auto dirNode = repo->directoryNode();
+
+        AccessMonitor::enableMonitoring();
         bool completed = YAMTest::executeNode(dirNode.get());
         EXPECT_TRUE(completed);
 
@@ -166,6 +176,8 @@ namespace
             auto child = dirNode_S2_S3->findChild(file);
             EXPECT_EQ(nullptr, child);
         }
+
+        AccessMonitor::disableMonitoring();
     }
 
     TEST(DirectoryNode, buildFileParserNode) {
@@ -185,6 +197,7 @@ namespace
         auto dirNode = repo->directoryNode();
         EXPECT_EQ(Node::State::Dirty, dirNode->state());
 
+        AccessMonitor::enableMonitoring();
         bool completed = YAMTest::executeNode(dirNode.get());
         EXPECT_TRUE(completed);
 
@@ -208,5 +221,7 @@ namespace
         ASSERT_NE(nullptr, buildFileCompilerNode);
         EXPECT_EQ(dirNode->buildFileCompilerNode(), buildFileCompilerNode);
         EXPECT_EQ(buildFileParserNode, buildFileCompilerNode->buildFileParser());
+
+        AccessMonitor::disableMonitoring();
     }
 }

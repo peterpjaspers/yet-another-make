@@ -14,6 +14,12 @@ namespace AccessMonitor {
     // Collection of monitoring events, maps accessed file name to access data
     typedef std::map<std::filesystem::path,FileAccess> MonitorEvents;
 
+    // Enable monitoring in this process.
+    // Actual monitoring will be performed between calls to startMonitoring and stopMonitoring.
+    void enableMonitoring();
+    // Disable monitoring in this process.
+    // Should not be called while monitoring is effect.
+    void disableMonitoring();
     // Start monitoring file access.
     // Session related result files are store in the given directory.
     // The aspects argument defines which (debug) aspects to log.
@@ -26,8 +32,8 @@ namespace AccessMonitor {
     void stopMonitoring( MonitorEvents* events );
 
     // A MonitorGuard prevents recursive entry into monitoring code; i.e., a patched function called
-    // from monitoring code associated with a patched function will not itself be monitored. Effectively
-    // only patched functions called from the application are actually monitored.
+    // from monitoring code associated with a patched function will not itself be monitored.
+    // Effectively, only patched function calls invoked directly from the application are monitored.
     class MonitorGuard {
     private:
         MonitorAccess* access;

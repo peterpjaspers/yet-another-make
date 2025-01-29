@@ -38,13 +38,17 @@ namespace
         std::filesystem::remove_all("generated");
         std::string unzipCmd(R"("C:\Program Files\7-Zip\7z.exe" e -y -ogenerated\rawImages rawImages.7z)");
 
+        AccessMonitor::enableMonitoring();
         AccessMonitor::startMonitoring(tempDir.dir.string());
-        boost::process::child unzip(unzipCmd, env);
-        unzip.wait();
-        auto exitCode = unzip.exit_code();
-        EXPECT_EQ(0, exitCode);
+        {
+            boost::process::child unzip(unzipCmd, env);
+            unzip.wait();
+            auto exitCode = unzip.exit_code();
+            EXPECT_EQ(0, exitCode);
+        }
         AccessMonitor::MonitorEvents unfilteredResult;
         AccessMonitor::stopMonitoring(&unfilteredResult);
+        AccessMonitor::disableMonitoring();
         AccessMonitor::MonitorEvents result;
         for (auto& pair : unfilteredResult) {
             std::filesystem::path filePath;
@@ -72,7 +76,7 @@ namespace
         std::string trackerCmd = trackerExe + " /I " + trackerLogDir.string() + " /c " + unzipCmd;
         boost::process::child tracker(trackerCmd, env);
         tracker.wait();
-        exitCode = tracker.exit_code();
+        auto exitCode = tracker.exit_code();
         EXPECT_EQ(0, exitCode);
         MSBuildTrackerOutputReader reader(trackerLogDir);
         auto readFiles = reader.readFiles();
@@ -167,6 +171,7 @@ namespace
 
         BOOL inheritHandles = TRUE;
         DWORD creationFlags = 0; // CREATE_UNICODE_ENVIRONMENT;
+        AccessMonitor::enableMonitoring();
         AccessMonitor::startMonitoring(tempDir.dir);
         if (!CreateProcessW(
             cmdExe.c_str(), // lpApplicationName
@@ -188,6 +193,7 @@ namespace
         WaitForSingleObject(pi.hProcess, INFINITE);
         AccessMonitor::MonitorEvents result;
         AccessMonitor::stopMonitoring(&result);
+        AccessMonitor::disableMonitoring();
         std::wstring junkPath = std::filesystem::path(wdir / "junk.txt").generic_wstring();
         ASSERT_TRUE(result.contains(junkPath));
         auto fileAccess = result.at(junkPath);
@@ -201,14 +207,17 @@ namespace
 
     TEST(AccessMonitor, remoteTest) {
         std::filesystem::path remoteSessionDir(std::filesystem::temp_directory_path() / "RemoteSession");
-        std::filesystem::remove(remoteSessionDir);
+        std::error_code ec;
+        std::filesystem::remove(remoteSessionDir, ec);
 
         auto remoteTest = boost::process::search_path("remoteTest.exe").string();
         WorkingDir tempDir;
+        AccessMonitor::enableMonitoring();
         AccessMonitor::startMonitoring(tempDir.dir.string());
         int exitCode = system(remoteTest.c_str());
         AccessMonitor::MonitorEvents result;
         AccessMonitor::stopMonitoring(&result);
+        AccessMonitor::disableMonitoring();
         EXPECT_GE(result.size(), 21);
     }
 }

@@ -4,25 +4,29 @@
 
 using namespace YAM;
 
-std::filesystem::path watchedDirectory("D:\\Peter");
+namespace 
+{
+    std::filesystem::path watchedDirectory("D:\\Peter");
 
-std::string toString(FileChange::Action action) {
-    std::string actionStr("Bad action");
-    if (action == FileChange::Action::Added) actionStr = "Added";
-    else if (action == FileChange::Action::Removed) actionStr = "Removed";
-    else if (action == FileChange::Action::Modified) actionStr = "Modified";
-    else if (action == FileChange::Action::Renamed) actionStr = "Renamed";
-    else if (action == FileChange::Action::Overflow) actionStr = "Overflow";
-    return actionStr;
-}
+    std::string toString(FileChange::Action action) {
+        std::string actionStr("Bad action");
+        if (action == FileChange::Action::Added) actionStr = "Added";
+        else if (action == FileChange::Action::Removed) actionStr = "Removed";
+        else if (action == FileChange::Action::Modified) actionStr = "Modified";
+        else if (action == FileChange::Action::Renamed) actionStr = "Renamed";
+        else if (action == FileChange::Action::Overflow) actionStr = "Overflow";
+        return actionStr;
+    }
 
- void handle(FileChange const& change) {
-     std::string action = toString(change.action);
-     std::cout 
-         << action 
-         << " file=" << watchedDirectory / change.fileName 
-         << " oldFile=" << watchedDirectory / change.oldFileName
-         <<  std::endl;
+     void handle(FileChange const& change) {
+         std::string action = toString(change.action);
+         std::cout << action << " file=" << watchedDirectory / change.fileName;
+         if (change.action == FileChange::Action::Renamed) {
+             std::cout << " oldFile=" << watchedDirectory / change.oldFileName;
+         }
+         std::cout <<  std::endl;
+    }
+
 }
 
 int main(int argc, char** argv) {
@@ -34,5 +38,4 @@ int main(int argc, char** argv) {
     DirectoryWatcher watcher(watchedDirectory, true, handler);
     std::string input;    
     while (input.empty()) std::cin >> input;
-
 }

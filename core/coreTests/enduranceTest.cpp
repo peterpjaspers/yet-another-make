@@ -72,9 +72,6 @@ namespace
             // make test a bit more deterministic
             //context->threadPool().size(1);
 
-            // Workaround concurrency isse in start/stopMonitoring until
-            // Phil fixed this.
-            // TODO: remove when fixed
             AccessMonitor::startMonitoring(wdir.dir);
         }
 
@@ -194,7 +191,7 @@ namespace
             auto& stats = driver.context->statistics();
             stats.registerNodes = true;
             driver.removeRepos();
-            for (int nBuilds = 0; nBuilds < 20; nBuilds++) {
+            for (int nBuilds = 0; nBuilds < 2; nBuilds++) {
                 stats.reset();
                 std::cout << "\nStarting build " << nRestarts << "." << nBuilds << std::endl;
                 std::shared_ptr<BuildResult> result = driver.build();

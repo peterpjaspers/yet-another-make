@@ -23,10 +23,12 @@ namespace AccessMonitor {
         const char* signature = "void inject( const string& library, SessionID session, ProcessID process, ThreadID thread, const path& directory  )";
         HANDLE processHandle = OpenProcess( PROCESS_CREATE_THREAD | PROCESS_VM_OPERATION | PROCESS_VM_WRITE, FALSE, (DWORD)process );
         if (processHandle != nullptr) {
-            size_t fileNameSize = ((library.size() + 1) * sizeof(char));
-            char* fileName = static_cast<char*>( VirtualAllocEx( processHandle, NULL, fileNameSize, MEM_COMMIT, PAGE_READWRITE ) );
+            size_t fileNameSize = (library.size() * sizeof(char));
+            char* fileName = static_cast<char*>( VirtualAllocEx( processHandle, NULL, (fileNameSize + 1), MEM_COMMIT, PAGE_READWRITE ) );
             if (fileName != nullptr) {
-                if (WriteProcessMemory( processHandle, fileName, library.c_str(), fileNameSize, NULL)) {
+                if (WriteProcessMemory( processHandle, fileName, library.c_str(), fileNameSize, NULL )) {
+                    char zero( 0 );
+                    WriteProcessMemory( processHandle, (fileName + fileNameSize), &zero, 1, NULL ); // Null terminate library file name
                     HMODULE module = GetModuleHandleW( L"Kernel32" );
                     if (module != nullptr) {
                         PTHREAD_START_ROUTINE function = reinterpret_cast<PTHREAD_START_ROUTINE>( GetProcAddress( module, "LoadLibraryA" ) );
@@ -45,6 +47,7 @@ namespace AccessMonitor {
                         } else throw injectException( signature, "Failed to access LoadLibraryW function pointer" );
                     } else throw injectException( signature, "Failed to access Kernel32 module" );
                 } else throw injectException( signature, "Failed to write to remote memory" );
+                VirtualFree( fileName, 0, MEM_RELEASE );
             } else throw injectException( signature, "Failed to allocate remote memory" );
             CloseHandle( processHandle );
         } else throw injectException( signature, "Failed to open target process" );

@@ -22,9 +22,13 @@
 #include "Glob.h"
 #include "BuildScopeFinder.h"
 #include "PeriodicTimer.h"
+#include "FileSystem.h"
 
 #include <iostream>
 #include <map>
+#include <atomic>
+
+#include "../accessMonitor/Monitor.h"
 
 namespace
 {
@@ -38,7 +42,7 @@ namespace
 
     void resetFailedAndCanceledNodes(NodeSet& nodes) {
         std::vector<std::shared_ptr<Node>> toReset;
-        for (auto const &pair : nodes.failedOrCanceledNodes()) {
+        for (auto const& pair : nodes.failedOrCanceledNodes()) {
             toReset.insert(toReset.end(), pair.second.begin(), pair.second.end());
         }
         for (auto const& node : toReset) node->setState(Node::State::Dirty);
@@ -67,7 +71,7 @@ namespace
 
     template<typename T>
     void appendDirtyNodesMap(
-        ExecutionContext *context,
+        ExecutionContext* context,
         std::string const& nodeClass,
         std::map<std::filesystem::path, std::shared_ptr<T>>& dirtyNodes
     ) {
@@ -97,6 +101,9 @@ namespace
         }
         return pruned;
     }
+    
+    std::mutex _mutex;
+    unsigned int _nBuilders = 0;
 }
 
 namespace YAM
@@ -125,10 +132,20 @@ namespace YAM
         _dirtyBuildFileParsers->setState(Node::State::Ok);
         _dirtyBuildFileCompilers->setState(Node::State::Ok);
         _dirtyCommands->setState(Node::State::Ok);
+
+        std::lock_guard<std::mutex> guard(_mutex);
+        if (_nBuilders == 0) {
+            AccessMonitor::enableMonitoring();
+        }
+        _nBuilders += 1;
     }
 
     Builder::~Builder() {
-
+        std::lock_guard<std::mutex> guard(_mutex);
+        if (_nBuilders == 1) {
+            AccessMonitor::disableMonitoring();
+        }
+        _nBuilders -= 1;
     }
 
     // Called in any thread
@@ -308,7 +325,7 @@ namespace YAM
             dirtyNodes.push_back(repositoriesNode);
         }
         for (auto const& pair : repositoriesNode->repositories()) {
-            auto &repo = pair.second;
+            auto& repo = pair.second;
             if (repo->repoType() != FileRepositoryNode::RepoType::Ignore) {
                 repo->consumeChanges();
                 auto fileExecSpecsNode = repo->fileExecSpecsNode();
@@ -402,11 +419,11 @@ namespace YAM
         if (n != _dirtyBuildFileCompilers.get()) throw std::exception("unexpected node");
         if (_dirtyBuildFileCompilers->state() != Node::State::Ok) {
             _postCompletion(Node::State::Failed);
-         } else if (_containsGroupCycles(_dirtyBuildFileCompilers->content())) {
-             for (auto const& node : _dirtyBuildFileCompilers->content()) {
-                 node->setState(Node::State::Failed);
-             }
-             _postCompletion(Node::State::Failed);
+        } else if (_containsGroupCycles(_dirtyBuildFileCompilers->content())) {
+            for (auto const& node : _dirtyBuildFileCompilers->content()) {
+                node->setState(Node::State::Failed);
+            }
+            _postCompletion(Node::State::Failed);
         } else {
             std::vector<std::shared_ptr<Node>> dirtyCommands;
             bool finderError = false;
@@ -448,7 +465,7 @@ namespace YAM
 
     void Builder::_postCompletion(Node::State resultState) {
         auto d = Delegate<void>::CreateLambda([this, resultState]() {
-            _notifyCompletion(resultState); 
+            _notifyCompletion(resultState);
         });
         _context.mainThreadQueue().push(std::move(d));
     }

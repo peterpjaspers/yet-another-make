@@ -43,7 +43,9 @@ namespace AccessMonitor {
     // Return original function associated with a patch function and its index.
     // The template argument is the type (signature) of the (original and patch) function.
     template<class T>
-    T patchOriginal( T function, PatchIndex index ) { return reinterpret_cast<T>( original( index ) ); }
+    T patchOriginal( T function, PatchIndex index ) { 
+        return reinterpret_cast<T>( original( index ) ); 
+    }
 
 } // namespace AccessMonitor
 

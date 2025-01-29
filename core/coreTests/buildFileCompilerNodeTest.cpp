@@ -18,6 +18,8 @@
 #include "gtest/gtest.h"
 #include <chrono>
 
+#include "../../accessMonitor/Monitor.h"
+
 namespace
 {
     using namespace YAM;
@@ -81,6 +83,7 @@ namespace
             context.repositoriesNode(repos);
             fileRepo->startWatching();
 
+            AccessMonitor::enableMonitoring();
             auto dirNode = fileRepo->directoryNode();
             bool completed = YAMTest::executeNode(dirNode.get());
             EXPECT_TRUE(completed);
@@ -111,7 +114,12 @@ namespace
 
             mainFile = dynamic_pointer_cast<SourceFileNode>(context.nodes().find(fileRepo->symbolicPathOf(f1)));
         }
+
+        ~TestSetup() {
+            AccessMonitor::disableMonitoring();
+        }
     };
+
 
     TEST(BuildFileCompilerNode, execute) {
         TestSetup setup;

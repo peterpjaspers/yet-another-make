@@ -37,7 +37,12 @@ namespace AccessMonitor {
             ThreadContext() = delete;
             ThreadContext( SessionID id, LogFile* eventLog = nullptr, LogFile* debugLog = nullptr ) : session( id ) {}
         };
-        inline ThreadContext* threadContext() { return( static_cast<ThreadContext*>(TlsGetValue(tlsSessionIndex)) ); }
+        inline ThreadContext* threadContext() { 
+            auto err = GetLastError();
+            auto context = ( static_cast<ThreadContext*>(TlsGetValue(tlsSessionIndex)));
+            SetLastError(err);
+            return context;
+        }
 
     }
 
@@ -157,6 +162,8 @@ namespace AccessMonitor {
         if (context == nullptr) throw runtime_error( string( signature ) + " - Thread not active on a session!" );
         if (context->session != id()) throw runtime_error( string( signature ) + " - Invalid session ID!" );
         delete context;
+        if (debug != nullptr) debug->removeThread();
+        if (events != nullptr) events->removeThread();
         TlsSetValue( tlsSessionIndex, nullptr );
 
     }
@@ -183,7 +190,7 @@ namespace AccessMonitor {
     // See recordSessionContext and retrieveSessionContext..
     struct SessionConextData {
         SessionID   session;                // The session in which the process was spawned
-        LogAspects  aspects;           // The debugging aspects to be applied in the spawned process
+        LogAspects  aspects;                // The debugging aspects to be applied in the spawned process
         char        directory[ MAX_PATH ];  // The directory in which monitor data is stored
     };
 

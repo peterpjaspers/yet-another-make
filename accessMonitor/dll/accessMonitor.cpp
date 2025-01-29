@@ -17,10 +17,15 @@ BOOL WINAPI DllMain( HINSTANCE dll,  DWORD reason, LPVOID arg ) {
         //    bool stop = true;
         //}
         ProcessID process( CurrentProcessID() );
+        enableMonitoring();
         startMonitoring( Session::retrieveContext( process ) );
         EventSignal( "ProcessPatched", process );
     } else if (reason == DLL_PROCESS_DETACH) {
-        stopMonitoring( nullptr );
+        // Commented-out because they cause a crash
+        // Also these statements are not necessary
+        // because detach happens during process exit. 
+        //stopMonitoring( nullptr );
+        //disableMonitoring();
     }
     return true;
 }
