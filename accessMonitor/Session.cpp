@@ -37,7 +37,10 @@ namespace AccessMonitor {
             ThreadContext() = delete;
             ThreadContext( SessionID id, LogFile* eventLog = nullptr, LogFile* debugLog = nullptr ) : session( id ) {}
         };
-        inline ThreadContext* threadContext() { return( static_cast<ThreadContext*>(TlsGetValue(tlsSessionIndex)) ); }
+        inline ThreadContext* threadContext() {
+            if ( tlsSessionIndex == -1 ) return nullptr;
+            return( static_cast<ThreadContext*>(TlsGetValue(tlsSessionIndex)) );
+        }
 
     }
 
@@ -92,13 +95,13 @@ namespace AccessMonitor {
     void Session::_terminate() {
         context.session |= TerminatedBit;
         activeCount -= 1;
-        if (this == remoteSession) remoteSession = nullptr;
         delete events; // Closes event log file
         events = nullptr;
         if (debug != nullptr) {
             delete debug; // Closes debug log file
             debug = nullptr;
         }
+        if (this == remoteSession) remoteSession = nullptr;
     }
     void Session::terminate() {
         static const char* signature = "void Session::terminate()";
