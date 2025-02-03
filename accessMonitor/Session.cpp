@@ -37,10 +37,7 @@ namespace AccessMonitor {
             ThreadContext() = delete;
             ThreadContext( SessionID id, LogFile* eventLog = nullptr, LogFile* debugLog = nullptr ) : session( id ) {}
         };
-        inline ThreadContext* threadContext() {
-            if ( tlsSessionIndex == -1 ) return nullptr;
-            return( static_cast<ThreadContext*>(TlsGetValue(tlsSessionIndex)) );
-        }
+        inline ThreadContext* threadContext() { return( static_cast<ThreadContext*>(TlsGetValue(tlsSessionIndex)) ); }
 
         Session* currentSession( ThreadContext* context ) {
             if (context == nullptr) {
