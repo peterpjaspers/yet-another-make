@@ -42,6 +42,19 @@ namespace AccessMonitor {
             return( static_cast<ThreadContext*>(TlsGetValue(tlsSessionIndex)) );
         }
 
+        Session* currentSession( ThreadContext* context ) {
+            if (context == nullptr) {
+                if (remoteSession == nullptr) return nullptr;
+                // Executing in a thread that was not explicitly created in a (remote) session (e.g., main thread).
+                remoteSession->addThread();
+                return remoteSession;
+            }
+            auto session( Session::session( context->session ) );
+            if (session->terminated()) return nullptr;
+            if (session->free()) return nullptr;
+            return( session );
+        }   
+
     }
 
     SessionID Session::initialize() {
@@ -129,20 +142,7 @@ namespace AccessMonitor {
         if ((remoteSession == nullptr) && (usedCount < id)) throw runtime_error( string(signature) + " - Invalid session ID!" );
         return &sessions[ id - 1 ];
     }
-    Session* Session::current() {
-        static const char* signature = "Session* Session::current()";
-        auto context( threadContext() );
-        if (context == nullptr) {
-            if (remoteSession == nullptr) return nullptr;
-            // Executing in a thread that was not explicitly created in a (remote) session (e.g., main thread).
-            remoteSession->addThread();
-            return remoteSession;
-        }
-        auto session( Session::session( context->session ) );
-        if (session->terminated()) return nullptr;
-        if (session->free()) return nullptr;
-        return( session );
-    }
+    Session* Session::current() { return currentSession( threadContext() ); }
     int Session::count() { return ( activeCount ); }
     const std::filesystem::path& Session::directory() const { return( context.directory ); }
     SessionID Session::id() const { return( context.session & SessionIDMask ); }
@@ -178,9 +178,10 @@ namespace AccessMonitor {
     }
     LogFile* Session::debugLog() const { return debug; }
     MonitorAccess* Session::monitorAccess() {
-        if (Session::current() == nullptr) return nullptr;
         auto context( threadContext() );
         if (context == nullptr) return nullptr;
+        if (currentSession( context ) == nullptr) return nullptr;
+        context = threadContext();
         return &context->access;
     }
 
