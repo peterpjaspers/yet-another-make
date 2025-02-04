@@ -106,7 +106,7 @@ void doFileAccess( const string& directory, const int index ) {
                 workerThreads.push_back( thread( worker, sessionDir / subdir.str() ) );
             }
             for (int i = 0; i < threads; ++i) workerThreads[ i ].join();
-        } else {
+        } else if (!remoteProcess) {
             worker( sessionDir / L"fileAccessTest" );
         }
         if (remoteProcess) {

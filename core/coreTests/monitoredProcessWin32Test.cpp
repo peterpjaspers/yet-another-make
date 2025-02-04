@@ -93,7 +93,7 @@ namespace
         t.join();
     }
 
-    TEST(MonitoredProcessWin32, fileDependencies) {
+   TEST(MonitoredProcessWin32, fileDependencies) {
         WorkingDir tempDir;
         std::string cmdExeStr = boost::process::search_path("cmd").string();
         std::filesystem::path cmdExe = std::filesystem::canonical(cmdExeStr);

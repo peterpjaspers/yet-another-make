@@ -93,21 +93,32 @@ namespace AccessMonitor {
         }
         // Provide exclusive access to monitor administration
         mutex monitorMutex;
+        bool enabled = false;
     }
 
     void enableMonitoring() {
+        const char* signature( "void enableMonitoring()" );
+        const lock_guard<mutex> lock( monitorMutex );
+        if (enabled) throw string( signature ) + " - Monitoring already enabled!";
         registerFileAccess();
         registerProcessAccess();
         patch();
+        enabled = true;
     }
     void disableMonitoring() {
+        const char* signature( "void disableMonitoring()" );
+        const lock_guard<mutex> lock( monitorMutex );
+        if (!enabled) throw string( signature ) + " - Monitoring not enabled!";
         unpatch();
         unregisterProcessAccess();
         unregisterFileAccess();
+        enabled = false;
     }
 
     void startMonitoring( const path& directory, const LogAspects aspects ) {
+        const char* signature( "void startMonitoring( const path& directory, const LogAspects aspects )" );
         const lock_guard<mutex> lock( monitorMutex );
+        if (!enabled) throw string( signature ) + " - Monitoring not enabled!";
         Session* session( Session::start( directory, aspects ) );
         createSessionDirectory( directory, session->id() );
         create_directory( directory / dataDirectory() );
@@ -120,7 +131,9 @@ namespace AccessMonitor {
         session->eventLog( createEventLog( directory, session->id() ) );
     }
     void startMonitoring( const SessionContext& context ) {
+        const char* signature( "void startMonitoring( const SessionContext& context )" );
         const lock_guard<mutex> lock( monitorMutex );
+        if (!enabled) throw string( signature ) + " - Monitoring not enabled!";
         Session* session( Session::start( context ) );
         auto debugLogFile( createDebugLog( context.directory, context.session ) );
         if (debugLogFile != nullptr) {
@@ -131,8 +144,10 @@ namespace AccessMonitor {
         session->eventLog( createEventLog( context.directory, context.session ) );
     }
     void stopMonitoring( MonitorEvents* events ) {
+        const char* signature( "void stopMonitoring( MonitorEvents* events )" );
         const lock_guard<mutex> lock( monitorMutex );
         auto session( Session::current() );
+        if (session == nullptr) throw string( signature ) + " - No monitoring session active!";
         const auto id( session->id() );
         const auto directory( session->directory() );
         if (debugLog( General )) debugRecord() << "Stop monitoring session " << id << "..." << record;

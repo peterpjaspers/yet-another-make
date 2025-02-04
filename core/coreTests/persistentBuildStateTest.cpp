@@ -20,6 +20,8 @@
 #include <chrono>
 #include <memory>
 
+#include "../../accessMonitor/Monitor.h"
+
 namespace
 {
     using namespace YAM;
@@ -135,6 +137,7 @@ namespace
             //repos->addRepository(winRepo);
             //winRepo->repoType(FileRepositoryNode::RepoType::Ignore);
 
+            AccessMonitor::enableMonitoring();
             bool completed = YAMTest::executeNode(sourceFileRepo()->directoryNode().get());
             EXPECT_TRUE(completed);
 
@@ -157,6 +160,10 @@ namespace
             completed = YAMTest::executeNodes(dirtyNodes);
             EXPECT_EQ(nNodes, context.nodes().size());
             persistentState.store();
+        }
+        
+        ~SetupHelper() {
+            AccessMonitor::disableMonitoring();
         }
 
         std::shared_ptr<FileRepositoryNode> sourceFileRepo() {
