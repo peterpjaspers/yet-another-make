@@ -176,9 +176,10 @@ namespace AccessMonitor {
     LogFile* Session::debugLog() const { return debug; }
     MonitorAccess* Session::monitorAccess() {
         auto context( threadContext() );
-        if (context == nullptr) return nullptr;
-        if (currentSession( context ) == nullptr) return nullptr;
-        context = threadContext();
+        if (context == nullptr) {
+            if (currentSession( context ) == nullptr) return nullptr;
+            context = threadContext();
+        }
         return &context->access;
     }
 
