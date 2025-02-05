@@ -38,12 +38,7 @@ namespace AccessMonitor {
             ThreadContext() = delete;
             ThreadContext( SessionID id, LogFile* eventLog = nullptr, LogFile* debugLog = nullptr ) : session( id ) {}
         };
-        inline ThreadContext* threadContext() {
-            auto err = GetLastError();
-            auto context = (static_cast<ThreadContext*>(TlsGetValue(tlsSessionIndex)));
-            SetLastError(err);
-            return context;
-        }
+        inline ThreadContext* threadContext() { return (static_cast<ThreadContext*>(TlsGetValue(tlsSessionIndex))); }
         Session* currentSession( ThreadContext* context ) {
             if (context == nullptr) {
                 if (remoteSession == nullptr) return nullptr;
@@ -188,15 +183,21 @@ namespace AccessMonitor {
         debug = file;
     }
     LogFile* Session::debugLog() const { return debug; }
-    MonitorAccess* Session::monitorFileAccess() {
+    MonitorAccess* Session::_monitorAccess( bool file, bool error ) {
+        auto errorCode( error ? GetLastError() : 0 );
         auto context( getThreadContext() );
-        if (context == nullptr) return nullptr;
-        return &context->fileAccess;
-    }
-    MonitorAccess* Session::monitorProcessAccess() {
-        auto context( getThreadContext() );
-        if (context == nullptr) return nullptr;
-        return &context->processAccess;
+        if (context != nullptr) {
+            auto access( (file) ? &context->fileAccess : &context->processAccess );
+            if (error) {
+                if (access->monitorCount == 0) {
+                    access->errorCode = errorCode;
+                    access->restoreError = error;
+                }
+            }
+            return access;
+        }
+        if (error) SetLastError( errorCode );
+        return nullptr;
     }
 
     // Session context passeed to spawned process to enable creating (opening) a session in a remote process.
@@ -210,7 +211,6 @@ namespace AccessMonitor {
     void* Session::recordContext( const ProcessID process ) const {
         const char* signature( "void recordSessionContext( const path& dir, const ProcessID process, const SessionID session, ThreadID thread )" );
         auto map = CreateFileMappingA( INVALID_HANDLE_VALUE, nullptr,   PAGE_READWRITE, 0, sizeof( SessionConextData ), sessionInfoMapName( process ).c_str() );
-        auto error = GetLastError();
         if (map == nullptr) throw runtime_error( string( signature ) + " - Could not create file mapping!" );
         auto address = MapViewOfFile( map, FILE_MAP_ALL_ACCESS, 0, 0, sizeof( SessionConextData ) );
         if (address == nullptr) throw runtime_error( string( signature ) + " - Could not open mapping!" );

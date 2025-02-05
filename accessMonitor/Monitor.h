@@ -37,28 +37,28 @@ namespace AccessMonitor {
     class MonitorGuard {
     private:
         MonitorAccess* access;
-        bool restoreError;
     public:
         MonitorGuard() = delete;
-        inline MonitorGuard( MonitorAccess* monitor, bool error = true ) : access( monitor ), restoreError( error ) {
-            auto errorCode( (restoreError) ? GetLastError() : 0 );
-            if (access != nullptr) {
-                auto count( access->monitorCount++ );
-                if (count == 0) access->errorCode = errorCode;
-            }
+        inline MonitorGuard( MonitorAccess* monitor ) : access( monitor ) {
+            if (access != nullptr) access->monitorCount++;
         }
         inline ~MonitorGuard() {
             if (access != nullptr) {
                 auto count( --access->monitorCount );
-                if ((count == 0) && restoreError) SetLastError( access->errorCode );
+                if ((count == 0) && access->restoreError) {
+                    SetLastError( access->errorCode );
+                    access->restoreError = false;
+                }
             }
         }
         inline bool operator()() { return( (access != nullptr) && (access->monitorCount == 1 ) ); }
         inline unsigned long count() { return( (access != nullptr) ? access->monitorCount : 0 ); }
         inline unsigned long error() { return( (access != nullptr) ? access->errorCode : 0 ); }
         inline void error( unsigned long error ) {
-            if (access != nullptr) access->errorCode = error;
-            restoreError = true;
+            if (access != nullptr) {
+                access->errorCode = error;
+                access->restoreError = true;
+            }
         }
     };
 

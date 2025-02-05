@@ -11,7 +11,8 @@ namespace AccessMonitor {
     struct MonitorAccess {
         unsigned long monitorCount;
         unsigned long errorCode;
-        inline MonitorAccess() : monitorCount( 0 ), errorCode( 0 ) {};
+        bool restoreError;
+        inline MonitorAccess() : monitorCount( 0 ), errorCode( 0 ), restoreError( false ) {};
     };
 
     // Context in which a session operates.
@@ -28,6 +29,9 @@ namespace AccessMonitor {
         SessionContext  context;
         LogFile*        events;     // Events log file for all events from all threads in this session
         LogFile*        debug;      // Debug log file when access monitor logging is enabled
+    private:
+        void _terminate();
+        static MonitorAccess* _monitorAccess( bool file, bool error = true );
     public:
         static const unsigned SessionIDBits = 7;
         static const SessionID MaxSessionID = (1 << SessionIDBits);
@@ -71,9 +75,9 @@ namespace AccessMonitor {
         // Return session debug log.
         LogFile* debugLog() const;
         // Return file monitor access for logging in this session.
-        static MonitorAccess* monitorFileAccess();
+        inline static MonitorAccess* monitorFileAccess( bool error = true ) { return _monitorAccess( true, error ); }
         // Return process monitor access for logging in this session.
-        static MonitorAccess* monitorProcessAccess();
+        inline static MonitorAccess* monitorProcessAccess( bool error = true ) { return _monitorAccess( false, error ); }
         // Record session context for a (spawned/remote) process.
         // The recorded session context may be retrieved in the (remote) process with a call to retrieveContext.
         void* recordContext( const ProcessID process ) const;
@@ -83,9 +87,7 @@ namespace AccessMonitor {
         // Retreive session context for/in a (spawned/remote) process recorded by a call to recordContext.
         // The retrieved context may be used to extend a session to the (remote) process.
         static const SessionContext retrieveContext( const ProcessID process = CurrentProcessID() );
-        static SessionID initialize();
-    private:
-        void _terminate();
+        static SessionID initialize();        
     };
 
 } // namespace AccessMonitor
