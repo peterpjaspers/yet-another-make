@@ -11,7 +11,8 @@ namespace AccessMonitor {
     struct MonitorAccess {
         unsigned long monitorCount;
         unsigned long errorCode;
-        inline MonitorAccess() : monitorCount( 0 ), errorCode( 0 ) {};
+        bool restoreError;
+        inline MonitorAccess() : monitorCount( 0 ), errorCode( 0 ), restoreError( false ) {};
     };
 
     // Context in which a session operates.
@@ -71,9 +72,9 @@ namespace AccessMonitor {
         // Return session debug log.
         LogFile* debugLog() const;
         // Return file monitor access for logging in this session.
-        static MonitorAccess* monitorFileAccess();
+        static MonitorAccess* monitorFileAccess( bool error = true );
         // Return process monitor access for logging in this session.
-        static MonitorAccess* monitorProcessAccess();
+        static MonitorAccess* monitorProcessAccess( bool error = true );
         // Record session context for a (spawned/remote) process.
         // The recorded session context may be retrieved in the (remote) process with a call to retrieveContext.
         void* recordContext( const ProcessID process ) const;

@@ -880,7 +880,7 @@ namespace AccessMonitor {
         }
         BOOL PatchCloseHandle( HANDLE handle ) {
             auto original( patchOriginal( PatchCloseHandle, IndexCloseHandle ) );
-            MonitorGuard guard( Session::monitorFileAccess(), false );
+            MonitorGuard guard( Session::monitorFileAccess( false ) );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "CloseHandle" ) << handleCode( handle ) << " )" << record;
                 // Record last write time when closing an actual file opened for write (also for WithProgress calls)

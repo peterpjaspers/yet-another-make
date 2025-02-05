@@ -184,14 +184,24 @@ namespace AccessMonitor {
         debug = file;
     }
     LogFile* Session::debugLog() const { return debug; }
-    MonitorAccess* Session::monitorFileAccess() {
+    MonitorAccess* Session::monitorFileAccess( bool error ) {
+        auto errorCode( error ? GetLastError() : 0 );
         auto context( getThreadContext() );
         if (context == nullptr) return nullptr;
+        if ((context->fileAccess.monitorCount == 0) && error) {
+            context->fileAccess.errorCode = errorCode;
+            context->fileAccess.restoreError = error;
+        }
         return &context->fileAccess;
     }
-    MonitorAccess* Session::monitorProcessAccess() {
+    MonitorAccess* Session::monitorProcessAccess( bool error ) {
+        auto errorCode( error ? GetLastError() : 0 );
         auto context( getThreadContext() );
         if (context == nullptr) return nullptr;
+        if ((context->processAccess.monitorCount == 0) && error) {
+            context->processAccess.errorCode = errorCode;
+            context->fileAccess.restoreError = error;
+        }
         return &context->processAccess;
     }
 
@@ -206,7 +216,6 @@ namespace AccessMonitor {
     void* Session::recordContext( const ProcessID process ) const {
         const char* signature( "void recordSessionContext( const path& dir, const ProcessID process, const SessionID session, ThreadID thread )" );
         auto map = CreateFileMappingA( INVALID_HANDLE_VALUE, nullptr,   PAGE_READWRITE, 0, sizeof( SessionConextData ), sessionInfoMapName( process ).c_str() );
-        auto error = GetLastError();
         if (map == nullptr) throw runtime_error( string( signature ) + " - Could not create file mapping!" );
         auto address = MapViewOfFile( map, FILE_MAP_ALL_ACCESS, 0, 0, sizeof( SessionConextData ) );
         if (address == nullptr) throw runtime_error( string( signature ) + " - Could not open mapping!" );
