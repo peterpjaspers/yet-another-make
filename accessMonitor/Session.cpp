@@ -184,25 +184,21 @@ namespace AccessMonitor {
         debug = file;
     }
     LogFile* Session::debugLog() const { return debug; }
-    MonitorAccess* Session::monitorFileAccess( bool error ) {
+    MonitorAccess* Session::_monitorAccess( bool file, bool error ) {
         auto errorCode( error ? GetLastError() : 0 );
         auto context( getThreadContext() );
-        if (context == nullptr) return nullptr;
-        if ((context->fileAccess.monitorCount == 0) && error) {
-            context->fileAccess.errorCode = errorCode;
-            context->fileAccess.restoreError = error;
+        if (context != nullptr) {
+            auto access( (file) ? &context->fileAccess : &context->processAccess );
+            if (error) {
+                if (access->monitorCount == 0) {
+                    access->errorCode = errorCode;
+                    access->restoreError = error;
+                }
+            }
+            return access;
         }
-        return &context->fileAccess;
-    }
-    MonitorAccess* Session::monitorProcessAccess( bool error ) {
-        auto errorCode( error ? GetLastError() : 0 );
-        auto context( getThreadContext() );
-        if (context == nullptr) return nullptr;
-        if ((context->processAccess.monitorCount == 0) && error) {
-            context->processAccess.errorCode = errorCode;
-            context->fileAccess.restoreError = error;
-        }
-        return &context->processAccess;
+        if (error) SetLastError( errorCode );
+        return nullptr;
     }
 
     // Session context passeed to spawned process to enable creating (opening) a session in a remote process.
