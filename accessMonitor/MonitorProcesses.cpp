@@ -111,7 +111,7 @@ namespace AccessMonitor {
             LPDWORD                 lpThreadId
         ) {
             auto original( patchOriginal( PatchCreateThread, IndexCreateThread ) );
-            MonitorGuard guard( Session::monitorAccess(), false );
+            MonitorGuard guard( Session::monitorProcessAccess(), false );
             if ( guard() ) {
                 bool resume = !(dwCreationFlags & CREATE_SUSPENDED);
                 auto args = static_cast<WrapperArguments*>( LocalAlloc( LPTR, sizeof( WrapperArguments ) ) );
@@ -131,7 +131,7 @@ namespace AccessMonitor {
             DWORD   dwExitCode
         ) {
             auto original( patchOriginal( PatchExitThread, IndexExitThread ) );
-            MonitorGuard guard( Session::monitorAccess(), false );
+            MonitorGuard guard( Session::monitorProcessAccess(), false );
             if ( guard() ) {
                 auto thread = CurrentThreadID();
                 if (debugLog( PatchExecution )) debugMessage( "ExitThread" ) << dwExitCode << " ) with ID "  << thread << record;
@@ -143,7 +143,7 @@ namespace AccessMonitor {
             DWORD   dwExitCode
         ) {
             auto original( patchOriginal( PatchTerminateThread, IndexTerminateThread ) );
-            MonitorGuard guard( Session::monitorAccess(), false );
+            MonitorGuard guard( Session::monitorProcessAccess(), false );
             if ( guard() ) {
                 auto thread = GetThreadID( GetThreadId( hThread ) );
                 if (debugLog( PatchExecution )) debugMessage( "TerminateThread" ) << thread << ", "  << dwExitCode << " )" << record;
@@ -163,7 +163,7 @@ namespace AccessMonitor {
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
             auto original( patchOriginal( PatchCreateProcessA, IndexCreateProcessA ) );
-            MonitorGuard guard( Session::monitorAccess(), false );
+            MonitorGuard guard( Session::monitorProcessAccess(), false );
             if ( guard() ) {
                 auto created = original( lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
                 guard.error( GetLastError() );
@@ -189,7 +189,7 @@ namespace AccessMonitor {
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
             auto original( patchOriginal( PatchCreateProcessW, IndexCreateProcessW ) );
-            MonitorGuard guard( Session::monitorAccess(), false );
+            MonitorGuard guard( Session::monitorProcessAccess(), false );
             if ( guard() ) {
                 auto created = original( lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
                 guard.error( GetLastError() );
@@ -216,7 +216,7 @@ namespace AccessMonitor {
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
             auto original( patchOriginal( PatchCreateProcessAsUserA, IndexCreateProcessAsUserA ) );
-            MonitorGuard guard( Session::monitorAccess(), false );
+            MonitorGuard guard( Session::monitorProcessAccess(), false );
             if ( guard() ) {
                 auto created = original( hToken, lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
                 guard.error( GetLastError() );
@@ -243,7 +243,7 @@ namespace AccessMonitor {
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
             auto original( patchOriginal( PatchCreateProcessAsUserW, IndexCreateProcessAsUserW ) );
-            MonitorGuard guard( Session::monitorAccess(), false );
+            MonitorGuard guard( Session::monitorProcessAccess(), false );
             if ( guard() ) {
                 auto created = original( hToken, lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
                 guard.error( GetLastError() );
@@ -270,7 +270,7 @@ namespace AccessMonitor {
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
             auto original( patchOriginal( PatchCreateProcessWithLogonW, IndexCreateProcessWithLogonW ) );
-            MonitorGuard guard( Session::monitorAccess(), false );
+            MonitorGuard guard( Session::monitorProcessAccess(), false );
             if ( guard() ) {
                 auto created = original( lpUsername, lpDomain, lpPassword, dwLogonFlags, lpApplicationName, lpCommandLine, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
                 guard.error( GetLastError() );
@@ -295,7 +295,7 @@ namespace AccessMonitor {
             LPPROCESS_INFORMATION lpProcessInformation
         ) {
             auto original( patchOriginal( PatchCreateProcessWithTokenW, IndexCreateProcessWithTokenW ) );
-            MonitorGuard guard( Session::monitorAccess(), false );
+            MonitorGuard guard( Session::monitorProcessAccess(), false );
             if ( guard() ) {
                 auto created = original( hToken, swLogonFlags, lpApplicationName, lpCommandLine, (dwCreationFlags | CREATE_SUSPENDED), lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation );
                 guard.error( GetLastError() );
@@ -311,7 +311,7 @@ namespace AccessMonitor {
 
         void PatchExitProcess( unsigned int exitCode ) {
             auto original( patchOriginal( PatchExitProcess, IndexExitProcess) );
-            MonitorGuard guard( Session::monitorAccess(), false );
+            MonitorGuard guard( Session::monitorProcessAccess(), false );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) {
                     char fileName[ MaxFileName ] = "";
@@ -339,7 +339,7 @@ namespace AccessMonitor {
             LPCSTR lpLibFileName
         ) {
             auto library = patchOriginal( PatchLoadLibraryA, IndexLoadLibraryA )( lpLibFileName );
-            MonitorGuard guard( Session::monitorAccess() );
+            MonitorGuard guard( Session::monitorProcessAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "LoadLibraryA" ) << lpLibFileName << L" )" << record;
             }
@@ -349,7 +349,7 @@ namespace AccessMonitor {
             LPCWSTR lpLibFileName
         ) {
             auto library = patchOriginal( PatchLoadLibraryW, IndexLoadLibraryW )( lpLibFileName );
-            MonitorGuard guard( Session::monitorAccess() );
+            MonitorGuard guard( Session::monitorProcessAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "LoadLibraryW" ) << lpLibFileName << L" )" << record;
             }
@@ -361,7 +361,7 @@ namespace AccessMonitor {
             DWORD  dwFlags
         ) {
             auto library = patchOriginal( PatchLoadLibraryExA, IndexLoadLibraryExA )( lpLibFileName, hFile, dwFlags );
-            MonitorGuard guard( Session::monitorAccess() );
+            MonitorGuard guard( Session::monitorProcessAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "LoadLibraryExA" ) << lpLibFileName  << ", ... )" << record;
             }
@@ -373,7 +373,7 @@ namespace AccessMonitor {
             DWORD  dwFlags
         ) {
             auto library = patchOriginal( PatchLoadLibraryExW, IndexLoadLibraryExW )( lpLibFileName, hFile, dwFlags );
-            MonitorGuard guard( Session::monitorAccess() );
+            MonitorGuard guard( Session::monitorProcessAccess() );
             if ( guard() ) {
                 if (debugLog( PatchExecution )) debugMessage( "LoadLibraryExW" ) << lpLibFileName << L", ... )" << record;
             }
