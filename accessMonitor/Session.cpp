@@ -33,17 +33,17 @@ namespace AccessMonitor {
 
         struct ThreadContext {
             SessionID       session;
-            MonitorAccess   access;
+            MonitorAccess   fileAccess;
+            MonitorAccess   processAccess;
             ThreadContext() = delete;
             ThreadContext( SessionID id, LogFile* eventLog = nullptr, LogFile* debugLog = nullptr ) : session( id ) {}
         };
-        inline ThreadContext* threadContext() { 
+        inline ThreadContext* threadContext() {
             auto err = GetLastError();
-            auto context = ( static_cast<ThreadContext*>(TlsGetValue(tlsSessionIndex)));
+            auto context = (static_cast<ThreadContext*>(TlsGetValue(tlsSessionIndex)));
             SetLastError(err);
             return context;
         }
-
         Session* currentSession( ThreadContext* context ) {
             if (context == nullptr) {
                 if (remoteSession == nullptr) return nullptr;
@@ -56,6 +56,15 @@ namespace AccessMonitor {
             if (session->free()) return nullptr;
             return( session );
         }   
+
+        ThreadContext* getThreadContext() {
+            auto context( threadContext() );
+            if (context == nullptr) {
+                if (currentSession( context ) == nullptr) return nullptr;
+                context = threadContext();
+            }
+            return context;
+        }
 
     }
 
@@ -179,13 +188,15 @@ namespace AccessMonitor {
         debug = file;
     }
     LogFile* Session::debugLog() const { return debug; }
-    MonitorAccess* Session::monitorAccess() {
-        auto context(threadContext());
-        if (context == nullptr) {
-            if (currentSession(context) == nullptr) return nullptr;
-            context = threadContext();
-        }
-        return &context->access;
+    MonitorAccess* Session::monitorFileAccess() {
+        auto context( getThreadContext() );
+        if (context == nullptr) return nullptr;
+        return &context->fileAccess;
+    }
+    MonitorAccess* Session::monitorProcessAccess() {
+        auto context( getThreadContext() );
+        if (context == nullptr) return nullptr;
+        return &context->processAccess;
     }
 
     // Session context passeed to spawned process to enable creating (opening) a session in a remote process.

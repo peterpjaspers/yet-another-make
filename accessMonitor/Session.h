@@ -70,8 +70,10 @@ namespace AccessMonitor {
         void debugLog( LogFile* file );
         // Return session debug log.
         LogFile* debugLog() const;
-        // Return monitor access for logging in this session.
-        static MonitorAccess* monitorAccess();
+        // Return file monitor access for logging in this session.
+        static MonitorAccess* monitorFileAccess();
+        // Return process monitor access for logging in this session.
+        static MonitorAccess* monitorProcessAccess();
         // Record session context for a (spawned/remote) process.
         // The recorded session context may be retrieved in the (remote) process with a call to retrieveContext.
         void* recordContext( const ProcessID process ) const;
