@@ -135,3 +135,17 @@ This needs to be adapted to: commmand execution can be started when
       }
     - parallel to above step: start cmd node when it is resumed (i.e. in sync
       with its build file) and Dirty and in build scope.
+
+
+-- 2025-02-05
+Alternative is to have no file aspect configuration and instead extend
+buildfile syntax to support this idea.
+Example:
+    *.obj |> link -dll %f -out %o |> mydll.dll mydll.lib
+    mydll.lib |> extractDllInterface %f -out %o |> mydll.if
+    mydll.lib(#=mydll.if) main.obj |> link -exe %f -out %o |> myapp.exe
+
+The link command fpr myapp.exe uses the hash of mydll.if instead the 
+hash of mydd.lib.
+Consequence is that the yam user must generate a file that contains the
+aspect content.
