@@ -1028,7 +1028,10 @@ namespace YAM
             }
             ss << "This file is not part of a known file repository and will not be tracked for changes." << std::endl;
             ss << "To get rid of this warning you must declare the file repository that contains the file." << std::endl;
-            ss << "Set the repository tracked property to false if yam must not track files in this repository." << std::endl;
+            ss << "Set the repository type to: " << std::endl;
+            ss << "    Build if it is a yam repository that must be build." << std::endl;
+            ss << "    Track if yam must only track dependencies on files in this repository." << std::endl;
+            ss << "    Ignore if yam must not track dependencies on files in this repository." << std::endl;
             LogRecord warning(LogRecord::Warning, ss.str());
             logBook.add(warning);
             return "";

@@ -118,3 +118,23 @@ Assume that a buildfile in R1 defines a rule with output file C:\R1\d3\bin\aap.l
 A rule in a buildfile in R2 uses this file as input to link an executable:
     : ..\src\aap.o <R1>\d3\bin\aap.lib |> link %f -o %o |> ..\bin\program
 Note: a relative path in a buildfile is relative to the buildfile directory.
+
+
+--Handling changes in repo configuration
+- nodes keep hash of their repo.
+  When repo changes -> node state becomes Dirty -> node re-executes
+
+- before accepting repo change: verify that all FileNodes adhere
+  to the change. 
+  TODO: finish below analysis
+  Possible changes and associated actions:	
+   - repoType 
+     Track=>Build: run a build
+     Track=>Ignore: remove repo DirectoryNode 
+                    -> marks all file/dir nodes Deleted
+                    -> Commands re-execute and remove references to Deleted nodes 
+					   
+   - directory
+   - add repo
+   - remove repo
+
