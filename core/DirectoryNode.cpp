@@ -247,8 +247,7 @@ namespace YAM
     }
 
     std::chrono::time_point<std::chrono::utc_clock> DirectoryNode::retrieveLastWriteTime() const {
-        std::error_code ec;
-        auto flwt = std::filesystem::last_write_time(absolutePath(), ec);
+        auto flwt = std::filesystem::last_write_time(absolutePath());
         auto ulwt = decltype(flwt)::clock::to_utc(flwt);
         return ulwt;
     }
@@ -401,8 +400,12 @@ namespace YAM
                 retrieveContent(result->_content, result->_added, result->_removed, result->_kept);
                 result->_executionHash = computeExecutionHash(_dotIgnoreNode->hash(), result->_content);
             }
-        } catch (std::filesystem::filesystem_error) {
+        } catch (std::filesystem::filesystem_error fserr) {
             success = false;
+            std::stringstream ss;
+            ss << "Failed (" << fserr.code().message() << ") to iterate directory " << absolutePath();
+            LogRecord error(LogRecord::Aspect::Error, ss.str());
+            context()->addToLogBook(error);
         }
         result->_newState = success ? Node::State::Ok : Node::State::Failed;
         auto d = Delegate<void>::CreateLambda(
