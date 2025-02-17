@@ -87,7 +87,25 @@ namespace YAM { namespace BuildFile {
         
     struct __declspec(dllexport) Deps : public Node
     {
+        // Rules may use input files that are output files of rules defined 
+        // in other buildfiles. Yam requires the user to declare dependencies
+        // on these buildfiles to ensure that all output files are defined
+        // before they are being referenced in rule input sections.
         std::vector<std::filesystem::path> depBuildFiles;
+
+        // Buildfile content can be defined indirectly by buildfile scripts,
+        // e.g. a Python script file. Yam executes these script files. The 
+        // The script outputs buildfile text in Yam rule syntax. Yam 
+        // detects and registers dependencies on files read during script 
+        // execution and re-exeuctes the script when one or more of these 
+        // dependencies change. 
+        // The script may also read directories, typically by using globs,
+        // e.g. to create a compilation rule for each source file. In this case
+        // the script must re-execute when the glob result changes. Yam 
+        // however cannot detect dependencies on directories/globs. The script
+        // must therefore declare these glob dependencies in the output 
+        // buildfile text. Yam will re-execute the script when glob results 
+        // change.
         std::vector<std::filesystem::path> depGlobs;
 
         void addHashes(std::vector<XXH64_hash_t>& hashes) const override;

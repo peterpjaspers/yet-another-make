@@ -32,9 +32,9 @@ namespace
     // This test demonstrates spurious change events on first-time iterating
     // over just created directories in the Windows implementation
     // According to ReadDirectoryChangesW for FILE_NOTIFY_CHANGE_LAST_WRITE:
-    //    Any change to the last write - time of files in the watched directory 
+    //    Any change to the last-write-time of files in the watched directory 
     //    or subtree causes a change notification wait operation to return. The 
-    //    operating system detects a change to the last write - time only when the 
+    //    operating system detects a change to the last-write-time only when the 
     //    file is written to the disk.For operating systems that use extensive caching,
     //    detection occurs only when the cache is sufficiently flushed.
     // It seems that flushing the directory files to cache is triggered by the
@@ -44,7 +44,7 @@ namespace
     //      - start watching the directory tree
     //      - iterate the directories.
     TEST(DirectoryWatcherWin32, spuriousChangeEvents) {
-        std::filesystem::path rootDir= FileSystem::createUniqueDirectory().string();
+        std::filesystem::path rootDir= FileSystem::createUniqueDirectory();
         std::vector<FileChange> detectedChanges;
         std::mutex mutex;
         std::condition_variable cond;
@@ -101,7 +101,7 @@ namespace
     }
 
     TEST(DirectoryWatcherWin32, suppressSpuriousChangeEvents) {
-        std::filesystem::path rootDir = FileSystem::createUniqueDirectory().string();
+        std::filesystem::path rootDir = FileSystem::createUniqueDirectory();
         std::vector<FileChange> detectedChanges;
         std::mutex mutex;
         std::condition_variable cond;
@@ -142,7 +142,7 @@ namespace
         std::filesystem::remove_all(rootDir);
     }
     TEST(DirectoryWatcherWin32, update_DirectoryTree) {
-        std::filesystem::path rootDir = FileSystem::createUniqueDirectory().string();
+        std::filesystem::path rootDir = FileSystem::createUniqueDirectory();
         std::vector<FileChange> detectedChanges;
         std::mutex mutex;
         std::condition_variable cond;
