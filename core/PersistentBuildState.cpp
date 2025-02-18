@@ -557,6 +557,11 @@ namespace YAM
     }
 
     void PersistentBuildState::store(Key key, std::shared_ptr<IPersistable> const& object) {
+        //std::stringstream ss;
+        //ss << "Insert  " << std::hex << key;
+        //LogRecord r(LogRecord::Aspect::Progress, ss.str());
+        //_context->addToLogBook(r);
+
         KeyCode code(key);
         auto tree = _typeToTree[code._type];
         auto& btreeVWriter = tree->insert(key);
@@ -597,6 +602,12 @@ namespace YAM
         }
         _keyToObject.erase(it);
         _objectToKey.erase(object.get());
+
+        //std::stringstream ss;
+        //ss << "Erase  " << std::hex << key;
+        //LogRecord r(LogRecord::Aspect::Progress, ss.str());
+        //_context->addToLogBook(r);
+
         KeyCode code(key);
         auto tree = _typeToTree[code._type];
         return tree->erase(key);
@@ -609,6 +620,12 @@ namespace YAM
         }
         _deletedObjectToKey.erase(it->second.get());
         _keyToDeletedObject.erase(it);
+
+        //std::stringstream ss;
+        //ss << "Erase  " << std::hex << key;
+        //LogRecord r(LogRecord::Aspect::Progress, ss.str());
+        //_context->addToLogBook(r);
+
         KeyCode code(key);
         auto tree = _typeToTree[code._type];
         return tree->erase(key);

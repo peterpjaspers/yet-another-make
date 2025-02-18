@@ -10,7 +10,6 @@
 #include <algorithm>
 #include <cassert>
 #include <utility>
-//#include <boost/filesystem.hpp>
 
 using namespace BTree;
 using namespace std;
@@ -20,6 +19,7 @@ using namespace std::filesystem;
 #define times(count) for(int i = 0; i < int(count); ++i)
 
 // ToDo: Validate = and [] operators on B-Tree
+// ToDo: Make use of filesystem library
 
 // Test program to measure B-Tree validity.
 // B-Tree validity is performed via a comprehensive set of use cases.
@@ -242,7 +242,7 @@ public:
                                 (page->persistent != 0) ||
                                 (page->recover != 0) ||
                                 (page->stored != 1) ||
-                                (page->capacity != BTreePageSize)
+                                (page->capacity != pageSize)
                             ) {
                                 log << "Free page " << index << " is corrupt : "
                                     << " modified " << page->modified
@@ -259,7 +259,7 @@ public:
                                 (page->persistent != 1) ||
                                 (page->recover != 0) ||
                                 (page->stored != 1) ||
-                                (page->capacity != BTreePageSize)
+                                (page->capacity != pageSize)
                             ) {
                                 log << "Persistentent page " << index << " is corrupt : "
                                     << " modified " << page->modified

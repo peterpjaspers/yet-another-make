@@ -31,7 +31,6 @@ namespace BTree {
         if (pool.persistent()) return PersistentTransaction;
         return InPlace;
     }
-    inline PageDepth TreeBase::depth() const { return( root->depth ); }
     void TreeBase::commit() const {
         if (stats) stats->commits += 1;
         static const char* signature = "void TreeBase::commit() const";
@@ -45,7 +44,6 @@ namespace BTree {
         PageLink link( pool.recover( (mode == PersistentTransaction), stats ) );
         recoverTree( link );
     }
-    inline PageLink TreeBase::rootLink() const { return root->page; }
     bool TreeBase::enableStatistics( const BTreeStatistics* initial ) const {
         if (stats != nullptr) return false;
         stats = new BTreeStatistics();

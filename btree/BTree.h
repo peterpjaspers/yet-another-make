@@ -15,8 +15,8 @@
 // ToDo: Provide merge function on entire B-Trees
 // ToDo: Avoid additional lookUp when growing (gain is marginal for page capacity large relative to key-value size)
 // ToDo: Try to reduce number of unsuccessful merge attempts (adapt thresholds dynamically?)
-// ToDo: Improve filling by distributing page content left and right during merge.
-// ToDo: Avoid growing by distributing page content left and/or right. Will probably also improve filling.
+// ToDo: Balance filling by distributing page content left and right during merge.
+// ToDo: Avoid growing by distributing full page content left and/or right. Should improve filling.
 
 namespace BTree {
 
@@ -401,10 +401,6 @@ namespace BTree {
             return iterator->end();
         }
 
-        inline void rootUpdate( PageHeader* page ) {
-            if (stats) stats->rootUpdates += 1;
-            root = page;
-        }
         // Empty the B-Tree
         // O(logN(n)) complexity.
         void clear() {
@@ -475,6 +471,10 @@ namespace BTree {
 
     private:
 
+        inline void rootUpdate( PageHeader* page ) {
+            if (stats) stats->rootUpdates += 1;
+            root = page;
+        }
         // Allocate a new Page from the page pool and (optionally) mark it as modified.
         template< class VT >
         inline Page<B<K>,B<VT>,A<K>,A<VT>>* allocatePage( const PageDepth depth, bool modify = true ) const {
@@ -543,7 +543,7 @@ namespace BTree {
                     } else {
                         node->replace( trail.index(), header.page, copy );
                     }
-                    recoverPage( node->header, (mode != MemoryTransaction) );
+                    recoverPage( node->header );
                     updateNodeTrail( trail, copy->header );
                 }
             }
@@ -579,7 +579,10 @@ namespace BTree {
         // Recover (persistent) src page if it differs from dst page;
         // i.e., dst is the copy-on-update version of src.
         inline void recoverUpdatedPage( const PageHeader& src, const PageHeader& dst ) {
-            if (src.page != dst.page) recoverPage( src, (mode != MemoryTransaction) );
+            if (src.page != dst.page) recoverPage( src );
+        }
+        inline void recoverPage( const PageHeader& page ) const {
+            recoverPage( page, (mode != MemoryTransaction) );
         }
         inline void recoverPage( const PageHeader& page, bool free ) const {
             if (stats && free) stats->pageFrees += 1;
@@ -671,8 +674,6 @@ namespace BTree {
             return found;
         }
 
-    private:
-    
         // Insert a key-link in a Node Page.
         // Recursively reorganize tree as required, this can fail if maximum tree depth is exceeded.
         template< class KT, std::enable_if_t<(S<KT>),bool> = true >
@@ -853,7 +854,7 @@ namespace BTree {
             } else {
                 removeAt<KT,PageLink>( trail.pop() );
             }
-            recoverPage( page->header, (mode != MemoryTransaction) );
+            recoverPage( page->header );
         }
 
         // Remove entry at trail.
@@ -1016,7 +1017,7 @@ namespace BTree {
                 removeAt<KT,PageLink>( srcTrail.pop() );
             }
             recoverUpdatedPage( dst->header, dstCopy->header );
-            recovePage( src->header, (mode != MemoryTransaction) );
+            recovePage( src->header );
         }
         // Append indexed content of source Page right to destination Page, adjusting split key
         // of destination page accordingly.
@@ -1040,7 +1041,7 @@ namespace BTree {
             dst->shiftLeft( *newDst, dst->size() );
             replaceSplitKey<KT,VT>( dstTrail, *srcCopy, index, newDst->header.page );
             srcCopy->erase( index );
-            recovePage( dst->header, (mode != MemoryTransaction) );
+            recovePage( dst->header );
             recoverUpdatedPage( src->header, srcCopy->header );
         }
         // Append entire content of src Page to dst Page, adjusting split key and
@@ -1064,7 +1065,7 @@ namespace BTree {
             insertSplit<VT>( *dst, dst->header.count, *ancestor, splitKeyIndex, *src, dstCopy );
             if (0 < src->header.count) src->shiftLeft( *dstCopy, src->header.count );
             recoverUpdatedPage( dst->header, dstCopy->header );
-            recoverPage( src->header, (mode != MemoryTransaction) );
+            recoverPage( src->header );
             // A non-empty ancestor node must exist as we just merged two pages
             // Remove link to recently merged page
             pruneBranch( srcTrail );
@@ -1111,7 +1112,7 @@ namespace BTree {
         void pruneBranch( Trail& trail ) {
             auto node = page<PageLink>( trail );
             while (node->size() == 0) {
-                recoverPage( node->header, (mode != MemoryTransaction) );
+                recoverPage( node->header );
                 node = page<PageLink>( trail.pop() );
             }
         }
@@ -1120,7 +1121,7 @@ namespace BTree {
             while ((root->count == 0) && (0 < root->depth)) {
                 auto rootPage = page<PageLink>( root );
                 rootUpdate( pool.reference( rootPage->split() ) );
-                recoverPage( rootPage->header, (mode != MemoryTransaction) );
+                recoverPage( rootPage->header );
             }
         }
         template< class KT, std::enable_if_t<(S<KT>),bool> = true >
@@ -1151,7 +1152,7 @@ namespace BTree {
                 const auto page = this->page<VT>( header );
                 Trail leftTrail( trail );
                 const auto leftPage = previousPage<VT>( leftTrail );
-                PageSize leftFill = (2 * page->header.capacity);
+                uint32_t leftFill = (2 * page->header.capacity);
                 if (leftPage) {
                     leftFill = leftPage->filling();
                     leftFill += page->indexedFilling( page->size() );
@@ -1160,14 +1161,14 @@ namespace BTree {
                 }
                 Trail rightTrail( trail );
                 const auto rightPage = nextPage<VT>( rightTrail );
-                PageSize rightFill = (2 * page->header.capacity);
+                uint32_t rightFill = (2 * page->header.capacity);
                 if (rightPage) {
                     rightFill = rightPage->indexedFilling( rightPage->size() );
                     PageSize rightSplitKeySize = splitKeySize<KT>( rightTrail );
                     if (0 < rightSplitKeySize) rightFill += (rightSplitKeySize + rightPage->splitValueSize());
                     rightFill += page->filling();
                 }
-                PageSize threshold = static_cast<PageSize>(HighPageThreshold * page->header.capacity);
+                uint32_t threshold = static_cast<PageSize>(HighPageThreshold * page->header.capacity);
                 if ((leftFill < rightFill) && (leftFill < threshold)) {
                     mergePage<KT,VT>( leftTrail, pageTrail ); // Shift content of this page to left page
                 } else if (rightFill < threshold) {
@@ -1195,7 +1196,7 @@ namespace BTree {
                     if (node->splitDefined()) freeAll( pool.access( node->split() ), recover );
                     for (PageIndex i = 0; i < node->size(); i++) freeAll( pool.access( node->value( i ) ), recover );
                 }
-                if (recover) recoverPage( page, (mode != MemoryTransaction) );
+                if (recover) recoverPage( page );
             }
         }
 
