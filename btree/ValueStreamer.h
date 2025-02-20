@@ -24,6 +24,33 @@ namespace BTree {
         return false;
     }
     template< class K >
+    inline bool operator>( const StreamKey<K>& lhs, const StreamKey<K>& rhs ) {
+        if ( lhs.key > rhs.key ) return true;
+        if ( rhs.key > lhs.key ) return false;
+        if ( lhs.sequence > rhs.sequence ) return true;
+        return false;
+    }
+    template< class K >
+    inline bool operator<=( const StreamKey<K>& lhs, const StreamKey<K>& rhs ) {
+        if ( lhs.key < rhs.key ) return true;
+        if ( rhs.key < lhs.key ) return false;
+        if ( lhs.sequence <= rhs.sequence ) return true;
+        return false;
+    }
+    template< class K >
+    inline bool operator>=( const StreamKey<K>& lhs, const StreamKey<K>& rhs ) {
+        if ( lhs.key > rhs.key ) return true;
+        if ( rhs.key > lhs.key ) return false;
+        if ( lhs.sequence >= rhs.sequence ) return true;
+        return false;
+    }
+    template< class K >
+    inline bool operator==( const StreamKey<K>& lhs, const StreamKey<K>& rhs ) {
+        if ( lhs.key != rhs.key ) return false;
+        if ( lhs.sequence == rhs.sequence ) return true;
+        return false;
+    }
+    template< class K >
     std::ostream & operator<<( std::ostream & stream, StreamKey<K> const & range ) {
         stream << "[ " << range.key << " : " << range.sequence << " ]";
         return stream;
@@ -93,7 +120,7 @@ namespace BTree {
         void stream( uint64_t& value ) { return( getValue<uint64_t>( value ) ); }
         bool eos() const { readBlock(); return( buffer.first == nullptr ); }
         ValueReader<K>& open( const K& key ) {
-            static const char* signature = "ValueReader& ValueReader<K>::open( const StreamKey<K>& key )";
+            static const char* signature( "ValueReader& ValueReader<K>::open( const StreamKey<K>& key )" );
             if (isOpen()) throw std::string( signature ) + " - Opening while reader open";
             streamKey = StreamKey<K>( key, 0 );
             readBlock();
@@ -101,12 +128,12 @@ namespace BTree {
         }
         bool isOpen() const { return( position != UINT16_MAX ); }
         void close() {
-            static const char* signature = "void ValueReader<K>::close()";
+            static const char* signature( "void ValueReader<K>::close()" );
             if (!isOpen()) throw std::string( signature ) + " - Closing closed reader";
             position = UINT16_MAX;
         }
         const K& key() const {
-            static const char* signature = "const K& ValueReader<K>::key()";
+            static const char* signature( "const K& ValueReader<K>::key()" );
             if (!isOpen()) throw std::string( signature ) + "' : Accesing key on closed stream";
             return streamKey.key;
         }
@@ -153,7 +180,7 @@ namespace BTree {
         void stream( uint64_t& value ) { return( putValue<uint64_t>( value ) ); }
         bool eos() const { return( false ); }
         ValueWriter<K>& open( const K& key ) {
-            static const char* signature = "ValueWriter& ValueWriter<K>open( const StreamKey<K>& key )";
+            static const char* signature( "ValueWriter& ValueWriter<K>open( const StreamKey<K>& key )" );
             if (isOpen()) throw std::string( signature ) + " - Opening while writer open";
             streamKey = StreamKey<K>( key, 0 );
             position = 0;
@@ -161,13 +188,13 @@ namespace BTree {
         }
         bool isOpen() const { return( position != UINT16_MAX ); }
         void close() {
-            static const char* signature = "void ValueWriter<K>close()";
+            static const char* signature( "void ValueWriter<K>close()" );
             if (!isOpen()) throw std::string( signature ) + " - Closing closed writer";
             writeBlock();
             position = UINT16_MAX;
         }
         const K& key() const {
-            static const char* signature = "const K& ValueWriter<K>::key()";
+            static const char* signature( "const K& ValueWriter<K>::key()" );
             if (!isOpen()) throw std::string( signature ) + " : Accesing key on closed stream";
             return streamKey.key;
         }

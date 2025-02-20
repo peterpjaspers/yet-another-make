@@ -3,6 +3,8 @@
 
 #include "PagePool.h"
 
+// ToDo: Change page pool file argument from string to path.
+
 namespace BTree {
 
     // A PersistentPagePool maintains a PagePool on a persistent backing store file.
@@ -47,6 +49,18 @@ namespace BTree {
         PageHeader* clean();
         // Determine the capacity of pages stored in the file path.
         static PageSize pageCapacity( const std::string path );
+        // Dertermine validity of persistent page pool file content.
+        // One or more errors may be returned.
+        typedef unsigned int ValidateError;
+        static const ValidateError NoErrors = (1 << 0);
+        static const ValidateError HeaderReadError = (1 << 0);
+        static const ValidateError PageReadError = (1 << 1);
+        static const ValidateError NoPages = (1 << 2);
+        static const ValidateError CapacityMismatch = (1 << 3);
+        static const ValidateError FileSizeError = (1 << 4);
+        static const ValidateError CorruptPage = (1 << 5);
+        static const ValidateError CorruptFreePage = (1 << 6);
+        static ValidateError validate( const std::string path );
     };
 
 } // namespace BTree

@@ -109,7 +109,7 @@ namespace BTree {
         }
 
         // Access a B-Tree in the Forest via its TreeIndex obtained when the B-Tree was planted.
-        // The key and value class template arguments (and optional key compae function) must match
+        // The key and value class template arguments (and optional key compare function) must match
         // those used to plant the B-Tree.
         template< class K, class V, std::enable_if_t<(S<K>),bool> = true >
         Tree<K,V>* access( TreeIndex index, typename Tree<K,V>::ScalarKeyCompare compareKey = defaultCompareScalar<B<K>> ) {

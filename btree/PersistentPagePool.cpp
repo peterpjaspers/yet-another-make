@@ -6,6 +6,8 @@
 // ToDo: Lazy read of pages from file.
 // ToDo: Swap pages to/from file to save memory based on usage count.
 // ToDo: Truncate file to largest persistent page during commit (to reduce size of persistent store).
+// ToDo: Coalesce and sort modified and free pages prior to write during commit.
+// ToDo: Sort pages to be recovered prior to read.
 
 using namespace std;
 
@@ -269,6 +271,54 @@ namespace BTree {
         file.close();
         return( capacity );
     };
+
+    PersistentPagePool::ValidateError PersistentPagePool::validate( const std::string path ) {
+        ValidateError errors( 0 );
+        auto pageSize( pageCapacity( path ) );
+        fstream file( path, ios::in | ios::binary );
+        if (file.good()) {
+            file.seekg( 0, file.end );
+            size_t fileSize = file.tellg();
+            size_t pageCount = ((fileSize - sizeof(PageHeader)) / pageSize);
+            if (pageCount == 0) errors |= NoPages;
+            PageHeader root;
+            file.seekg( 0, file.beg );
+            file.read( reinterpret_cast<char*>( &root ), sizeof(PageHeader) );
+            if (file.good()) {
+                if (root.capacity != pageSize) errors|= CapacityMismatch;
+                if (fileSize != ((pageCount * pageSize) + sizeof(PageHeader))) errors|= FileSizeError;
+                auto buffer = new uint8_t[ pageSize ];
+                for (size_t index = 0; index < pageCount; ++index) {
+                    file.read( reinterpret_cast<char*>( buffer ), pageSize );
+                    if (!file.good()) {
+                        errors |= PageReadError;
+                        break;
+                    }
+                    auto page = reinterpret_cast<PageHeader*>( buffer );
+                    if (page->free == 1) {
+                        if (
+                            (page->modified != 0) ||
+                            (page->persistent != 0) ||
+                            (page->recover != 0) ||
+                            (page->stored != 1) ||
+                            (page->capacity != pageSize)
+                        ) errors |= CorruptPage;
+                    } else {
+                        if (
+                            (page->modified != 0) ||
+                            (page->persistent != 1) ||
+                            (page->recover != 0) ||
+                            (page->stored != 1) ||
+                            (page->capacity != pageSize)
+                        ) errors |= CorruptFreePage;
+                    }
+                }
+                delete[] buffer;
+            } else errors |= HeaderReadError;
+            file.close();
+        }
+        return errors;
+    }
 
 
 } // namespace BTree

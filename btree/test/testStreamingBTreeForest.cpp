@@ -308,65 +308,11 @@ int main(int argc, char* argv[]) {
     auto capacity( PersistentPagePool::pageCapacity( bTreeFileName ) );
     PersistentPagePool pool( PersistentPagePool::pageCapacity( bTreeFileName ), bTreeFileName );
     Forest forest( pool );
-    // for ( auto index : forest ) {
-    //     StreamingTree<uint64_t>* tree( forest.accessStreamingTree<uint64_t>( index.first ) );
-    //     *log << endl << "Validating StreamingTree<uint64_t> " << index.first << "..." << endl;
-    //     validateStreamingTree<uint64_t>( *log, *tree );
-    // }
-    auto tree( forest.accessStreamingTree<uint64_t>( 12 ) );
-    tree->erase( 0xc00000000000296 );
-    tree->erase( 0xc0000000000000f );
-    tree->erase( 0xc00000000000010 );
-    tree->erase( 0xc00000000000011 );
-    tree->erase( 0x400000000000012 );
-    tree->erase( 0xc00000000000016 );
-    tree->erase( 0xc00000000000015 );
-    tree->erase( 0xc00000000000053 );
-    tree->erase( 0xc00000000000054 );
-    tree->erase( 0xc00000000000051 );
-    tree->erase( 0xc00000000000050 );
-    tree->erase( 0xc00000000000055 );
-    tree->erase( 0xc0000000000004d );
-    tree->erase( 0xc0000000000004e );
-    tree->erase( 0xc0000000000004c );
-    tree->erase( 0x50000000000004b );
-    tree->erase( 0xc00000000000090 );
-    tree->erase( 0xc000000000002dd );
-    tree->erase( 0xc00000000000091 );
-    tree->erase( 0xc00000000000285 );
-    tree->erase( 0xc000000000002cf );
-    tree->erase( 0xc000000000002d0 );
-    tree->erase( 0xc0000000000008c );
-    tree->erase( 0xc0000000000008f );
-    tree->erase( 0x50000000000008d );
-    tree->erase( 0xc0000000000008e );
-    tree->erase( 0xc000000000000b8 );
-    tree->erase( 0xc000000000000b7 );
-    tree->erase( 0xc000000000000d4 );
-    tree->erase( 0xc000000000000d6 );
-    tree->erase( 0xc0000000000032b );
-    tree->erase( 0xc00000000000291 );
-    tree->erase( 0x500000000000290 );
-    tree->erase( 0xc000000000000b1 );
-    tree->erase( 0xc000000000000ca );
-    tree->erase( 0xc000000000000cb );
-    tree->erase( 0xc000000000000cc );
-    tree->erase( 0xc0000000000011b );
-    tree->erase( 0xc0000000000011c );
-    tree->erase( 0xc0000000000011a );
-    tree->erase( 0x4000000000000db );
-    tree->erase( 0xc00000000000031 );
-    tree->erase( 0xc000000000000d1 );
-    tree->erase( 0xc000000000000d2 );
-    tree->erase( 0xc000000000000d3 );
-    tree->erase( 0xc000000000000d0 );
-    tree->erase( 0xc000000000000cf );
-    tree->erase( 0xc000000000000ce );
-    tree->erase( 0xc00000000000041 );
-    tree->erase( 0xc00000000000040 );
-    tree->erase( 0xc00000000000042 );
-    validateStreamingTree<uint64_t>( *log, *tree );
-    tree->erase( 0xc00000000000089 );
+    for ( auto index : forest ) {
+        StreamingTree<uint64_t>* tree( forest.accessStreamingTree<uint64_t>( index.first ) );
+        *log << endl << "Validating StreamingTree<uint64_t> " << index.first << "..." << endl;
+        validateStreamingTree<uint64_t>( *log, *tree );
+    }
 };
 
 // Type specfiers are defined through the syntax:

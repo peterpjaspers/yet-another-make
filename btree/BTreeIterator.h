@@ -5,9 +5,8 @@
 
 #include <iterator>
 
-// ToDo: Provide const TreeIterator (ConstTreeIterator). begin, end and find functions on Tree are const.
-// ToDo: provide assignment (and operator)
-// ToDo: avoid dynamic allocation of iterators in Tree::begin,end & find
+// ToDo: Provide const TreeIterator (ConstTreeIterator).
+// ToDo: provide assignment (and operator), simply assigns trail
 
 namespace BTree {
     
@@ -21,20 +20,19 @@ namespace BTree {
     //
     // In addition to standard bi-directional iterator operations, it provides
     // key() and value() to retrieve the key and value at particular iterator position.
+    // The type T depends on whether types K and V are variable length arrays defined through
+    // conditional templated instantiation by BTree. 
     //
     template< class K, class V, class T >
-    class TreeIterator : public std::iterator< std::bidirectional_iterator_tag, T, size_t, T*, T& > {
+    class TreeIterator {
     protected:
         Trail trail;
     public:
-        // Implement these typedefs to avoid deriving from class iterator (deprecated since C++17)
-        /*
-        typedef difference_type nullptr_t;
-        typedef value_type std::remove_cv_t<T>(T);
-        typedef pointer std::pair< const B<K>&, const V& >; // typedef depends on B and S on K and V
-        typedef reference std::pair< const B<K>&, const V& >; // typedef depends on B and S on K and V
-        typedef iterator_category std::bidirectional_iterator_tag;
-        */
+        typedef std::nullptr_t difference_type;
+        typedef std::remove_cv_t<T> value_type;
+        typedef value_type& pointer;
+        typedef value_type& reference;
+        typedef std::bidirectional_iterator_tag iterator_category;
         TreeIterator() = delete;
         TreeIterator( const TreeBase& tree ) : trail( tree ) {}
         TreeIterator( const TreeIterator& iterator ) : trail( iterator.trail ) {}
