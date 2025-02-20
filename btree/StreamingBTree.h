@@ -25,10 +25,13 @@ namespace BTree {
         template< class KT >
         friend std::ostream & operator<<( std::ostream & o, const StreamingTree<KT>& tree );
     public:
-        StreamingTree( PagePool& pool, UpdateMode mode = Auto ) :
+        StreamingTree( PagePool& pool, PageSize blockSize, UpdateMode mode = Auto ) :
             Tree<StreamKey<K>,uint8_t[]>( pool, compareStreamKey<K>, mode ),
             reader( *this ),
-            writer( *this, Page<StreamKey<K>,uint8_t,false,true>::optimalBlockSize( pool.pageCapacity() ) )
+            writer( *this, blockSize )
+        {};
+        inline StreamingTree( PagePool& pool, UpdateMode mode = Auto ) :
+            StreamingTree( pool, Page<StreamKey<K>,uint8_t,false,true>::optimalBlockSize( pool.pageCapacity() ), mode )
         {};
 
         // Normal B-Tree modifiers and access disabled for StreamingTree...

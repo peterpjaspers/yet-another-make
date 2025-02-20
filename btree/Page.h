@@ -499,10 +499,10 @@ namespace BTree {
         // Only valid for pages with fixed-size keys and variable-size values.
         template <bool AK = KA, bool AV = VA, std::enable_if_t<(!AK&&AV), bool> = true>
         static PageSize optimalBlockSize( PageSize capacity ) {
-            PageIndex minN = 8; // Minimum page entry count
+            PageIndex minN = 8; // Minimum page entry count; i.e., maximum of ~12% overhead due to block size
             PageSize pageOverhead = ( sizeof( PageHeader ) + ((minN + 1) * sizeof( PageSize )) + (minN * sizeof(K)) );
             PageSize blockSize = ((capacity - pageOverhead) / minN) - sizeof( PageSize );
-            PageSize targetBlockSize = (sizeof( PageSize ) * 50); // 2% overhead
+            PageSize targetBlockSize = (sizeof( PageSize ) * 51); // 2% overhead due to block size value.
             PageIndex targetN =
                 (capacity - sizeof( PageHeader ) - sizeof( PageSize ) - targetBlockSize) /
                 (targetBlockSize + sizeof( PageSize ) + sizeof( K ));
