@@ -106,7 +106,6 @@ namespace YAM
     void BuildServiceProtocol::send(std::shared_ptr<IStreamable> message)
     {
         BinaryValueWriter valueWriter(_ostream.get());
-        MessageToClientWriter msgWriter;
         SharedObjectWriter sharedMsgWriter(_msgSerializer.get());
         Streamer writer(&valueWriter, &sharedMsgWriter);
         writer.stream(message);
