@@ -11,14 +11,10 @@ namespace YAM
     class __declspec(dllexport) CollapsedFileChanges
     {
     public:
-        // Construct a set of file changes. See add() function for use of
-        // directory.
-        CollapsedFileChanges(std::filesystem::path const& directory);
+        // Construct a set of file changes.
+        CollapsedFileChanges();
 
-        std::filesystem::path const& directory() const;
-
-        // Add a change whose fileName/oldFileName is relative to directory
-        // given in constructor. Thread-safe.
+        // Add a change. Thread-safe.
         void add(FileChange const& change);
 
         // Return whether a change is contained for path.
@@ -37,7 +33,6 @@ namespace YAM
 
     public:
         std::mutex _mutex;
-        std::filesystem::path _directory;
         std::map<std::filesystem::path, FileChange> _changes;
     };
 }

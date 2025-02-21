@@ -17,7 +17,11 @@ namespace YAM
     {
         _impl = std::make_shared<FW_IMPL_CLASS>(_directory, _recursive, _changeHandler);
     }
-    
+
+    void DirectoryWatcher::start() {
+        _impl->start();
+    }
+
     void DirectoryWatcher::stop() {
         _impl->stop();
     }

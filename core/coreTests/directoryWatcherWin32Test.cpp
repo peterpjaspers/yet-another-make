@@ -50,7 +50,7 @@ namespace
         std::condition_variable cond;
         DirectoryTree testTree(rootDir, 3, RegexSet());
 
-        DirectoryWatcherWin32 watcher(
+        auto watcher = std::make_shared<DirectoryWatcherWin32>(
             rootDir, true,
             Delegate<void, FileChange const&>::CreateLambda([&](FileChange const& c)
                 {
@@ -59,6 +59,7 @@ namespace
                     cond.notify_one();
                 })
         );
+        watcher->start();
 
         // Now iterate some directories in testTree.
         // Although no changes are expected there are changes for three directories:
@@ -96,7 +97,7 @@ namespace
         EXPECT_EQ(0, detectedChanges.size());
 
         lock.unlock();
-        watcher.stop();
+        watcher->stop();
         std::filesystem::remove_all(rootDir);
     }
 
@@ -107,7 +108,7 @@ namespace
         std::condition_variable cond;
         DirectoryTree testTree(rootDir, 3, RegexSet());
 
-        DirectoryWatcherWin32 watcher(
+        auto watcher = std::make_shared<DirectoryWatcherWin32>(
             rootDir, true,
             Delegate<void, FileChange const&>::CreateLambda([&](FileChange const& c)
                 {
@@ -117,6 +118,7 @@ namespace
                 }),
             true
         );
+        watcher->start();
 
         // Now iterate some directories in testTree.
         // No spurious events should be notified.
@@ -138,7 +140,7 @@ namespace
         EXPECT_EQ(0, detectedChanges.size());
 
         lock.unlock();
-        watcher.stop();
+        watcher->stop();
         std::filesystem::remove_all(rootDir);
     }
     TEST(DirectoryWatcherWin32, update_DirectoryTree) {
@@ -150,7 +152,7 @@ namespace
         DirectoryTree* sd2 = testTree.getSubDirs()[1];
         DirectoryTree* sd2_sd3 = sd2->getSubDirs()[2];
 
-        DirectoryWatcherWin32 watcher(
+        auto watcher = std::make_shared<DirectoryWatcherWin32>(
             rootDir, true,
             Delegate<void, FileChange const&>::CreateLambda([&](FileChange const& c)
                 {
@@ -159,39 +161,40 @@ namespace
                     cond.notify_one();
                 })
         );
+        watcher->start();
 
         // Update file system and create expected changes
         testTree.addFile();
-        FileChange c1a{ FA::Added, path("File4") };
+        FileChange c1a{ FA::Added, path(rootDir / "File4") };
 
         sd2->addFile();
-        FileChange c2a{ FA::Modified, path("SubDir2") };
-        FileChange c2b{ FA::Added, path("SubDir2\\File4") };
+        FileChange c2a{ FA::Modified, path(rootDir / "SubDir2") };
+        FileChange c2b{ FA::Added, path(rootDir / "SubDir2\\File4") };
         
         sd2_sd3->addDirectory();
-        FileChange c3a{ FA::Modified, path("SubDir2\\SubDir3") };
-        FileChange c3b{ FA::Added, path("SubDir2\\SubDir3\\SubDir4") };
-        FileChange c3c{ FA::Modified, path("SubDir2\\SubDir3\\SubDir4") };
-        FileChange c3d{ FA::Added, path("SubDir2\\SubDir3\\SubDir4\\File1") };
-        FileChange c3e{ FA::Added, path("SubDir2\\SubDir3\\SubDir4\\File2") };
-        FileChange c3f{ FA::Added, path("SubDir2\\SubDir3\\SubDir4\\File3") };
-        FileChange c3g{ FA::Added, path("SubDir2\\SubDir3\\SubDir4\\SubDir1") };
-        FileChange c3h{ FA::Added, path("SubDir2\\SubDir3\\SubDir4\\SubDir2") };
-        FileChange c3i{ FA::Added, path("SubDir2\\SubDir3\\SubDir4\\SubDir3") };
+        FileChange c3a{ FA::Modified, path(rootDir / "SubDir2\\SubDir3") };
+        FileChange c3b{ FA::Added, path(rootDir / "SubDir2\\SubDir3\\SubDir4") };
+        FileChange c3c{ FA::Modified, path(rootDir / "SubDir2\\SubDir3\\SubDir4") };
+        FileChange c3d{ FA::Added, path(rootDir / "SubDir2\\SubDir3\\SubDir4\\File1") };
+        FileChange c3e{ FA::Added, path(rootDir / "SubDir2\\SubDir3\\SubDir4\\File2") };
+        FileChange c3f{ FA::Added, path(rootDir / "SubDir2\\SubDir3\\SubDir4\\File3") };
+        FileChange c3g{ FA::Added, path(rootDir / "SubDir2\\SubDir3\\SubDir4\\SubDir1") };
+        FileChange c3h{ FA::Added, path(rootDir / "SubDir2\\SubDir3\\SubDir4\\SubDir2") };
+        FileChange c3i{ FA::Added, path(rootDir / "SubDir2\\SubDir3\\SubDir4\\SubDir3") };
 
         sd2_sd3->addFile();
-        FileChange c4a{ FA::Added, path("SubDir2\\SubDir3\\File4") };
-        FileChange c4b{ FA::Modified, path("SubDir2\\SubDir3") };
+        FileChange c4a{ FA::Added, path(rootDir / "SubDir2\\SubDir3\\File4") };
+        FileChange c4b{ FA::Modified, path(rootDir / "SubDir2\\SubDir3") };
 
         sd2_sd3->modifyFile("File4");
-        FileChange c5a{ FA::Modified, path("SubDir2\\SubDir3\\File4") };
+        FileChange c5a{ FA::Modified, path(rootDir / "SubDir2\\SubDir3\\File4") };
 
         sd2_sd3->renameFile("File4", "File5");
-        FileChange c6a{ FA::Renamed, path("SubDir2\\SubDir3\\File5"), path("SubDir2\\SubDir3\\File4") };
+        FileChange c6a{ FA::Renamed, path(rootDir / "SubDir2\\SubDir3\\File5"), path(rootDir / "SubDir2\\SubDir3\\File4") };
 
         sd2_sd3->deleteFile("File1");
-        FileChange c7a{ FA::Removed, path("SubDir2\\SubDir3\\File1") };
-        FileChange c7b{ FA::Modified, path("SubDir2\\SubDir3\\File1") };
+        FileChange c7a{ FA::Removed, path(rootDir / "SubDir2\\SubDir3\\File1") };
+        FileChange c7b{ FA::Modified, path(rootDir / "SubDir2\\SubDir3\\File1") };
         
         auto deadline = std::chrono::system_clock::now() + std::chrono::seconds(5);       
         std::vector<FileChange>& dcs = detectedChanges;
@@ -231,7 +234,7 @@ namespace
         EXPECT_TRUE(contains(dcs, c7a) || contains(dcs, c7b));
 
         lock.unlock();
-        watcher.stop();
+        watcher->stop();
         std::filesystem::remove_all(rootDir);
     }
 }

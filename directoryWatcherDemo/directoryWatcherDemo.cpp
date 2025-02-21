@@ -6,8 +6,6 @@ using namespace YAM;
 
 namespace 
 {
-    std::filesystem::path watchedDirectory("D:\\Peter");
-
     std::string toString(FileChange::Action action) {
         std::string actionStr("Bad action");
         if (action == FileChange::Action::Added) actionStr = "Added";
@@ -20,9 +18,9 @@ namespace
 
      void handle(FileChange const& change) {
          std::string action = toString(change.action);
-         std::cout << action << " file=" << watchedDirectory / change.fileName;
+         std::cout << action << " file=" << change.fileName;
          if (change.action == FileChange::Action::Renamed) {
-             std::cout << " oldFile=" << watchedDirectory / change.oldFileName;
+             std::cout << " oldFile=" << change.oldFileName;
          }
          std::cout <<  std::endl;
     }
@@ -30,12 +28,22 @@ namespace
 }
 
 int main(int argc, char** argv) {
-    if (argc > 1) {
-        watchedDirectory = std::filesystem::path(argv[1]);
+    if (argc < 2) {
+        std::cout << "Usage: directoryWatcherDemo directoriesToWatch" << std::endl;
     }
-    std::cout << "watching " << watchedDirectory << std::endl;
     auto handler = Delegate<void, FileChange const&>::CreateStatic(handle);
-    DirectoryWatcher watcher(watchedDirectory, true, handler);
+    std::vector<DirectoryWatcher*> watchers;
+    for (int a = 1; a < argc; ++a) {
+        std::filesystem::path dir(argv[a]);
+        auto watcher = new DirectoryWatcher(dir, true, handler);
+        watchers.push_back(watcher);
+        watcher->start();
+        std::cout << "Watching " << dir << std::endl;
+
+    }
     std::string input;    
     while (input.empty()) std::cin >> input;
+    for (auto watcher : watchers) {
+        watcher->stop();
+    }
 }

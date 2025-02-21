@@ -8,14 +8,21 @@
 #include <thread>
 #include <mutex>
 #include <chrono>
+#include <memory>
 #include <map>
 #include <condition_variable>
 
 namespace YAM
 {
-    class __declspec(dllexport) DirectoryWatcherWin32 : public IDirectoryWatcher
+    class DirectoriesWatcherWin32;
+
+    class __declspec(dllexport) DirectoryWatcherWin32 : 
+        public IDirectoryWatcher,
+        public std::enable_shared_from_this<DirectoryWatcherWin32>
     {
     public:
+        friend class DirectoriesWatcherWin32;
+
         // Construct watcher that watches changes in given 'directory'.
         // Call 'changeHandler' when a change is detected.
         // 
@@ -32,8 +39,10 @@ namespace YAM
             bool suppressSpuriousEvents = false);
 
         ~DirectoryWatcherWin32(); 
-        
+
+        void start() override;
         void stop() override;
+
 
     private:
         void queueReadChangeRequest();
@@ -48,23 +57,19 @@ namespace YAM
             std::chrono::time_point<std::chrono::utc_clock>& lwt);
         void removeFromDirUpdateTimes(std::filesystem::path const& absPath);
 
-        void run(); // runs in _thread
-
-        void handleNotification(
-            PFILE_NOTIFY_INFORMATION info,
-            FileChange& change, 
-            FileChange& rename);
+        HANDLE dirHandle() { return _dirHandle; }
+        OVERLAPPED* overlapped() { return &_overlapped; }
+        void processNotifications(DWORD nrBytesReceived);
+        void processNotification(PFILE_NOTIFY_INFORMATION info);
 
         HANDLE _dirHandle;
-        DWORD _changeBufferSize;
+        DWORD _changeBufferSize; // in nr of DWORDs
         std::unique_ptr<uint8_t> _changeBuffer;
         OVERLAPPED _overlapped;
 
         bool _suppressSpuriousEvents;
-        std::map<std::filesystem::path, std::chrono::time_point<std::chrono::utc_clock>> _dirUpdateTimes;
-
-        std::atomic<bool> _stop;
-        std::unique_ptr<std::thread> _watcher;
+        std::map<std::filesystem::path, std::chrono::time_point<std::chrono::utc_clock>> _dirUpdateTimes; 
+        FileChange _rename;
     };
 }
 

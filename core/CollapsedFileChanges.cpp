@@ -119,13 +119,7 @@ namespace
 
 namespace YAM
 {
-    CollapsedFileChanges::CollapsedFileChanges(std::filesystem::path const& directory)
-        : _directory(directory)
-    {}
-
-    std::filesystem::path const& CollapsedFileChanges::directory() const {
-        return _directory;
-    }
+    CollapsedFileChanges::CollapsedFileChanges() {}
 
     void CollapsedFileChanges::add(FileChange const& change) {
         std::lock_guard<std::mutex> lock(_mutex);
@@ -133,12 +127,7 @@ namespace YAM
             _changes.clear();
             _changes.insert({ overflowPath, change });
         } else if (!_changes.contains(overflowPath)) {
-            FileChange absChange = change;
-            absChange.fileName = _directory / change.fileName;
-            if (change.action == FileChange::Action::Renamed) {
-                absChange.oldFileName = _directory / absChange.oldFileName;
-            }
-            addChange(_changes, absChange);
+            addChange(_changes, change);
         }
     }
 

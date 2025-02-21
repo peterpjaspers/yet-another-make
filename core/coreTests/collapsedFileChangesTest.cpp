@@ -18,21 +18,21 @@ namespace
     std::filesystem::path absFile1(rootDir / file1);
     std::filesystem::path absFile2(rootDir / file2);
 
-    FileChange add1{ Action::Added, file1, std::filesystem::path(), lwt() + offset };
-    FileChange add2{ Action::Added, file2, std::filesystem::path(), lwt() + 2*offset };
-    FileChange modify1{ Action::Modified, file1, std::filesystem::path(), lwt() + 3*offset };
-    FileChange modify2{ Action::Modified, file2, std::filesystem::path(), lwt() + 4*offset };
-    FileChange remove1{ Action::Removed, file1, std::filesystem::path(), lwt() + 5*offset };
-    FileChange remove2{ Action::Removed, file2, std::filesystem::path(), lwt() + 5*offset };
-    FileChange rename1to2{ Action::Renamed, file2, file1, lwt() + 7*offset };
-    FileChange rename2to1{ Action::Renamed, file1, file2, lwt() + 8*offset };
+    FileChange add1{ Action::Added, absFile1, std::filesystem::path(), lwt() + offset };
+    FileChange add2{ Action::Added, absFile2, std::filesystem::path(), lwt() + 2*offset };
+    FileChange modify1{ Action::Modified, absFile1, std::filesystem::path(), lwt() + 3*offset };
+    FileChange modify2{ Action::Modified, absFile2, std::filesystem::path(), lwt() + 4*offset };
+    FileChange remove1{ Action::Removed, absFile1, std::filesystem::path(), lwt() + 5*offset };
+    FileChange remove2{ Action::Removed, absFile2, std::filesystem::path(), lwt() + 5*offset };
+    FileChange rename1to2{ Action::Renamed, absFile2, absFile1, lwt() + 7*offset };
+    FileChange rename2to1{ Action::Renamed, absFile1, absFile2, lwt() + 8*offset };
 
     class Helper
     {
     public:
         CollapsedFileChanges changes;
 
-        Helper() : changes(rootDir) {}
+        Helper() {}
 
         FileChange find(std::filesystem::path const& path) {
             auto cmap = changes.changes();

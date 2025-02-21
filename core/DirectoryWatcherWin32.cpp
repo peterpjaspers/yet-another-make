@@ -1,9 +1,16 @@
 #include "DirectoryWatcherWin32.h"
 
 #include <string>
+#include <map>
+#include <filesystem>
+#include <mutex>
+#include <thread>
+#include <memory>
 
 namespace
 {
+    using namespace YAM;
+
     HANDLE createHandle(std::filesystem::path const& directory) {
         std::wstring path = directory.wstring();
         LPCWSTR dirPath = static_cast<LPCWSTR>(path.c_str());
@@ -30,6 +37,154 @@ namespace
 
 namespace YAM
 {
+    class DirectoriesWatcherWin32
+    {
+    private:
+        // completionKey->watcher, where completionKey==watcher.get()
+        std::map<ULONG_PTR, std::shared_ptr<DirectoryWatcherWin32>> _watchers;
+        std::map<ULONG_PTR, std::shared_ptr<DirectoryWatcherWin32>> _removedWatchers;
+        std::mutex _watchersMutex;
+        HANDLE _iocp; // The i/o completion port
+        std::thread _iocpReader;
+
+        void checkDuplicate(std::shared_ptr<DirectoryWatcherWin32> const& watcher) {
+            for (auto const& pair : _watchers) {
+                if (
+                    (pair.second == watcher)
+                    || (pair.second->directory() == watcher->directory())
+                ) {
+                    throw std::runtime_error("attempt to add duplicate watcher");
+                }
+            }
+        }
+
+        void processNotification(DWORD nBytes, ULONG_PTR completionKey) {
+            DirectoryWatcherWin32* watcher = reinterpret_cast<DirectoryWatcherWin32*>(completionKey);
+            std::lock_guard<std::mutex> lock(_watchersMutex); 
+            if (_removedWatchers.contains(completionKey)) {
+                if (nBytes == 0) {
+                    // Buffer overflow or closing notification of a removed watcher.
+                    _removedWatchers.erase(completionKey);
+                } else {
+                    // ignore notification
+                }
+            } else if (_watchers.contains(completionKey)) {
+                watcher->processNotifications(nBytes);
+            } else {
+                throw std::runtime_error("Logic error");
+            }
+        }
+
+        bool dequeueNotifications() {
+            DWORD nBytes = 0;
+            OVERLAPPED* ov = nullptr;
+            ULONG_PTR completionKey = 0;
+            ULONG_PTR stopKey = reinterpret_cast<ULONG_PTR>(this);
+            BOOL success = true;
+            bool stopped = false;
+            while (
+                !stopped &&
+                 (success = GetQueuedCompletionStatus(_iocp, &nBytes, &completionKey, &ov, INFINITE))
+            ) {
+                if (completionKey == stopKey) {
+                    stopped = true;
+                } else {
+                    processNotification(nBytes, completionKey);
+                }
+            }
+            if (!success) {
+                std::error_code ec(GetLastError(), std::system_category());
+                throw std::system_error(ec, "GetQueuedCompletionStatus failed");
+            }
+            return success;
+        }
+
+        // Consume closing notifications of removed watchers.
+        void dequeueClosingNotifications() {
+            DWORD nBytes = 0;
+            OVERLAPPED* ov = nullptr;
+            ULONG_PTR completionKey = 0;
+            std::lock_guard<std::mutex> lock(_watchersMutex);
+            while (
+                !_removedWatchers.empty()
+                && GetQueuedCompletionStatus(_iocp, &nBytes, &completionKey, &ov, INFINITE)
+            ) {
+                if (nBytes == 0) {
+                    _removedWatchers.erase(completionKey);
+                }
+            }
+        }
+
+    public:
+        DirectoriesWatcherWin32()
+        {
+            _iocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1);
+            if (_iocp == NULL) {
+                std::error_code ec(GetLastError(), std::system_category());
+                throw std::system_error(ec, "DirectoriesWatcher failed to create i/o completion port");
+            }
+            _iocpReader = std::thread([this]() { iocpReader(); });
+        }
+
+        ~DirectoriesWatcherWin32() {
+            if (_iocp != INVALID_HANDLE_VALUE) {
+                {
+                    std::lock_guard<std::mutex> lock(_watchersMutex);
+                    for (auto& pair : _watchers) pair.second->stop();
+                    // send notification that will stop the iocp reader thread
+                    PostQueuedCompletionStatus(_iocp, 0, reinterpret_cast<ULONG_PTR>(this), nullptr);
+                }
+                _iocpReader.join();
+                CloseHandle(_iocp);
+                _iocp = INVALID_HANDLE_VALUE;
+            }
+        }
+
+        void add(std::shared_ptr<DirectoryWatcherWin32> const& watcher) {
+            std::lock_guard<std::mutex> lock(_watchersMutex);
+            checkDuplicate(watcher);
+            ULONG_PTR completionKey = reinterpret_cast<ULONG_PTR>(watcher.get());
+            _watchers.insert({ completionKey, watcher });
+            if (!CreateIoCompletionPort(watcher->dirHandle(), _iocp, completionKey, 1)) {
+                std::error_code ec(GetLastError(), std::system_category());
+                throw std::system_error(ec, "Failed to add directory handle to i/o completion port");
+            }
+        }
+
+        void remove(std::shared_ptr<DirectoryWatcherWin32> const& watcher) {
+            // Before a watcher removes itself it will close its directory
+            // handle. This will result in ReadDirectoryChanges to send a 
+            // closing notification. The notification buffer of the removed
+            // watcher must therefore remain allocated until this closing 
+            // notification has been received. To prevent the watcher from
+            // going out-of-scope (and being destructed), the watcher is
+            // kept in _removedWatchers until its closing notification is
+            // received.
+            std::lock_guard<std::mutex> lock(_watchersMutex);
+            ULONG_PTR completionKey = reinterpret_cast<ULONG_PTR>(watcher.get());
+            auto it = _watchers.find(completionKey);
+            if (it == _watchers.end()) throw std::runtime_error("Unknown watcher");
+            auto result = _removedWatchers.insert({ completionKey, watcher });
+            if (!result.second) throw std::runtime_error("Failed to remove watcher");
+            _watchers.erase(it);
+        }
+
+        void iocpReader() {
+            bool success = dequeueNotifications();
+            if (success) {
+               // dequeueClosingNotifications();
+            }
+        }
+    };
+}
+
+namespace
+{
+    DirectoriesWatcherWin32 watcher;
+}
+
+namespace YAM
+{
     DirectoryWatcherWin32::DirectoryWatcherWin32(
         std::filesystem::path const& directory,
         bool recursive,
@@ -37,10 +192,11 @@ namespace YAM
         bool suppressSpuriousEvents)
         : IDirectoryWatcher(directory, recursive, changeHandler)
         , _dirHandle(createHandle(directory))
-        , _changeBufferSize(32*1024)
-        , _changeBuffer(new uint8_t[_changeBufferSize])
+        , _changeBufferSize(32*1024/sizeof(DWORD))
+        // allocate DWORDs to get a DWORD-aligned buffer
+        , _changeBuffer(reinterpret_cast<uint8_t*>(new DWORD[_changeBufferSize]))
         , _suppressSpuriousEvents(suppressSpuriousEvents)
-        , _stop(false)
+        , _rename {FileChange::Action::None }
     {
         if (_dirHandle == INVALID_HANDLE_VALUE) throw std::exception("Dir handle creation failed");
         _overlapped.hEvent = CreateEvent(NULL, FALSE, 0, NULL);
@@ -48,23 +204,24 @@ namespace YAM
         if (_suppressSpuriousEvents) {
             fillDirUpdateTimes(_directory, readLastWriteTime(_directory));
         }
-
         queueReadChangeRequest();
-        _watcher = std::make_unique<std::thread>(&DirectoryWatcherWin32::run, this);
     }
 
     DirectoryWatcherWin32::~DirectoryWatcherWin32() {
         stop();
     }
 
+
+    void DirectoryWatcherWin32::start() {
+        watcher.add(shared_from_this());
+    }
+
     void DirectoryWatcherWin32::stop() {
-        if (!_stop) {
-            _stop = true;
-            SetEvent(_overlapped.hEvent); // to wakeup WaitForSingleObject
-            _watcher->join();
-            CancelIo(_dirHandle);
-            CloseHandle(_overlapped.hEvent);
-            CloseHandle(_dirHandle);
+        if (_dirHandle != INVALID_HANDLE_VALUE) {
+            auto handle = _dirHandle;
+            _dirHandle = INVALID_HANDLE_VALUE;
+            watcher.remove(shared_from_this());
+            CloseHandle(handle);
         }
     }
 
@@ -115,64 +272,58 @@ namespace YAM
     }
 
     void DirectoryWatcherWin32::queueReadChangeRequest() {
-        BOOL success = ReadDirectoryChangesW(
-            _dirHandle, _changeBuffer.get(), _changeBufferSize, TRUE,
-            FILE_NOTIFY_CHANGE_FILE_NAME |
-            FILE_NOTIFY_CHANGE_DIR_NAME |
-            FILE_NOTIFY_CHANGE_LAST_WRITE,
-            NULL, &_overlapped, NULL);
-        if (!success && !_stop) {
-            throw std::exception("ReadDirectoryChangesW failed");
-        }
-    }
-
-    void DirectoryWatcherWin32::run() {
-        FileChange rename{ FileChange::Action::None };
-        FileChange change{ FileChange::Action::None };
-        while (!_stop) {
-            DWORD result = WaitForSingleObject(_overlapped.hEvent, INFINITE);
-            if (!_stop && result == WAIT_OBJECT_0) {
-                DWORD bytesTransferred = 0;
-                GetOverlappedResult(_dirHandle, &_overlapped, &bytesTransferred, FALSE);
-                if (bytesTransferred == 0) {
-                    FileChange overflow;
-                    overflow.action = FileChange::Action::Overflow;
-                    _changeHandler.Execute(overflow);
-                } else {
-                    std::size_t offset = 0;
-                    PFILE_NOTIFY_INFORMATION info;
-                    do {
-                        info = reinterpret_cast<PFILE_NOTIFY_INFORMATION>(&_changeBuffer.get()[offset]);
-                        handleNotification(info, change, rename);
-                        offset += info->NextEntryOffset; 
-                    } while (info->NextEntryOffset != 0);
-                }
-                queueReadChangeRequest();
+        if (_dirHandle != INVALID_HANDLE_VALUE) {
+            BOOL success = ReadDirectoryChangesW(
+                _dirHandle, _changeBuffer.get(), _changeBufferSize * sizeof(DWORD), TRUE,
+                FILE_NOTIFY_CHANGE_FILE_NAME |
+                FILE_NOTIFY_CHANGE_DIR_NAME |
+                FILE_NOTIFY_CHANGE_LAST_WRITE,
+                NULL, &_overlapped, NULL);
+            if (!success) {
+                std::error_code ec(GetLastError(), std::system_category());
+                throw std::system_error(ec, "ReadDirectoryChangesW failed");
             }
         }
     }
 
-    void DirectoryWatcherWin32::handleNotification(
-        PFILE_NOTIFY_INFORMATION info,
-        YAM::FileChange& change, 
-        YAM::FileChange& rename)
+    void DirectoryWatcherWin32::processNotifications(DWORD nrBytesReceived) {
+        if (nrBytesReceived == 0) {
+            FileChange overflow;
+            overflow.action = FileChange::Action::Overflow;
+            _changeHandler.Execute(overflow);
+        } else {
+            std::size_t offset = 0;
+            PFILE_NOTIFY_INFORMATION info;
+            do {
+                info = reinterpret_cast<PFILE_NOTIFY_INFORMATION>(&_changeBuffer.get()[offset]);
+                processNotification(info);
+                offset += info->NextEntryOffset;
+            } while (info->NextEntryOffset != 0);
+        }
+        queueReadChangeRequest();
+    }
+
+    void DirectoryWatcherWin32::processNotification(PFILE_NOTIFY_INFORMATION info)
     {
         std::wstring fileNameStr(info->FileName, info->FileNameLength / sizeof(wchar_t));
-        std::filesystem::path fileName(fileNameStr);
-        std::filesystem::path absFileName = _directory / fileName;
+        std::filesystem::path fileName(_directory / fileNameStr);
         std::error_code ec;
+        std::filesystem::path absFileName = std::filesystem::canonical(fileName, ec);
+        if (ec) absFileName = fileName;
+
+        YAM::FileChange change{ FileChange::Action::None };
         change.lastWriteTime = readLastWriteTime(absFileName);
         if (info->Action == FILE_ACTION_ADDED) {
             change.action = FileChange::Action::Added;
-            change.fileName = fileName;
+            change.fileName = absFileName;
             if (_suppressSpuriousEvents) registerSpuriousModifiedEvent(absFileName, change.lastWriteTime);
         } else if (info->Action == FILE_ACTION_REMOVED) {
             change.action = FileChange::Action::Removed;
-            change.fileName = fileName;
+            change.fileName = absFileName;
             if (_suppressSpuriousEvents) removeFromDirUpdateTimes(absFileName);
         } else if (info->Action == FILE_ACTION_MODIFIED) {
             change.action = FileChange::Action::Modified;
-            change.fileName = fileName;
+            change.fileName = absFileName;
             if (
                 _suppressSpuriousEvents &&
                 registerSpuriousModifiedEvent(absFileName, change.lastWriteTime)
@@ -180,23 +331,23 @@ namespace YAM
                 change.action = FileChange::Action::None;
             }
         } else if (info->Action == FILE_ACTION_RENAMED_OLD_NAME) {
-            rename.action = FileChange::Action::Renamed;
-            rename.oldFileName = fileName;
-            if (_suppressSpuriousEvents) removeFromDirUpdateTimes(_directory / fileName);
+            _rename.action = FileChange::Action::Renamed;
+            _rename.oldFileName = absFileName;
+            if (_suppressSpuriousEvents) removeFromDirUpdateTimes(absFileName);
         } else if (info->Action == FILE_ACTION_RENAMED_NEW_NAME) {
-            rename.action = FileChange::Action::Renamed;
-            rename.fileName = fileName;
+            _rename.action = FileChange::Action::Renamed;
+            _rename.fileName = absFileName;
             if (_suppressSpuriousEvents) registerSpuriousModifiedEvent(absFileName, change.lastWriteTime);
         }
         if (
-            rename.action == FileChange::Action::Renamed
-            && !rename.fileName.empty()
-            && !rename.oldFileName.empty()
+            _rename.action == FileChange::Action::Renamed
+            && !_rename.fileName.empty()
+            && !_rename.oldFileName.empty()
         ) {
-            _changeHandler.Execute(rename);
-            rename.action = FileChange::Action::None;
-            rename.fileName = "";
-            rename.oldFileName = "";
+            _changeHandler.Execute(_rename);
+            _rename.action = FileChange::Action::None;
+            _rename.fileName = "";
+            _rename.oldFileName = "";
         } else if (change.action != FileChange::Action::None) {
             _changeHandler.Execute(change);
             change.action = FileChange::Action::None;

@@ -45,7 +45,7 @@ namespace YAM
         ExecutionContext* context)
         : _context(context)
         , _repository(nullptr)
-        , _changes(directory)
+        , _directory(directory)
         , _watcher(std::make_shared<DirectoryWatcher>(
             directory,
             true,
@@ -54,6 +54,7 @@ namespace YAM
         FileChange overflow;
         overflow.action = FileChange::Overflow;
         _addChange(overflow);
+        _watcher->start();
     }
 
     FileRepositoryWatcher::FileRepositoryWatcher(
@@ -136,7 +137,7 @@ namespace YAM
 
     void FileRepositoryWatcher::_handleOverflow() {
         std::vector<std::shared_ptr<Node>> nodesInRepo;
-        std::filesystem::path const& repoDir = _changes.directory();
+        std::filesystem::path const& repoDir = _directory;
         auto repo = _repository;
         auto includeNode = Delegate<bool, std::shared_ptr<Node> const&>::CreateLambda(
             [&repoDir, repo](std::shared_ptr<Node> const& node) {

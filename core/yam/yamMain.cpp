@@ -287,7 +287,7 @@ int main(int argc, char* argv[]) {
 
     // TODO: remove before release.
     std::vector<LogRecord::Aspect> logAspects = logBook.aspects();
-    //logAspects.push_back(LogRecord::BuildStateUpdate);
+    logAspects.push_back(LogRecord::BuildStateUpdate);
     logAspects.push_back(LogRecord::IgnoredOutputFiles);
     logBook.aspects(logAspects);
     options._logAspects = logAspects;

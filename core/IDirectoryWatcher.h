@@ -33,7 +33,7 @@ namespace YAM
             Overflow = 5  // lost track of changes due to buffer overflow
         };
         Action action;
-        // The file names are relative to the watched directory.
+        // The file names are absolute canonical paths.
         std::filesystem::path fileName;
         std::filesystem::path oldFileName; // only applicable when Renamed
         std::chrono::time_point<std::chrono::utc_clock> lastWriteTime; // of fileName
@@ -46,8 +46,8 @@ namespace YAM
     class __declspec(dllexport) IDirectoryWatcher
     {
     public:
-        // Create a watcher that monitors the given directory in a
-        // watcher thread that is started/controlled by the watcher.
+        // Create a watcher that, once started, monitors the given directory in
+        // a watcher thread that is started/controlled by the watcher.
         // Execute the given delegate when a change is detected.
         // File names in FileChanges are relative to the watched directory.
         // Take care: execution is done in watcher thread context.
@@ -64,6 +64,8 @@ namespace YAM
         std::filesystem::path const& directory() const { return _directory; }
         bool recursive() const { return _recursive; }
 
+        // start watching the directory
+        virtual void start() = 0;
         // stop watching the directory
         virtual void stop() = 0;
 

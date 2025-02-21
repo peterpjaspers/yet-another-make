@@ -88,6 +88,7 @@ namespace YAM
 
         ExecutionContext* _context;
         FileRepositoryNode* _repository;
+        std::filesystem::path _directory;
         CollapsedFileChanges _changes;
         std::shared_ptr<IDirectoryWatcher> _watcher;
     };

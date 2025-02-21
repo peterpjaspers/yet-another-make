@@ -17,6 +17,7 @@ namespace YAM
             bool recursive,
             Delegate<void, FileChange const&> const& changeHandler);
 
+        void start() override;
         void stop() override;
 
     private:
