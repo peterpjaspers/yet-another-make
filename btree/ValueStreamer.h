@@ -2,6 +2,7 @@
 #define VALUE_STREAMER_H
 
 #include "StreamingBTree.h"
+#include "PageStreamASCII.h"
 
 namespace BTree {
 
@@ -52,7 +53,10 @@ namespace BTree {
     }
     template< class K >
     std::ostream & operator<<( std::ostream & stream, StreamKey<K> const & range ) {
-        stream << "[ " << range.key << " : " << range.sequence << " ]";
+        stream << "[ ";
+        if ( ASCIIStreamer::keys::mode( stream ) == ASCIIStreamer::Mode::Hex) stream << hex;
+        stream << range.key;
+        stream << dec << " : " << range.sequence << " ]";
         return stream;
     };
     

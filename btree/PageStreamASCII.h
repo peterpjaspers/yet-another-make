@@ -3,9 +3,53 @@
 
 #include "Types.h"
 
-#include <iostream>
+#include <ostream>
 
 namespace BTree {
+
+    namespace ASCIIStreamer {
+
+        // Page streaming IO manipulators
+        // IO stream manipulator constants
+        enum Mode {
+            Native = 0,
+            Hex = 1,
+            Dec = 2,
+            ASCII = 3
+        };
+
+        static long StreamKeyIndex = std::ios_base::xalloc();
+        static long StreamValueIndex = std::ios_base::xalloc();
+
+        class keys {
+        public:
+            keys() : streamMode( Native ) {};
+            keys( Mode m ) : streamMode( m ) {};
+            static Mode mode( std::ostream& stream ) { return( static_cast<Mode>( stream.iword( StreamKeyIndex ) ) ); }
+            std::ostream& operator()( std::ostream& stream ) const {
+                stream.iword( StreamKeyIndex ) = static_cast<long>( streamMode );
+                return stream;
+            };
+        private:
+            Mode streamMode;
+        };
+        class values {
+        public:
+            values() : streamMode( Native ) {};
+            values( Mode m ) : streamMode( m ) {};
+            static Mode mode( std::ostream& stream ) { return( static_cast<Mode>( stream.iword( StreamValueIndex ) ) ); }
+            std::ostream& operator()( std::ostream& stream ) const {
+                stream.iword( StreamValueIndex ) = static_cast<long>( streamMode );
+                return stream;
+            };
+        private:
+            Mode streamMode;
+        };
+
+    }; 
+
+    static std::ostream& operator<<( std::ostream& stream, ASCIIStreamer::keys mode ) { mode( stream ); return stream; }
+    static std::ostream& operator<<( std::ostream& stream, ASCIIStreamer::values mode ) { mode( stream ); return stream; }
 
     class ASCIIPageStreamer {
     public:

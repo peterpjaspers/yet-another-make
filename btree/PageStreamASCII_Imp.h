@@ -45,7 +45,7 @@ namespace BTree {
         const unsigned int ArrayBlockSize( 160 ); // Block size in humand readable characters
         template< class T >
         struct BlockStreamer{
-            typedef void (*Function)( ostream &o, const T* data, int n, int digits );
+            typedef void (*Function)( ostream &o, const T* data, int n, int digits, const char* separator );
         };
         const char ToASCII[ 256 ] = {
             // 0    1    2    3    4    5    6    7    8    9    A    B    C    D    E    F
@@ -67,56 +67,61 @@ namespace BTree {
               ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // F
         };
         template< class T >
-        void streamArrayBlockASCII(ostream &o, const T* data, int n, int digits) {
+        void streamArrayBlockASCII( ostream &o, const T* data, int n, int digits, const char* separator ) {
             o.flags( ios_base::dec );
             if (0 < n) o << ToASCII[ data[0] ];
-            for (int i = 1; i < n; i++) o << ToASCII[ data[i] ];
+            for (int i = 1; i < n; i++) o << separator << ToASCII[ data[i] ];
         }
         template< class T >
-        void streamArrayBlockDec(ostream &o, const T* data, int n, int digits) {
+        void streamArrayBlockDec( ostream &o, const T* data, int n, int digits, const char* separator ) {
             o.flags( ios_base::dec );
             if (0 < n) o << setw(digits) << static_cast<int64_t>( data[0] );
-            for (int i = 1; i < n; i++) o << ", " << setw(digits) << static_cast<int64_t>( data[i] );
+            for (int i = 1; i < n; i++) o << separator << setw(digits) << static_cast<int64_t>( data[i] );
         }
         template< class T >
-        void streamArrayBlockHex(ostream &o, const T* data, int n, int digits) {
+        void streamArrayBlockHex( ostream &o, const T* data, int n, int digits, const char* separator ) {
             o.flags( ios_base::hex );
             if (0 < n) o << setw(digits) << static_cast<int64_t>( data[0] );
-            for (int i = 1; i < n; i++) o << ", " << setw(digits) << static_cast<int64_t>( data[i] );
+            for (int i = 1; i < n; i++) o << separator << setw(digits) << static_cast<int64_t>( data[i] );
             o.flags( ios_base::dec );
         }
         template< class T >
-        void streamArrayBlock(ostream &o, const T* data, int n, int digits) {
+        void streamArrayBlock( ostream &o, const T* data, int n, int digits, const char* separator ) {
             if (0 < n) o << data[0];
-            for (int i = 1; i < n; i++) o << ", " << data[i];
+            for (int i = 1; i < n; i++) o << separator << data[i];
         }
         template< class T >
-        void streamArray( ostream &o, const T* data, int n, typename BlockStreamer<T>::Function block, int blockSize, int digits ) {
+        void streamArray( ostream &o, const T* data, int n, typename BlockStreamer<T>::Function block, int blockSize, int digits, const char* separator ) {
             o << n << " [ ";
             if (n <= blockSize) {
-                block( o, data, n, digits ); 
+                block( o, data, n, digits, separator ); 
             } else {
                 int remaining( n );
                 while (blockSize < remaining) {
-                    o << "\n       "; block( o, data, blockSize, digits );
+                    o << "\n       "; block( o, data, blockSize, digits, separator );
                     remaining -= blockSize;
                     data += blockSize;
                     o << ",";
                 }
-                o << "\n       "; block( o, data, remaining, digits ); o << "\n";
+                o << "\n       "; block( o, data, remaining, digits, separator ); o << "\n";
             }
             o << " ]";
         }
         template< class T >
-        void streamArrayValue(ostream &o, const T* data, int n) {
-            auto flags( o.flags() );
-            streamArray<T>( o, data, n, streamArrayBlockASCII, 120, 1 );
-            // auto digits( static_cast<int>( ceil( sizeof(T) * 2.0 ) ) );
-            // auto blockSize( ArrayBlockSize / (digits + 2) );
-            // streamArray<T>( o, data, n, streamArrayBlockHex, blockSize, digits );
-            // auto digits( static_cast<int>( ceil( (sizeof(T) * 8) / 3.3219 ) ) );
-            // auto blockSize( ArrayBlockSize / (digits + 2) );
-            // streamArray<T>( o, data, n, streamArrayBlockDec, blockSize, digits );
+        void streamArrayValue(ostream &o, ASCIIStreamer::Mode mode, const T* data, int n) {
+            if (mode == ASCIIStreamer::ASCII) {
+                streamArray<T>( o, data, n, streamArrayBlockASCII, 120, 1, "" );
+            } else if (mode == ASCIIStreamer::Hex) {
+                auto digits( static_cast<int>( ceil( sizeof(T) * 2.0 ) ) );
+                auto blockSize( ArrayBlockSize / (digits + 2) );
+                streamArray<T>( o, data, n, streamArrayBlockHex, blockSize, digits, " " );
+            } else if (mode == ASCIIStreamer::Dec) {
+                auto digits( static_cast<int>( ceil( (sizeof(T) * 8) / 3.3219 ) ) );
+                auto blockSize( ArrayBlockSize / (digits + 2) );
+                streamArray<T>( o, data, n, streamArrayBlockDec, blockSize, digits, " " );
+            } else {
+                streamArray<T>( o, data, n, streamArrayBlock, n, 0, ", " );
+            }
         }
         template< class T >
         void streamPageContentHex(ostream &o, const T* data, int n) {
@@ -186,7 +191,7 @@ namespace BTree {
         }
         for (int k = 0; k < page.header.count; k++) {
             o << setw(6) << k << " : ";
-            streamArrayValue<K>( o, page.key(k), page.keySize(k) );
+            streamArrayValue<K>( o, ASCIIStreamer::keys::mode( o ), page.key(k), page.keySize(k) );
             o << " -> " << page.value(k) << "\n";
         }
     }
@@ -195,12 +200,12 @@ namespace BTree {
         streamPageHeader(o, page);
         if (page.splitDefined()) {
             o << "     - : ";
-            streamArrayValue<V>( o, page.split(), page.splitSize() );
+            streamArrayValue<V>( o, ASCIIStreamer::values::mode( o ), page.split(), page.splitSize() );
             o << "\n";
         }
         for (int k = 0; k < page.header.count; k++) {
             o << setw(6) << k << " : " << page.key(k) << " -> ";
-            streamArrayValue<V>( o, page.value(k), page.valueSize(k) );
+            streamArrayValue<V>( o, ASCIIStreamer::values::mode( o ), page.value(k), page.valueSize(k) );
             o << "\n";
         }
     }
@@ -209,14 +214,14 @@ namespace BTree {
         streamPageHeader(o, page);
         if (page.splitDefined()) {
             o << "     - : ";
-            streamArrayValue<V>( o, page.split(), page.splitSize() );
+            streamArrayValue<V>( o, ASCIIStreamer::values::mode( o ), page.split(), page.splitSize() );
             o << "\n";
         }
         for (int k = 0; k < page.header.count; k++) {
             o << setw(6) << k << " : ";
-            streamArrayValue<K>( o, page.key(k), page.keySize(k) );
+            streamArrayValue<K>( o, ASCIIStreamer::keys::mode( o ), page.key(k), page.keySize(k) );
             o << " -> ";
-            streamArrayValue<V>( o, page.value(k), page.valueSize(k) );
+            streamArrayValue<V>( o, ASCIIStreamer::values::mode( o ), page.value(k), page.valueSize(k) );
             o << "\n";
         }
     }

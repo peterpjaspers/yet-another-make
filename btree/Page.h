@@ -7,7 +7,6 @@
 
 #include "Types.h"
 #include "PageFunctions.h"
-#include "PageStreamASCII.h"
 
 namespace BTree {
 
@@ -172,7 +171,6 @@ namespace BTree {
         // Return size of actual payload (i.e., filling without overhead)
         template< bool AK = KA, bool AV = VA >
         inline PageSize payload() const { return( filling() - overhead<AK,AV>() ); }
-        
 
         // Return number of bytes required to store a key.
         template< bool AK = KA, std::enable_if_t<(!AK),bool> = true >

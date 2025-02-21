@@ -175,13 +175,13 @@ pair<uint32_t,uint32_t> validatePage( ostream& log, PagePool& pool, set<PageLink
     uint32_t pageCount = 1;
     if (0 < page.depth) {
         auto node( pool.page<KT,PageLink,KA,false>( &page ) );
-        log << *node;
+        log << ASCIIStreamer::keys( ASCIIStreamer::Hex ) << *node;
         auto result = validateNode<KT,VT,KA,VA>( log, pool, pageLinks, *node, depth );
         errors += result.first;
         pageCount += result.second;
     } else {
         auto leaf( pool.page<KT,VT,KA,VA>( &page ) );
-        log << *leaf;
+        log << ASCIIStreamer::keys( ASCIIStreamer::Hex ) << ASCIIStreamer::values( ASCIIStreamer::ASCII ) << *leaf;
         
     }
     return{ errors, pageCount };
@@ -271,12 +271,19 @@ uint32_t validatePagePoolFile( ostream& log, string persistentFile ) {
     uint32_t errors = 0;
     log << "Reading B-Tree page size...\n" << flush;
     auto pageSize( PersistentPagePool::pageCapacity( persistentFile ) );
-    log << "Validating page pool file...\n" << flush;
-    errors += validatePersistentPagePool( log, pageSize, persistentFile );
-    if ( errors == 0 ) {
-        PersistentPagePool pool( pageSize, persistentFile );
-        log << "Validating page pool...\n" << flush;
-        errors += validatePagePool<K,V>( log, pool, pool.commitRoot()->page );
+    if (0 < pageSize) {
+        log << "Validating page pool file...\n" << flush;
+        errors += validatePersistentPagePool( log, pageSize, persistentFile );
+        if ( errors == 0 ) {
+            PersistentPagePool pool( pageSize, persistentFile );
+            log << "Validating page pool...\n" << flush;
+            errors += validatePagePool<K,V>( log, pool, pool.commitRoot()->page );
+        } else {
+            log << "Persistent page file " << persistentFile << " is corrupt!\n";
+        }
+    } else {
+        log << "Unable to read persistent page file " << persistentFile << "!\n";
+        errors += 1;
     }
     return errors;
 }
