@@ -56,14 +56,16 @@ namespace BTree {
         friend class Trail;
         friend class Forest;
     public:
+        // Return PagePool associated with B-tree.
+        inline PagePool& pagePool() const { return pool; }
         // Return depth of B-tree, an indication of the log(N) complexity of B-tree operations.
-        PageDepth depth() const;
+        inline PageDepth depth() const  { return( root->depth ); };
         // Consolidate all Page modifications.
         void commit() const;
         // Restore all Pages to last consolidated state.
         void recover();
         // Return PageLink of B-Tree root
-        PageLink rootLink() const;
+        inline PageLink rootLink() const { return root->page; };
         // Enable gathering of B-Tree statistics.
         // Initializes statistics counters to given values if provided otherwise sets counters to zero.
         bool enableStatistics( const BTreeStatistics* initial = nullptr ) const;

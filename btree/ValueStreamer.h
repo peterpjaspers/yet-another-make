@@ -17,6 +17,13 @@ namespace BTree {
         void nextBlock() const { sequence += 1; }
     };
     template< class K >
+    inline bool operator<( const StreamKey<K>& lhs, const StreamKey<K>& rhs ) {
+        if ( lhs.key < rhs.key ) return true;
+        if ( rhs.key < lhs.key ) return false;
+        if ( lhs.sequence < rhs.sequence ) return true;
+        return false;
+    }
+    template< class K >
     std::ostream & operator<<( std::ostream & stream, StreamKey<K> const & range ) {
         stream << "[ " << range.key << " : " << range.sequence << " ]";
         return stream;

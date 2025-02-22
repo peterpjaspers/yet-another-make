@@ -85,6 +85,9 @@ namespace YAM
                 return true;
             }
         }
+        for (auto const& file : _dotIgnoreFiles) {
+            if (file->absolutePath() == path) return true;
+        }
         return false;
     }
 
