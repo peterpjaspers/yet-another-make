@@ -16,6 +16,7 @@
 #include "BinaryValueStreamer.h"
 #include "ISharedObjectStreamer.h"
 #include "Streamer.h"
+#include "MemoryStream.h"
 
 #include "../btree/Forest.h"
 #include "../btree/PersistentPagePool.h"
@@ -300,7 +301,7 @@ namespace YAM
 
     BTree::PersistentPagePool* createPagePool(std::filesystem::path const& path) {
         // Determine stored page size (if any)...
-        const BTree::PageSize pageSize = 32 * 1024;
+        const BTree::PageSize pageSize = 4 * 1024;
         BTree::PageSize storedPageSize = BTree::PersistentPagePool::pageCapacity(path.string());
         return new BTree::PersistentPagePool(((0 < storedPageSize) ? storedPageSize : pageSize), path.string());
     }
@@ -475,6 +476,7 @@ namespace YAM
         auto const &toRemove = nodes.removedNodes();
         logDifference(*(_context->logBook()), toInsert, toReplace, toRemove);
 
+        auto start = std::chrono::system_clock::now();
         for (auto const& p : toRemove) {
             if (!p->deleted()) {
                 throw std::exception("Wrong state to delete");
@@ -506,23 +508,30 @@ namespace YAM
                 }
             }
         }
+        auto removeTime = std::chrono::system_clock::now();
 
         // First bind keys to new objects to avoid re-entrant storage...
         for (auto const& p : toInsert) bindToKey(p);
+        auto bindToKeyTime = std::chrono::system_clock::now();
+
         // ...then store the new objects
         for (auto const& p : toInsert) {
             store(_objectToKey[p.get()], p);
             p->modified(false);
         }
+        auto storeNewTime = std::chrono::system_clock::now();
 
         for (auto const& p : toReplace) {
             store(_objectToKey[p.get()], p);
             p->modified(false);
         }
+        auto replaceTime = std::chrono::system_clock::now();
+
         for (auto const& p : toReplaceDeleted) {
             store(_deletedObjectToKey[p.get()], p);
             p->modified(false);
         }
+        auto replaceDeletedTime = std::chrono::system_clock::now();
 
         std::size_t nStored = 
             toInsert.size()
@@ -530,8 +539,33 @@ namespace YAM
             + toRemove.size()
             + toReplaceDeleted.size();
         nodes.clearChangeSet();
+        auto end = std::chrono::system_clock::now();
+        auto milliSeconds = (std::chrono::duration_cast<std::chrono::milliseconds>(end-start)).count();
+        {
+            std::stringstream ss;
+            ss << "Store streaming took " << milliSeconds << " ms" << std::endl;
+            ss << "remove=" << (std::chrono::duration_cast<std::chrono::milliseconds>(removeTime - start)).count() << " ms" << std::endl;
+            ss << "bindKey=" << (std::chrono::duration_cast<std::chrono::milliseconds>(bindToKeyTime - removeTime)).count() << " ms" << std::endl;
+            ss << "storeNew=" << (std::chrono::duration_cast<std::chrono::milliseconds>(storeNewTime - bindToKeyTime)).count() << " ms" << std::endl;
+            ss << "replace=" << (std::chrono::duration_cast<std::chrono::milliseconds>(replaceTime - replaceTime)).count() << " ms" << std::endl;
+            ss << "replaceDeleted=" << (std::chrono::duration_cast<std::chrono::milliseconds>(replaceDeletedTime - replaceTime)).count() << " ms" << std::endl;
+            LogRecord d(LogRecord::Progress, ss.str());
+            _context->addToLogBook(d);
+        }
+
         if (0 < nStored) {
-            try { _forest->commit(); } 
+            try {
+                auto start = std::chrono::system_clock::now();
+                _forest->commit();
+                auto end = std::chrono::system_clock::now();
+                auto milliSeconds = (std::chrono::duration_cast<std::chrono::milliseconds>(end - start)).count();
+                {
+                    std::stringstream ss;
+                    ss << "Store commit took " << milliSeconds << " ms";
+                    LogRecord d(LogRecord::Progress, ss.str());
+                    _context->addToLogBook(d);
+                }
+            } 
             catch (std::string msg) {
                 // This should be a very rare error. Therefore no attempt
                 // is made to optimize recovery.
@@ -557,11 +591,21 @@ namespace YAM
     }
 
     void PersistentBuildState::store(Key key, std::shared_ptr<IPersistable> const& object) {
+
+        // Code to measure the contribution of the NOode
+        // streaming to store() time by streaming to 
+        // memory buffer instead of to btree.
+        //MemoryStream memStream(8 * 1024);
+        //BinaryValueWriter vWriter(&memStream);
+        //SharedPersistableWriter snWriter(*this);
+        //Streamer writer(&vWriter, &snWriter);
+        //object->stream(&writer);
+
         //std::stringstream ss;
-        //ss << "Insert  " << std::hex << key;
+        //ss << "Insert  " << std::hex << key << std::dec << " streamsize=" << memStream.readableBytes();
         //LogRecord r(LogRecord::Aspect::Progress, ss.str());
         //_context->addToLogBook(r);
-
+         
         KeyCode code(key);
         auto tree = _typeToTree[code._type];
         auto& btreeVWriter = tree->insert(key);
