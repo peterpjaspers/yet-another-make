@@ -75,46 +75,6 @@ namespace YAM
             }
         }
 
-        bool dequeueNotifications() {
-            DWORD nBytes = 0;
-            OVERLAPPED* ov = nullptr;
-            ULONG_PTR completionKey = 0;
-            ULONG_PTR stopKey = reinterpret_cast<ULONG_PTR>(this);
-            BOOL success = true;
-            bool stopped = false;
-            while (
-                !stopped &&
-                 (success = GetQueuedCompletionStatus(_iocp, &nBytes, &completionKey, &ov, INFINITE))
-            ) {
-                if (completionKey == stopKey) {
-                    stopped = true;
-                } else {
-                    processNotification(nBytes, completionKey);
-                }
-            }
-            if (!success) {
-                std::error_code ec(GetLastError(), std::system_category());
-                throw std::system_error(ec, "GetQueuedCompletionStatus failed");
-            }
-            return success;
-        }
-
-        // Consume closing notifications of removed watchers.
-        void dequeueClosingNotifications() {
-            DWORD nBytes = 0;
-            OVERLAPPED* ov = nullptr;
-            ULONG_PTR completionKey = 0;
-            std::lock_guard<std::mutex> lock(_watchersMutex);
-            while (
-                !_removedWatchers.empty()
-                && GetQueuedCompletionStatus(_iocp, &nBytes, &completionKey, &ov, INFINITE)
-            ) {
-                if (nBytes == 0) {
-                    _removedWatchers.erase(completionKey);
-                }
-            }
-        }
-
     public:
         DirectoriesWatcherWin32()
         {
@@ -167,12 +127,31 @@ namespace YAM
             auto result = _removedWatchers.insert({ completionKey, watcher });
             if (!result.second) throw std::runtime_error("Failed to remove watcher");
             _watchers.erase(it);
+            watcher->closeDirHandle();
         }
 
         void iocpReader() {
-            bool success = dequeueNotifications();
-            if (success) {
-               // dequeueClosingNotifications();
+            DWORD nBytes = 0;
+            OVERLAPPED* ov = nullptr;
+            ULONG_PTR completionKey = 0;
+            ULONG_PTR stopKey = reinterpret_cast<ULONG_PTR>(this);
+            BOOL success = true;
+            bool stopped = false;
+            while (!stopped && success) {
+                success = GetQueuedCompletionStatus(_iocp, &nBytes, &completionKey, &ov, INFINITE);
+                if (success) {
+                    if (completionKey == stopKey) {
+                        if (!_watchers.empty() || !_removedWatchers.empty()) {
+                            throw std::runtime_error("Logic error");
+                        }
+                        stopped = true;
+                    } else {
+                        processNotification(nBytes, completionKey);
+                    }
+                } else {
+                    std::error_code ec(GetLastError(), std::system_category());
+                    throw std::system_error(ec, "GetQueuedCompletionStatus failed");
+                }
             }
         }
     };
@@ -213,14 +192,21 @@ namespace YAM
 
 
     void DirectoryWatcherWin32::start() {
-        watcher.add(shared_from_this());
+        if (_dirHandle != INVALID_HANDLE_VALUE) {
+            watcher.add(shared_from_this());
+        }
     }
 
     void DirectoryWatcherWin32::stop() {
         if (_dirHandle != INVALID_HANDLE_VALUE) {
+            watcher.remove(shared_from_this());
+        }
+    }
+
+    void DirectoryWatcherWin32::closeDirHandle() {
+        if (_dirHandle != INVALID_HANDLE_VALUE) {
             auto handle = _dirHandle;
             _dirHandle = INVALID_HANDLE_VALUE;
-            watcher.remove(shared_from_this());
             CloseHandle(handle);
         }
     }

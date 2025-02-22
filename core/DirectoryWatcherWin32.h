@@ -58,6 +58,7 @@ namespace YAM
         void removeFromDirUpdateTimes(std::filesystem::path const& absPath);
 
         HANDLE dirHandle() { return _dirHandle; }
+        void closeDirHandle();
         OVERLAPPED* overlapped() { return &_overlapped; }
         void processNotifications(DWORD nrBytesReceived);
         void processNotification(PFILE_NOTIFY_INFORMATION info);
