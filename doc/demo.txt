@@ -1,0 +1,63 @@
+- copy d:\clean_repos to d:
+
+
+- 'compilation' and 'link' rules in test_yam\demo\compileAndLink   
+   - 0 or 1 buildfile per directory
+   - change detection
+       change bar.cpp, bar.h, delete/change bar.obj
+   - foreach and globs: add foo.cpp
+   - no stale generated files
+       remove foo.cpp, remove rule, change output file name
+   - rule specifies all output files
+       add noot.txt to output files -> error
+   - paths relative to directory that contains the buildfile
+   - yam commandline, usage of wildcards to do partial build
+
+- test_yam\demo\groups
+  Buildfile platform
+  Buildfile app/A
+  Buildfile app/B
+  Buildfile app
+
+  Demo use of globs versus groups to select generated files as rule input.
+  Explain advantage of group over glob.
+
+- What if not all output files are known? In test_yam\demo\groups\imageProcessing
+   // unpack raw (not-processed)  images from zip file and reference them in group <rawImages>
+   : rawImages.7z |>  "C:\Program Files\7-Zip\7z.exe" e -ogenerated\%B %f |> generated\%B\* <rawImages>
+   
+   // Process the unpacked raw images and reference them in group <processedImages>
+   : foreach <rawImages>  |> echo %f > %o |> generated/processedImages/%B.txt <processedImages>
+   
+   // Pack the processed images in a zip file
+   : <processedImages> |> "c:\Program Files\7-Zip\7z.exe" a %o generated/processedImages/img*.txt |> generated/processedImages/processedImages.7z
+
+- What if not all output files are usefull?
+  demo\ignoreOutputs
+  Note: yam deletes ignored outputs.
+  
+- Dependencies on files outside the repository being built.
+  Yam registers input files in its buildstate and tracks these
+  files for changes. Change in input -> script re-executes.
+  Scripts may access files outside the repository. Yam does not register
+  such out-of-repo accesses, warns the user and encourages the user to
+  make his/her intent explicit.
+  Demo: comment-out in yamConfig\repositories the 7z repo, 
+  delete demo\imageProcessing\generated and run build. 
+  Note the warnings for dependencies on 7z.exe and 7z.dll.
+
+- Multi-repository build
+  Some development teams prefer multi-repository over single repository
+  development. This poses challenges building a system out of these
+  repositories. Yam makes it easy to do a system level build.
+  E.g. using a different version of repository A is simple done by
+  checking out the desired version in the repo directory of A and
+  then running a build in the system repository.
+  See yamConfig\repositories.txt
+  
+Still missing/bugs:
+- a more complete buildfile syntax
+- command completion logging
+- multi-repo build cannot deal with already existing build output in
+  referenced repository A when that output was produced by a build in repo A.
+-
