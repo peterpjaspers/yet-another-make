@@ -57,7 +57,7 @@ namespace YAM
         void _handleCommandsCompletion(Node* n);
         void _postCompletion(Node::State resultState);
         void _notifyCompletion(Node::State resultState);
-        void _storeBuildState(bool logSave = false);
+        void _storeBuildState();
 
         ExecutionContext _context;
         std::shared_ptr<PersistentBuildState> _buildState;

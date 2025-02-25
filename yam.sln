@@ -17,6 +17,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "doc", "doc", "{37AB3F5E-F8E
 	ProjectSection(SolutionItems) = preProject
 		doc\analysis_junctions.txt = doc\analysis_junctions.txt
 		doc\codingStyle.md = doc\codingStyle.md
+		doc\demo.txt = doc\demo.txt
 		doc\design_aspectHashes.txt = doc\design_aspectHashes.txt
 		doc\design_buildfile.txt = doc\design_buildfile.txt
 		doc\design_buildfile_processing.txt = doc\design_buildfile_processing.txt

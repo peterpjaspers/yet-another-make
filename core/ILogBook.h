@@ -14,13 +14,17 @@ namespace YAM
 
         virtual void add(LogRecord const& record) {
             if (record.aspect == LogRecord::Aspect::Error) _error = true;
+            else if (record.aspect == LogRecord::Aspect::Warning) _warning = true;
         }
 
         // Return whether an error record has been logged
         virtual bool error() const { return _error; }
 
-        // Post: !error();
-        virtual void resetError() { _error = false; }
+        // Return whether a warning record has been logged
+        virtual bool warning() const { return _warning; }
+
+        // Post: !error() && !warning();
+        virtual void reset() { _error = false; _warning = false; }
 
         void aspects(std::vector<LogRecord::Aspect> aspects) {
             _aspects = aspects;
@@ -37,6 +41,7 @@ namespace YAM
 
     protected:
         bool _error;
+        bool _warning;
         std::vector<LogRecord::Aspect> _aspects;
     };
 }

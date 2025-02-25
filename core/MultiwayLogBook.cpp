@@ -26,9 +26,16 @@ namespace YAM
         return false;
     }
 
-    void MultiwayLogBook::resetError() {
+    bool MultiwayLogBook::warning() const {
         for (auto const& b : _books) {
-            b->resetError();
+            if (b->warning()) return true;
+        }
+        return false;
+    }
+
+    void MultiwayLogBook::reset() {
+        for (auto const& b : _books) {
+            b->reset();
         }
     } 
 }

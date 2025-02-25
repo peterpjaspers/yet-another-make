@@ -124,14 +124,24 @@ void logBuildResult(ILogBook& logBook, BuildResult& result) {
     LogRecord::Aspect aspect;
     std::stringstream ss;   
     if (result.state() == BuildResult::State::Ok) {
-        aspect = LogRecord::Aspect::Progress;
-        ss << "Build completed successfully";
+        if (logBook.warning()) {
+            aspect = LogRecord::Aspect::Warning;
+            ss << "Build completed with warning(s)";
+        } else {
+            aspect = LogRecord::Aspect::Progress;
+            ss << "Build completed successfully";
+        }
     } else if (result.state() == BuildResult::State::Failed) {
         aspect = LogRecord::Aspect::Error;
         ss << "Build completed with errors";
     } else if (result.state() == BuildResult::State::Canceled) {
-        aspect = LogRecord::Aspect::Warning;
-        ss << "Build canceled by user";
+        if (logBook.error()) {
+            aspect = LogRecord::Aspect::Error;
+            ss << "Build completed with errors";
+        } else {
+            aspect = LogRecord::Aspect::Progress;
+            ss << "Build canceled by user";
+        }
     } else {
         aspect = LogRecord::Aspect::Error;
         ss << "Build completed with unknown result";

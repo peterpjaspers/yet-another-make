@@ -468,15 +468,18 @@ namespace YAM
     }
 
     std::size_t PersistentBuildState::store() {
+        auto start = std::chrono::system_clock::now();
         if (_context->nodes().changeSetSize() == 0) return 0;
         std::unordered_set<std::shared_ptr<IPersistable>> toReplaceDeleted;
         auto& nodes = _context->nodes();
         auto const &toInsert = nodes.addedNodes();
         auto const &toReplace = nodes.modifiedNodes();
         auto const &toRemove = nodes.removedNodes();
-        logDifference(*(_context->logBook()), toInsert, toReplace, toRemove);
+        auto getChangesTime = std::chrono::system_clock::now();
 
-        auto start = std::chrono::system_clock::now();
+        logDifference(*(_context->logBook()), toInsert, toReplace, toRemove);
+        auto logDiffsTime = std::chrono::system_clock::now();
+
         for (auto const& p : toRemove) {
             if (!p->deleted()) {
                 throw std::exception("Wrong state to delete");
@@ -544,7 +547,9 @@ namespace YAM
         {
             std::stringstream ss;
             ss << "Store streaming took " << milliSeconds << " ms" << std::endl;
-            ss << "remove=" << (std::chrono::duration_cast<std::chrono::milliseconds>(removeTime - start)).count() << " ms" << std::endl;
+            ss << "getChanges=" << (std::chrono::duration_cast<std::chrono::milliseconds>(getChangesTime - start)).count() << " ms" << std::endl;
+            ss << "logDifs=" << (std::chrono::duration_cast<std::chrono::milliseconds>(logDiffsTime - getChangesTime)).count() << " ms" << std::endl;
+            ss << "remove=" << (std::chrono::duration_cast<std::chrono::milliseconds>(removeTime - logDiffsTime)).count() << " ms" << std::endl;
             ss << "bindKey=" << (std::chrono::duration_cast<std::chrono::milliseconds>(bindToKeyTime - removeTime)).count() << " ms" << std::endl;
             ss << "storeNew=" << (std::chrono::duration_cast<std::chrono::milliseconds>(storeNewTime - bindToKeyTime)).count() << " ms" << std::endl;
             ss << "replace=" << (std::chrono::duration_cast<std::chrono::milliseconds>(replaceTime - replaceTime)).count() << " ms" << std::endl;

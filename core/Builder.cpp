@@ -294,15 +294,15 @@ namespace YAM
         return cycling;
     }
 
-    void Builder::_storeBuildState(bool logSave) {
+    void Builder::_storeBuildState() {
         auto start = std::chrono::system_clock::now();
+        ILogBook& logBook = *(_context.logBook());
         std::size_t nStored = _buildState->store();
-        if (0 < nStored) {
+        if (logBook.mustLogAspect(LogRecord::BuildStateUpdate) && 0 < nStored) {
             auto duration = std::chrono::system_clock::now() - start;
             auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration);
             std::stringstream ss;
             ss << "Updated " << nStored << " nodes in buildstate in " << ms << std::endl;
-            ILogBook& logBook = *(_context.logBook());
             LogRecord saving(LogRecord::Progress, ss.str());
             logBook.add(saving);
         }
