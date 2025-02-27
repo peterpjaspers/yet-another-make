@@ -156,10 +156,8 @@ namespace YAM
     }
 
     void DirectoryNode::_removeGeneratedFile(std::shared_ptr<GeneratedFileNode> const& genFile) {
-        if (_generatedContent.contains(genFile->name())) {
-            _generatedContent.erase(genFile->name());
-            modified(true);
-        }
+        std::size_t nRemoved = _generatedContent.erase(genFile->name());
+        if (nRemoved != 0) modified(true);
     }
 
     void DirectoryNode::getFiles(std::vector<std::shared_ptr<FileNode>>& filesInDir) {

@@ -1229,7 +1229,7 @@ namespace YAM
         std::string script = compileScript(logBook);
         if (script.empty()) return MonitoredProcessResult{ 1 };
 
-        std::filesystem::path tmpDir = FileSystem::createUniqueDirectory();
+        std::filesystem::path tmpDir = FileSystem::createUniqueDirectory("cmd_");
         auto scriptFilePath = std::filesystem::path(tmpDir / "cmdscript.cmd");
         std::ofstream scriptFile(scriptFilePath.string());
         scriptFile << "@echo off" << std::endl;
@@ -1266,6 +1266,8 @@ namespace YAM
             result.readOnlyFiles.erase(scriptFilePath);
         } else if (!canceling()) {
             logScriptFailure(this, result, tmpDir, logBook);
+        } else  {
+            bool stop = true;
         }
         return result;
     }

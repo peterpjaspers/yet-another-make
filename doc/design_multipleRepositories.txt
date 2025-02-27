@@ -129,12 +129,21 @@ Note: a relative path in a buildfile is relative to the buildfile directory.
   TODO: finish below analysis
   Possible changes and associated actions:	
    - repoType 
-     Track=>Build: run a build
+     Track=>Build: no action needed, build will pickup buildfiles etc.
      Track=>Ignore: remove repo DirectoryNode 
-                    -> marks all file/dir nodes Deleted
-                    -> Commands re-execute and remove references to Deleted nodes 
-					   
-   - directory
+         -> this marks all file/dir nodes Deleted
+         -> build re-executes Commands that depend on deleted files and
+		    these commands will remove references to Deleted nodes.
+	 Ignore=>Track: add repo DirectoryNode 
+	     -> build executes dir node
+	 Ignore=>Build: add repo DirectoryNode 
+	     -> build executes dir node
+		 -> build will parse&compile buildfiles
+		 -> build will execute Commands
+	 Build=>Ignore: same as Track=>Ignore
+	 Build=>Track: Track=>Ignore + Ignore=>Track (brute force approach)
+   - directory: repoType = type, repoType(Ignore), update directory,
+     repoType(repoType)
    - add repo
    - remove repo
 

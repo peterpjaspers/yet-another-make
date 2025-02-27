@@ -57,7 +57,7 @@ namespace
 
         TestSetup()
             : repoTree(FileSystem::createUniqueDirectory("_buildFileCompilingTest"), 1, RegexSet())
-            , fileRepo(std::make_shared<FileRepositoryNode>(&context, "repo", repoTree.path()))
+            , fileRepo(std::make_shared<FileRepositoryNode>(&context, "repo", repoTree.path(), FileRepositoryNode::RepoType::Build))
             , absBuildFilePath(repoTree.path() / R"(buildfile_yam.bat)")
             , absSub1BuildFilePath(repoTree.path() / R"(SubDir1\buildfile_yam.bat)")
             , cmdOutputFile(fileRepo->directoryNode()->name() / "main.obj")
@@ -116,6 +116,7 @@ namespace
         }
 
         ~TestSetup() {
+            fileRepo->stopWatching();
             AccessMonitor::disableMonitoring();
         }
     };

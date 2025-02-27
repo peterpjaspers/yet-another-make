@@ -1,4 +1,4 @@
-- copy d:\clean_repos to d:
+- copy d:\clean_repos\* to d:
 
 
 - 'compilation' and 'link' rules in test_yam\demo\compileAndLink   

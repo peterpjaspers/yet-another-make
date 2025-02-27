@@ -78,7 +78,8 @@ namespace
                 std::make_shared<FileRepositoryNode>(
                     &context,
                     ".",
-                    repoDir);
+                    repoDir,
+                    FileRepositoryNode::RepoType::Build);
             auto repos = std::make_shared<RepositoriesNode>(&context, homeRepo);
             context.repositoriesNode(repos);
 
@@ -86,9 +87,9 @@ namespace
                 std::make_shared<FileRepositoryNode>(
                     &context,
                     "windows",
-                    std::filesystem::path("C:\\Windows"));
+                    std::filesystem::path("C:\\Windows"),
+                    FileRepositoryNode::RepoType::Ignore);
             repos->addRepository(winRepo);
-            winRepo->repoType(FileRepositoryNode::RepoType::Ignore);
 
             stats.registerNodes = true;
             //context.threadPool().size(1); // to ease debugging

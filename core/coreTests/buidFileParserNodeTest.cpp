@@ -50,7 +50,7 @@ namespace
 
         TestSetup(bool syntaxError = false)
             : repoTree(FileSystem::createUniqueDirectory("_buildFileProcessingTest"), 1, RegexSet())
-            , fileRepo(std::make_shared<FileRepositoryNode>(&context, "repo", repoTree.path()))
+            , fileRepo(std::make_shared<FileRepositoryNode>(&context, "repo", repoTree.path(), FileRepositoryNode::RepoType::Build))
             , absBuildFilePath(repoTree.path() / R"(buildfile_yam.bat)")
             , absBuildFilePathSD1(repoTree.path() / R"(SubDir1\buildfile_yam.txt)")
             , absBuildFilePathSD2(repoTree.path() / R"(SubDir2\buildfile_yam.txt)")

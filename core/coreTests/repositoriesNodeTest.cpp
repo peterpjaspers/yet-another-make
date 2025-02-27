@@ -27,7 +27,7 @@ namespace
             : homeRepoDir(FileSystem::createUniqueDirectory("_repositoriesNodeTest"))
             , repositoriesPath(homeRepoDir / RepositoriesNode::configFilePath())
             , logBook(std::make_shared<MemoryLogBook>())
-            , fileRepo(std::make_shared<FileRepositoryNode>(&context, ".", homeRepoDir))
+            , fileRepo(std::make_shared<FileRepositoryNode>(&context, ".", homeRepoDir, FileRepositoryNode::RepoType::Build))
         {
             context.logBook(logBook);
             auto repos = std::make_shared<RepositoriesNode>(&context, fileRepo);
@@ -73,6 +73,8 @@ namespace
         EXPECT_NE(nullptr, frepo2);
         EXPECT_EQ(setup.homeRepoDir.parent_path() / "r2", frepo2->directoryNode()->absolutePath());
 
+        frepo1->stopWatching();
+        frepo2->stopWatching();
         std::filesystem::remove(setup.homeRepoDir.parent_path() / "r1");
         std::filesystem::remove(setup.homeRepoDir.parent_path() / "r2");
     }
@@ -159,6 +161,8 @@ namespace
         LogRecord const& r = setup.logBook->records()[0];
         std::string msg("repository directory is equal to directory of repository \"repo1\"");
         EXPECT_NE(std::string::npos, r.message.find(msg));
+        setup.context.findRepository(".")->stopWatching();
+        setup.context.findRepository("repo1")->stopWatching();
         std::filesystem::remove(setup.homeRepoDir.parent_path() / "r1");
     }
 }

@@ -214,7 +214,8 @@ namespace YAM
                     auto homeRepo = std::make_shared<FileRepositoryNode>(
                         &_context,
                         repoName,
-                        repoDir);
+                        repoDir,
+                        FileRepositoryNode::RepoType::Build);
                     repositoriesNode = std::make_shared<RepositoriesNode>(&_context, homeRepo);
                     repositoriesNode->ignoreConfigFile(false);
                     _context.repositoriesNode(repositoriesNode);

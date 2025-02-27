@@ -11,22 +11,21 @@ namespace
 
 namespace YAM
 {
-    std::filesystem::path FileSystem::createUniqueDirectory(std::string const& postfix) {
-        std::filesystem::path d = uniquePath(postfix);
-        while (!std::filesystem::create_directory(d)) {
-            d = uniquePath(postfix);
+    std::filesystem::path FileSystem::createUniqueDirectory(std::string const& prefix) {
+        std::filesystem::path d = uniquePath(prefix);
+        while (!std::filesystem::create_directories(d)) {
+            d = uniquePath(prefix);
         }
         std::filesystem::create_directory(d);
         return canonicalPath(d);
     }
 
-    std::filesystem::path FileSystem::uniquePath(std::string const& postfix) {
-        static std::string prefix("yam_");
+    std::filesystem::path FileSystem::uniquePath(std::string const& prefix) {
         std::lock_guard<std::mutex> lock(mutex);
         char* name = std::tmpnam(nullptr);
         if (name == nullptr) throw std::exception("std::tmpnam failed");
         std::filesystem::path p(name);
-        std::filesystem::path up(p.parent_path() / (prefix + p.filename().string() + postfix ));
+        std::filesystem::path up(p.parent_path() / "yam_temp" / (prefix + p.filename().string()));
         return up;
     }
 

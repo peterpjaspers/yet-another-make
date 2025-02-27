@@ -326,6 +326,7 @@ namespace YAM
         if (it == _repositories.end()) return false;
         std::shared_ptr<FileRepositoryNode>& repo = it->second;
         modified(true);
+        repo->stopWatching();
         repo->removeObserver(this);
         repo->removeYourself();
         context()->nodes().remove(repo);
@@ -437,7 +438,11 @@ namespace YAM
             absRepoDir = std::filesystem::canonical(absRepoDir);
             auto it = _repositories.find(repo.name);
             if (it == _repositories.end()) {
-                frepo = std::make_shared<FileRepositoryNode>(context(), repo.name, absRepoDir);
+                frepo = std::make_shared<FileRepositoryNode>(
+                    context(), 
+                    repo.name, 
+                    absRepoDir, 
+                    FileRepositoryNode::RepoType::Ignore);
                 ok = addRepository(frepo);
                 if (!ok) return false;
             } else {

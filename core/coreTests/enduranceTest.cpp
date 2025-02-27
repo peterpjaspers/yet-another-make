@@ -120,7 +120,7 @@ namespace
             request->repoDirectory(repoDir);
             request->repoName(repoName);
             BuildOptions options;
-            options._threads = context->threadPool().size();
+            options._threads = static_cast<uint32_t>(context->threadPool().size());
             request->options(options);
             return executeRequest(request);
         }

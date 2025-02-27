@@ -14,16 +14,16 @@ namespace
         std::filesystem::path dir = FileSystem::createUniqueDirectory("__test");
         EXPECT_TRUE(std::filesystem::exists(dir));
         EXPECT_FALSE(std::filesystem::create_directory(dir));
-        EXPECT_TRUE(dir.filename().string().starts_with("yam_"));
-        EXPECT_TRUE(dir.filename().string().ends_with("__test"));
+        EXPECT_EQ(dir.parent_path().filename().string(), "yam_temp");
+        EXPECT_TRUE(dir.filename().string().starts_with("__test"));
         std::filesystem::remove_all(dir);
     }
     TEST(FileSystem, uniquePath) {
         std::filesystem::path path = FileSystem::uniquePath();
-        EXPECT_TRUE(path.filename().string().starts_with("yam_"));
-        path = FileSystem::uniquePath(".postfix");
-        EXPECT_TRUE(path.filename().string().starts_with("yam_"));
-        EXPECT_TRUE(path.filename().string().ends_with(".postfix"));
+        EXPECT_EQ(path.parent_path().filename().string(), "yam_temp");
+        path = FileSystem::uniquePath(".prefix");
+        EXPECT_EQ(path.parent_path().filename().string(), "yam_temp");
+        EXPECT_TRUE(path.filename().string().starts_with(".prefix"));
     }
 
     TEST(FileSystem, canonicalPath) {

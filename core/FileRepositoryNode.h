@@ -205,11 +205,12 @@ namespace YAM
         };
 
         FileRepositoryNode(); // needed for deserialization
-        // Construct repository node of type Build
+
         FileRepositoryNode(
             ExecutionContext* context,
             std::string const& repoName,
-            std::filesystem::path const& directory);
+            std::filesystem::path const& directory,
+            FileRepositoryNode::RepoType type);
 
         virtual ~FileRepositoryNode();
 

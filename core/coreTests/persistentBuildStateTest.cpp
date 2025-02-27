@@ -95,7 +95,8 @@ namespace
             auto homeRepo = std::make_shared<FileRepositoryNode>(
                 &context,
                 "repo",
-                repoDir);
+                repoDir,
+                FileRepositoryNode::RepoType::Build);
             auto repos = std::make_shared<RepositoriesNode>(&context, homeRepo);
             context.repositoriesNode(repos);
         }
@@ -123,7 +124,8 @@ namespace
             auto homeRepo = std::make_shared<FileRepositoryNode>(
                 &context,
                 "repo",
-                repoDir);
+                repoDir,
+                FileRepositoryNode::RepoType::Build);
             auto repos = std::make_shared<RepositoriesNode>(&context, homeRepo);
             context.repositoriesNode(repos);
             homeRepo->repoType(FileRepositoryNode::RepoType::Build);
@@ -553,13 +555,15 @@ namespace
                 repo0 = std::make_shared<FileRepositoryNode>(
                     &context,
                     "repo0",
-                    repoDir/"r0");
+                    repoDir/"r0",
+                    FileRepositoryNode::RepoType::Build);
                 auto repos = std::make_shared<RepositoriesNode>(&context, repo0);
                 context.repositoriesNode(repos);
                 repo1 = std::make_shared<FileRepositoryNode>(
                     &context,
                     "repo1",
-                    repoDir/"r1");
+                    repoDir/"r1",
+                    FileRepositoryNode::RepoType::Build);
                 repos->addRepository(repo1);
 
             }

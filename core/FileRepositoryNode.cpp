@@ -18,13 +18,14 @@ namespace YAM
     FileRepositoryNode::FileRepositoryNode(
         ExecutionContext* context,
         std::string const& repoName,
-        std::filesystem::path const& directory)
+        std::filesystem::path const& directory,
+        FileRepositoryNode::RepoType type)
         : Node(context, repoName)
         , _repoName(repoName)
         , _type(FileRepositoryNode::RepoType::Ignore)
         , _directory(directory)
     {
-        repoType(RepoType::Build);
+        repoType(type);
     }
 
     FileRepositoryNode::~FileRepositoryNode() {
@@ -65,18 +66,40 @@ namespace YAM
         return _type;
     }
 
+        // Track=>Build: no action needed, build will pickup buildfiles etc.
+        // Track=>Ignore: remove repo DirectoryNode
+        //     -> removes file/dir nodes from context and marks them Deleted
+        //     -> removes buildfile parser&compile nodes from context
+        //     -> removes all Commands and GeneratedFiles from context
+        // Ignore=>Track: add repo DirectoryNode
+        //     -> build executes dir node (adds dir and file nodes to context)
+        // Ignore=>Build: add repo DirectoryNode
+        //     -> build executes dir node
+        //     -> build parses & compiles buildfiles
+        //     -> build executes resulting Commands
+        // Build=>Ignore: same as Track=> Ignore
+        // Build=>Track: Track=>Ignore + Ignore=>Track 
+        //      -> brute force approach to get rid of Commands and GeneratedFiles
+        //
     void FileRepositoryNode::repoType(RepoType newType) {
         if (_type != newType) {
-            _type = newType;
-            if (_type == RepoType::Ignore) {
+            if (
+                (newType == RepoType::Ignore) 
+                || (_type == Build && newType == Track)
+            ) {
                 stopWatching();
                 removeYourself();
-            } else if (_directoryNode == nullptr) {
-                _directoryNode = std::make_shared<DirectoryNode>(context(), symbolicDirectory(), nullptr);
-                _fileExecSpecsNode = std::make_shared<FileExecSpecsNode>(context(), symbolicDirectory());
-                context()->nodes().add(_directoryNode);
-                context()->nodes().add(_fileExecSpecsNode);
-                _directoryNode->addPrerequisitesToContext();
+            }
+            _type = newType;
+            if (_type != RepoType::Ignore) {
+                if (_directoryNode == nullptr) {
+                    _directoryNode = std::make_shared<DirectoryNode>(context(), symbolicDirectory(), nullptr);
+                    _fileExecSpecsNode = std::make_shared<FileExecSpecsNode>(context(), symbolicDirectory());
+                    context()->nodes().add(_directoryNode);
+                    context()->nodes().add(_fileExecSpecsNode);
+                    _directoryNode->addPrerequisitesToContext();
+                    startWatching();
+                }
             }
             _hash = computeHash();
             modified(true);
@@ -86,15 +109,10 @@ namespace YAM
 
     void FileRepositoryNode::directory(std::filesystem::path const& dir) {
         if (_directory != dir) {
+            RepoType savedType = _type;
+            repoType(Ignore);
             _directory = dir;
-            if (watching()) {
-                stopWatching();
-                startWatching();
-            }
-            _hash = computeHash();
-            setState(Node::State::Dirty);
-
-            modified(true);
+            repoType(savedType);
             std::stringstream ss;
             ss
                 << "Repository " << repoName() << " moved from " << _directory
