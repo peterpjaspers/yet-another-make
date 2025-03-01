@@ -28,6 +28,8 @@ namespace
     std::string cmdExe = boost::process::search_path("cmd").string();
     uint32_t streamableTypeId = 0;
 
+    std::mutex removeAllMutex;
+
     std::vector<std::shared_ptr<Node>> getFileNodes(std::vector<std::shared_ptr<Node>> const& nodes) {
         std::vector<std::shared_ptr<Node>> files;
         for (auto const& node : nodes) {
@@ -214,9 +216,9 @@ namespace
             bool deleted = deleteFile(absPath);
             std::stringstream ss;
             if (!deleted) {
-                ss << "Failed to delete ignored output file " << absPath << std::endl;
+                ss << "Failed to delete ignored output file " << absPath;
             } else {
-                ss << "Deleted ignored output file " << absPath << std::endl;
+                ss << "Deleted ignored output file " << absPath;
             }
             LogRecord deleteRecord(LogRecord::Progress, ss.str());
             logBook.add(deleteRecord);
@@ -1182,6 +1184,8 @@ namespace YAM
                 LogRecord change(LogRecord::DirectoryChanges, ss.str());
                 context()->logBook()->add(change);
             }
+            LogRecord p(LogRecord::Progress, "OK: " + name().string());
+            context()->addToLogBook(p);
         } else {
             clearDetectedInputs();
             for (auto const &pair : _mandatoryOutputs) pair.second->deleteFile();
@@ -1259,9 +1263,16 @@ namespace YAM
 
         if (result.exitCode == 0 || canceling()) {
             std::error_code ec;
-            bool removed = std::filesystem::remove_all(tmpDir, ec);
-            if (!removed) {
-                logDirRemovalError(this, tmpDir, ec, logBook);
+            {
+                // remove_all often returns true while not having deleted
+                // tmpDir. This seems to be a multi-threading issue because
+                // it only happens when the threadpool contains more than 1
+                // thread. Workaround: serialize the remove_all calls.
+                std::lock_guard<std::mutex> lock(removeAllMutex);
+                bool removed = std::filesystem::remove_all(tmpDir, ec);
+                if (!removed) {
+                    logDirRemovalError(this, tmpDir, ec, logBook);
+                }
             }
             result.readOnlyFiles.erase(scriptFilePath);
         } else if (!canceling()) {

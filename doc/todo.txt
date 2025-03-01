@@ -12,6 +12,12 @@ Bugs
   Yam can delete the stale output files. Should only be deleted on user confirm.
   Try to solve this or accept and explain in the manual?
 
+- Removal of temp dir by CommandNode succeeds according to std::filesystem::remove_all
+  but in reality most of these temp dirs stay in existence.
+  Running a build with threadpool of size 1 fixes this problem.
+  A problem in Windows or in std::filesystem?
+  Workaround: serialize remove_all calls
+
 Features
 - multi-repo build: clone repos in subdirs of the yam root dir.
   Remove relation with .git directory in class DotYamDirectory?

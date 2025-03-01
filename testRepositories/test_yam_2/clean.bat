@@ -1,0 +1,14 @@
+del .yam\*
+rmdir .yam
+del project\linkedobjects.txt
+del project\cyclic*.txt
+del project\fooobjects.txt
+del submodules\*.obj
+del submodules\*objects*.txt
+del submodules\group_*.txt
+del submodules\sm1\*.obj
+del submodules\sm1\objects_1.txt
+del submodules\sm1\objects_11.txt
+del submodules\sm1\buildfile_yam_gen.txt
+del submodules\sm2\*.obj
+del submodules\sm3\*.obj

@@ -536,15 +536,8 @@ namespace YAM
         }
         auto replaceDeletedTime = std::chrono::system_clock::now();
 
-        std::size_t nStored = 
-            toInsert.size()
-            + toReplace.size()
-            + toRemove.size()
-            + toReplaceDeleted.size();
-        nodes.clearChangeSet();
-        auto end = std::chrono::system_clock::now();
-        auto milliSeconds = (std::chrono::duration_cast<std::chrono::milliseconds>(end-start)).count();
-        {
+        if (_context->logBook()->mustLogAspect(LogRecord::Performance)) {
+            auto milliSeconds = (std::chrono::duration_cast<std::chrono::milliseconds>(replaceDeletedTime - start)).count();
             std::stringstream ss;
             ss << "Store streaming took " << milliSeconds << " ms" << std::endl;
             ss << "getChanges=" << (std::chrono::duration_cast<std::chrono::milliseconds>(getChangesTime - start)).count() << " ms" << std::endl;
@@ -558,13 +551,20 @@ namespace YAM
             _context->addToLogBook(d);
         }
 
+        std::size_t nStored =
+            toInsert.size()
+            + toReplace.size()
+            + toRemove.size()
+            + toReplaceDeleted.size();
+        nodes.clearChangeSet();
+
         if (0 < nStored) {
             try {
                 auto start = std::chrono::system_clock::now();
                 _forest->commit();
-                auto end = std::chrono::system_clock::now();
-                auto milliSeconds = (std::chrono::duration_cast<std::chrono::milliseconds>(end - start)).count();
-                {
+                if (_context->logBook()->mustLogAspect(LogRecord::Performance)) {
+                    auto end = std::chrono::system_clock::now();
+                    auto milliSeconds = (std::chrono::duration_cast<std::chrono::milliseconds>(end - start)).count();
                     std::stringstream ss;
                     ss << "Store commit took " << milliSeconds << " ms";
                     LogRecord d(LogRecord::Progress, ss.str());
