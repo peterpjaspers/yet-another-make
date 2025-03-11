@@ -10,38 +10,42 @@ Note: at time of writing the YAM repo can only be built on Windows using Visual 
    This allows dependencies to boost and gtest to be referenced with relative
    paths.
 
-3- Install Visual Studio Community 2022
-   From https://visualstudio.microsoft.com/vs/community/
-   - Take care to install at least the package for C++ development.
-   - Open VS 2022 and clone repository from https://github.com/peterpjaspers/yet-another-make.git
-     into the yam\GitHub directory. This will create directory yam\GitHub\main which contains
-     the main (master) branch of the git yam repo.
+3- Clone yam repository
+   - cd yam\github
+   - git clone https://github.com/peterpjaspers/yet-another-make.git main
+     This creates directory yam\GitHub\main which contains the main (master)
+     branch of the git yam repo.
 
-4- Get boost
+4- Install Visual Studio Community 2022 from https://visualstudio.microsoft.com/vs/community/
+   Take care to install at least the package for C++ development.
+
+6- Get boost
    - Download the boost installer 1.79.0 from https://sourceforge.net/projects/boost/files/boost-binaries/
    - Run the installer and install to the yam directory.
      This results in directory yam\boost_1_79_0.
 
-5- Get googletest
+7- Get googletest
    - You need cmake. If this is not on your system:
      Download the Windows x64 cmake installer from https://cmake.org/download/
      and run it.
    - Clone googletest git repo
-        cd yam
-        mkdir gtest
-        cd gtest
+        cd yam\github
         git clone https://github.com/google/googletest.git -b release-1.12.1 
+     This creates directory yam\github\googletest
    - Generate VS2022 .vcxproj and.sln files
      (From https://github.com/google/googletest/blob/main/googletest/README.md):
-        cd googletest
+        cd yam\github\googletest
         mkdir build
         cd build
         cmake ..
-   - Open yam\github\gtest\googletest\build\googletest\gtest.sln in VS2022 and build 
+   - Open yam\github\googletest\build\googletest\gtest.sln in VS2022 and build 
      the solution for Debug and Release x64 configurations. Static libs will be written
      to directories yam\github\gtest\googletest\build\lib\Debug and 
      yam\github\gtest\googletest\build\lib\Release.
 
-6- Build yam
-   - Open yam\GitHub\main\yam.sln
-   - Build the solution
+8- Download 64-bit Windows x64 installer for 7z from  https://www.7-zip.org/download.html
+   Run installer install in C:\Program Files\7-Zip\
+
+9- Build yam
+   - Open yam\github\main\yam.sln in VS 2022
+   - Build the solution (ctrl-shift-b)

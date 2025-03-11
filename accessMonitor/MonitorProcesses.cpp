@@ -41,8 +41,21 @@ namespace AccessMonitor {
             IndexLoadLibraryExW             = IndexBase + 14,
         };
 
+        std::string getPatchDLLFile()
+        {
+            //char path[MAX_PATH];
+            //GetModuleFileNameA(NULL, path, MAX_PATH);
+            //std::filesystem::path modulePath(path);
+            //modulePath = modulePath.parent_path() / "accessMonitorDll.dll";
+            //return modulePath.string();
+            std::string dll1(R"(C:\users\peter\documents\yam\github\main\x64\Debug\accessMonitorDll.dll)");
+            std::string dll2(R"(D:\yam\github\main\x64\Debug\accessMonitorDll.dll)");
+            if (std::filesystem::exists(dll1)) return dll1;
+            return dll2;
+        }
+
         //const std::string patchDLLFile("C:/Users/philv/Code/yam/yet-another-make/accessMonitor/dll/accessMonitor64");
-        const std::string patchDLLFile("C:/Users/peter/Documents/yam/github/main/x64/Debug/accessMonitorDll.dll");
+        //const std::string patchDLLFile("C:/Users/peter/Documents/yam/github/main/x64/Debug/accessMonitorDll.dll");
 
         string exceptionText( const string& signature, const string& message ) {
             stringstream ss;
@@ -53,6 +66,7 @@ namespace AccessMonitor {
         void injectProcess( LPPROCESS_INFORMATION processInfo ) {
             const char* signature( "void injectProcess( LPPROCESS_INFORMATION processInfo )" );
             ProcessID process = GetProcessID( processInfo->dwProcessId );
+            auto patchDLLFile = getPatchDLLFile();
             if (debugLog( General )) debugRecord() << L"MonitorProcesses - Injecting DLL " << wstring( patchDLLFile.begin(), patchDLLFile.end() ) << " in process with ID " << process << "..." << record;
             inject( patchDLLFile, process, Session::current() );
         }

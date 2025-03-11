@@ -16,8 +16,17 @@ using namespace AccessMonitor;
 using namespace std;
 using namespace std::filesystem;
 
+std::wstring getPatchDLLFile()
+{
+    char path[MAX_PATH];
+    GetModuleFileNameA(NULL, path, MAX_PATH);
+    std::filesystem::path modulePath(path);
+    modulePath = modulePath.parent_path() / "accessMonitorDll.dll";
+    return modulePath.wstring();
+}
+
 //const std::wstring patchDLLFile( L"C:/Users/philv/Code/yam/yet-another-make/accessMonitor/dll/accessMonitor64.dll" );
-const std::wstring patchDLLFile( L"C:/Users/peter/Documents/yam/github/main/x64/Debug/accessMonitorDll.dll" );
+//const std::wstring patchDLLFile( L"C:/Users/peter/Documents/yam/github/main/x64/Debug/accessMonitorDll.dll" );
 
 mutex suspend;
 
@@ -58,6 +67,7 @@ int main( int argc, char* argv[] ) {
     auto thread = CurrentThreadID();
     auto patched = AccessEvent( "ProcessPatched", process );
     auto data( session->recordContext( process ) );
+    auto patchDLLFile = getPatchDLLFile();
     HMODULE library = LoadLibraryW( patchDLLFile.c_str() );
     auto error = GetLastError();
     if (error != 0) cout << "LoadLibraryW failed with error " << error << endl;

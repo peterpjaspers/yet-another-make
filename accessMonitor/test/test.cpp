@@ -21,8 +21,17 @@ static int threads = 1;         // Number of threads in each session
 static int iterations = 1;      // Number of successive start/stop monitoring requests in each session
 static bool remoteProcess = false;
 
+std::string getRemoteTestFile()
+{
+    char path[MAX_PATH];
+    GetModuleFileNameA(NULL, path, MAX_PATH);
+    std::filesystem::path modulePath(path);
+    modulePath = modulePath.parent_path() / "remoteTest.exe";
+    return modulePath.string();
+}
+
 //const std::string remoteTestFile( "C:/Users/philv/Code/yam/yet-another-make/accessMonitor/test/remoteTest.exe" );
-const std::string remoteTestFile( "C:/Users/peter/Documents/yam/github/main/x64/Debug/remoteTest.exe" );
+//const std::string remoteTestFile( "C:/Users/peter/Documents/yam/github/main/x64/Debug/remoteTest.exe" );
 
 void worker( const path directoryPath ) {
     try {
@@ -75,7 +84,7 @@ void doFileAccess( const string& directory, const int index ) {
         PROCESS_INFORMATION pi;
         if (remoteProcess) {
             stringstream commandStream;
-            commandStream << remoteTestFile << " " << index << " " << threads << " " << directory;
+            commandStream << getRemoteTestFile() << " " << index << " " << threads << " " << directory;
             command = commandStream.str();
             if (debugLog( General )) debugRecord() << "Starting remote process " << command.c_str() << record;
             // auto exitCode = system( command.str().c_str() );

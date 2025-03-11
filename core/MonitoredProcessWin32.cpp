@@ -12,8 +12,6 @@
 
 namespace
 {
-    std::string trackerExe = R"("D:\Programs\Microsoft Visual Studio\2022\community\MSBuild\Current\Bin\amd64\Tracker.exe")";
-
     std::wstring widen(std::string const& narrow) {
         std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
         std::wstring wide = converter.from_bytes(narrow);

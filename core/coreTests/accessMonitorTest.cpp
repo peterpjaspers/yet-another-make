@@ -70,8 +70,12 @@ namespace
         result.erase(std::wstring(L"C:/Program Files/7-Zip/7z.dll"));
         result.erase(std::wstring(L"C:/Program Files/7-Zip/7z.exe"));
 
+        std::string trackerExe1 = R"("C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\Tracker.exe")";
+        std::string trackerExe2= R"("D:\Programs\Microsoft Visual Studio\2022\community\MSBuild\Current\Bin\amd64\Tracker.exe")";
+        std::string trackerExe;
+        if (std::filesystem::exists(trackerExe1)) trackerExe = trackerExe1;
+        else trackerExe = trackerExe2;
 
-        std::string trackerExe = R"("C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\Tracker.exe")";
         std::filesystem::path trackerLogDir(tempDir.dir / "trackerLogDir");
         std::string trackerCmd = trackerExe + " /I " + trackerLogDir.string() + " /c " + unzipCmd;
         boost::process::child tracker(trackerCmd);
