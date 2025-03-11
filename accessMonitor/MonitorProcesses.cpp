@@ -42,7 +42,7 @@ namespace AccessMonitor {
         };
 
         //const std::string patchDLLFile("C:/Users/philv/Code/yam/yet-another-make/accessMonitor/dll/accessMonitor64");
-        const std::string patchDLLFile("D:/Peter/Github/yam/x64/Debug/accessMonitorDll.dll");
+        const std::string patchDLLFile("C:/Users/peter/Documents/yam/github/main/x64/Debug/accessMonitorDll.dll");
 
         string exceptionText( const string& signature, const string& message ) {
             stringstream ss;

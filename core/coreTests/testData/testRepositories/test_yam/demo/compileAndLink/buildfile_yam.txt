@@ -1,0 +1,21 @@
+// demo\compileAndLink
+//
+
+// Compile bar.cpp into bar.obj
+//: bar.cpp |> copy bar.cpp bin\bar.obj |> bin\bar.obj
+
+// Avoid duplication of input and output filenames in script
+//: bar.cpp |> copy %f %o & type %B.h >> %o |> bin\%B.obj
+
+// Implicit dependencies on .h files
+//: bar.cpp |> copy %f %o  & type %B.h >> %o |> bin\%B.obj
+
+// Add another compilation
+//: foo.cpp |> copy %f %o  & type %B.h >> %o |> bin\%B.obj
+
+// Use foreach to avoid enumeration of all files
+//: foreach bar.cpp foo.cpp |> copy %f %o & type %B.h >> %o |> bin\%B.obj
+: foreach *.cpp |> copy %f %o & type %B.h >> %o |> bin\%B.obj
+
+// Link all objects into app.exe
+: bin\*.obj |> type %f > %o |> bin\app.exe

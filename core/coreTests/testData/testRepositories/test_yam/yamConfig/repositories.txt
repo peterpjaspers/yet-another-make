@@ -1,0 +1,5 @@
+name = test_1 dir = ..\test_yam_1 type = Build;
+name = test_2 dir = ..\test_yam_2 type = Build;
+name = windows dir = C:\Windows type = Ignore;
+name = progs0 dir = "C:\Program Files\7-Zip" type = Ignore;
+name = progs1 dir = "C:\Program Files\Intel" type = Ignore;

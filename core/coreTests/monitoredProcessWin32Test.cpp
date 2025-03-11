@@ -99,10 +99,19 @@ namespace
         std::filesystem::path cmdExe = std::filesystem::canonical(cmdExeStr);
         std::map<std::string, std::string> env;
 
+        std::filesystem::path cTemp("C:\\temp");
+        std::filesystem::create_directory(cTemp);
+
+        auto scriptFilePath = std::filesystem::path(tempDir.dir / "cmdscript.cmd");
+        std::ofstream scriptFile(scriptFilePath.string());
+        scriptFile << "@echo off" << std::endl;
+        scriptFile << "echo rubbish > C:\\temp\\junk.txt & type C:\\temp\\junk.txt" << std::endl;
+        scriptFile.close();
+
         AccessMonitor::enableMonitoring();
         MonitoredProcessWin32 cmd(
             cmdExe.string(),
-            " /c echo rubbish > junk.txt & type junk.txt",
+            std::string(" /c ") + scriptFilePath.string(), //" /c echo rubbish > C:\\temp\\junk.txt & type C:\\temp\\junk.txt",
             wdir,
             env);
         EXPECT_TRUE(cmd.wait_for(15000));
@@ -115,7 +124,7 @@ namespace
         EXPECT_EQ(1, result.writtenFiles.size());
         EXPECT_TRUE(result.readFiles.contains(cmdExe));
         EXPECT_TRUE(result.readOnlyFiles.contains(cmdExe));
-        EXPECT_TRUE(result.readFiles.contains(wdir / "junk.txt"));
-        EXPECT_TRUE(result.writtenFiles.contains(wdir / "junk.txt"));
+        EXPECT_TRUE(result.readFiles.contains("C:\\temp\\junk.txt"));
+        EXPECT_TRUE(result.writtenFiles.contains("C:\\temp\\junk.txt"));
     }
 }

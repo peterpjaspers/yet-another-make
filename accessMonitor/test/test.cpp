@@ -22,7 +22,7 @@ static int iterations = 1;      // Number of successive start/stop monitoring re
 static bool remoteProcess = false;
 
 //const std::string remoteTestFile( "C:/Users/philv/Code/yam/yet-another-make/accessMonitor/test/remoteTest.exe" );
-const std::string remoteTestFile( "D:/Peter/Github/yam/x64/Debug/remoteTest.exe" );
+const std::string remoteTestFile( "C:/Users/peter/Documents/yam/github/main/x64/Debug/remoteTest.exe" );
 
 void worker( const path directoryPath ) {
     try {

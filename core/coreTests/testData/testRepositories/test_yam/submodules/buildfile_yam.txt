@@ -1,0 +1,16 @@
+// submodules/
+//
+buildfile sm[123]/buildfile_yam*
+
+: sm1/foo.obj |> echo %f > %o |> foo_objects.txt
+: sm[12]/*.obj |> echo %f > %o |> sm12_objects.txt
+
+: sm2/bar.obj  |> echo %f > %o |> moduleobjects_4.txt <group1> <group2>
+: sm3/poo.obj  |> echo %f > %o |> moduleobjects_5.txt <group1>
+
+: <group1>  |> echo %f > %o |> group_1.txt
+: <group2>  |> echo %f > %o |> group_2.txt
+
+: <objects> |> echo %f > %o |> moduleobjects_1.txt <cyclic1>
+: <objects> |> echo %f > %o |> moduleobjects_2.txt <cyclic2>
+: <objects> |> echo %f > %o |> moduleobjects_3.txt <cyclic3>

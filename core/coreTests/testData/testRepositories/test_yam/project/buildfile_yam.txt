@@ -1,0 +1,18 @@
+// project/
+//
+
+//buildfile @@test_2/submodules/sm[123]/
+//: @@test_2/submodules/sm[123]/*.obj  |> echo %f > %o |> test2_objects.txt
+
+: ../submodules/<objects> |> echo %f > %o |> linkedobjects.txt {objectsbin}
+: {objectsbin} ../submodules\<fooobjects> |> echo %f > %o |> fooobjects_bin_grp.txt
+: ../submodules/<cyclic1> |> echo %f > %o |> cyclic0.txt
+//: ../submodules/<cyclic1> |> echo %f > %o |> cyclic1.txt ../submodules\<objects>
+//: ../submodules/<cyclic2> |> echo %f > %o |> cyclic2.txt ../submodules\<objects>
+: ../submodules/<cyclic3> |> echo %f > %o |> cyclic3.txt //../submodules\<objects>
+
+: fooobjects_bin_grp.txt |> echo hi > %o |> ../submodules/%B.obj
+:           |> echo hi > %o |> cyclic8.txt
+:           |> echo hi > %o |> cyclic4.txt <cyclic4>
+: <cyclic4> |> echo %f > %o |> cyclic5.txt <cyclic5>
+: <cyclic5> |> echo %f > %o |> cyclic6.txt //<cyclic4>

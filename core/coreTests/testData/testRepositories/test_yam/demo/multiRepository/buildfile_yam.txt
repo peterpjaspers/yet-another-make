@@ -1,0 +1,9 @@
+// demo/multiRepository/
+//
+
+//buildfile @@test_1/submodules/sm[123]/
+//buildfile @@test_2/submodules/sm[123]/
+
+//: @@test_1/submodules/sm1/rens.obj |> echo %f > %o |> rens_objects.txt
+
+//: @@test_1/submodules/sm[123]/*.obj @@test_2/submodules/sm[123]/*.obj  |> echo %f > %o |> repo_objects.txt

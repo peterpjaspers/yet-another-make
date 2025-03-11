@@ -9,6 +9,8 @@ namespace YAM
     class __declspec(dllexport) FileSystem
     {
     public:
+        static std::filesystem::path yamTempFolder();
+
         // If not yet exists: create directory yam_temp folder in the system temporary
         // folder. Create a directory in the yam_temp folder .
         // Return normalized absolute path of created directory.

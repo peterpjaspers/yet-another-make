@@ -36,7 +36,7 @@ namespace
         env["TMP"] = tempDir.dir.string();
         env["TEMP"] = tempDir.dir.string();
         std::filesystem::remove_all("generated");
-        std::string unzipCmd(R"("C:\Program Files\7-Zip\7z.exe" e -y -ogenerated\rawImages rawImages.7z)");
+        std::string unzipCmd(R"("C:\Program Files\7-Zip\7z.exe" e -y -ogenerated\rawImages ..\..\core\coreTests\testData\rawImages.7z)");
 
         AccessMonitor::enableMonitoring();
         AccessMonitor::startMonitoring(tempDir.dir.string());
@@ -71,10 +71,10 @@ namespace
         result.erase(std::wstring(L"C:/Program Files/7-Zip/7z.exe"));
 
 
-        std::string trackerExe = R"("D:\Programs\Microsoft Visual Studio\2022\community\MSBuild\Current\Bin\amd64\Tracker.exe")";
+        std::string trackerExe = R"("C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\Tracker.exe")";
         std::filesystem::path trackerLogDir(tempDir.dir / "trackerLogDir");
         std::string trackerCmd = trackerExe + " /I " + trackerLogDir.string() + " /c " + unzipCmd;
-        boost::process::child tracker(trackerCmd, env);
+        boost::process::child tracker(trackerCmd);
         tracker.wait();
         auto exitCode = tracker.exit_code();
         EXPECT_EQ(0, exitCode);
@@ -210,7 +210,8 @@ namespace
         std::error_code ec;
         std::filesystem::remove(remoteSessionDir, ec);
 
-        auto remoteTest = boost::process::search_path("remoteTest.exe").string();
+        //to remoteTest = boost::process::search_path("remoteTest.exe").string();
+        std::string remoteTest("remoteTest.exe");
         WorkingDir tempDir;
         AccessMonitor::enableMonitoring();
         AccessMonitor::startMonitoring(tempDir.dir.string());
@@ -227,7 +228,8 @@ namespace
         std::error_code ec;
         std::filesystem::remove(remoteSessionDir, ec);
 
-        auto remoteTest = boost::process::search_path("remoteTest.exe").string();
+        //auto remoteTest = boost::process::search_path("remoteTest.exe").string();
+        std::string remoteTest("remoteTest.exe");
         WorkingDir tempDir;
 
         STARTUPINFOA si;

@@ -1,30 +1,47 @@
 Before you can build YAM you need to get boost and googletest.
 Note: at time of writing the YAM repo can only be built on Windows using Visual Studio.
-It is the ambition to make it buildable (and runnable) on Windows, Linux and MacOs.
 
-Getting boost:
-Download https://www.boost.org/users/history/version_1_79_0.html and unzip to directory of your choice.
-Update YAM\core\boost_x64.props to change references to boost unzip directory.
+1- Install git for use in cmd shell
+   Download Git-2.48.1-64-bit installer from https://git-scm.com/downloads/win
+   and run it.
 
-Getting googletest:
-From https://github.com/google/googletest/blob/main/googletest/README.md :
+2- Create directories yam and yam\github
+   All stuff needed for yam will be in this directory.
+   This allows dependencies to boost and gtest to be referenced with relative
+   paths.
 
-    mkdir gtest
-	cd gtest
-	git clone https://github.com/google/googletest.git -b release-1.12.1 
-	cd googletest        # Main directory of the cloned repository.
-	mkdir build          # Create a directory to hold the build output.
-	cd build
-	cmake ..             # Generate native build scripts for GoogleTest
+3- Install Visual Studio Community 2022
+   From https://visualstudio.microsoft.com/vs/community/
+   - Take care to install at least the package for C++ development.
+   - Open VS 2022 and clone repository from https://github.com/peterpjaspers/yet-another-make.git
+     into the yam\GitHub directory. This will create directory yam\GitHub\main which contains
+     the main (master) branch of the git yam repo.
 
+4- Get boost
+   - Download the boost installer 1.79.0 from https://sourceforge.net/projects/boost/files/boost-binaries/
+   - Run the installer and install to the yam directory.
+     This results in directory yam\boost_1_79_0.
 
-If you are on Windows and have Visual Studio installed, a gtest.sln file and several .vcxproj files will be 
-created. You can then build them using Visual Studio.
+5- Get googletest
+   - You need cmake. If this is not on your system:
+     Download the Windows x64 cmake installer from https://cmake.org/download/
+     and run it.
+   - Clone googletest git repo
+        cd yam
+        mkdir gtest
+        cd gtest
+        git clone https://github.com/google/googletest.git -b release-1.12.1 
+   - Generate VS2022 .vcxproj and.sln files
+     (From https://github.com/google/googletest/blob/main/googletest/README.md):
+        cd googletest
+        mkdir build
+        cd build
+        cmake ..
+   - Open yam\github\gtest\googletest\build\googletest\gtest.sln in VS2022 and build 
+     the solution for Debug and Release x64 configurations. Static libs will be written
+     to directories yam\github\gtest\googletest\build\lib\Debug and 
+     yam\github\gtest\googletest\build\lib\Release.
 
-If you are on a linux system, you should now see a Makefile in the current directory. 
-Just type make to build GoogleTest. 
-And then you can simply install GoogleTest if you are a system administrator.
-	make
-	sudo make install    # Install in /usr/local/ by default
-
-On Mac OS X with Xcode installed, a .xcodeproj file will be generated.
+6- Build yam
+   - Open yam\GitHub\main\yam.sln
+   - Build the solution

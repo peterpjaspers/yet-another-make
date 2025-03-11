@@ -33,19 +33,77 @@ namespace
         return ss.str();
     }
 
+     // The environment variables that are copied from the current process.
+     // Note that only systemroot is needed. Without this variable cmd.exe will fail
+     // to execute commands like 'cmd /c cmdscript.cmd'
+     //
+     std::vector<std::string> vars = {
+        //"ALLUSERSPROFILE",
+        //"APPDATA",
+        //"BRB",
+        //"BRS",
+        //"CommonProgramFiles",
+        //"CommonProgramFiles(x86)",
+        //"CommonProgramW6432",
+        //"COMPUTERNAME",
+        //"ComSpec",
+        //"DriverData",
+        //"EFC_12392",
+        //"FPS_BROWSER_APP_PROFILE_STRING",
+        //"FPS_BROWSER_USER_PROFILE_STRING",
+        //"HOMEDRIVE",
+        //"HOMEPATH",
+        //"LOCALAPPDATA",
+        //"LOGONSERVER",
+        //"NUMBER_OF_PROCESSORS",
+        //"OneDrive",
+        //"OneDriveConsumer",
+        //"OnlineServices",
+        //"OS",
+        //"Path",
+        //"PATHEXT",
+        //"platformcode",
+        //"PROCESSOR_ARCHITECTURE",
+        //"PROCESSOR_IDENTIFIER",
+        //"PROCESSOR_LEVEL",
+        //"PROCESSOR_REVISION",
+        //"ProgramData",
+        //"ProgramFiles",
+        //"ProgramFiles(x86)",
+        //"ProgramW6432",
+        //"PROMPT",
+        //"PSModulePath",
+        //"PUBLIC",
+        //"RegionCode",
+        //"SESSIONNAME",
+        //"SystemDrive",
+        "SystemRoot",
+        //"TEMP",
+        //"TMP",
+        //"USERDOMAIN",
+        //"USERDOMAIN_ROAMINGPROFILE",
+        //"USERNAME",
+        //"USERPROFILE",
+        //"windir",
+        //"ZES_ENABLE_SYSMAN"
+    };
+
     boost::process::environment generateEnv(
         std::filesystem::path const& tmpDir, 
         std::map<std::string, std::string> const& env
     ) {
-        //boost::process::environment thisenv = boost::this_process::environment();
+        boost::process::environment thisenv = boost::this_process::environment();
         boost::process::environment bpenv;
-        //bpenv["SystemRoot"] = thisenv.at("SystemRoot").to_string();
+        for (auto var : vars) {
+            bpenv[var] = thisenv.at(var).to_string();
+        }
         bpenv["TMP"] = tmpDir.string();
         bpenv["TEMP"] = tmpDir.string();
         for (auto const& pair : env) {
             bpenv[pair.first] = pair.second;
         }
         return bpenv;
+
     }
 
     std::filesystem::path getTempDirAndStartMonitoring(

@@ -17,7 +17,7 @@ using namespace std;
 using namespace std::filesystem;
 
 //const std::wstring patchDLLFile( L"C:/Users/philv/Code/yam/yet-another-make/accessMonitor/dll/accessMonitor64.dll" );
-const std::wstring patchDLLFile( L"D:/Peter/Github/yam/x64/Debug/accessMonitorDll.dll" );
+const std::wstring patchDLLFile( L"C:/Users/peter/Documents/yam/github/main/x64/Debug/accessMonitorDll.dll" );
 
 mutex suspend;
 

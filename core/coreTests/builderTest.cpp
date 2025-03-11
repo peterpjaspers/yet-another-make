@@ -131,8 +131,6 @@ namespace
                 nameFile.repoName(repoName);
                 build();
 
-                // context->threadPool().size(1); // to ease debugging
-
                 // Simulate compilation and linking
                 {
                     std::stringstream script;
@@ -232,6 +230,9 @@ namespace
 
         std::shared_ptr<BuildResult> build() {
             auto request = std::make_shared< BuildRequest>();
+            BuildOptions options;
+            options._threads = 1; // to ease debugging
+            request->options(options);
             request->repoDirectory(repo.dir);
             request->repoName(repoName);
             return executeRequest(request);

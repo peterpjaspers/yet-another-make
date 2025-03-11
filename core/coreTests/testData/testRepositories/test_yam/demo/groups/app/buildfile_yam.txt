@@ -1,0 +1,24 @@
+//demo\groups\app
+//
+
+// The first rule has input globs on generated files. The rules that declare these
+// output (generated) files are defined in buildfiles in other directories.
+// Yam requires forward declaration of output files and therefore requires these
+// buildfiles to be declared (kind of included) up-front.
+// Note: because a directory can contain at most 1 buildfile it suffices to
+// specify the directory paths.
+//
+buildfile ../platform
+buildfile A
+buildfile B
+
+// The globs select generated files.
+: ../platform/*.obj A/*.obj B/*.obj |> echo %f > %o |> app.exe
+
+// Groups are more efficient than globs because globs require a query evaluation.
+// This is not needed for groups as their content is known.
+//
+// Also groups are more convenient than globs because groups do not require
+// the buildfiles that contribute to a group to be declared.
+//
+//: ../platform/<objects> <objects> |> echo %f > %o |> app.exe

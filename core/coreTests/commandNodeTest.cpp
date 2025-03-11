@@ -92,7 +92,7 @@ namespace
             repos->addRepository(winRepo);
 
             stats.registerNodes = true;
-            //context.threadPool().size(1); // to ease debugging
+            context.threadPool().size(1); // to ease debugging
 
             std::ofstream pietSrcFile(pietSrc->absolutePath().string());
             pietSrcFile << "piet";

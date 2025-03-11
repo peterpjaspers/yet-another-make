@@ -1,0 +1,10 @@
+// demo\ignoreOutputs
+//
+
+: foo.cpp |> 
+ echo %f > %o
+ echo nep > nep\nep.lib
+ echo nep > nep\nep.obj
+ echo nep > nep\nep.exe
+ echo nep > nep\nep.txt
+|> nep\%B.obj ^nep\* nep\%B.obj 

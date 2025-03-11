@@ -1,0 +1,27 @@
+// submodules/sm1
+//
+// Demonstrates use of groups, outputs and groups on any directory,
+// handling unknown output files, ignoring some output files,
+// image processing pipeline, 
+// 
+
+: foreach *.cpp |> type %f > %o |> %B.obj ../<objects> ../<fooobjects>
+: ../<fooobjects> |> echo %f > %o |> fooobjects_grp.txt
+
+// unpack raw (not-processed) images from zip file and reference them in group <rawImages>
+: rawImages.7z |> "C:\Program Files\7-Zip\7z.exe" e -ogenerated\%B %f |> generated/%B/* <rawImages>
+
+// Process the unpacked raw images and reference them in group <processedImages>
+: foreach <rawImages>  |> echo %f > %o |> generated/processedImages/%B.txt <processedImages>
+
+// Pack the processed images in a zip file
+: <processedImages> |> "c:\Program Files\7-Zip\7z.exe" a %o generated/processedImages/img*.txt |> generated/processedImages/processedImages.7z
+
+// Ignore some output files
+: foo.cpp |> 
+ echo %f > %o
+ echo nep > nep\nep.lib
+ echo nep > nep\nep.obj
+ echo nep > nep\nep.exe
+ echo nep > nep\nep.txt
+|> nep\%B.obj ^nep\* nep\%B.obj 

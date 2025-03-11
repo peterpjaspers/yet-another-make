@@ -1,0 +1,3 @@
+: foreach *.cpp ^foo.cpp |> type %f > %o |> %B.obj ../<objects> ../<fooobjects>
+: foo.cpp |> type %f > %o |> %B.obj ../<objects> ../<fooobjects>
+: *.obj |> echo "%f" > %o |> objects_1.txt

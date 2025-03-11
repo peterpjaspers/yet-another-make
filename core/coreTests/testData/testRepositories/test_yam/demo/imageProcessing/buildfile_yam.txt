@@ -1,0 +1,14 @@
+// demo\imageProcessing
+//
+// Demonstrates use of groups to deal with unknown output files in
+// implementing an image processing pipeline.
+// 
+
+// unpack raw (not-processed) images from zip file and reference them in group <rawImages>
+: rawImages.7z |> "C:\Program Files\7-Zip\7z.exe" e -ogenerated\%B %f |> generated/%B/* <rawImages>
+
+// Process the unpacked raw images and reference them in group <processedImages>
+: foreach <rawImages>  |> echo %f > %o |> generated/processedImages/%B.txt <processedImages>
+
+// Pack the processed images in a zip file
+: <processedImages> |> "c:\Program Files\7-Zip\7z.exe" a %o generated/processedImages/img*.txt |> generated/processedImages/processedImages.7z

@@ -60,7 +60,7 @@ namespace
 
         TestDriver()
             : repoName("test_0")
-            , repoDir("D:\\test_yam")
+            , repoDir(std::filesystem::current_path() / "repos\\test_yam")
             , context(builder.context())
         {
             std::vector<LogRecord::Aspect> logAspects;
@@ -140,15 +140,22 @@ namespace
         }
     };
 
+    void copyTestRepositories() {
+        std::filesystem::path testReposSrc("..\\..\\core\\coreTests\\testData\\testrepositories");
+        std::filesystem::path testReposDst(".\\repos");
+
+        std::filesystem::remove_all(testReposDst);
+        std::filesystem::create_directory(testReposDst);
+        std::filesystem::copy(testReposSrc / "test_yam", testReposDst / "test_yam", std::filesystem::copy_options::recursive);
+        std::filesystem::copy(testReposSrc / "test_yam_1", testReposDst / "test_yam_1", std::filesystem::copy_options::recursive);
+        std::filesystem::copy(testReposSrc / "test_yam_2", testReposDst / "test_yam_2", std::filesystem::copy_options::recursive);
+    }
+
     // Reproduces crash caused by bug in PersistentBuildState::removePendingDelete
     // Crash fixed by commit after commit edc730a7c8e2e431162d9837d290d10a4ebae942
     TEST(Endurance, reproducePendingDeleteCrash) {
-        std::filesystem::remove_all("D:\\test_yam");
-        std::filesystem::remove_all("D:\\test_yam_1");
-        std::filesystem::remove_all("D:\\test_yam_2");
-        std::filesystem::copy("D:\\clean_repos\\test_yam", "D:\\test_yam", std::filesystem::copy_options::recursive);
-        std::filesystem::copy("D:\\clean_repos\\test_yam_1", "D:\\test_yam_1", std::filesystem::copy_options::recursive);
-        std::filesystem::copy("D:\\clean_repos\\test_yam_2", "D:\\test_yam_2", std::filesystem::copy_options::recursive);
+        copyTestRepositories();
+        
         const int maxRestarts = 10;
         std::shared_ptr<BuildResult> result;
         {
@@ -180,12 +187,8 @@ namespace
     // Reproduces crash in build 2.0
     // Crash fixed by commit after commit edc730a7c8e2e431162d9837d290d10a4ebae942
     TEST(Endurance, repeatAddRemoveRepositories_crashIn2_0) {
-        std::filesystem::remove_all("D:\\test_yam");
-        std::filesystem::remove_all("D:\\test_yam_1");
-        std::filesystem::remove_all("D:\\test_yam_2");
-        std::filesystem::copy("D:\\clean_repos\\test_yam", "D:\\test_yam", std::filesystem::copy_options::recursive);
-        std::filesystem::copy("D:\\clean_repos\\test_yam_1", "D:\\test_yam_1", std::filesystem::copy_options::recursive);
-        std::filesystem::copy("D:\\clean_repos\\test_yam_2", "D:\\test_yam_2", std::filesystem::copy_options::recursive);
+        copyTestRepositories();
+
         for (int nRestarts = 0; nRestarts < 4; nRestarts++) {
             TestDriver driver;
             auto& stats = driver.context->statistics();

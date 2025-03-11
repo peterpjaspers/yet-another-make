@@ -1,0 +1,5 @@
+//demo\groups\apps\A
+//
+
+
+: foreach *.cpp |> copy %f %o |> %B.obj ../<objects>

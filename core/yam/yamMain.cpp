@@ -159,6 +159,14 @@ void logBuildResult(ILogBook& logBook, BuildResult& result) {
     LogRecord record(aspect, ss.str());
     logBook.add(record);
 }
+
+boost::filesystem::path GetModulePath()
+{
+    char path[MAX_PATH];
+    GetModuleFileNameA(NULL, path, MAX_PATH);
+    return path;
+}
+
 void logCannotFindYamServer(ILogBook& logBook) {
     std::stringstream ss;
     ss
@@ -195,7 +203,8 @@ public:
         BuildServicePortRegistry portReader;
         if (!portReader.serverRunning() && startServer) {
             logStartingServer(logBook);
-            auto server = boost::process::search_path("yamServer");
+            //auto server = boost::process::search_path("yamServer");
+            auto server = GetModulePath().parent_path() / "yamServer.exe";
             success = !server.empty();
             if (!success) {
                 logCannotFindYamServer(logBook);
