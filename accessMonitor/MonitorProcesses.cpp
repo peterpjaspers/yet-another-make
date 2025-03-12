@@ -22,6 +22,11 @@ using namespace filesystem;
 
 namespace AccessMonitor {
 
+    HINSTANCE patchDllModule = NULL;
+    void setPatchDllModule(HINSTANCE dll) {
+        patchDllModule = dll;
+    }
+
     namespace {
         const unsigned long IndexBase = 80;
         enum{
@@ -43,19 +48,12 @@ namespace AccessMonitor {
 
         std::string getPatchDLLFile()
         {
-            //char path[MAX_PATH];
-            //GetModuleFileNameA(NULL, path, MAX_PATH);
-            //std::filesystem::path modulePath(path);
-            //modulePath = modulePath.parent_path() / "accessMonitorDll.dll";
-            //return modulePath.string();
-            std::string dll1(R"(C:\users\peter\documents\yam\github\main\x64\Debug\accessMonitorDll.dll)");
-            std::string dll2(R"(D:\yam\github\main\x64\Debug\accessMonitorDll.dll)");
-            if (std::filesystem::exists(dll1)) return dll1;
-            return dll2;
+            char path[MAX_PATH];
+            GetModuleFileNameA(patchDllModule, path, MAX_PATH);
+            std::filesystem::path modulePath(path);
+            modulePath = modulePath.parent_path() / "accessMonitorDll.dll";
+            return modulePath.string();
         }
-
-        //const std::string patchDLLFile("C:/Users/philv/Code/yam/yet-another-make/accessMonitor/dll/accessMonitor64");
-        //const std::string patchDLLFile("C:/Users/peter/Documents/yam/github/main/x64/Debug/accessMonitorDll.dll");
 
         string exceptionText( const string& signature, const string& message ) {
             stringstream ss;

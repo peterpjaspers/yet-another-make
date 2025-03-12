@@ -87,6 +87,9 @@ namespace YAM
         }
 
         ~DirectoriesWatcherWin32() {
+            if (!_watchers.empty() || !_removedWatchers.empty()) {
+                throw std::runtime_error("Logic error");
+            }
             if (_iocp != INVALID_HANDLE_VALUE) {
                 {
                     std::lock_guard<std::mutex> lock(_watchersMutex);

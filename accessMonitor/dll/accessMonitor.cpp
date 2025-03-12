@@ -3,6 +3,7 @@
 #include "../FileNaming.h"
 #include "../Session.h"
 #include "../Monitor.h"
+#include "../MonitorProcesses.h"
 
 #include <windows.h>
 #include <psapi.h>
@@ -17,6 +18,7 @@ BOOL WINAPI DllMain( HINSTANCE dll,  DWORD reason, LPVOID arg ) {
         //    bool stop = true;
         //}
         ProcessID process( CurrentProcessID() );
+        AccessMonitor::setPatchDllModule(dll);
         enableMonitoring();
         startMonitoring( Session::retrieveContext( process ) );
         EventSignal( "ProcessPatched", process );

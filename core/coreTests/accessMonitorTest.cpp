@@ -57,6 +57,7 @@ namespace
             } else {
                 filePath = pair.first;
             }
+            filePath = std::filesystem::weakly_canonical(filePath);
             if (
                 !Glob::isGlob(filePath) &&
                 !isSubpath(filePath.make_preferred(), tempDir.dir) &&
@@ -67,17 +68,18 @@ namespace
         }
         std::filesystem::remove_all("generated");
         // MSBuild tracker does not report read-access on these files:
+        auto dll = std::filesystem::current_path() / "accessMonitorDll.dll";
         result.erase(std::wstring(L"C:/Program Files/7-Zip/7z.dll"));
         result.erase(std::wstring(L"C:/Program Files/7-Zip/7z.exe"));
+        result.erase(dll.wstring());
 
-        std::string trackerExe1 = R"("C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\Tracker.exe")";
-        std::string trackerExe2= R"("D:\Programs\Microsoft Visual Studio\2022\community\MSBuild\Current\Bin\amd64\Tracker.exe")";
-        std::string trackerExe;
+        std::filesystem::path trackerExe1("C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\MSBuild\\Current\\Bin\\Tracker.exe");
+        std::filesystem::path trackerExe2("D:\\Programs\\Microsoft Visual Studio\\2022\\community\\MSBuild\\Current\\Bin\\amd64\\Tracker.exe");
+        std::filesystem::path trackerExe = trackerExe2;
         if (std::filesystem::exists(trackerExe1)) trackerExe = trackerExe1;
-        else trackerExe = trackerExe2;
 
         std::filesystem::path trackerLogDir(tempDir.dir / "trackerLogDir");
-        std::string trackerCmd = trackerExe + " /I " + trackerLogDir.string() + " /c " + unzipCmd;
+        std::string trackerCmd = trackerExe.string() + " /I " + trackerLogDir.string() + " /c " + unzipCmd;
         boost::process::child tracker(trackerCmd);
         tracker.wait();
         auto exitCode = tracker.exit_code();
