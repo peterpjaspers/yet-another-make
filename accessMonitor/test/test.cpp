@@ -27,6 +27,10 @@ std::string getRemoteTestFile()
     GetModuleFileNameA(NULL, path, MAX_PATH);
     std::filesystem::path modulePath(path);
     modulePath = modulePath.parent_path() / "remoteTest.exe";
+	if (!std::filesystem::exists(modulePath)) {
+		std::cerr << "Remote test file not found: " << modulePath << std::endl;
+		throw std::runtime_error("Remote test file not found");
+	}
     return modulePath.string();
 }
 
@@ -155,6 +159,7 @@ void doMonitoredFileAccess( int thread, int iteration ) {
         startMonitoring( temp, aspects );
         auto session( Session::current() );
         doFileAccess( session->directory().generic_string(), session->id() );
+        //doFileAccess("C:/Users/peter/AppData/Local/Temp/fileAccessMonitor", thread);
         MonitorEvents events;
         stopMonitoring( &events );
         // Log (all) events for monitoring session...

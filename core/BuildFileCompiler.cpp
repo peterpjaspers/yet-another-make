@@ -60,7 +60,7 @@ namespace
         std::filesystem::path uid = uidPath(baseDir);
         while (
             (nodes.find(uid) != nullptr)
-            && (newNodes.find(uid) != newNodes.end())
+            || (newNodes.find(uid) != newNodes.end())
         ) {
             uid = uidPath(baseDir);
         }

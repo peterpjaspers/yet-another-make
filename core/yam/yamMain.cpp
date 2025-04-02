@@ -305,11 +305,11 @@ int main(int argc, char* argv[]) {
     if (parser.help()) return 0;
 
     // TODO: remove before release.
-    std::vector<LogRecord::Aspect> logAspects = logBook.aspects();
-    logAspects.push_back(LogRecord::BuildStateUpdate);
-    logAspects.push_back(LogRecord::IgnoredOutputFiles);
-    logBook.aspects(logAspects);
-    options._logAspects = logAspects;
+    //std::vector<LogRecord::Aspect> logAspects = logBook.aspects();
+    //logAspects.push_back(LogRecord::BuildStateUpdate);
+    //logAspects.push_back(LogRecord::IgnoredOutputFiles);
+    //logBook.aspects(logAspects);
+    //options._logAspects = logAspects;
 
     std::filesystem::path repoDir;
     std::string repoName;
