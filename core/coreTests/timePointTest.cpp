@@ -61,4 +61,21 @@ namespace
         std::string dt = wct.time1();
         EXPECT_EQ("11:01:10.7", dt);
     }
+
+	TEST(TimeDuration, toString) {
+        TimePoint start0(std::vector<uint32_t>{ 2023, 2, 14, 11, 01, 10, 698765 });
+        TimePoint end0 (std::vector<uint32_t> { 2023, 2, 14, 11, 01, 10, 698765 });
+        auto str = TimeDuration::toString(end0.time() - start0.time());
+        EXPECT_EQ("", str);
+
+        TimePoint start1(std::vector<uint32_t>{ 2023, 12, 31, 23, 59, 59, 999999 });
+        TimePoint end1 (std::vector<uint32_t> { 2024,  1,  1,  0,  0,  0,      0 });
+        str = TimeDuration::toString(end1.time() - start1.time());
+        EXPECT_EQ("", str);
+
+        TimePoint start2(std::vector<uint32_t>{ 2023, 10, 10, 10, 10, 10, 100000 });
+        TimePoint end2 (std::vector<uint32_t> { 2023, 10, 10, 12, 12, 12, 120000 });
+        str = TimeDuration::toString(end2.time() - start2.time());
+        EXPECT_EQ("2 hours 2 minutes 2 seconds 20 milliseconds", str);
+	}
 }
