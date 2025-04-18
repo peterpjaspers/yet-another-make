@@ -101,6 +101,29 @@ namespace
         }
         return pruned;
     }
+    void deleteLeftoverFiles(const std::filesystem::path& tempFolder, ILogBook* logBook) {
+        if (!std::filesystem::exists(tempFolder)) {
+            std::filesystem::create_directories(tempFolder);
+        }
+        else {
+            auto dirIter = std::filesystem::directory_iterator(tempFolder);
+            int fileCount = std::count_if(
+                begin(dirIter),
+                end(dirIter),
+                [](auto& entry) { return true; }
+            );
+            if (fileCount > 0) {
+                std::stringstream ss;
+                ss << "Deleting " << fileCount << " directories from " << tempFolder;
+                LogRecord progress(LogRecord::Progress, ss.str());
+                logBook->add(progress);
+            }
+            std::error_code ec;
+            for (auto const& entry : std::filesystem::directory_iterator(tempFolder)) {
+                std::filesystem::remove_all(entry.path(), ec);
+            }
+        }
+    }
     
     std::mutex _mutex;
     unsigned int _nBuilders = 0;
@@ -198,6 +221,8 @@ namespace YAM
         if (threads == 0) threads = defaultThreads;
         else if (threads > maxThreads) threads = maxThreads;
         _context.threadPool().size(threads);
+
+		deleteLeftoverFiles(FileSystem::yamTempFolder(), _context.logBook().get());
 
         if (_buildState == nullptr) {
             std::filesystem::path yamDir = repoDir / DotYamDirectory::yamName();
