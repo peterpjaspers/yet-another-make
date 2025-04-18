@@ -216,6 +216,57 @@ namespace YAM
             _time = wc2tp(_wctime);
         }
     }
+
+    TimeDuration::TimeDuration(
+        std::chrono::system_clock::time_point start,
+        std::chrono::system_clock::time_point end
+    )
+        : TimeDuration(end - start)
+    {
+    }
+
+    TimeDuration::TimeDuration(std::chrono::system_clock::duration duration)
+        : _duration(duration)
+    {
+    }
+
+    std::string TimeDuration::toString(std::chrono::system_clock::duration const& duration) {
+        auto milliSeconds = (std::chrono::duration_cast<std::chrono::milliseconds>(duration)).count();
+
+        long long hours = milliSeconds / (60 * 60 * 1000);
+        milliSeconds -= hours * 60 * 60 * 1000;
+        long long minutes = milliSeconds / (60 * 1000);
+        milliSeconds -= minutes * 60 * 1000;
+        long long seconds = milliSeconds / 1000;
+        milliSeconds -= seconds * 1000;
+
+        std::stringstream ss;
+        if (hours == 1) {
+            ss << "1 hour ";
+        }
+        else if (hours > 1) {
+            ss << hours << " hours ";
+        }
+        if (minutes == 1) {
+            ss << "1 minute ";
+        }
+        else if (minutes > 1) {
+            ss << minutes << " minutes ";
+        }
+        if (seconds == 1) {
+            ss << "1 second ";
+        }
+        else if (seconds > 1) {
+            ss << seconds << " seconds ";
+        }
+        if (milliSeconds == 1) {
+            ss << "1 milliseconds ";
+        }
+        else if (milliSeconds > 1) {
+            ss << milliSeconds << " milliseconds";
+        }
+        return ss.str();
+    }
 }
 
 

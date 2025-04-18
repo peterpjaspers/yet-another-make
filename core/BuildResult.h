@@ -23,8 +23,6 @@ namespace YAM
         std::chrono::system_clock::time_point endTime() const;
         // Return endTime() - startTime()
         std::chrono::system_clock::duration duration() const;
-        // Return duration as string: h hours m minute etc.
-        std::string niceDuration() const;
 
         void nNodesStarted(unsigned int);
         void nNodesExecuted(unsigned int);

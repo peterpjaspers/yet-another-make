@@ -88,4 +88,25 @@ namespace YAM
         std::chrono::system_clock::time_point _time;
         WallClockTime _wctime;
     };
+
+    class __declspec(dllexport) TimeDuration
+    {
+    public:
+        TimeDuration(
+            std::chrono::system_clock::time_point start,
+            std::chrono::system_clock::time_point end
+        );
+        TimeDuration(std::chrono::system_clock::duration duration);
+
+        // Return duration as string: h hours m minutes etc. until and including ms.
+        static std::string toString(std::chrono::system_clock::duration const& duration);
+
+        std::chrono::system_clock::duration const& duration() const { return _duration; }
+
+        // Return duration as string: h hours m minutes etc. until and including ms.
+        std::string string() const { return toString(_duration); }
+
+    private:
+        std::chrono::system_clock::duration _duration;
+    };
 }
