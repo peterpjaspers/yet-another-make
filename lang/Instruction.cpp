@@ -126,6 +126,7 @@ namespace Language {
         // Pick (procedure) descriptor, this is on the stack just below the argument pointer (ap)
         // The descriptor may be a file or a string in which case it must translated.
         Descriptor& transfer( *reinterpret_cast<Descriptor*>( addressMemory( context.stack, (context.ep - 16 ) ) ) );
+        if (monitor( DebugAspects::ProcedureCall )) monitorRecord() << "Procedure call " << transfer << record<char>;
         if (!isProcedure( transfer )) throw string( signature ) + " - Procedures call address invalid";
         push( context, AddressDescriptor( context.pc ) );
         push( context, AddressDescriptor( context.fp ) );
@@ -139,7 +140,12 @@ namespace Language {
         Descriptor& result( *reinterpret_cast<Descriptor*>( addressMemory( context.stack, (context.ap - 16 ) ) ) );
         result = pop( context );
         #ifdef _DEBUG_INTERPRETER
-            // Restore frame-pointer, stack-pointer and argument-pointer
+            // Adjust stack-pointer with local variable count
+            if (monitor( DebugAspects::ProcedureCall )) monitorRecord() << "Procedure return " << record<char>;
+            Descriptor& locals( *reinterpret_cast<Descriptor*>( addressMemory( context.stack, context.fp ) ) );
+            if (!isInteger( locals )) throw string( signature ) + " - Corrupt stack";
+            // Restore frame-pointer, stack-pointer, argument-pointer and program-counter
+            context.sp -= word( locals + 8 );
             auto fp( pop( context ) );
             auto pc( pop( context ) );
             if (!isAddress( pc ) or !isAddress( fp )) throw string( signature ) + " - Corrupt stack";
@@ -158,6 +164,7 @@ namespace Language {
     }
     inline void locals( ThreadContext& context ) {
         Word locals( fetchWordOperand( context ) );
+        push( context, IntegerDescriptor( locals ) );
         // Initialize local variables to null
         auto localNulls( addressStack( context ) );
         for (int i = 0; i < (locals / sizeof( Descriptor )); ++i) { *localNulls++ = NullDescriptor(); }
@@ -218,7 +225,6 @@ namespace Language {
         context.sp += sizeof( Descriptor );
     }
     // Output expression value to console
-    // ToDo: provide sophisticated output mechanism
     void output( ThreadContext& context ) {
         auto value( pop( context ) );
         if (isVariable( value )) value = dereference( context, value );
@@ -327,10 +333,10 @@ namespace Language {
     string toReadable( const OpCode code ) { return opCodeTable[ code ].name; }
 
     void printProgram( const std::filesystem::path file ) {
-        LogFile<char> stream( file, false, false );
+        LogFile stream( file, false, false );
         printProgram( stream );
     }
-    void printProgram( LogFile<char>& stream ) {
+    void printProgram( LogFile& stream ) {
         Address pc( 0 );
         Address extent( allocateProgram( 0 ) );
         while (pc < extent) {

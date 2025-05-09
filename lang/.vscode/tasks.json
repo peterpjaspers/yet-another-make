@@ -11,7 +11,7 @@
 				"-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/ucrt",
 				"-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/um",
 				"-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/shared",
-				"${workspaceFolder}/testLanguage.cpp",
+				"${workspaceFolder}/test/testLanguage.cpp",
 				"${workspaceFolder}/LogFile.cpp",
 				"${workspaceFolder}/Monitor.cpp",
 				"${workspaceFolder}/Types.cpp",
@@ -26,7 +26,7 @@
                 "/LIBPATH:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.22621.0/um/x64",
             ],
 			"options": {
-				"cwd": "${workspaceFolder}"
+				"cwd": "${workspaceFolder}/test"
 			},
 			"group": "build",
 			"detail": "compiler: \"C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/bin/Hostx64/x64/cl.exe\""
@@ -41,7 +41,8 @@
 				"-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/ucrt",
 				"-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/um",
 				"-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/shared",
-				"${workspaceFolder}/testParser.cpp",
+				"${workspaceFolder}/test/testParser.cpp",
+				"${workspaceFolder}/Reader.cpp",
 				"${workspaceFolder}/LogFile.cpp",
 				"${workspaceFolder}/Monitor.cpp",
 				"${workspaceFolder}/Types.cpp",
@@ -57,7 +58,7 @@
                 "/LIBPATH:C:/Program Files (x86)/Windows Kits/10/Lib/10.0.22621.0/um/x64",
             ],
 			"options": {
-				"cwd": "${workspaceFolder}"
+				"cwd": "${workspaceFolder}/test"
 			},
 			"group": "build",
 			"detail": "compiler: \"C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.38.33130/bin/Hostx64/x64/cl.exe\""

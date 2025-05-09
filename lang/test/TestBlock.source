@@ -1,0 +1,26 @@
+// Block structuring test program
+
+var c( 1 );
+out( "Expect 1 " );
+out( c );
+{
+    out( "Expect 1 " );
+    out( c );
+    var c( 2 );
+    out( "Expect 2 " );
+    out( c );
+    {
+        var c( 3 );
+        out( "Expect 3 " );
+        out( c );
+    }
+    {
+        var c( 4 );
+        out( "Expect 4 " );
+        out( c );
+    }
+    out( "Expect 2 " );
+    out( c );
+}
+out( "Expect 1 " );
+out( c );

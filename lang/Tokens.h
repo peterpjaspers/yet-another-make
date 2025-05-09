@@ -1,17 +1,13 @@
-#ifndef LANG_TOKENIZER_H
-#define LANG_TOKENIZER_H
-
-#include "Types.h"
-
-#include <string>
-#include <filesystem>
-#include <fstream>
+#ifndef LANG_TOKENS_H
+#define LANG_TOKENS_H
 
 namespace Language {
 
     enum Token {
-        Undefined,
+        None,
         EndOfFile,
+        Illegal,
+        ReadError,
         Identifier,
         IntegerConstant,
         RealConstant,
@@ -64,21 +60,18 @@ namespace Language {
         MinusEqual,             // -=
         AnpersandEqual,         // &=
         CaretEqual,             // ^=
+        KeywordVar,
         KeywordIf,
         KeywordThen,
         KeywordElse,
         KeywordWhile,
+        KeywordDef,
         KeywordReturn,
-        KeywordDef
+        KeywordOut,
+        KeywordImport,
+        KeywordInclude,
     };
-
-    Token nextToken();
-    void skipToToken( const Token to);
-
-    // Convert program source in a series of tokens
-    void tokenize( std::string program );
-    void tokenize( std::filesystem::path program );
 
 }
 
-#endif // LANG_TOKENIZER_H
+#endif // LANG_TOKENS_H

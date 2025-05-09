@@ -1,4 +1,6 @@
 #include "SymbolTable.h"
+#include "Monitor.h"
+#include "Descriptor.h"
 
 #include <map>
 
@@ -7,82 +9,48 @@ using namespace std::filesystem;
 
 namespace Language {
 
-    namespace {
+    namespace { map<string,Descriptor> symbolTable; }
 
-        struct SymbolEntry {
-            SymbolType type;
-            union SymbolValue {
-                Address address;    // Address in program memeory of procedure entry-point
-                Address heap;       // Address in heap memory for global variable
-                Word offset;        // Offset from frame-pointer for local variable or argument
-            } value;
-        };
-
-        map<string,SymbolEntry> symbolTable;
-    
+    string scopedName( const std::string& name, const vector<string>& scope, int depth ) {
+        string qualifiedName( "" );
+        for ( int i = 0; i < depth; ++i ) qualifiedName += scope[ i ] + ":";
+        qualifiedName += name;
+        return qualifiedName;
     }
-
-    void createLocalVariable( const std::string& name, const Word offset ) {
-        SymbolEntry entry;
-        entry.type = LocalVariable;
-        entry.value.offset = offset;
-        symbolTable.insert( { name, entry } );
+    Descriptor lookUpSymbol( const std::string& name, const vector<string>& scope, bool local ) {
+        int depth( scope.size() );
+        if (local) {
+            auto found( symbolTable.find( scopedName( name, scope, depth ) ) );
+            if (found != symbolTable.end()) return found->second;
+        } else {
+            while (0 <= depth) {
+                auto found( symbolTable.find( scopedName( name, scope, depth ) ) );
+                if (found != symbolTable.end()) return found->second;
+                depth -= 1;
+            }
+        }
+        return NullDescriptor();
     }
-    Word localVariableOffset( const std::string& name ) {
-        auto entry( symbolTable.at( name ) );
-        return entry.value.offset;
-    }
-    void createArgumentVariable( const std::string& name, const Address address ) {
-        SymbolEntry entry;
-        entry.type = ArgumentVariable;
-        entry.value.address = address;
-        symbolTable.insert( { name, entry } );
-    }
-    Address argumentVariableAddress( const std::string& name ) {
-        auto entry( symbolTable.at( name ) );
-        return entry.value.heap;
-    }
-    void createGlobalVariable( const std::string& name, const Address address ) {
-        SymbolEntry entry;
-        entry.type = GlobalVariable;
-        entry.value.address = address;
-        symbolTable.insert( { name, entry } );
-    }
-    Address globalVariableAddress( const std::string& name ) {
-        auto entry( symbolTable.at( name ) );
-        return entry.value.heap;
-    }
-    void createProcedure( const std::string& name, const Address address ) {
-        SymbolEntry entry;
-        entry.type = Procedure;
-        entry.value.address = address;
-        symbolTable.insert( { name, entry } );
-
-    }
-    Address procedureAddress( const std::string& name ) {
-        auto entry( symbolTable.at( name ) );
-        return entry.value.address;
-    }
-    SymbolType symbolType( const std::string& name ) {
-        auto entry( symbolTable.find( name ) );
-        if (entry == symbolTable.end()) return None;
-        return entry->second.type;
+    void defineSymbol( const std::string& name, const vector<string>& scope, const Descriptor value ) {
+        auto qualifiedName( scopedName( name, scope, scope.size() ) );
+        symbolTable.insert( { qualifiedName, value } );
     }
 
-    void printSymbolTable( LogFile<char>& stream ) {
+    void printSymbolTable( LogFile& stream ) {
         for ( auto entry : symbolTable ) {
             ostream& output = stream() << setw( 32 ) << entry.first << " : ";
-            switch (entry.second.type) {
-                case None : output << setw( 11 ) << "None" << record<char>; break;
-                case LocalVariable : output << setw( 11 ) << "Local[ " << setw( 4 ) << entry.second.value.offset << " ]" << record<char>; break;
-                case GlobalVariable : output << setw( 11 ) << "Global[ " << setw( 4 ) << entry.second.value.heap << " ]" << record<char>; break;
-                case ArgumentVariable : output << setw( 11 ) << "Argument[ " << setw( 4 ) << entry.second.value.heap << " ]" << record<char>; break;
-                case Procedure : output << setw( 11 ) << "Procedure[ " << setw( 4 ) << entry.second.value.address << " ]" << record<char>; break;
-            } 
+            auto descriptor( entry.second );
+            auto typeWord( type( descriptor ) );
+            auto value( word( descriptor ) );
+            if (typeWord == LocalVariableTypeWord) output << setw( 11 ) << "Local[ " << setw( 4 ) << value << " ]" << record<char>;
+            else if (typeWord == GlobalVariableTypeWord) output << setw( 11 ) << "Global[ " << setw( 4 ) << value << " ]" << record<char>;
+            else if (typeWord == ArgumentVariableTypeWord) output << setw( 11 ) << "Argument[ " << setw( 4 ) << value << " ]" << record<char>;
+            else if (typeWord == ProcedureTypeWord) output << setw( 11 ) << "Procedure[ " << setw( 4 ) << value << " ]" << record<char>;
+            else output << setw( 11 ) << "Undefined[ " << setw( 4 ) << value << " ]" << record<char>;
         }
     }
     void printSymbolTable( const path file ) {
-        LogFile<char> stream( file, false, false );
+        LogFile stream( file, false, false );
         return printSymbolTable( stream );
     }
 

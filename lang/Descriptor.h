@@ -5,21 +5,22 @@
 
 namespace Language {
 
+    
     // A Descriptor provides typed access to program data.
     // A descriptor is a 64-bit entity consisting of a 32-bit type and a 32-bit value.
     // The value field holds either the actual value (Word, Integer or Real) or an pointer to the value (Address).
     // The representation of the value field depends on the type of the descriptor.
     inline Type type( const Descriptor& d ) { return( d >> 32 ); }
-    inline VarType variableType( const Descriptor& d ) { return( VarType(( type( d ) >> 29 ) & 0x3 ) ); }
+    inline VariableType variableType( const Descriptor& d ) { return( VariableType(( type( d ) >> 29 ) & 0x3 ) ); }
     inline Word word( const Descriptor& d ) { return( static_cast<Word>( d & ((uint64_t( 1 ) << 32) - 1) ) ); }
     inline int32_t integer( const Descriptor& d ) { return( int32_t( word( d ) ) ); }
     inline float real( const Descriptor& d ) { return( std::bit_cast<float>( word( d ) ) ); }
     inline Address address( const Descriptor& d ) { return( Address( word( d ) ) ); }
     inline Descriptor descriptor( const Type t, const Word v ) { return( (uint64_t( t ) << 32) | uint64_t( v ) ); }
-    inline bool isLocalVariable( const Descriptor& d ) { return( variableType( d ) == Local ); }
-    inline bool isArgumentVariable( const Descriptor& d ) { return( variableType( d ) == Argument ); }
-    inline bool isGlobalVariable( const Descriptor& d )  { return( variableType( d ) == Global ); }
-    inline bool isVariable( const Descriptor& d )  { return( variableType( d ) != Undefined ); }
+    inline bool isLocalVariable( const Descriptor& d ) { return( variableType( d ) == VariableType::Local ); }
+    inline bool isArgumentVariable( const Descriptor& d ) { return( variableType( d ) == VariableType::Argument ); }
+    inline bool isGlobalVariable( const Descriptor& d )  { return( variableType( d ) == VariableType::Global ); }
+    inline bool isVariable( const Descriptor& d )  { return( variableType( d ) != VariableType::Undefined ); }
     inline bool isString( const Descriptor& d ) { return( not ( type( d ) & NS ) ); }
     inline Type typeCode( const Descriptor& d ) {
         if (isString( d )) return TypeString;

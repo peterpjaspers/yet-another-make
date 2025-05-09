@@ -10,24 +10,24 @@
 #include <cstdlib>
 #include <windows.h>
 
-// ToDo: Remove mutex, no need for thread safe logging for interpreter
+// ToDo: Remove mutex for implementations that do not require multi-threaded log-file access.
 
 namespace Language {
 
     // Multi-thread safe logger.
     //
-    // LogFile files contain records teminated with a newline.
+    // BasicLogFile files contain records teminated with a newline.
     // Each record can be composed as an output stream.
     //
     // For example:
     //
-    //    log = LogFile<char>( "logfile.log" );
+    //    log = BasicLogFile<char>( "logfile.log" );
     //    ...
     //    log() << "This is a log record" << record;
     //    log() << "The current time is " << std::chrono::system_clock::now << record;
     //    ...
     //
-    // LogFile record streams are terminated with the 'record' IO manipulator.
+    // BasicLogFile record streams are terminated with the 'record' IO manipulator.
     // Each thread has its own record stream in which to composed log records at it own pace.
     // The 'record' IO manipulator ensures thread-safe access to the log file.
     //
@@ -36,20 +36,20 @@ namespace Language {
 
     typedef uint64_t LogAspects;
 
-    template< class T> class LogRecord;
+    template< class T> class BasicLogRecord;
 
     template< class T>
-    class LogFile {
+    class BasicLogFile {
     public:
-        LogFile() = delete;
-        LogFile( const std::filesystem::path& file, bool logTimes = false, bool logIntervals = false );
-        LogFile( const LogFile<T>& other ) = delete;
-        LogFile( LogFile<T>&& other ) = delete;
-        ~LogFile();
-        LogFile<T>& operator=( const LogFile<T>& other ) = delete;
-        LogFile<T>& operator=( LogFile<T>&& other ) = delete;
+        BasicLogFile() = delete;
+        BasicLogFile( const std::filesystem::path& file, bool logTimes = false, bool logIntervals = false );
+        BasicLogFile( const BasicLogFile<T>& other ) = delete;
+        BasicLogFile( BasicLogFile<T>&& other ) = delete;
+        ~BasicLogFile();
+        BasicLogFile<T>& operator=( const BasicLogFile<T>& other ) = delete;
+        BasicLogFile<T>& operator=( BasicLogFile<T>&& other ) = delete;
         // Return a (wide) string stream in which to compose a log record.
-        LogRecord<T>& operator()();
+        BasicLogRecord<T>& operator()();
         // Enable logging one or more aspects.
         inline LogAspects enable( const LogAspects aspects );
         // Disable logging one or more aspects.
@@ -68,47 +68,50 @@ namespace Language {
         bool logTime;
         bool logInterval;
         void record( const std::basic_string<T>& string );
-        friend class LogRecord<T>;
+        friend class BasicLogRecord<T>;
     };
 
+    typedef BasicLogFile<char> LogFile;
+    typedef BasicLogFile<wchar_t> WLogFile;
+
     template< class T>
-    inline LogAspects LogFile<T>::enable( const LogAspects aspects ) {
+    inline LogAspects BasicLogFile<T>::enable( const LogAspects aspects ) {
         auto previous = enabledAspects;
         enabledAspects |= aspects;
         return previous;
     }
     template< class T>
-    inline LogAspects LogFile<T>::disable( const LogAspects aspects ) {
+    inline LogAspects BasicLogFile<T>::disable( const LogAspects aspects ) {
         auto previous = enabledAspects;
         enabledAspects &= ~aspects;
         return previous;
     }
     template< class T>
-    inline bool LogFile<T>::operator()( const LogAspects aspects ) const {
+    inline bool BasicLogFile<T>::operator()( const LogAspects aspects ) const {
         if ((enabledAspects & aspects) != 0) return true;
         return false;
     }
 
     template< class T >
-    LogFile<T>::LogFile( const std::filesystem::path& file, bool time, bool interval ) : 
+    BasicLogFile<T>::BasicLogFile( const std::filesystem::path& file, bool time, bool interval ) : 
         logFile( file ), tlsRecordIndex( TlsAlloc() ), enabledAspects( 0 ), logTime( time ), logInterval( interval ), previousTime( std::chrono::system_clock::now() )
     {
-        const char* signature("LogFile( const path& file, bool time, bool interval )" );
+        const char* signature("BasicLogFile( const path& file, bool time, bool interval )" );
         if (tlsRecordIndex == TLS_OUT_OF_INDEXES) throw std::runtime_error( std::string( signature ) + " - Could not allocate thread local storage!" );
     }
     template< class T >
-    LogFile<T>::~LogFile() {
+    BasicLogFile<T>::~BasicLogFile() {
         const std::lock_guard<std::mutex> lock( logMutex );
         logFile.close();
         TlsFree( tlsRecordIndex );
     }
     // Return logging stream on enabled log.
     template< class T >
-    LogRecord<T>& LogFile<T>::operator()() {
-        static const char* signature( "LogRecord& LogFile::operator()()" );
-        auto record( static_cast<LogRecord<T>*>( TlsGetValue( tlsRecordIndex ) ) );
+    BasicLogRecord<T>& BasicLogFile<T>::operator()() {
+        static const char* signature( "BasicLogRecord& BasicLogFile::operator()()" );
+        auto record( static_cast<BasicLogRecord<T>*>( TlsGetValue( tlsRecordIndex ) ) );
         if (record == nullptr) {
-            record = new LogRecord<T>( *this );
+            record = new BasicLogRecord<T>( *this );
             TlsSetValue( tlsRecordIndex, record );
         }
         if (logTime || logInterval) {
@@ -121,14 +124,14 @@ namespace Language {
         return( *record );
     }
     template< class T >
-    void LogFile<T>::removeThread() const {
-        auto record( static_cast<LogRecord<T>*>( TlsGetValue( tlsRecordIndex ) ) );
+    void BasicLogFile<T>::removeThread() const {
+        auto record( static_cast<BasicLogRecord<T>*>( TlsGetValue( tlsRecordIndex ) ) );
         if (record != nullptr) free( record );
         TlsSetValue( tlsRecordIndex, nullptr );
     }
 
     template< class T >
-    void LogFile<T>::record( const std::basic_string<T>& string ) {
+    void BasicLogFile<T>::record( const std::basic_string<T>& string ) {
         const std::lock_guard<std::mutex> lock( logMutex ); 
         if (logFile.is_open()) logFile << string << std::flush;
     }
@@ -136,7 +139,7 @@ namespace Language {
     template< class T >
     // Complete log entry and write to log file.
     std::basic_ostream<T>& record( std::basic_ostream<T>& stream ) {
-        auto& entry( static_cast<LogRecord<T>&>( stream ) );
+        auto& entry( static_cast<BasicLogRecord<T>&>( stream ) );
         entry << "\n";
         entry.record( entry.str() );
         entry.str( "" );
@@ -144,23 +147,21 @@ namespace Language {
     }
 
     template< class T>
-    class LogRecord : public std::basic_ostringstream<T> {
+    class BasicLogRecord : public std::basic_ostringstream<T> {
     public:
-        LogRecord() = delete;
-        LogRecord( LogFile<T>& log ) : logFile( log ) {};
-        LogRecord( const LogRecord<T>& other ) = delete;
-        LogRecord( LogRecord<T>&& other ) = delete;
-        LogRecord<T>& operator=( const LogRecord<T>& other ) = delete;
-        LogRecord<T>& operator=( LogRecord<T>&& other ) = delete;
+        BasicLogRecord() = delete;
+        BasicLogRecord( BasicLogFile<T>& log ) : logFile( log ) {};
+        BasicLogRecord( const BasicLogRecord<T>& other ) = delete;
+        BasicLogRecord( BasicLogRecord<T>&& other ) = delete;
+        BasicLogRecord<T>& operator=( const BasicLogRecord<T>& other ) = delete;
+        BasicLogRecord<T>& operator=( BasicLogRecord<T>&& other ) = delete;
         inline void record( std::basic_string<T> string ) { logFile.record( string ); };
     private:
-        LogFile<T>& logFile;
-        friend std::basic_ostringstream<T>& record( std::basic_ostringstream<T>& record );
+        BasicLogFile<T>& logFile;
     };
 
-    // Terminate a log record and write it to the log file.
-    template< class T>
-    std::basic_ostringstream<T>& record( std::basic_ostringstream<T>& stream );
+    typedef BasicLogRecord<char> LogRecord;
+    typedef BasicLogRecord<wchar_t> WLogRecord;
 
     // Convert ANSI string to a wide string
     std::wstring widen( const std::string& src );

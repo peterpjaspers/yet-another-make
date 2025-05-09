@@ -1,27 +1,26 @@
-#include "Translator.h"
+#include "../Translator.h"
 
-#include "Monitor.h"
-#include "Instruction.h"
-#include "SymbolTable.h"
+#include "../Monitor.h"
+#include "../Instruction.h"
+#include "../SymbolTable.h"
 
 using namespace std;
 using namespace std::filesystem;
 
 using namespace Language;
 
-// ToDo: Move test programs to test subdirectory
-
 int main( int argc, char* argv[] ) {
     startMonitor( ".", "Parser", true, false );
     monitor().enable(
         DebugAspects::ParserFunctions |
         DebugAspects::GeneratedCode |
-        DebugAspects::SourceCode
+        DebugAspects::SourceCode |
+        DebugAspects::Symbols
     );
     auto start( translate( path( argv[ 1 ] ) ) );
     stopMonitor();
-    printProgram( "GeneratedCode.txt" );
-    printSymbolTable( "Symbols.txt" );
+    printProgram( "GeneratedCode.log" );
+    printSymbolTable( "Symbols.log" );
     startMonitor( ".", "Interpreter", true, false );
     monitor().enable(
         DebugAspects::InstructionExecution |

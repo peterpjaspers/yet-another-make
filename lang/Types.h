@@ -45,17 +45,18 @@ namespace Language {
     std::string typeToString( const Type type );
 
     // Desriptor access
-    enum VarType {
+    enum VariableType {
         Undefined   = 0,
         Local       = 1,
         Argument    = 2,
-        Global      = 3
+        Global      = 3,
+        Procedure
     };
 
-    static const Type NS( 1 << 31 );            // Not string
-    static const Type LV( Local << 29 );        // Local Variable
-    static const Type AV( Argument << 29 );     // Argument Variable
-    static const Type GV( Global << 29 );       // Global Variable
+    static const Type NS( 1 << 31 );                        // Not string
+    static const Type LV( VariableType::Local << 29 );      // Local Variable
+    static const Type AV( VariableType::Argument << 29 );   // Argument Variable
+    static const Type GV( VariableType::Global << 29 );     // Global Variable
     static const Type Pointer( 1 << 28 );
     static const Type Trapped( 1 << 27 );
     static const Type TypeValueMask( (1 << 27) - 1 );
@@ -84,6 +85,7 @@ namespace Language {
     inline Descriptor GlobalVariableDescriptor( Address address ) { return( ((Descriptor)GlobalVariableTypeWord << 32) | address ); }
     inline Descriptor ProcedureDescriptor( Address address ) { return( ((Descriptor)ProcedureTypeWord << 32) | address ); }
     inline Descriptor AddressDescriptor( Address address ) { return( ((Descriptor)AddressTypeWord << 32) | address ); }
+    inline Descriptor BuildDescriptor( Type type, Word value ) { return( ((Descriptor)type << 32) | value ); }
 
 } // namespace Language
 

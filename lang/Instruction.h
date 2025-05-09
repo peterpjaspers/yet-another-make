@@ -125,7 +125,7 @@ namespace Language {
     std::string toReadable( const OpCode code );
 
     // Contents the contents of the program to a human readbale file.
-    void printProgram( LogFile<char>& stream );
+    void printProgram( LogFile& stream );
     void printProgram( const std::filesystem::path file );
 
 } // namespace Language

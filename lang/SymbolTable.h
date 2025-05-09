@@ -7,28 +7,18 @@
 #include <string>
 #include <filesystem>
 #include <iostream>
+#include <vector>
 
 namespace Language {
 
-    enum SymbolType {
-        None,
-        LocalVariable,
-        GlobalVariable,
-        ArgumentVariable,
-        Procedure
-    };
+    // Look-up a symbol with the given name in the current scope.
+    // The local argument controls scope locality, false to look-up in full hierarchy.
+    // Returns the Descriptor value of the symbol if it exists, otherwise return NullDescriptor.
+    Descriptor lookUpSymbol( const std::string& name, const std::vector<std::string>& scope, bool local = false );
+    // Define a symbol with the given name in the current local scope.
+    void defineSymbol( const std::string& name, const std::vector<std::string>& scope, const Descriptor value );
 
-    SymbolType symbolType( const std::string& name );
-    void createLocalVariable( const std::string& name, const Word offset );
-    Word localVariableOffset( const std::string& name );
-    void createArgumentVariable( const std::string& name, const Address address );
-    Address argumentVariableAddress( const std::string& name );
-    void createGlobalVariable( const std::string& name, const Address address );
-    Address globalVariableAddress( const std::string& name );
-    void createProcedure( const std::string& name, const Address address );
-    Address procedureAddress( const std::string& name );
-
-    void printSymbolTable( LogFile<char>& stream );
+    void printSymbolTable( LogFile& stream );
     void printSymbolTable( const std::filesystem::path file );
 
 }

@@ -1,0 +1,15 @@
+import <Factorial.source>
+def g ( x, y, z ) {
+    return( x * y / z );
+}
+import <Factorial.source>
+{
+    var c( 0 );
+    while (c < 47) c += 7; out c;
+    var b( 5 );
+    var d( 13 + b * c ); out d;
+    if (b < 33) c = 13 + b * c; else d =  47 - b * c;
+    out "Factorial( 7 )";
+    out factorial( 7 );
+    out g( 10, 13.4, 7 );
+}
