@@ -32,6 +32,7 @@ namespace YAM
     }
 
     void FileNode::execute() {
+		auto start = std::chrono::high_resolution_clock::now();
         auto newState = Node::State::Ok;
         std::map<std::string, XXH64_hash_t> newHashes;
         auto lwt = _lastWriteTime;
@@ -55,6 +56,8 @@ namespace YAM
                 finish(newState, newLastWriteTime, newHashes);
             });
         context()->mainThreadQueue().push(std::move(d));
+        auto end = std::chrono::high_resolution_clock::now();
+        _executeDuration = end - start;
     }
        
     void FileNode::finish(
@@ -75,6 +78,13 @@ namespace YAM
                     context()->logBook()->add(change);
                 }
                 context()->statistics().registerRehashedFile(this);
+                if (context()->logBook()->mustLogAspect(LogRecord::Performance)) {
+                    auto ms = _executeDuration.count()/1000000;
+                    std::stringstream ss;
+                    ss << "FOK(" << ms << " ms) " << name().string();
+                    LogRecord perf(LogRecord::Performance, ss.str());
+                    context()->addToLogBook(perf);
+                }
             }
         } else {
             std::stringstream ss;

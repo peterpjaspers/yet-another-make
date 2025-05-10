@@ -1184,7 +1184,10 @@ namespace YAM
                 LogRecord change(LogRecord::DirectoryChanges, ss.str());
                 context()->logBook()->add(change);
             }
-            LogRecord p(LogRecord::Progress, "OK: " + name().string());
+            auto ms = _scriptDuration.count() / 1000000;
+            std::stringstream ss;
+			ss << "COK(" << ms << " ms, " << _detectedInputs.size() << ") " << name().string();
+            LogRecord p(LogRecord::Progress, ss.str());
             context()->addToLogBook(p);
         } else {
             clearDetectedInputs();
@@ -1252,6 +1255,7 @@ namespace YAM
             wdir = std::filesystem::current_path();
         }
 
+        auto start = std::chrono::high_resolution_clock::now();
         auto executor = std::make_shared<MonitoredProcess>(
             cmdExe,
             std::string(" /c ") + scriptFilePath.string(),
@@ -1260,14 +1264,18 @@ namespace YAM
         _scriptExecutor.store(executor);
         MonitoredProcessResult result = executor->wait();
         _scriptExecutor.store(nullptr);
+        auto end = std::chrono::high_resolution_clock::now();
+        _scriptDuration = end - start;
 
         if (result.exitCode == 0 || canceling()) {
             std::error_code ec;
             {
                 // remove_all often returns true while not having deleted
-                // tmpDir. This seems to be a multi-threading issue because
-                // it only happens when the threadpool contains more than 1
-                // thread. Workaround: serialize the remove_all calls.
+                // tmpDir. This is related to multi-threading because it does
+                // not happen when the threadpool contains 1 thread only.
+                // Serializing the remove_all calls helps but does not entirely
+                // fix the problem. Reason is unknown. Workaround: delete
+                // the remaining tmp dirs at start of each build.
                 std::lock_guard<std::mutex> lock(removeAllMutex);
                 bool removed = std::filesystem::remove_all(tmpDir, ec);
                 if (!removed) {
@@ -1277,8 +1285,6 @@ namespace YAM
             result.readOnlyFiles.erase(scriptFilePath);
         } else if (!canceling()) {
             logScriptFailure(this, result, tmpDir, logBook);
-        } else  {
-            bool stop = true;
         }
         return result;
     }

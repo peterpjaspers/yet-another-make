@@ -7,14 +7,13 @@
 namespace
 {
     std::mutex mutex; // to guard access to std::tmpnam
-
-    std::filesystem::path _yamTempFolder = std::filesystem::temp_directory_path() / "yam_temp";
 }
 
 namespace YAM
 {
     std::filesystem::path FileSystem::yamTempFolder() {
-        return _yamTempFolder;
+        static std::filesystem::path tmp = std::filesystem::temp_directory_path() / "yam_temp";
+        return tmp;
     }
 
     std::filesystem::path FileSystem::createUniqueDirectory(std::string const& prefix) {
@@ -31,7 +30,7 @@ namespace YAM
         char* name = std::tmpnam(nullptr);
         if (name == nullptr) throw std::exception("std::tmpnam failed");
         std::filesystem::path p(name);
-        std::filesystem::path up(_yamTempFolder / (prefix + p.filename().string()));
+        std::filesystem::path up(yamTempFolder() / (prefix + p.filename().string()));
         return up;
     }
 

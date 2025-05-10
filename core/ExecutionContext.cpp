@@ -34,7 +34,7 @@ namespace YAM
         : _mainThreadQueue(nPriorities())
         , _threadPoolQueue(nPriorities())
         , _mainThread(&_mainThreadQueue, "YAM_main")
-        , _threadPool(&_threadPoolQueue, "YAM_threadpool", getDefaultPoolSize()) 
+        , _threadPool(&_threadPoolQueue, "YAM_thread", getDefaultPoolSize()) 
         , _logBook(std::make_shared<ConsoleLogBook>())
     {
         auto const& entireFileSet = FileAspectSet::entireFileSet();

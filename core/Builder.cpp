@@ -107,10 +107,10 @@ namespace
         }
         else {
             auto dirIter = std::filesystem::directory_iterator(tempFolder);
-            int fileCount = std::count_if(
-                begin(dirIter),
-                end(dirIter),
-                [](auto& entry) { return true; }
+            auto fileCount = std::count_if(
+               begin(dirIter),
+               end(dirIter),
+               [](auto& entry) { return true; }
             );
             if (fileCount > 0) {
                 std::stringstream ss;
@@ -520,7 +520,19 @@ namespace YAM
         _dirtyBuildFileCompilers->setState(Node::State::Ok);
         _dirtyCommands->setState(Node::State::Ok);
 
-        //_buildState->logState(*(_context.logBook()));
+        if (_context.logBook()->mustLogAspect(LogRecord::Performance)) {
+            std::stringstream ss;
+            ss << "Time usage of threads: " << std::endl;
+            auto ns = _context.mainThread().timeUsage();
+            ss << "Main thread: " << ns.count() / 1000000 << " us" << std::endl;
+            for (auto const& thread : _context.threadPool().threads()) {
+                ns = thread->timeUsage();
+                ss <<thread->name() << ": " << ns.count() / 1000000 << " us" << std::endl;
+            }
+            LogRecord perf(LogRecord::Performance, ss.str());
+            _context.addToLogBook(perf);
+        }
+
         auto result = _result;
         _result = nullptr;
         _context.buildRequest(nullptr);

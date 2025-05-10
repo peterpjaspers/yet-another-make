@@ -8,6 +8,7 @@
 #include "xxhash.h"
 
 #include <atomic>
+#include <chrono>
 #include <unordered_set>
 
 namespace YAM
@@ -288,5 +289,7 @@ namespace YAM
         // The hash of the hashes of all items that, when changed, invalidate
         // the output files.
         XXH64_hash_t _executionHash;
+
+		std::chrono::nanoseconds _scriptDuration;
     };
 }

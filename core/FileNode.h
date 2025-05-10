@@ -123,6 +123,7 @@ namespace YAM
         std::chrono::utc_clock::time_point _lastWriteTime;
         // file aspect name => file aspect hash
         std::map<std::string, XXH64_hash_t> _hashes;
+        std::chrono::nanoseconds _executeDuration;
     };
 }
 

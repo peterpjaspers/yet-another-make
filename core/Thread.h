@@ -2,6 +2,7 @@
 
 #include <thread>
 #include <string>
+#include <chrono>
 
 namespace YAM
 {
@@ -13,6 +14,7 @@ namespace YAM
         Thread(PriorityDispatcher* dispatcher, std::string const & name);
         ~Thread();
 
+        void run();
         std::string const& name() const;
         PriorityDispatcher* dispatcher() const;
 
@@ -22,10 +24,19 @@ namespace YAM
         // Return whether call is made in this thread.
         bool isThisThread() const;
 
+        // Return the time spent in this thread since the last call
+        // to this function.
+        std::chrono::nanoseconds timeUsage() {
+            auto tmp = _executeDuration;
+            _executeDuration = std::chrono::nanoseconds::zero();
+            return tmp;
+        }
+
     private:
         PriorityDispatcher* _dispatcher;
         std::string _name;
         std::thread _thread;
+        std::chrono::nanoseconds _executeDuration;
     };
 }
 

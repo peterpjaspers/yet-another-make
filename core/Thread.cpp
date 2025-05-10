@@ -4,10 +4,6 @@
 
 namespace
 {
-    void run(YAM::PriorityDispatcher* dispatcher) {
-        dispatcher->run();
-    }
-
         namespace {
 
         const DWORD MS_VC_EXCEPTION = 0x406D1388;
@@ -61,7 +57,8 @@ namespace YAM
     Thread::Thread(PriorityDispatcher* dispatcher, std::string const& name)
         : _dispatcher(dispatcher)
         , _name(name)
-        , _thread(&run, _dispatcher)
+        , _thread(&Thread::run, this)
+        , _executeDuration(std::chrono::nanoseconds::zero())
     {
         SetThreadName(&_thread, name.c_str());
     }
@@ -69,6 +66,18 @@ namespace YAM
     Thread::~Thread() {
         if (joinable()) {
             join();
+        }
+    }
+
+    void Thread::run() {
+        while (!_dispatcher->stopped()) {
+            Delegate<void> d = _dispatcher->pop();
+            if (d.IsBound()) {
+                auto start = std::chrono::high_resolution_clock::now();
+                d.Execute();
+                auto end = std::chrono::high_resolution_clock::now();
+                _executeDuration += end - start;
+            }
         }
     }
 

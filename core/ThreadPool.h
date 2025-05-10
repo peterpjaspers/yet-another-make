@@ -19,6 +19,8 @@ namespace YAM
         // Return the number of threads in the pool.
         std::size_t size() const;
 
+		std::vector<std::shared_ptr<Thread>> const& threads() const { return _threads; }
+
         // Adjust the number of threads in the pool. 
         // 
         // YAM only adjusts size (when the users requests a non-default size) 
