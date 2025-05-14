@@ -1,6 +1,6 @@
 #include "Functions.h"
 #include "Instruction.h"
-#include "Memory.h"
+#include "ThreadContext.h"
 
 #include <cmath>
 
@@ -53,14 +53,14 @@ namespace Language {
         struct Dyadic {
             Descriptor left;
             Descriptor right;
-            Dyadic( ThreadContext& context, const Convert convert ) {
-                static const char* signature( "Dyadic( ThreadContext& context )" );
-                right = pop( context );
-                left = pop( context );
+            Dyadic( const Convert convert ) {
+                static const char* signature( "Dyadic( const Convert convert )" );
+                right = pop();
+                left = pop();
                 // 1 - If either is a variable, dereference it.
                 // 2 - If either is an expression evaluate it. (ToDo:)
-                if (isVariable( left )) left = dereference( context, left );
-                if (isVariable( right )) right = dereference( context, right );
+                if (isVariable( left )) left = dereference( left );
+                if (isVariable( right )) right = dereference( right );
                 if (convert == Convert::Integer) { toInteger( left ); toInteger( right ); }
                 else if (convert == Convert::Real) { toReal( left ); toReal( right ); }
                 else if (convert == Convert::String) { toString( left ); toString( right ); }
@@ -71,10 +71,10 @@ namespace Language {
         };
         struct Monadic {
             Descriptor operand;
-            Monadic( ThreadContext& context, const Convert convert ) {
-                static const char* signature( "Monadic( ThreadContext& context )" );
-                operand = pop( context );
-                if (isVariable( operand )) operand = dereference( context, operand );
+            Monadic( const Convert convert ) {
+                static const char* signature( "Monadic( const Convert convert )" );
+                operand = pop();
+                if (isVariable( operand )) operand = dereference( operand );
                 if (convert == Convert::Integer) toInteger( operand );
                 else if (convert == Convert::Real) toReal( operand );
                 else if (convert == Convert::String) toString( operand );
@@ -90,117 +90,117 @@ namespace Language {
         };
     }
 
-    int32_t compareString( ThreadContext& context, const Descriptor& left, const Descriptor& right ) {
+    int32_t compareString( const Descriptor& left, const Descriptor& right ) {
         auto leftString( stringToCString( left ) );
         auto rightString( stringToCString( right ) );
         strcmp( leftString.c_str(), rightString.c_str() );
         return strcmp( leftString.c_str(), rightString.c_str() );
     }
-    int32_t compareInteger( ThreadContext& context, const Descriptor& left, const Descriptor& right ) {
+    int32_t compareInteger( const Descriptor& left, const Descriptor& right ) {
         auto leftInteger( integer( left ) );
         auto rightInteger( integer( right ) );
         if ( leftInteger < rightInteger ) return( -1 );
         if ( rightInteger < leftInteger ) return( 1 );
         return( 0 );
     }
-    int32_t compareReal( ThreadContext& context, const Descriptor& left, const Descriptor& right ) {
+    int32_t compareReal( const Descriptor& left, const Descriptor& right ) {
         auto leftReal( real( left ) );
         auto rightReal( real( right ) );
         if ( leftReal < rightReal ) return( -1 );
         if ( rightReal < leftReal ) return( 1 );
         return( 0 );
     }
-    int32_t compare( ThreadContext& context ) {
-        static const char* signature( "int32_t compare( ThreadContext& context )" );
-        Dyadic ops( context, Convert::Arithmetic );
-        if (typeCode( ops.left ) == TypeString) return compareString( context, ops.left, ops.right );
-        else if (typeCode( ops.left ) == TypeInteger) return compareInteger( context, ops.left, ops.right );
-        else if (typeCode( ops.left ) == TypeReal) return compareReal( context, ops.left, ops.right );
+    int32_t compare() {
+        static const char* signature( "int32_t compare()" );
+        Dyadic ops( Convert::Arithmetic );
+        if (typeCode( ops.left ) == TypeString) return compareString( ops.left, ops.right );
+        else if (typeCode( ops.left ) == TypeInteger) return compareInteger( ops.left, ops.right );
+        else if (typeCode( ops.left ) == TypeReal) return compareReal( ops.left, ops.right );
         else throw string( signature ) + " - Cannot compare " + typeToString(typeCode( ops.left )) + " with " + typeToString(typeCode( ops.right ));
     }
-    Descriptor compare( ThreadContext& context, int32_t success ) {
-        auto cmp( compare( context ) );
+    Descriptor compare( int32_t success ) {
+        auto cmp( compare() );
         if (cmp == success) return( IntegerDescriptor( 1 ) );
         return( NullDescriptor() );
     }
-    Descriptor compare( ThreadContext& context, int32_t success1, int32_t success2 ) {
-        auto cmp( compare( context ) );
+    Descriptor compare( int32_t success1, int32_t success2 ) {
+        auto cmp( compare() );
         if ((cmp == success1) or (cmp == success2)) return( IntegerDescriptor( 1 ) );
         return( NullDescriptor() );
     }
-    Descriptor FunAdd( ThreadContext& context ) {
-        Dyadic ops( context, Convert::Arithmetic );
+    Descriptor FunAdd() {
+        Dyadic ops( Convert::Arithmetic );
         if (typeCode( ops.left ) == TypeInteger) return( IntegerDescriptor( integer( ops.left ) + integer( ops.right ) ) );
         return( RealDescriptor( real( ops.left ) + real( ops.right ) ) );
     }
-    Descriptor FunSub( ThreadContext& context ) {
-        Dyadic ops( context, Convert::Arithmetic );
+    Descriptor FunSub() {
+        Dyadic ops( Convert::Arithmetic );
         if (typeCode( ops.left ) == TypeInteger) return( IntegerDescriptor( integer( ops.left ) - integer( ops.right ) ) );
         return( RealDescriptor( real( ops.left ) - real( ops.right ) ) );
     }
-    Descriptor FunMul( ThreadContext& context ) {
-        Dyadic ops( context, Convert::Arithmetic );
+    Descriptor FunMul() {
+        Dyadic ops( Convert::Arithmetic );
         if (typeCode( ops.left ) == TypeInteger) return( IntegerDescriptor( integer( ops.left ) * integer( ops.right ) ) );
         return( RealDescriptor( real( ops.left ) * real( ops.right ) ) );
     }
-    Descriptor FunDiv( ThreadContext& context ) {
-        Dyadic ops( context, Convert::Arithmetic );
+    Descriptor FunDiv() {
+        Dyadic ops( Convert::Arithmetic );
         if (typeCode( ops.left ) == TypeInteger) return( IntegerDescriptor( integer( ops.left ) / integer( ops.right ) ) );
         return( RealDescriptor( real( ops.left ) / real( ops.right ) ) );
     }
-    Descriptor FunEq( ThreadContext& context ) { return compare( context, 0 ); }
-    Descriptor FunNeq( ThreadContext& context ) { return compare( context, -1, 1 ); }
-    Descriptor FunLt( ThreadContext& context ) { return compare( context, -1 ); }
-    Descriptor FunLteq( ThreadContext& context ) { return compare( context, -1, 0 ); }
-    Descriptor FunGt( ThreadContext& context ) { return compare( context, 1 ); }
-    Descriptor FunGteq( ThreadContext& context ) { return compare( context, 1, 0 ); }
-    Descriptor FunCompare( ThreadContext& context ) { return IntegerDescriptor( compare( context ) ); }
-    Descriptor FunNot( ThreadContext& context ) {
-        auto op( pop( context ) );
+    Descriptor FunEq() { return compare( 0 ); }
+    Descriptor FunNeq() { return compare( -1, 1 ); }
+    Descriptor FunLt() { return compare( -1 ); }
+    Descriptor FunLteq() { return compare( -1, 0 ); }
+    Descriptor FunGt() { return compare( 1 ); }
+    Descriptor FunGteq() { return compare( 1, 0 ); }
+    Descriptor FunCompare() { return IntegerDescriptor( compare() ); }
+    Descriptor FunNot() {
+        auto op( pop() );
         if (typeCode( op ) == TypeNull) return NullDescriptor();
         return( IntegerDescriptor( 1 ) );
     }
-    Descriptor FunAnd( ThreadContext& context ) {
-        Dyadic ops( context, Convert::None );
+    Descriptor FunAnd() {
+        Dyadic ops( Convert::None );
         if ((typeCode( ops.left ) == TypeNull) or (typeCode( ops.left ) == TypeNull)) return NullDescriptor();
         return( IntegerDescriptor( 1 ) );
     }
-    Descriptor FunOr( ThreadContext& context ) {
-        Dyadic ops( context, Convert::None );
+    Descriptor FunOr() {
+        Dyadic ops( Convert::None );
         if ((typeCode( ops.left ) == TypeNull) and (typeCode( ops.left ) == TypeNull)) return NullDescriptor();
         return( IntegerDescriptor( 1 ) );
     }
-    Descriptor FunShiftLeft( ThreadContext& context ) {
-        Dyadic ops( context, Convert::Integer );
+    Descriptor FunShiftLeft() {
+        Dyadic ops( Convert::Integer );
         return( IntegerDescriptor( integer( ops.left ) << integer( ops.right ) ) );
     }
-    Descriptor FunShiftRight( ThreadContext& context ) {
-        Dyadic ops( context, Convert::Integer );
+    Descriptor FunShiftRight() {
+        Dyadic ops( Convert::Integer );
         return( IntegerDescriptor( integer( ops.left ) >> integer( ops.right ) ) );
     }
-    Descriptor FunBitwiseOr( ThreadContext& context ) {
-        Dyadic ops( context, Convert::Integer );
+    Descriptor FunBitwiseOr() {
+        Dyadic ops( Convert::Integer );
         return( IntegerDescriptor( integer( ops.left ) | integer( ops.right ) ) );
     }
-    Descriptor FunBitwiseXor( ThreadContext& context ) {
-        Dyadic ops( context, Convert::Integer );
+    Descriptor FunBitwiseXor() {
+        Dyadic ops( Convert::Integer );
         return( IntegerDescriptor( integer( ops.left ) ^ integer( ops.right ) ) );
     }
-    Descriptor FunBitwiseAnd( ThreadContext& context ) {
-        Dyadic ops( context, Convert::Integer );
+    Descriptor FunBitwiseAnd() {
+        Dyadic ops( Convert::Integer );
         return( IntegerDescriptor( integer( ops.left ) & integer( ops.right ) ) );
     }
-    Descriptor FunBitwiseNegate( ThreadContext& context ) {
-        Monadic op( context, Convert::Integer );
+    Descriptor FunBitwiseNegate() {
+        Monadic op( Convert::Integer );
         return( IntegerDescriptor( ~integer( op.operand ) ) );
     }
-    Descriptor FunInvert( ThreadContext& context ) {
-        Monadic op( context, Convert::Arithmetic );
+    Descriptor FunInvert() {
+        Monadic op( Convert::Arithmetic );
         if (typeCode(op.operand) == TypeInteger) return( IntegerDescriptor( -integer( op.operand ) ) );
         return( RealDescriptor( -real( op.operand ) ) );
     }
-    Descriptor FunRemainder( ThreadContext& context ) {
-        Dyadic ops( context, Convert::Integer );
+    Descriptor FunRemainder() {
+        Dyadic ops( Convert::Integer );
         return( IntegerDescriptor( integer( ops.left ) % integer( ops.right ) ) );
     }
 

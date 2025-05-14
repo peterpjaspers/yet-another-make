@@ -4,7 +4,7 @@
 #include "SymbolTable.h"
 #include "Instruction.h"
 #include "Monitor.h"
-#include "Memory.h"
+#include "ThreadContext.h"
 
 #include <iostream>
 #include <fstream>
@@ -12,8 +12,6 @@
 #include <map>
 #include <set>
 
-// ToDo: Name-scoping via block statements and procedures (nested symbol table and re-use of local storage)
-// ToDo: Named arguments (requires name-scoping)
 // ToDo: Thread-safe translation and execution
 // ToDo: Python like format strings
 // ToDo: Better error handling; i.e., try to recover
@@ -268,7 +266,7 @@ namespace Language {
                             value = ArgumentVariableDescriptor(  reader->integerConstant * sizeof( Descriptor ) );
                             storeInstruction( OpPushDescriptor, value );
                         } else if (reader->identifierType == VariableType::Global) {
-                            value = GlobalVariableDescriptor( allocateHeap( sizeof(Descriptor) ) ) ;
+                            value = GlobalVariableDescriptor( allocateGlobal( sizeof(Descriptor) ) ) ;
                             storeInstruction( OpPushDescriptor, value );
                         } else fatalError( "Internal parser error - Invalid identifier type" );
                         defineSymbol( identifier(), scopeNames, value );
@@ -319,15 +317,17 @@ namespace Language {
                             auto descriptor( LocalVariableDescriptor( locals ) );
                             defineSymbol( identifier(), scopeNames, descriptor );
                             nextLocal();
+                            storeInstruction( OpPushDescriptor, descriptor );
                             if (token() == Token::LeftParen) {
                                 nextToken();
-                                storeInstruction( OpPushDescriptor, descriptor );
                                 parseExpression();
-                                storeInstruction( OpAssign );
                                 if (token() == Token::RightParen) {
                                     nextToken();
                                 } else recoverableError( "Expected )", SemiColon );
+                            } else {
+                                storeInstruction( OpPushNull );
                             }
+                            storeInstruction( OpAssign );
                         } else recoverableError( "Identifier already declared", SemiColon );
                     } else recoverableError( "Expected identifier", SemiColon );
                 }
@@ -459,7 +459,7 @@ namespace Language {
                     if (token() == Token::Identifier) {
                         nextToken();
                         // Provisionally Insert code to jump over procedure definition
-                        // ToDo: Jump can be avoided by determining start address of code for a translation unit.
+                        // ToDo: Jump can be avoided by determining start address of code for a translation unit. (low-prio)
                         auto procedureName( identifier() );
                         auto skip( createPatch() );
                         storeInstruction( OpJump, Address( 0 ) );
@@ -598,7 +598,7 @@ namespace Language {
                 return parsed;
             }
             void initialize() {
-                locals = sizeof( Descriptor );
+                locals = 0;
                 maxLocals = locals;
                 consumed = true;
                 errors = 0;

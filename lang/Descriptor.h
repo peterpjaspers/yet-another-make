@@ -2,6 +2,7 @@
 #define LANG_DESCRIPTOR_H
 
 #include "Types.h"
+#include "ThreadContext.h"
 
 namespace Language {
 
@@ -31,7 +32,7 @@ namespace Language {
     inline bool isReal( const Descriptor& d ) { return( typeCode( d ) == TypeReal ); }
     inline bool isAddress( const Descriptor& d ) { return( typeCode( d ) == TypeAddress ); }
     inline bool isProcedure( const Descriptor& d ) { return( typeCode( d ) == TypeProcedure ); }
-    Descriptor dereference( const ThreadContext& context, const Descriptor& descriptor );
+    Descriptor dereference( const Descriptor& descriptor );
     Descriptor& toInteger( Descriptor& d );
     Descriptor& toReal( Descriptor& d );
     Descriptor& toString( Descriptor& d );

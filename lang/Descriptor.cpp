@@ -1,15 +1,15 @@
 #include "Descriptor.h"
-#include "Memory.h"
+#include "ThreadContext.h"
 
 using namespace std;
 
 namespace Language {
 
-    Descriptor dereference( const ThreadContext& context, const Descriptor& descriptor ) {
-        static const char* signature( "Descriptor dereference( const ThreadContext& context, const Descriptor& descriptor )" );
+    Descriptor dereference( const Descriptor& descriptor ) {
+        static const char* signature( "Descriptor dereference( const Descriptor& descriptor )" );
         auto adr( address( descriptor ) );
-        if (isLocalVariable( descriptor)) return *addressLocal( context, adr );
-        if (isArgumentVariable( descriptor)) return *addressArgument( context, adr );
+        if (isLocalVariable( descriptor)) return *addressLocal( adr );
+        if (isArgumentVariable( descriptor)) return *addressArgument( adr );
         if (isGlobalVariable( descriptor)) return *addressGlobal( adr );
         throw string( signature ) + " - Dereferencing unknown variable type";
     }
@@ -77,7 +77,6 @@ namespace Language {
         return string( reinterpret_cast<char*>( addressString( address( d ) ) ), type( d ) & TypeValueMask );
     }
 
-    // ToDo: Format as function of descriptor type (string, value, address...)
     string toReadable( const Descriptor& d ) {
         string readable( "Descriptor< " );
         auto t( type( d ) );

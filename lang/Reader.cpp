@@ -63,10 +63,14 @@ namespace Language {
             else if (stream->good()) nextLine();
             else { character = EOF; token = Token::ReadError; };
         }
-        if (character != EOF) character = line[ characterPosition++  ];
+        if (character != EOF) character = line[ characterPosition++ ];
     }
     void Reader::skipWhiteSpace() { while (isspace( static_cast<unsigned char>( character ) ) && (character != EOF)) nextCharacter(); }
     inline bool isIdentifier( char c ) { return( isalpha( c ) || (c == '_') ); }
+    inline bool isComment( const string& line, int pos ) {
+        if (((pos + 1) < line.size()) && (line[ pos ] == '/') && (line[ pos + 1 ] == '/')) return true;
+        return false;
+    }
     // ToDo: Table driven tokenizer to avoid large if then else construct
     void Reader::nextToken() {
         skipWhiteSpace();
@@ -87,7 +91,7 @@ namespace Language {
                 token = Token::Identifier;
                 identifierType = VariableType::Global;
             } else {
-                token = Token::Dollar;
+                token = Token::Colon;
             }
         } else if (character == '$') {
             nextCharacter();
@@ -181,8 +185,15 @@ namespace Language {
         } else if (character == '/') {
             nextCharacter();
             if (character == '=' ) { token = Token::SlashEqual; nextCharacter(); }
-            // ToDo: avoid recursive call to token when consuming comments
-            else if (character == '/') { nextLine(); nextCharacter(); nextToken(); }
+            else if (character == '/') {
+                characterPosition -= 1;
+                while (isComment( line, (characterPosition - 1))) {
+                    nextLine();
+                    nextCharacter();
+                    skipWhiteSpace();
+                }
+                nextToken();
+            }
             else token = Token::Slash;
         } else if (character == '|') {
             nextCharacter();

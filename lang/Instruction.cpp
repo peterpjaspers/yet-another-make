@@ -1,12 +1,11 @@
 #include "Instruction.h"
-#include "Memory.h"
+#include "ThreadContext.h"
 #include "Functions.h"
 #include "Monitor.h"
 
 #include <iostream>
 
 // ToDo: Include symbol name when outputing monitoring info
-// ToDo: Check stack pointer at end of each instruction, looks pushes and pops are not matched
 
 using namespace std;
 
@@ -37,9 +36,10 @@ namespace Language {
             return( byte3 << 24 || byte2 << 16 || byte1 << 8 || byte0 );
         }
     }
-    inline Word fetchWordOperand( ThreadContext& context ) {
-        auto operand( loadWordOperand( context.pc ) );
-        context.pc += 4;
+    inline Word fetchWordOperand() {
+        auto& ctx( context() );
+        auto operand( loadWordOperand( ctx.pc ) );
+        ctx.pc += 4;
         return operand;
     }
     void storeDescriptorOperand( const Address pc, const Descriptor d ) {
@@ -73,145 +73,148 @@ namespace Language {
             return( byte7 << 56 | byte6 << 48 | byte5 << 40 | byte4 << 32 | byte3 << 24 | byte2 << 16 | byte1 << 8 | byte0 );
         }
     }
-    inline Descriptor fetchDescriptorOperand( ThreadContext& context ) {
-        auto operand( loadDescriptorOperand( context.pc ) );
-        context.pc += 8;
+    inline Descriptor fetchDescriptorOperand() {
+        auto& ctx( context() );
+        auto operand( loadDescriptorOperand( ctx.pc ) );
+        ctx.pc += 8;
         return operand;
     }
-    ostream& monitorInstruction( ThreadContext& context, OpCode code ) {
-        ostream& record = monitorRecord() << setw( 4 ) << (context.pc - 1) << " - " << opCodeTable[ code ].name;
+    ostream& monitorInstruction( OpCode code ) {
+        auto& ctx( constContext() );
+        ostream& record = monitorRecord() << setw( 4 ) << ctx.pc << " - " << opCodeTable[ code ].name;
         if (opCodeTable[ code ].operand == 1) {
-            auto operand( loadWordOperand( context.pc ) );
+            auto operand( loadWordOperand( ctx.pc + sizeof( OpCode ) ) );
             if (code == OpPushReal) record << "( " << bit_cast<float>( operand ) << " )";
             else record << "( " << operand << " )";
-        } else if (opCodeTable[ code ].operand == 2) { record << "( " << toReadable( loadDescriptorOperand( context.pc ) ) << " )"; }
+        } else if (opCodeTable[ code ].operand == 2) {
+            record << "( " << toReadable( loadDescriptorOperand( ctx.pc + sizeof( OpCode ) ) ) << " )";
+        }
         return record;
     }
-    void push( ThreadContext& context, const Descriptor& descriptor ) {
-        auto address( addressStack( context ) );
+    void push( const Descriptor& descriptor ) {
+        auto address( addressStack() );
         if (monitor( DebugAspects::StackOperations )) monitorRecord() << "push(" << toReadable( descriptor ) << " )" << record<char>;
         *address = descriptor;
-        context.sp += sizeof( Descriptor );
+        context().sp += sizeof( Descriptor );
     }
-    Descriptor pop( ThreadContext& context ) {
-        auto d( *addressStack( context, sizeof( Descriptor ) ) );
+    Descriptor pop() {
+        auto d( *addressStack( sizeof( Descriptor ) ) );
         if (monitor( DebugAspects::StackOperations )) monitorRecord() << "pop()" << record<char>;
         #ifdef _DEBUG_INTERPRETER
-            static const char* signature( "Descriptor pop( ThreadContext& context )" );
-            if (context.sp < sizeof( Descriptor )) throw string( signature ) + " - Stack underflow";
+            static const char* signature( "Descriptor pop()" );
+            if (constContext().sp < sizeof( Descriptor )) throw string( signature ) + " - Stack underflow";
         #endif
-        context.sp -= sizeof( Descriptor );
+        context().sp -= sizeof( Descriptor );
         return d;
     }
-    inline void jump( ThreadContext& context ) {
-        Address transfer( fetchWordOperand( context ) );
-        context.pc = transfer;
+    inline void jump() {
+        Address transfer( fetchWordOperand() );
+        context().pc = transfer;
     }
-    inline void conditionalJump( ThreadContext& context ) {
-        Address transfer( fetchWordOperand( context ) );
-        if (isNull( pop( context ) )) context.pc = transfer;
+    inline void conditionalJump() {
+        Address transfer( fetchWordOperand() );
+        if (isNull( pop() )) context().pc = transfer;
     }
-    inline void exitProgram( ThreadContext& context ) {
-        auto d( pop( context ) );
+    inline void exitProgram() {
+        auto d( pop() );
         toInteger( d );
         exit( integer( d ) );
     }
     // Mark start of argument expression evaluation
-    inline void arguments( ThreadContext& context ) {
-        push( context, AddressDescriptor( context.ep ) );
-        context.ep = context.sp;
+    inline void arguments() {
+        auto& ctx( context() );
+        push( AddressDescriptor( ctx.ep ) );
+        ctx.ep = ctx.sp;
     }
-    inline void procedureCall( ThreadContext& context ) {
-        static const char* signature( "void procedureCall( ThreadContext& context )" );
-        // Pick (procedure) descriptor, this is on the stack just below the argument pointer (ap)
-        // The descriptor may be a file or a string in which case it must translated.
-        Descriptor& transfer( *reinterpret_cast<Descriptor*>( addressMemory( context.stack, (context.ep - 16 ) ) ) );
-        if (monitor( DebugAspects::ProcedureCall )) monitorRecord() << "Procedure call " << transfer << record<char>;
+    inline void procedureCall() {
+        static const char* signature( "void procedureCall()" );
+        // Pick-up (procedure) descriptor, the procedure descriptor and saved expression pointer descriptor
+        // are located under the current expression pointer (ep).
+        auto& ctx( context() );
+        Descriptor& transfer( *reinterpret_cast<Descriptor*>( addressMemory( ctx.stack, ctx.ep - (2 * sizeof( Descriptor )) ) ) );
+        // The descriptor may be a file or a string in which case it must translated (not implemented yet).
         if (!isProcedure( transfer )) throw string( signature ) + " - Procedures call address invalid";
-        push( context, AddressDescriptor( context.pc ) );
-        push( context, AddressDescriptor( context.fp ) );
-        context.pc = address( transfer );
-        context.fp = context.sp;
-        context.ap = context.ep;
+        if (monitor( DebugAspects::ProcedureCall )) monitorRecord() << "Procedure call " << transfer << record<char>;
+        push( AddressDescriptor( ctx.pc ) );
+        push( AddressDescriptor( ctx.fp ) );
+        ctx.pc = address( transfer );
+        ctx.fp = ctx.sp;
+        ctx.ap = ctx.ep;
     }
-    inline void procedureReturn( ThreadContext& context ) {
-        static const char* signature( "void procedureReturn( ThreadContext& )" );
+    inline void procedureReturn() {
+        static const char* signature( "void procedureReturn()" );
+        auto& ctx( context() );
         // Replace procedure call descriptor with procedure result
-        Descriptor& result( *reinterpret_cast<Descriptor*>( addressMemory( context.stack, (context.ap - 16 ) ) ) );
-        result = pop( context );
+        Descriptor& result( *reinterpret_cast<Descriptor*>( addressMemory( ctx.stack, (ctx.ap - (2 * sizeof( Descriptor )) ) ) ) );
+        result = pop();
         #ifdef _DEBUG_INTERPRETER
-            // Adjust stack-pointer with local variable count
             if (monitor( DebugAspects::ProcedureCall )) monitorRecord() << "Procedure return " << record<char>;
-            Descriptor& locals( *reinterpret_cast<Descriptor*>( addressMemory( context.stack, context.fp ) ) );
-            if (!isInteger( locals )) throw string( signature ) + " - Corrupt stack";
-            // Restore frame-pointer, stack-pointer, argument-pointer and program-counter
-            context.sp -= word( locals + 8 );
-            auto fp( pop( context ) );
-            auto pc( pop( context ) );
+            ctx.sp = ctx.fp;
+            auto fp( pop() );
+            auto pc( pop() );
             if (!isAddress( pc ) or !isAddress( fp )) throw string( signature ) + " - Corrupt stack";
-            context.pc = address( pc );
-            context.fp = address( fp );
-            context.sp = context.ap;
-            auto ap( pop( context ) );
+            ctx.pc = address( pc );
+            ctx.fp = address( fp );
+            ctx.sp = ctx.ap;
+            auto ap( pop() );
             if (!isAddress( ap )) throw string( signature ) + " - Corrupt stack";
-            context.ep = ( context.ap = address( ap ) );
+            ctx.ep = ( ctx.ap = address( ap ) );
         #elif
-            context.fp( address( pop( context ) ) );
-            context.pc( address( pop( context ) ) );
-            context.sp = context.ap;
-            context.ap( address( pop( context ) ) );
+            ctx.sp = ctx.fp;
+            ctx.fp( address( pop() ) );
+            ctx.pc( address( pop() ) );
+            ctx.sp = ctx.ap;
+            ctx.ap( address( pop() ) );
         #endif
     }
-    inline void locals( ThreadContext& context ) {
-        Word locals( fetchWordOperand( context ) );
-        push( context, IntegerDescriptor( locals ) );
-        // Initialize local variables to null
-        auto localNulls( addressStack( context ) );
-        for (int i = 0; i < (locals / sizeof( Descriptor )); ++i) { *localNulls++ = NullDescriptor(); }
-        context.sp += locals;
+    inline void locals() {
+        Word locals( fetchWordOperand() );
+        context().sp += locals;
     }
-    inline void loadArgument( ThreadContext& context ) {
+    inline void loadArgument() {
         #ifdef _DEBUG_INTERPRETER
             static const char* signature( "void loadArgument( ThreadContext& context )" );
-            Word offset( fetchWordOperand( context ) );
-            auto range( context.fp - context.ap );
+            Word offset( fetchWordOperand() );
+            auto& ctx( context() );
+            auto range( ctx.fp - ctx.ap );
             if (range <= offset) throw string( signature ) + " - Argument out of range";
-            push( context, *addressArgument( context, offset ) );
+            push( *addressArgument( offset ) );
         #else
-            push( context, *addressArgument( context, fetchWordOperand( context ) ) );
+            push( *addressArgument( fetchWordOperand() ) );
         #endif
     }
-    inline void loadLocal( ThreadContext& context ) {
-        push( context, *addressLocal( context, fetchWordOperand( context ) ) );
+    inline void loadLocal() {
+        push( *addressLocal( fetchWordOperand() ) );
     }
-    inline void loadGlobal( ThreadContext& context ) {
-        push( context, *addressGlobal( fetchWordOperand( context ) ) );
+    inline void loadGlobal() {
+        push( *addressGlobal( fetchWordOperand() ) );
     }
-    inline void storeArgument( ThreadContext& context ) {
+    inline void storeArgument() {
         #ifdef _DEBUG_INTERPRETER
             static const char* signature( "void storeArgument( ThreadContext& context )" );
-            Word offset( fetchWordOperand( context ) );
-            auto range( context.fp - context.ap );
+            Word offset( fetchWordOperand() );
+            auto& ctx( context() );
+            auto range( ctx.fp - ctx.ap );
             if (range <= offset) throw string( signature ) + " - Argument out of range";
-            *addressArgument( context, offset ) = pop( context );
+            *addressArgument( offset ) = pop();
         #else
-            *addressArgument( context, fetchWordOperand( context ) ) = pop( context );
+            *addressArgument( fetchWordOperand() ) = pop();
         #endif
     }
-    inline void storeLocal( ThreadContext& context ) {
-        *addressLocal( context, fetchWordOperand( context ) ) = pop( context );
+    inline void storeLocal() {
+        *addressLocal( fetchWordOperand() ) = pop();
     }
-    inline void storeGlobal( ThreadContext& context ) {
-        *addressGlobal( fetchWordOperand( context ) ) = pop( context );
+    inline void storeGlobal() {
+        *addressGlobal( fetchWordOperand() ) = pop();
     }
-    inline void assign( ThreadContext& context ) {
+    inline void assign() {
         static const char* signature( "void assign( ThreadContext& context )" );
-        auto rhs( pop( context ) );
-        auto lhs( addressStack( context, sizeof( Descriptor ) ) );
+        auto rhs( pop() );
+        auto lhs( addressStack( sizeof( Descriptor ) ) );
         if (isLocalVariable( *lhs )) {
-            *addressLocal( context, address( *lhs ) ) = rhs;
+            *addressLocal( address( *lhs ) ) = rhs;
         } else if (isArgumentVariable( *lhs )) {
-            *addressArgument( context, address( *lhs ) ) = rhs;
+            *addressArgument( address( *lhs ) ) = rhs;
         } else if (isGlobalVariable( *lhs )) {
             *addressGlobal( address( *lhs ) ) = rhs;
         } else {
@@ -219,69 +222,71 @@ namespace Language {
         }
         *lhs = rhs;
     }
-    inline void duplicate( ThreadContext& context ) {
-        auto value( addressStack( context, sizeof( Descriptor ) ) );
+    inline void duplicate() {
+        auto value( addressStack( sizeof( Descriptor ) ) );
         *(value + 1) = *value;
-        context.sp += sizeof( Descriptor );
+        context().sp += sizeof( Descriptor );
     }
     // Output expression value to console
-    void output( ThreadContext& context ) {
-        auto value( pop( context ) );
-        if (isVariable( value )) value = dereference( context, value );
+    void output() {
+        auto value( pop() );
+        if (isVariable( value )) value = dereference( value );
         auto str( stringToCString( toString( value ) ) );
         cout << str << endl;
     }
-    bool executeInstruction( ThreadContext& context ) {
-        static const char* signature( "void executeInstruction( ThreadContext& context )" );
-        auto address( addressProgram( context.pc++ ) );
+    bool executeInstruction() {
+        static const char* signature( "void executeInstruction()" );
+        auto& ctx( context() );
+        auto address( addressProgram( ctx.pc ) );
         OpCode code( *address );
-        if (monitor( DebugAspects::InstructionExecution )) monitorInstruction( context, code ) << record<char>;
+        if (monitor( DebugAspects::InstructionExecution )) monitorInstruction( code ) << record<char>;
+        ctx.pc += 1;
         switch ( code ) {
-            case OpPushNull : push( context, NullDescriptor() ); break;
-            case OpPushInteger : push( context, IntegerDescriptor( fetchWordOperand( context ) ) ); break;
-            case OpPushReal : push( context, RealDescriptor( bit_cast<float>(fetchWordOperand( context )) ) ); break;
-            case OpPushDescriptor : push( context, fetchDescriptorOperand( context ) ); break;
-            case OpPop : pop( context ); break;
-            case OpAdd : push( context, FunAdd( context ) ); break;
-            case OpSub : push( context, FunSub( context ) ); break;
-            case OpMul : push( context, FunMul( context ) ); break;
-            case OpDiv : push( context, FunDiv( context ) ); break;
-            case OpEq : push( context, FunEq( context ) ); break;
-            case OpNeq : push( context, FunNeq( context ) ); break;
-            case OpLt : push( context, FunLt( context ) ); break;
-            case OpLteq : push( context, FunLteq( context ) ); break;
-            case OpGt : push( context, FunGt( context ) ); break;
-            case OpGteq : push( context, FunGteq( context ) ); break;
-            case OpCompare : push( context, FunCompare( context ) ); break;
-            case OpNot : push( context, FunNot( context ) ); break;
-            case OpAnd : push( context, FunAnd( context ) ); break;
-            case OpOr : push( context, FunOr( context ) ); break;
-            case OpJump : jump( context ); break;
-            case OpConditionalJump : conditionalJump( context ); break;
-            case OpArguments : arguments( context ); break;
-            case OpProcedureCall : procedureCall( context ); break;
-            case OpReturn : procedureReturn( context ); break;
-            case OpLocals : locals( context ); break;
-            case OpLoadArgument : loadArgument( context ); break;
-            case OpLoadLocal : loadLocal( context ); break;
-            case OpLoadGlobal : loadGlobal( context ); break;
-            case OpStoreArgument : storeArgument( context ); break;
-            case OpStoreLocal : storeLocal( context ); break;
-            case OpStoreGlobal : storeGlobal( context ); break;
-            case OpAssign : assign( context ); break;
-            case OpDup : duplicate( context ); break;
-            case OpShiftLeft : FunShiftLeft( context ); break;
-            case OpShiftRight : FunShiftRight( context ); break;
-            case OpBitOr : FunBitwiseOr( context ); break;
-            case OpBitXor : FunBitwiseXor( context ); break;
-            case OpBitAnd : FunBitwiseAnd( context ); break;
-            case OpNegate : FunBitwiseNegate( context ); break;
-            case OpInvert : FunInvert( context ); break;
-            case OpRem : FunRemainder( context ); break;
+            case OpPushNull : push( NullDescriptor() ); break;
+            case OpPushInteger : push( IntegerDescriptor( fetchWordOperand() ) ); break;
+            case OpPushReal : push( RealDescriptor( bit_cast<float>(fetchWordOperand()) ) ); break;
+            case OpPushDescriptor : push( fetchDescriptorOperand() ); break;
+            case OpPop : pop(); break;
+            case OpAdd : push( FunAdd() ); break;
+            case OpSub : push( FunSub() ); break;
+            case OpMul : push( FunMul() ); break;
+            case OpDiv : push( FunDiv() ); break;
+            case OpEq : push( FunEq() ); break;
+            case OpNeq : push( FunNeq() ); break;
+            case OpLt : push( FunLt() ); break;
+            case OpLteq : push( FunLteq() ); break;
+            case OpGt : push( FunGt() ); break;
+            case OpGteq : push( FunGteq() ); break;
+            case OpCompare : push( FunCompare() ); break;
+            case OpNot : push( FunNot() ); break;
+            case OpAnd : push( FunAnd() ); break;
+            case OpOr : push( FunOr() ); break;
+            case OpJump : jump(); break;
+            case OpConditionalJump : conditionalJump(); break;
+            case OpArguments : arguments(); break;
+            case OpProcedureCall : procedureCall(); break;
+            case OpReturn : procedureReturn(); break;
+            case OpLocals : locals(); break;
+            case OpLoadArgument : loadArgument(); break;
+            case OpLoadLocal : loadLocal(); break;
+            case OpLoadGlobal : loadGlobal(); break;
+            case OpStoreArgument : storeArgument(); break;
+            case OpStoreLocal : storeLocal(); break;
+            case OpStoreGlobal : storeGlobal(); break;
+            case OpAssign : assign(); break;
+            case OpDup : duplicate(); break;
+            case OpShiftLeft : FunShiftLeft(); break;
+            case OpShiftRight : FunShiftRight(); break;
+            case OpBitOr : FunBitwiseOr(); break;
+            case OpBitXor : FunBitwiseXor(); break;
+            case OpBitAnd : FunBitwiseAnd(); break;
+            case OpNegate : FunBitwiseNegate(); break;
+            case OpInvert : FunInvert(); break;
+            case OpRem : FunRemainder(); break;
             case OpFail : break;
             case OpMark : break;
             case OpUnmark : break;
-            case OpOutput : output( context ); break;
+            case OpOutput : output(); break;
             case OpExit : return false;
             default : throw string( signature ) + " - Invalid op-code " + to_string( code );
         }
@@ -290,12 +295,12 @@ namespace Language {
     // ToDo: Provides means of passing arguments to program
     int run( const Address start ) {
         try {
-            ThreadContext context;
-            context.pc = start;
-            while (executeInstruction( context )) {};
+            auto& ctx( context() );
+            ctx.pc = start;
+            while (executeInstruction()) {};
             // Pick-up return value left behind on the stack, if any
-            if (sizeof(Descriptor) < context.sp) {
-                auto value( pop( context ) );
+            if (sizeof(Descriptor) < ctx.sp) {
+                auto value( pop() );
                 return word( toInteger( value ) );
             } else return( 0 );
         }

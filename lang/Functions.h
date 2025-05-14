@@ -6,28 +6,28 @@
 
 namespace Language {
 
-    Descriptor FunAdd( ThreadContext& context );
-    Descriptor FunSub( ThreadContext& context );
-    Descriptor FunMul( ThreadContext& context );
-    Descriptor FunDiv( ThreadContext& context );
-    Descriptor FunEq( ThreadContext& context );
-    Descriptor FunNeq( ThreadContext& context );
-    Descriptor FunLt( ThreadContext& context );
-    Descriptor FunLteq( ThreadContext& context );
-    Descriptor FunGt( ThreadContext& context );
-    Descriptor FunGteq( ThreadContext& context );
-    Descriptor FunCompare( ThreadContext& context );
-    Descriptor FunNot( ThreadContext& context );
-    Descriptor FunAnd( ThreadContext& context );
-    Descriptor FunOr( ThreadContext& context );
-    Descriptor FunShiftLeft( ThreadContext& context );
-    Descriptor FunShiftRight( ThreadContext& context );
-    Descriptor FunBitwiseOr( ThreadContext& context );
-    Descriptor FunBitwiseXor( ThreadContext& context );
-    Descriptor FunBitwiseAnd( ThreadContext& context );
-    Descriptor FunBitwiseNegate( ThreadContext& context );
-    Descriptor FunInvert( ThreadContext& context );
-    Descriptor FunRemainder( ThreadContext& context );
+    Descriptor FunAdd();
+    Descriptor FunSub();
+    Descriptor FunMul();
+    Descriptor FunDiv();
+    Descriptor FunEq();
+    Descriptor FunNeq();
+    Descriptor FunLt();
+    Descriptor FunLteq();
+    Descriptor FunGt();
+    Descriptor FunGteq();
+    Descriptor FunCompare();
+    Descriptor FunNot();
+    Descriptor FunAnd();
+    Descriptor FunOr();
+    Descriptor FunShiftLeft();
+    Descriptor FunShiftRight();
+    Descriptor FunBitwiseOr();
+    Descriptor FunBitwiseXor();
+    Descriptor FunBitwiseAnd();
+    Descriptor FunBitwiseNegate();
+    Descriptor FunInvert();
+    Descriptor FunRemainder();
 
 } // namespace Language
 

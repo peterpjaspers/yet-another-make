@@ -1,0 +1,12 @@
+// Comment test
+var a( 1 ); // Variable a
+var b( 2 ); // Variable b
+// A
+// multi-line
+// Comment
+var c( 3 );
+    // another
+    // multi-line
+    // comment
+var d( 4 );
+out ( a * b * c * d );

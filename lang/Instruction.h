@@ -110,13 +110,13 @@ namespace Language {
     };
 
     // Execute (single) instruction
-    bool executeInstruction( ThreadContext& context );
+    bool executeInstruction();
     // Run a program starting at an address.
     int run( const Address start );
     // Push a descriptor-value on the stack
-    void push( ThreadContext& context, const Descriptor& descriptor );
+    void push( const Descriptor& descriptor );
     // Pop a descriptor-value from the stack
-    Descriptor pop( ThreadContext& context );
+    Descriptor pop();
     // Store an instruction in Program memory
     void storeInstruction( const OpCode code );
     void storeInstruction( const OpCode code, const Word operand );

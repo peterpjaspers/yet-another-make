@@ -9,7 +9,7 @@ import <Factorial.source>
     var b( 5 );
     var d( 13 + b * c ); out d;
     if (b < 33) c = 13 + b * c; else d =  47 - b * c;
+    out g( 10, 13.4, 7 );
     out "Factorial( 7 )";
     out factorial( 7 );
-    out g( 10, 13.4, 7 );
 }

@@ -21,16 +21,6 @@ namespace Language {
     typedef uint32_t Offset;
     typedef uint8_t* PageAddress;
 
-    struct ThreadContext {
-        Address pc;  // Program counter
-        Address sp;  // Stack pointer
-        Address ep;  // Expression pointer
-        Address ap;  // Argument pointer
-        Address fp;  // Frame pointer
-        std::vector<PageAddress> stack;
-        ThreadContext() : pc( 0 ), sp( 0 ), ep( 0 ), ap( 0 ), fp( 0 ) {};
-    };
-
     // Value types
     static const Type TypeNull( 0 );
     static const Type TypeInteger( 1 );
