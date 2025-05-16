@@ -30,6 +30,8 @@ namespace YAM {
         bool matches(std::string const& str) const;
         bool matches(std::filesystem::path const& path) const;
 
+        std::regex const& regex() const { return _re; }
+
     private:
         std::regex _re;
     };
