@@ -114,7 +114,7 @@ namespace
             );
             if (fileCount > 0) {
                 std::stringstream ss;
-                ss << "Deleting " << fileCount << " directories from " << tempFolder;
+                ss << "Deleting " << fileCount << " temporary yam directories from " << tempFolder.string();
                 LogRecord progress(LogRecord::Progress, ss.str());
                 logBook->add(progress);
             }

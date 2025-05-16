@@ -78,6 +78,7 @@ namespace
             } while (!confirmRepoName(input));
             repoName = input;
         } else {
+            repoName.clear();
             std::cout << "Restart yam at the root directory of your source code repository" << std::endl;
         }
         return repoName;

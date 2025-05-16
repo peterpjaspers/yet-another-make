@@ -146,7 +146,8 @@ void logBuildResult(ILogBook& logBook, BuildResult& result) {
         aspect = LogRecord::Aspect::Error;
         ss << "Build completed with unknown result";
     }
-    auto duration = result.niceDuration();
+
+    auto duration = TimeDuration::toString(result.duration());
     if (!duration.empty()) ss << " in " << duration;
     else ss << " in less than 1 ms ";
     ss
@@ -290,8 +291,17 @@ bool initializeYam(ILogBook &logBook, std::filesystem::path &repoDir, std::strin
             repoName = prompt(repoDir);
             if (!repoName.empty()) {
                 repoNameFile.repoName(repoName);
+            } else {
+                repoDir.clear();
             }
         }
+    }
+    if (!repoDir.empty()) {
+        RepositoryNameFile repoNameFile(repoDir);
+        std::cout
+            << "Building repository " << repoNameFile.repoName()
+            << ", rooted at directory " << repoDir.string()
+            << std::endl;
     }
     return !repoName.empty();
 }
@@ -305,11 +315,15 @@ int main(int argc, char* argv[]) {
     if (parser.help()) return 0;
 
     // TODO: remove before release.
-    //std::vector<LogRecord::Aspect> logAspects = logBook.aspects();
+    std::vector<LogRecord::Aspect> logAspects = logBook.aspects();
     //logAspects.push_back(LogRecord::BuildStateUpdate);
     //logAspects.push_back(LogRecord::IgnoredOutputFiles);
-    //logBook.aspects(logAspects);
-    //options._logAspects = logAspects;
+    //logAspects.push_back(LogRecord::Scope);
+    //logAspects.push_back(LogRecord::FileChanges);
+    //logAspects.push_back(LogRecord::DirectoryChanges);
+    logAspects.push_back(LogRecord::Performance);
+    logBook.aspects(logAspects);
+    options._logAspects = logAspects;
 
     std::filesystem::path repoDir;
     std::string repoName;
