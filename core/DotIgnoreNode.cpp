@@ -1,4 +1,5 @@
 #include "DotIgnoreNode.h"
+#include "DotIgnoreParser.h"
 #include "ExecutionContext.h"
 #include "SourceFileNode.h"
 #include "DirectoryNode.h"
@@ -25,6 +26,17 @@ namespace
                 setDirtyRecursively(node);
             }
         }
+    }
+
+    void parseRules(
+        std::filesystem::path const& ignoreFile, 
+        std::vector<DotIgnoreRule> & rules
+    ) {
+        DotIgnoreParser parser(ignoreFile);
+        rules.insert(
+            rules.end(),
+            parser.rules().begin(),
+            parser.rules().end());
     }
 }
 
@@ -61,38 +73,53 @@ namespace YAM
             context()->nodes().remove(file);
         }
         _dotIgnoreFiles.clear();
+        _rules.clear();
     }
 
     void DotIgnoreNode::setState(State newState) {
         if (state() != newState) {
             Node::setState(newState);
             if (newState == Node::State::Dirty) {
-                // Given de gitignore precedence rules a change in ignore files
+                // Given de gitignore precedence rules a change in ignore file
                 // in some directory D affects all sub-directories of D.
                 setDirtyRecursively(_directory);
             }
         }
     }
 
-    bool DotIgnoreNode::ignore(std::shared_ptr<FileRepositoryNode> const& repo, std::filesystem::path const& path) const {
-        if (repo == context()->repositoriesNode()->homeRepository()) {
-            std::filesystem::path yamConfigDir = repo->directory() / "yamConfig";
-            if (path == yamConfigDir || path.parent_path() == yamConfigDir) {
-                return true;
-            }
-            std::filesystem::path yamDir = repo->directory() / ".yam";
-            if (path == yamDir || path.parent_path() == yamDir) {
-                return true;
+    bool DotIgnoreNode::ignore(std::filesystem::path const& path) const {
+        //if (repo == context()->repositoriesNode()->homeRepository()) {
+        //    std::filesystem::path yamConfigDir = repo->directory() / "yamConfig";
+        //    if (path == yamConfigDir || path.parent_path() == yamConfigDir) {
+        //        return true;
+        //    }
+        //    std::filesystem::path yamDir = repo->directory() / ".yam";
+        //    if (path == yamDir || path.parent_path() == yamDir) {
+        //        return true;
+        //    }
+        //}
+        //for (auto const& file : _dotIgnoreFiles) {
+        //    if (file->absolutePath() == path) return true;
+        //}
+        for (auto it = _rules.rbegin(); it != _rules.rend(); ++it) {
+            auto const& rule = *it;
+            if (rule.match(path)) {
+                return !rule.negate();
             }
         }
-        for (auto const& file : _dotIgnoreFiles) {
-            if (file->absolutePath() == path) return true;
+        auto parentDir = _directory->parent();
+        if (parentDir != nullptr) {
+            auto parentName = parentDir->name().filename();
+            return parentDir->dotIgnoreNode()->ignore(parentName / path);
         }
         return false;
     }
 
     XXH64_hash_t DotIgnoreNode::computeHash() const {
         std::vector<XXH64_hash_t> hashes;
+        if (_directory->parent() != nullptr) {
+            hashes.push_back(_directory->parent()->dotIgnoreNode()->hash());
+        }
         for (auto const& node : _dotIgnoreFiles) {
             hashes.push_back(node->hashOf(FileAspect::entireFileAspect().name()));
         }
@@ -103,6 +130,11 @@ namespace YAM
     void DotIgnoreNode::start(PriorityClass prio) {
         Node::start(prio);
         std::vector<Node*> requisites;
+        if (_directory->parent() != nullptr) {
+            auto parentDotIgnoreNode = _directory->parent()->dotIgnoreNode();
+            parentDotIgnoreNode->addObserver(this);
+            requisites.push_back(parentDotIgnoreNode.get());
+        }
         for (auto const& n : _dotIgnoreFiles) requisites.push_back(n.get());
         auto callback = Delegate<void, Node::State>::CreateLambda(
             [this](Node::State s) { handleRequisiteCompletion(s); }
@@ -111,6 +143,10 @@ namespace YAM
     }
 
     void DotIgnoreNode::handleRequisiteCompletion(Node::State state) {
+        if (_directory->parent() != nullptr) {
+            auto parentDotIgnoreNode = _directory->parent()->dotIgnoreNode();
+            parentDotIgnoreNode->removeObserver(this);
+        }
         if (state != Node::State::Ok) {
             Node::notifyCompletion(state);
         } else if (canceling()) {
@@ -130,8 +166,12 @@ namespace YAM
         if (canceling()) {
             postCompletion(Node::State::Canceled);
         } else {
-            // TODO: parse the dotignore files
-            //modified(true);
+            _rules.clear();
+            for (auto const& n : _dotIgnoreFiles) {
+                parseRules(n->absolutePath(), _rules);
+            }
+            _hash = computeHash();
+            modified(true);
             postCompletion(Node::State::Ok);
         }
     }

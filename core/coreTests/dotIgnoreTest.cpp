@@ -18,7 +18,7 @@ namespace
     std::string source = ".ignore, line 2"; // fake source
 
     TEST(DotIgnoreParser, read) {
-        DotIgnoreParser parser(R"(C:\Users\peter\Documents\yam\github\main\.gitignore)");
+        DotIgnoreParser parser(R"(..\..\.gitignore)");
     }
     TEST(DotIgnoreRule, IgnoreNotAnchored) {
         DotIgnoreRule rule("*.py[cod]", source);
@@ -26,6 +26,7 @@ namespace
         EXPECT_TRUE(rule.ignore("main.pyc"));
         EXPECT_TRUE(rule.ignore("/main.pyc"));
         EXPECT_TRUE(rule.ignore("dir/main.pyc"));
+        EXPECT_TRUE(rule.ignore("/dir/main.pyc"));
         EXPECT_TRUE(rule.ignore("/dir/main.pyc"));
 
         DotIgnoreRule rrule("*.py[c-o]", source);

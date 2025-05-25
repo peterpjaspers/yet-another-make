@@ -258,14 +258,20 @@ namespace YAM
     ) {
         std::shared_ptr<Node> child = nullptr;
         auto const& absPath = dirEntry.path();
-        if (!_dotIgnoreNode->ignore(repo, absPath)) {
+        bool ignored = true;
+        if (dirEntry.is_directory()) {
+            ignored = _dotIgnoreNode->ignore(absPath.filename() / "");
+        } else if (dirEntry.is_regular_file()) {
+            ignored = _dotIgnoreNode->ignore(absPath.filename());
+        }
+        if (!ignored) {
             auto symPath = repo->symbolicPathOf(absPath);
             auto it = _content.find(symPath);
             if (it != _content.end()) {
                 child = it->second;
                 kept.insert(it->second);
             } else {
-                // A node for this entry may be present in buildstate (contect->nodes()).
+                // A node for this entry may be present in buildstate (context->nodes()).
                 // getNode() executes in threadpool context, hence buildstate access
                 // at this point is not allowed. Instead optimistically create a new node
                 // and check in main thread (commitResult) whether it already existed in

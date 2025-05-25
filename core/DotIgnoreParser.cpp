@@ -27,7 +27,7 @@ namespace
 
     bool anchored(std::string const& pattern) {
         auto pos = pattern.find_first_of("/");
-        return (pos != std::string::npos && pos < pattern.length());
+        return (pos != std::string::npos && pos != pattern.length()-1);
     }
 
     bool dirOnly(std::string const& pattern) {
@@ -76,13 +76,17 @@ namespace YAM
     }
 
     bool DotIgnoreRule::ignore(std::filesystem::path const& path) const {
+        return !_negate && match(path);
+    }
+
+    bool DotIgnoreRule::match(std::filesystem::path const& path) const {
         std::string fwdSlashedPath = fwdSlashPath(path);
         if (_anchored && fwdSlashedPath[0] != '/') {
             fwdSlashedPath.insert(0, "/");
         }
         std::smatch re_match;
         bool matches = std::regex_match(fwdSlashedPath, re_match, _re);
-        return !_negate && matches;
+        return matches;
     }
 
     std::string const& DotIgnoreRule::pattern() const { return _pattern; }
@@ -110,29 +114,18 @@ namespace YAM
         parseStream(ignoreFile, stream);
     }
 
-    std::vector<DotIgnoreRule> const& DotIgnoreParser::rules() { return _rules; }
+    std::vector<DotIgnoreRule> const& DotIgnoreParser::rules() const { return _rules; }
     bool DotIgnoreParser::hasNegations() const { return _hasNegations; }
 
     bool DotIgnoreParser::ignore(std::filesystem::path const& path) const
     {
-        bool ignored = false;
-        if (!_hasNegations) {
-            for (const auto& rule : _rules) {
-                if (rule.ignore(path)) {
-                    ignored = true;
-                    break;
-                }
-            }
-        } else {
-            for (const auto& rule : _rules) {
-                if (rule.ignore(path)) {
-                    ignored = true;
-                } else if (rule.negate()) {
-                    ignored = false;
-                }
+        for (auto it = std::rbegin(_rules); it != std::rend(_rules); ++it) {
+            auto rule = *it;
+            if (rule.match(path)) {
+                return !rule.negate();
             }
         }
-        return ignored;
+        return false;
     }
 
     void DotIgnoreParser::parseStream(std::filesystem::path const& ignoreFile, std::basic_istream<char>& stream) {

@@ -10,6 +10,7 @@
 #include "../BuildFileParserNode.h"
 #include "../BuildFileCompilerNode.h"
 #include "../RepositoriesNode.h"
+#include "../FileSystem.h"
 #include "../xxhash.h"
 
 #include <chrono>
@@ -21,10 +22,30 @@ namespace
     using namespace YAM;
     using namespace YAMTest;
 
+
+    void writeFile(std::filesystem::path p, std::string const& content) {
+        std::ofstream stream(p.string().c_str());
+        EXPECT_TRUE(stream.is_open());
+        stream << content;
+        stream.close();
+    }
+
+    std::shared_ptr<DirectoryNode> mirrorTree(std::filesystem::path const& rootDir) {
+        ExecutionContext context;
+        auto repo = std::make_shared<FileRepositoryNode>(&context, "repo", rootDir, FileRepositoryNode::RepoType::Build);
+        auto repos = std::make_shared<RepositoriesNode>(&context, repo);
+        context.repositoriesNode(repos);
+        auto dirNode = repo->directoryNode();
+
+        AccessMonitor::enableMonitoring();
+        bool completed = YAMTest::executeNode(dirNode.get());
+        EXPECT_TRUE(completed);
+        return dirNode;
+    }
+
     std::chrono::seconds timeout(10);
     TEST(DirectoryNode, construct_twoDeepDirectoryTree) {
-        std::string tmpDir(std::tmpnam(nullptr));
-        std::filesystem::path rootDir(std::string(tmpDir + "_dirNodeTest"));
+        std::filesystem::path rootDir = FileSystem::uniquePath("dirNodeTest_");
         DirectoryTree testTree(rootDir, 2, RegexSet());
 
         // Create the directory node tree that reflects testTree
@@ -43,8 +64,7 @@ namespace
     }
 
     TEST(DirectoryNode, update_threeDeepDirectoryTree) {
-        std::string tmpDir(std::tmpnam(nullptr));
-        std::filesystem::path rootDir(std::string(tmpDir + "_dirNodeTest"));
+        std::filesystem::path rootDir = FileSystem::uniquePath("dirNodeTest_");
         DirectoryTree testTree(rootDir, 3, RegexSet());
 
         // Create the directory node tree that reflects testTree
@@ -111,8 +131,7 @@ namespace
     }
 
     TEST(DirectoryNode, findChild) {
-        std::string tmpDir(std::tmpnam(nullptr));
-        std::filesystem::path rootDir(std::string(tmpDir + "_dirNodeTest"));
+        std::filesystem::path rootDir = FileSystem::uniquePath("dirNodeTest_");
         DirectoryTree testTree(rootDir, 3, RegexSet());
 
         // Create the directory node tree that reflects testTree
@@ -182,8 +201,7 @@ namespace
     }
 
     TEST(DirectoryNode, buildFileParserNode) {
-        std::string tmpDir(std::tmpnam(nullptr));
-        std::filesystem::path rootDir(std::string(tmpDir + "_dirNodeTest"));
+        std::filesystem::path rootDir = FileSystem::uniquePath("dirNodeTest_");
         std::filesystem::path buildFilePath(rootDir / R"(buildfile_yam.txt)");
         DirectoryTree testTree(rootDir, 2, RegexSet());
         std::ofstream buildFileStream(buildFilePath.string().c_str());
@@ -224,5 +242,57 @@ namespace
         EXPECT_EQ(buildFileParserNode, buildFileCompilerNode->buildFileParser());
 
         AccessMonitor::disableMonitoring();
+    }
+
+    TEST(DirectoryNode, dotIgnore) {
+        std::filesystem::path rootDir = FileSystem::uniquePath("dirNodeTest_");
+        DirectoryTree testTree(rootDir, 2, RegexSet());
+        const char* rootRules =
+            "File1\n"          // Ignore File1 in all directories
+            "SubDir1/\n"       // Ignore SubDir1 in all directories
+            "/File2\n"         // Ignore File2 only in rootDir
+            "!SubDir1/File1\n" // Accept File1 in SubDir1. This rule will have
+                               // no effect because SubDir1 is ignored
+            ;
+        writeFile(rootDir / ".yamIgnore", std::string(rootRules));
+
+        const char* subDir2Rules =
+            "/File2\n" // Ignore File2 in SubDir2
+            "!/File1"  // Undo ignore of File1 in SubDir2
+            ;
+        writeFile(rootDir / "SubDir2\\.yamIgnore", std::string(subDir2Rules));
+
+        const char* subDir3Rules =
+            "/File2\n" // Ignore File2 in SubDir2/SubDir3
+            "!/File1"  // Undo ignore of File1 in SubDir2/SubDir2
+            ;
+        writeFile(rootDir / "SubDir2\\SubDir3\\.yamIgnore", std::string(subDir3Rules));
+
+        auto dirNode = mirrorTree(rootDir);
+        EXPECT_EQ(Node::State::Ok, dirNode->state());
+
+        std::map<std::filesystem::path, std::shared_ptr<Node>> const& content = dirNode->getContent();
+        EXPECT_TRUE(content.contains("@@repo/.yamIgnore"));
+        EXPECT_TRUE(content.contains("@@repo/File3"));
+        EXPECT_TRUE(content.contains("@@repo/SubDir2"));
+        EXPECT_TRUE(content.contains("@@repo/SubDir3"));
+        EXPECT_EQ(4, content.size());
+
+        auto subDir2 = std::dynamic_pointer_cast<DirectoryNode>(content.at("@@repo/SubDir2"));
+        std::map<std::filesystem::path, std::shared_ptr<Node>> const& content2 = subDir2->getContent();
+        EXPECT_TRUE(content2.contains("@@repo/SubDir2/.yamIgnore"));
+        EXPECT_TRUE(content2.contains("@@repo/SubDir2/File1"));
+        EXPECT_TRUE(content2.contains("@@repo/SubDir2/File3"));
+        EXPECT_TRUE(content2.contains("@@repo/SubDir2/SubDir2"));
+        EXPECT_TRUE(content2.contains("@@repo/SubDir2/SubDir3"));
+        EXPECT_EQ(5, content2.size());
+
+        auto subDir3 = std::dynamic_pointer_cast<DirectoryNode>(content2.at("@@repo/SubDir2/SubDir3"));
+        std::map<std::filesystem::path, std::shared_ptr<Node>> const& content3 = subDir3->getContent();
+        EXPECT_TRUE(content3.contains("@@repo/SubDir2/SubDir3/.yamIgnore"));
+        EXPECT_TRUE(content3.contains("@@repo/SubDir2/SubDir3/File1"));
+        EXPECT_TRUE(content3.contains("@@repo/SubDir2/SubDir3/File3"));
+        EXPECT_EQ(3, content3.size());
+
     }
 }

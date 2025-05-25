@@ -21,6 +21,10 @@ namespace YAM
         // Pre: path does not contain . and .. path components.
         bool ignore(std::filesystem::path const& path) const;
 
+        // Return whether path matches the pattern, ignoring negate().
+        // Pre: path does not contain . and .. path components.
+        bool match(std::filesystem::path const& path) const;
+
         std::string const& pattern() const;
         std::string const& source() const;
 
@@ -55,7 +59,7 @@ namespace YAM
         DotIgnoreParser(std::filesystem::path const& ignoreFile, std::string const& fileContent);
 
         // Return the parsed rules, in order of appearance in the file.
-        std::vector<DotIgnoreRule> const& rules();
+        std::vector<DotIgnoreRule> const& rules() const;
 
         // Return whether the file contains negated rules.
         bool hasNegations() const;

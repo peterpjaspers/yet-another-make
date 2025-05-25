@@ -1,5 +1,6 @@
 #pragma once
 #include "FileNode.h"
+#include "DotIgnoreParser.h"
 
 #include <vector>
 #include <memory>
@@ -38,14 +39,16 @@ namespace YAM
         void addPrerequisitesToContext();
 
         void setState(State newState) override;
-        void start(PriorityClass prio) override;
+        void start(PriorityClass prio) override; 
+        
+        std::vector<DotIgnoreRule> const& rules() const { return _rules; }
 
         // return the hash of the ignore patterns. 
         XXH64_hash_t hash() const { return _hash; }
 
-        // Return whether given path is not a source file or a source file that is
-        // not allowed to be accessed by the build.
-        bool ignore(std::shared_ptr<FileRepositoryNode> const& repo, std::filesystem::path const& path) const;
+        // Return whether given path is to be ignored by the build.
+        // Pre: path is relative to directory()->absolutePath().
+        bool ignore(std::filesystem::path const& path) const;
 
         // Remove the .gitignore and .yamignore nodes from context->nodes().
         void clear();
@@ -68,12 +71,14 @@ namespace YAM
         void handleRequisiteCompletion(Node::State state); 
         void parseDotIgnoreFiles();
 
-
+        // The directory that contains the ignore files.
+        // Note: one or both of these files may be non-existing.
         DirectoryNode* _directory;
 
-        // The input files, i.e. the .gitignore and/or .yamignore files
+        // The the .gitignore and .yamignore files
         std::vector<std::shared_ptr<SourceFileNode>> _dotIgnoreFiles;
-        // TODO: the patterns retrieved from the input files.
+
+        std::vector<DotIgnoreRule> _rules;
          
         // The hash of the hashes of the _dotIgnoreFiles.
         XXH64_hash_t _hash;
