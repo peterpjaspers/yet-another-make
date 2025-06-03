@@ -7,16 +7,14 @@ using namespace std::filesystem;
 
 namespace Language {
 
-    std::string qualifySymbolName( const std::string& name, int depth ) {
-        auto& ctx( ccontext() );
+    std::string qualifySymbolName( const ThreadContext& cctx, const std::string& name, int depth ) {
         string qualifiedName( "" );
-        if (depth == 0) depth = ctx.scope.size();
-        for ( int i = 0; i < depth; ++i ) qualifiedName += ctx.scope[ i ] + ":";
+        if (depth == 0) depth = cctx.scope.size();
+        for ( int i = 0; i < depth; ++i ) qualifiedName += cctx.scope[ i ] + ":";
         qualifiedName += name;
         return qualifiedName;
     }
-    Descriptor lookUpSymbol( const std::string& name, bool local ) {
-        auto& ctx( ccontext() );
+    Descriptor lookUpSymbol( ThreadContext& ctx, const std::string& name, bool local ) {
         int depth( ctx.scope.size() );
         if (local) {
             auto found( ctx.symbols.find( qualifySymbolName( name, depth ) ) );
@@ -30,15 +28,13 @@ namespace Language {
         }
         return NullDescriptor();
     }
-    void defineSymbol( const std::string& name, const Descriptor value ) {
-        auto& ctx( context() );
+    void defineSymbol( ThreadContext& ctx, const std::string& name, const Descriptor value ) {
         auto qualifiedName( qualifySymbolName( name, ctx.scope.size() ) );
         ctx.symbols.insert( { qualifiedName, value } );
     }
 
-    void printSymbolTable( LogFile& stream ) {
-        auto& ctx( ccontext() );
-        for ( auto entry : ctx.symbols ) {
+    void printSymbolTable( const ThreadContext& cctx, LogFile& stream ) {
+        for ( auto entry : cctx.symbols ) {
             ostream& output = stream() << setw( 32 ) << entry.first << " -> ";
             auto descriptor( entry.second );
             auto typeWord( type( descriptor ) );
@@ -51,9 +47,9 @@ namespace Language {
             else output << setw( 11 ) << "Undefined[ " << setw( 4 ) << value << " ]" << record<char>;
         }
     }
-    void printSymbolTable( const path file ) {
+    void printSymbolTable(  const ThreadContext& cctx, const path file ) {
         LogFile stream( file, false, false );
-        return printSymbolTable( stream );
+        return printSymbolTable( cctx, stream );
     }
 
 } // namespace Language

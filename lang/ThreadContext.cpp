@@ -18,13 +18,17 @@ namespace Language {
     ThreadContext& context() { return currentContext; };
 
     MemoryUsage::MemoryUsage() {
-        auto& ctx( ccontext() );
-        program = ctx.program.extent;
-        global = ctx.program.extent;
-        string = ctx.string.extent;
+        auto& cctx( ccontext() );
+        program = cctx.program.extent;
+        global = cctx.program.extent;
+        string = cctx.string.extent;
     }
-    void recoverMemory( const MemoryUsage& usage ) {
-        auto& ctx( context() );
+    MemoryUsage::MemoryUsage( const ThreadContext& cctx ) {
+        program = cctx.program.extent;
+        global = cctx.program.extent;
+        string = cctx.string.extent;
+    }
+    void recoverMemory( ThreadContext& ctx, const MemoryUsage& usage ) {
         ctx.program.extent = usage.program;
         ctx.program.extent = usage.global;
         ctx.string.extent = usage.string;
@@ -58,42 +62,39 @@ namespace Language {
         return allocated;
     }
 
-    PageAddress addressProgram( const Address address ) { return addressMemory( ccontext().program, address ); }
-    Address allocateProgram( const Word extent ) { return allocateMemory( context().program, extent ); }
-    void deallocateProgram( const Word extent ) { context().program.extent -= extent; }
+    PageAddress addressProgram( const ThreadContext& cctx, const Address address ) { return addressMemory( cctx.program, address ); }
+    Address allocateProgram( ThreadContext& ctx, const Word extent ) { return allocateMemory( ctx.program, extent ); }
+    void deallocateProgram( ThreadContext& ctx, const Word extent ) { ctx.program.extent -= extent; }
 
-    Descriptor* addressGlobal( const Address address ) {
+    Descriptor* addressGlobal( const ThreadContext& cctx, const Address address ) {
         static const char* signature = "PageAddress addressHeap( const Address address )";
         if (monitor( DebugAspects::GlobalAccess )) monitorRecord() << setw( 20 ) << "" << "Global variable access " << address << record<char>;
-        return reinterpret_cast<Descriptor*>( addressMemory( ccontext().global, address ) );
+        return reinterpret_cast<Descriptor*>( addressMemory( cctx.global, address ) );
     }
-    Address allocateGlobal( const Word extent ) { return allocateMemory( context().global, extent ); };
-    void deallocateGlobal( const Word extent ) { context().global.extent -= extent; }
+    Address allocateGlobal( ThreadContext& ctx, const Word extent ) { return allocateMemory( ctx.global, extent ); };
+    void deallocateGlobal( ThreadContext& ctx, const Word extent ) { ctx.global.extent -= extent; }
     
-    PageAddress addressString( const Address address ) { return addressMemory( ccontext().string, address ); }
-    Address allocateString( const Word extent ) { return allocateMemory( context().string, extent ); };
-    void deallocateString( const Word extent ) { context().string.extent -= extent; }
+    PageAddress addressString( const ThreadContext& cctx, const Address address ) { return addressMemory( cctx.string, address ); }
+    Address allocateString( ThreadContext& ctx, const Word extent ) { return allocateMemory( ctx.string, extent ); };
+    void deallocateString( ThreadContext& ctx, const Word extent ) { ctx.string.extent -= extent; }
 
-    Descriptor* addressStack( const Offset& offset ) {
+    Descriptor* addressStack( const ThreadContext& cctx, const Offset& offset ) {
         static const char* signature = "Descriptor* addressStack( ThreadContext& context, const Offset& offset )";
-        auto& ctx( ccontext() );
         #ifdef _DEBUG_INTERPRETER
-            if (ctx.sp < offset) throw std::string( signature ) + " - Invalid stack offset " + std::to_string( offset );
+            if (cctx.sp < offset) throw std::string( signature ) + " - Invalid stack offset " + std::to_string( offset );
         #endif
-        Word page = ((ctx.sp - offset) >> PageAddressBits);
-        if (ctx.stack.pages.size() <= page) allocatePage( context().stack );
+        Word page = ((cctx.sp - offset) >> PageAddressBits);
+        if (cctx.stack.pages.size() <= page) allocatePage( context().stack );
         if (monitor( DebugAspects::StackAccess )) monitorRecord() << setw( 20 ) << "" << "Stack access " << offset << record<char>;
-        return reinterpret_cast<Descriptor*>( addressMemory( ctx.stack, (ctx.sp - offset) ) );
+        return reinterpret_cast<Descriptor*>( addressMemory( cctx.stack, (cctx.sp - offset) ) );
     }
-    Descriptor* addressLocal( const Address& address ) {
-        auto& ctx( ccontext() );
+    Descriptor* addressLocal( const ThreadContext& cctx, const Address& address ) {
         if (monitor( DebugAspects::LocalAccess )) monitorRecord() << setw( 20 ) << "" << "Local variable access " << address << record<char>;
-        return reinterpret_cast<Descriptor*>( addressMemory( ctx.stack, (ctx.fp + address) ) );
+        return reinterpret_cast<Descriptor*>( addressMemory( cctx.stack, (cctx.fp + address) ) );
     }
-    Descriptor* addressArgument( const Address& address ) {
-        auto& ctx( ccontext() );
+    Descriptor* addressArgument( const ThreadContext& cctx, const Address& address ) {
         if (monitor( DebugAspects::ArgumentAccess )) monitorRecord() << setw( 20 ) << "" << "Argument variable access " << address << record<char>;
-        return reinterpret_cast<Descriptor*>( addressMemory( ctx.stack, (ctx.ap + address) ) );
+        return reinterpret_cast<Descriptor*>( addressMemory( cctx.stack, (cctx.ap + address) ) );
     }
 
 } // namespace Language

@@ -16,25 +16,33 @@ namespace Language {
     // entire scope hierarchy.
 
     // Enter a named scope within the current scope.
-    inline void enterNamedScope( const std::string& name ) { context().scope.push_back( name ); }
+    inline void enterNamedScope( ThreadContext& ctx, const std::string& name ) { ctx.scope.push_back( name ); }
+    inline void enterNamedScope( const std::string& name ) { enterNamedScope( context(), name ); }
     // Enter an anonymous scope within the current scope.
-    inline void enterAnonymousScope( const int index ) { context().scope.push_back( std::to_string( index ) ); }
+    inline void enterAnonymousScope( ThreadContext& ctx, const int index ) { ctx.scope.push_back( std::to_string( index ) ); }
+    inline void enterAnonymousScope( const int index ) { enterAnonymousScope( context(), index ); }
     // Exit the current scope.
-    inline void exitScope() { context().scope.pop_back(); }
+    inline void exitScope( ThreadContext& ctx ) { ctx.scope.pop_back(); }
+    inline void exitScope() { exitScope( context() ); }
 
     // Qualify a name with the current scope.
     // The optional depth argument defines the scope nesting level to which the name is to be qualified.
-    std::string qualifySymbolName( const std::string& name, int depth = 0 );
+    std::string qualifySymbolName( const ThreadContext& cctx, const std::string& name, int depth = 0 );
+    inline std::string qualifySymbolName( const std::string& name, int depth = 0 ) { return qualifySymbolName( ccontext(), name, depth ); }
 
     // Look-up a symbol with the given name in the current scope.
     // The local argument controls scope locality, false to look-up in full hierarchy.
     // Returns the Descriptor value of the symbol if it exists, otherwise return NullDescriptor.
-    Descriptor lookUpSymbol( const std::string& name, bool local = false );
+    Descriptor lookUpSymbol( ThreadContext& ctx, const std::string& name, bool local = false );
+    inline Descriptor lookUpSymbol( const std::string& name, bool local = false ) { lookUpSymbol( context(), name, local ); }
     // Define a symbol with the given name in the current local scope.
-    void defineSymbol( const std::string& name, const Descriptor value );
+    void defineSymbol( ThreadContext& ctx, const std::string& name, const Descriptor value );
+    inline void defineSymbol( const std::string& name, const Descriptor value ) { defineSymbol( context(), name, value ); }
 
-    void printSymbolTable( LogFile& stream );
-    void printSymbolTable( const std::filesystem::path file );
+    void printSymbolTable( const ThreadContext& cctx, LogFile& stream );
+    void printSymbolTable( const ThreadContext& cctx, const std::filesystem::path file );
+    inline void printSymbolTable( LogFile& stream ) { printSymbolTable( ccontext(), stream ); }
+    inline void printSymbolTable( const std::filesystem::path file ) { printSymbolTable( ccontext(), file ); }
 
 }
 

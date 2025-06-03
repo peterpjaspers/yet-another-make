@@ -38,14 +38,17 @@ namespace Language {
 
     };
 
-    const ThreadContext& ccontext();
+    // Access the current thread context.
     ThreadContext& context();
+    // Const access the current thread context.
+    const ThreadContext& ccontext();
 
     struct MemoryUsage {
         Address program;
         Address global;
         Address string;
         MemoryUsage();
+        MemoryUsage( const ThreadContext& cctx );
     };
 
     static const Word PageAddressBits( 12 );
@@ -55,40 +58,54 @@ namespace Language {
     // Determine number of bytes from address to end of page
     inline Word pageRemainder( const Address& address ) { return( PageSize - (address && PageAddressMask) ); }
     // Address memory via a page table
-    PageAddress addressMemory( const PageTable& table, const Address address  );
+    inline PageAddress addressMemory( const PageTable& table, const Address address  );
 
     // Record current memory usage.
     inline MemoryUsage currentMemoryUsage() { return( MemoryUsage() ); }
+    inline MemoryUsage currentMemoryUsage( const ThreadContext& cctx ) { return( MemoryUsage( cctx ) ); }
     // Recover memory to given usage-point.
-    void recoverMemory( const MemoryUsage& usage );
+    void recoverMemory( ThreadContext& ctx, const MemoryUsage& usage );
+    inline void recoverMemory( const MemoryUsage& usage ) { recoverMemory( context(), usage ); };
 
     // Address Program memory (read-execute).
-    PageAddress addressProgram( const Address address );
+    PageAddress addressProgram( const ThreadContext& cctx, const Address address );
+    inline PageAddress addressProgram( const Address address ) { return addressProgram( ccontext(), address ); }
     // Allocate Program memory
-    Address allocateProgram( const Word extent );
+    Address allocateProgram( ThreadContext& ctx, const Word extent );
+    inline Address allocateProgram( const Word extent ) { return allocateProgram( context(), extent ); }
     // Deallocate Progran memory by decreasing program page-table extent
-    void deallocateProgram( const Word extent );
+    void deallocateProgram( ThreadContext& ctx, const Word extent );
+    inline void deallocateProgram( const Word extent ) { deallocateProgram( context(), extent ); }
 
     // Address Heap memory.
-    Descriptor* addressGlobal( const Address address );
+    Descriptor* addressGlobal( const ThreadContext& cctx, const Address address );
+    inline Descriptor* addressGlobal( const Address address ) { return addressGlobal( ccontext(), address ); };
     // Allocate Heap memory
-    Address allocateGlobal( const Word extent );
+    Address allocateGlobal( ThreadContext& ctx, const Word extent );
+    inline Address allocateGlobal( const Word extent ) { return allocateGlobal( context(), extent ); }
     // Deallocate Heap memory by decreasing heap page-table extent
-    void deallocateGlobal( const Word extent );
+    void deallocateGlobal( ThreadContext& ctx, const Word extent );
+    inline void deallocateGlobal( const Word extent ) { deallocateGlobal( context(), extent ); }
 
     // Address String memory.
-    PageAddress addressString( const Address address );
+    PageAddress addressString( const ThreadContext& cctx, const Address address );
+    inline PageAddress addressString( const Address address ) { return addressString( ccontext(), address ); }
     // Allocate String memory
-    Address allocateString( const Word extent );
+    Address allocateString( ThreadContext& ctx, const Word extent );
+    inline Address allocateString( const Word extent ) { return allocateString( context(), extent ); }
     // Deallocate String memory by decreasing string page-table extent
-    void deallocateString( const Word extent );
+    void deallocateString( ThreadContext& ctx, const Word extent );
+    inline void deallocateString( const Word extent ) { deallocateString( context(), extent ); }
     
     // Address Stack memory.
-    Descriptor* addressStack( const Offset& offset = 0 );
+    Descriptor* addressStack( const ThreadContext& cctx, const Offset& offset = 0 );
+    inline Descriptor* addressStack( const Offset& offset = 0 ) { return addressStack( ccontext(), offset ); }
     // Address local variable.
-    Descriptor* addressLocal( const Address& address );
+    Descriptor* addressLocal( const ThreadContext& cctx, const Address& address );
+    inline Descriptor* addressLocal( const Address& address ) { return addressLocal( ccontext(), address ); }
     // Address argument variable.
-    Descriptor* addressArgument( const Address& address );
+    Descriptor* addressArgument( const ThreadContext& cctx, const Address& address );
+    inline Descriptor* addressArgument( const Address& address ) { return addressArgument( ccontext(), address ); }
 
 } // namespace Language
 

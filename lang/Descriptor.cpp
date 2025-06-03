@@ -5,12 +5,12 @@ using namespace std;
 
 namespace Language {
 
-    Descriptor dereference( const Descriptor& descriptor ) {
+    Descriptor dereference( ThreadContext& ctx, const Descriptor& descriptor ) {
         static const char* signature( "Descriptor dereference( const Descriptor& descriptor )" );
         auto adr( address( descriptor ) );
-        if (isLocalVariable( descriptor)) return *addressLocal( adr );
-        if (isArgumentVariable( descriptor)) return *addressArgument( adr );
-        if (isGlobalVariable( descriptor)) return *addressGlobal( adr );
+        if (isLocalVariable( descriptor)) return *addressLocal( ctx, adr );
+        if (isArgumentVariable( descriptor)) return *addressArgument( ctx, adr );
+        if (isGlobalVariable( descriptor)) return *addressGlobal( ctx, adr );
         throw string( signature ) + " - Dereferencing unknown variable type";
     }
     Descriptor& toInteger( Descriptor& d ) {

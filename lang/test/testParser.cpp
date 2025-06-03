@@ -1,5 +1,4 @@
 #include "../Translator.h"
-
 #include "../Monitor.h"
 #include "../Instruction.h"
 #include "../SymbolTable.h"

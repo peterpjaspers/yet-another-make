@@ -119,16 +119,21 @@ namespace Language {
 
     // Execute (single) instruction
     bool executeInstruction();
+    bool executeInstruction( ThreadContext& ctx );
     // Run the program starting at address.
     int run( const Address start );
-    // Push a descriptor-value on the stack.
+    // Push/pop a descriptor-value on/from the stack.
     void push( const Descriptor& descriptor );
-    // Pop a descriptor-value from the stack.
     Descriptor pop();
+    void push( ThreadContext& ctx, const Descriptor& descriptor );
+    Descriptor pop( ThreadContext& ctx );
     // Store an instruction in Program memory
-    void storeInstruction( const OpCode code );
-    void storeInstruction( const OpCode code, const Word operand );
-    void storeInstruction( const OpCode code, const Descriptor operand );
+    void storeInstruction( ThreadContext& ctx, const OpCode code );
+    void storeInstruction( ThreadContext& ctx, const OpCode code, const Word operand );
+    void storeInstruction( ThreadContext& ctx, const OpCode code, const Descriptor operand );
+    inline void storeInstruction( const OpCode code ) { storeInstruction( context(), code ); }
+    inline void storeInstruction( const OpCode code, const Word operand ) { storeInstruction( context(), code, operand ); }
+    inline void storeInstruction( const OpCode code, const Descriptor operand ) { storeInstruction( context(), code, operand ); }
     // Convert op-code to human readble string
     std::string toReadable( const OpCode code );
 

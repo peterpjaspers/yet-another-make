@@ -6,7 +6,6 @@
 
 namespace Language {
 
-    
     // A Descriptor provides typed access to program data.
     // A descriptor is a 64-bit entity consisting of a 32-bit type and a 32-bit value.
     // The value field holds either the actual value (Word, Integer or Real) or an pointer to the value (Address).
@@ -33,7 +32,8 @@ namespace Language {
     inline bool isAddress( const Descriptor& d ) { return( typeCode( d ) == TypeAddress ); }
     inline bool isProcedure( const Descriptor& d ) { return( typeCode( d ) == TypeProcedure ); }
     inline bool isIntrinsic( const Descriptor& d ) { return( typeCode( d ) == TypeIntrinsic ); }
-    Descriptor dereference( const Descriptor& descriptor );
+    Descriptor dereference( ThreadContext& ctx, const Descriptor& descriptor );
+    inline Descriptor dereference( const Descriptor& descriptor ) { return dereference( context(), descriptor ); }
     Descriptor& toInteger( Descriptor& d );
     Descriptor& toReal( Descriptor& d );
     Descriptor& toString( Descriptor& d );

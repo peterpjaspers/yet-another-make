@@ -4,7 +4,6 @@
 #include "SymbolTable.h"
 #include "Instruction.h"
 #include "Monitor.h"
-#include "ThreadContext.h"
 #include "Intrinsics.h"
 
 #include <iostream>
@@ -78,47 +77,47 @@ namespace Language {
 
             // Create a patch entry for an instruction at the current program address,
             // returning a label to perform the actual patch.
-            PatchLabel createPatch() {
+            PatchLabel createPatch( ThreadContext& ctx ) {
                 if (nextPatch == MAXINT32) fatalError( "Out of jump labels" );
                 auto label( nextPatch++ );
-                patches.insert( { label, allocateProgram( 0 ) } );
+                patches.insert( { label, allocateProgram( ctx, 0 ) } );
                 return label;
             }
             // Patch (set) the operand value of the (previously generated) instruction associated with a patch label
-            void patchOperand( const PatchLabel label, const Word operand ) {
+            void patchOperand( ThreadContext& ctx, const PatchLabel label, const Word operand ) {
                 auto entry( patches.find( label ) );
                 if (entry == patches.end()) fatalError( "Internal error, invalid patch label" );
                 auto opAddress( entry->second );
-                auto operandAddress( reinterpret_cast<Word*>( addressProgram( opAddress ) + sizeof( OpCode ) ) );
+                auto operandAddress( reinterpret_cast<Word*>( addressProgram( ctx, opAddress ) + sizeof( OpCode ) ) );
                 *operandAddress = operand;
             }
             // Set target address of the jump instruction associated with a patch label to the current program address.
-            void patchJump( const PatchLabel label ) { patchOperand( label, allocateProgram( 0 ) ); }
+            void patchJump( ThreadContext& ctx, const PatchLabel label ) { patchOperand( ctx, label, allocateProgram( 0 ) ); }
 
-            void parseNamedScope( const string name ) {
+            void parseNamedScope( ThreadContext& ctx, const string name ) {
                 blockIndeces.push_back( 0 );
                 auto n( name.size() );
-                auto address( allocateString( n ) );
-                strncpy( (char*)addressString( address ), name.c_str(), n );
-                enterNamedScope( name );
-                storeInstruction( OpEnterNamedScope, StringDescriptor( address, n ) );
+                auto address( allocateString( ctx, n ) );
+                strncpy( (char*)addressString( ctx, address ), name.c_str(), n );
+                enterNamedScope( ctx, name );
+                storeInstruction( ctx, OpEnterNamedScope, StringDescriptor( address, n ) );
             }
-            void parseAnonymousScope() {
+            void parseAnonymousScope( ThreadContext& ctx ) {
                 static const char* signature( "void parseAnonymousScope()" );
                 if (blockIndeces.size() == 0) throw string( signature ) + "Internal parser error, no scope defined";
                 auto index( blockIndeces.back() );
                 blockIndeces.pop_back();
                 blockIndeces.push_back( index + 1 );
                 blockIndeces.push_back( 0 );
-                enterAnonymousScope( index );
-                storeInstruction( OpEnterScope, Word( index ) );
+                enterAnonymousScope( ctx, index );
+                storeInstruction( ctx, OpEnterScope, Word( index ) );
             }
-            void unparseScope() {
+            void unparseScope( ThreadContext& ctx ) {
                 static const char* signature( "void unparseScope()" );
                 if (blockIndeces.size() == 0) throw string( signature ) + "Internal parser error, no scope defined";
                 blockIndeces.pop_back();
-                exitScope();
-                storeInstruction( OpExitScope );
+                exitScope( ctx );
+                storeInstruction( ctx, OpExitScope );
             }
 
             // <expression> ::= <dyadic> | <assignment>
@@ -131,15 +130,15 @@ namespace Language {
             //        '==' | '!=' | '<' | '>' | '<=' | '>=' |   // relatation
             //        '<<' | '>>' |                             // shift
             //        '+' | '-' | '*' | '/'                     // arithmetic
-            void generateExpressionCode( const OpPrecedence op ) {
+            void generateExpressionCode(  ThreadContext& ctx, const OpPrecedence op ) {
                 auto top( operatorStack.back() );
-                while (top.precedence >= op.precedence) { storeInstruction( top.code ); operatorStack.pop_back(); top = operatorStack.back(); }
+                while (top.precedence >= op.precedence) { storeInstruction( ctx, top.code ); operatorStack.pop_back(); top = operatorStack.back(); }
                 if (op.token != Token::None) operatorStack.push_back( op );
             }
-            inline void generateExpressionCode() { generateExpressionCode( OpPrecedence{ Token::None, -1, 0 } ); }
+            inline void generateExpressionCode( ThreadContext& ctx ) { generateExpressionCode( ctx, OpPrecedence{ Token::None, -1, 0 } ); }
             inline void suspendExpressionCode() { operatorStack.push_back( OpPrecedence{ Token::None, -2, 0 } ); }
-            inline void resumeExpressionCode() { generateExpressionCode(); operatorStack.pop_back(); }
-            bool parseDyadicExpression() {
+            inline void resumeExpressionCode( ThreadContext& ctx ) { generateExpressionCode( ctx ); operatorStack.pop_back(); }
+            bool parseDyadicExpression( ThreadContext& ctx ) {
                 static const OpPrecedence ops[] = {
                     { VerticalVerticalBar, 1, OpOr }, { AmpersandAmpersand, 2, OpAnd },
                     { VerticalBar, 3, OpBitOr }, { Caret, 4, OpBitXor }, { Ampersand, 5, OpBitAnd },
@@ -150,14 +149,14 @@ namespace Language {
                     { Asterisk, 10, OpMul }, { Slash, 10, OpDiv }, { Percentile, 10, OpRem }
                 };
                 if (monitor( DebugAspects::ParserFunctions )) monitorRecord() << setw( 20 ) << "" << "parseDyadicExpression" << record<char>;
-                auto parsed( parseMonadicExpression() );
+                auto parsed( parseMonadicExpression( ctx ) );
                 if (parsed) {
                     bool parseAssignment( true );
                     for (int i = 0; i < (sizeof( ops ) / sizeof( OpPrecedence )); ++i) {
                         if ((ops[ i ].token) == token()) {
                             nextToken();
-                            if (ops[ i ].code != 0) generateExpressionCode( ops[ i ] );
-                            parsed = parseDyadicExpression();
+                            if (ops[ i ].code != 0) generateExpressionCode( ctx, ops[ i ] );
+                            parsed = parseDyadicExpression( ctx );
                             parseAssignment = false;
                             break;
                         }
@@ -171,17 +170,17 @@ namespace Language {
                         };
                         if (token() == Token::Equal) {
                             nextToken();
-                            parsed = parseDyadicExpression();
-                            if (parsed) generateExpressionCode( { Equal, 0, OpAssign } );
+                            parsed = parseDyadicExpression( ctx );
+                            if (parsed) generateExpressionCode( ctx, { Equal, 0, OpAssign } );
                         } else {
                             for (int i = 0; i < (sizeof( asignOps ) / sizeof( OpPrecedence )); ++i) {
                                 if ((asignOps[ i ].token) == token()) {
                                     nextToken();
-                                    storeInstruction( OpDup );
-                                    parsed = parseDyadicExpression();
-                                    if (asignOps[ i ].code != 0) generateExpressionCode( asignOps[ i ] );
+                                    storeInstruction( ctx, OpDup );
+                                    parsed = parseDyadicExpression( ctx );
+                                    if (asignOps[ i ].code != 0) generateExpressionCode( ctx, asignOps[ i ] );
                                     if (parsed) {
-                                        generateExpressionCode( { Equal, 0, OpAssign } );
+                                        generateExpressionCode( ctx, { Equal, 0, OpAssign } );
                                     } else {
                                         recoverableError( "Expected expression", SemiColon );
                                     }
@@ -195,7 +194,7 @@ namespace Language {
             }
             // <monadic> ::= [ <monadic-op> ] <postfix>
             // <monadic-op> ::= '+' | '-' | '~' | '!'
-            bool parseMonadicExpression() {
+            bool parseMonadicExpression( ThreadContext& ctx ) {
                 static const OpPrecedence ops[] = {
                     { Plus, 11, 0 }, { Minus, 11, OpNegate },   // arithmetic
                     { Tilde, 11, OpInvert },                    // bit-wise
@@ -205,22 +204,22 @@ namespace Language {
                 for (int i = 0; i < (sizeof( ops ) / sizeof( Token )); ++i) {
                     if (ops[ i ].token == token()) {
                         nextToken();
-                        auto parsed( parseMonadicExpression() );
-                        if (ops[ i ].code != 0) generateExpressionCode( ops[ i ] );
+                        auto parsed( parseMonadicExpression( ctx ) );
+                        if (ops[ i ].code != 0) generateExpressionCode( ctx, ops[ i ] );
                         return parsed;
                     }
                 }
-                return parsePostfixExpression();
+                return parsePostfixExpression( ctx );
             }
             // <postfix> ::= <primary> [ <index> | <arguments> ]
             // <index> ::= '[' <expression> ']'
             // <arguments> ::= '(' <expression> [ ',' <expression> ]+ ')'
-            bool parsePostfixExpression() {
+            bool parsePostfixExpression( ThreadContext& ctx ) {
                 if (monitor( DebugAspects::ParserFunctions )) monitorRecord() << setw( 20 ) << "" << "parsePostfixExpression" << record<char>;
-                auto parsed( parsePrimaryExpression() );
+                auto parsed( parsePrimaryExpression( ctx ) );
                 if (parsed && (token() == Token::RightSquare)) {
                     nextToken();
-                    parsed = parseExpression();
+                    parsed = parseExpression( ctx );
                     if (parsed && token() == Token::LeftSquare) {
                         nextToken();
                         // ToDo: Generate code to index list, set or map
@@ -231,21 +230,21 @@ namespace Language {
                     // Procedure-call has highest priority,
                     // suspend (lower-priority) expression evaluation during argument expression evaluation...
                     suspendExpressionCode();
-                    storeInstruction( OpArguments );
+                    storeInstruction( ctx, OpArguments );
                     // Parse argument expressions
                     while (parsed) {
-                        parsed = parseExpression();
+                        parsed = parseExpression( ctx );
                         // Dereference all variables prior to entering procedure as variable
                         // scope will/may be inaccessible inside the procedure.
-                        storeInstruction( OpDereference );
+                        storeInstruction( ctx, OpDereference );
                         if (token() != Token::Comma) break;
                         nextToken();
                     }
                     if (token() == Token::RightParen) {
                         nextToken();
-                        storeInstruction( OpProcedureCall );
+                        storeInstruction( ctx, OpProcedureCall );
                         // ... resume (lower-priority) expression evaluation
-                        resumeExpressionCode();
+                        resumeExpressionCode( ctx );
                     } else { recoverableError( "Expected )", SemiColon ); parsed = false; }
                 }
                 return parsed;
@@ -259,42 +258,29 @@ namespace Language {
             // <integer> ::= <digit> [ <digit> ]*
             // <real> ::= <integer> '.' [ <integer> ]
             // <string> ::= '"' [ <character> ]* '"'
-            bool parsePrimaryExpression() {
+            bool parsePrimaryExpression( ThreadContext& ctx ) {
                 if (monitor( DebugAspects::ParserFunctions )) monitorRecord() << setw( 20 ) << "" << "parsePrimaryExpression" << record<char>;
                 if (token() == Token::Identifier) {
-                    auto found( lookUpSymbol( identifier() ));
+                    auto found( lookUpSymbol( ctx, identifier() ));
                     if (found != NullDescriptor()) {
                         storeInstruction( OpPushDescriptor, found );
                     } else {
                         recoverableError( "Undefined identifier ", SemiColon );
-                        // Descriptor value;
-                        // if (reader->identifierType == VariableType::Local) {
-                        //     value = LocalVariableDescriptor( locals );
-                        //     storeInstruction( OpPushDescriptor, value );
-                        //     nextLocal();
-                        // } else if (reader->identifierType == VariableType::Argument) {
-                        //     value = ArgumentVariableDescriptor(  reader->integerConstant * sizeof( Descriptor ) );
-                        //     storeInstruction( OpPushDescriptor, value );
-                        // } else if (reader->identifierType == VariableType::Global) {
-                        //     value = GlobalVariableDescriptor( allocateGlobal( sizeof(Descriptor) ) ) ;
-                        //     storeInstruction( OpPushDescriptor, value );
-                        // } else fatalError( "Internal parser error - Invalid identifier type" );
-                        // defineSymbol( identifier(), value );
                     }
                     nextToken();
                 } else if (token() == Token::IntegerConstant) {
-                    storeInstruction( OpPushInteger, (Word)reader->integerConstant ); nextToken();
+                    storeInstruction( ctx, OpPushInteger, (Word)reader->integerConstant ); nextToken();
                 } else if (token() == Token::RealConstant) {
-                    storeInstruction( OpPushReal, bit_cast<Word>( reader->realConstant ) ); nextToken();
+                    storeInstruction( ctx, OpPushReal, bit_cast<Word>( reader->realConstant ) ); nextToken();
                 } else if (token() == Token::StringConstant) {
                     auto n( reader->stringConstant.size() );
-                    auto address( allocateString( n ) );
-                    strncpy( (char*)addressString( address ), reader->stringConstant.c_str(), n );
-                    storeInstruction( OpPushDescriptor, StringDescriptor( address, n ) );
+                    auto address( allocateString( ctx, n ) );
+                    strncpy( (char*)addressString( ctx, address ), reader->stringConstant.c_str(), n );
+                    storeInstruction( ctx, OpPushDescriptor, StringDescriptor( address, n ) );
                     nextToken();
                 } else if (token() == Token::LeftParen) {
                     nextToken();
-                    auto parsed( parseExpression() );
+                    auto parsed( parseExpression( ctx ) );
                     if (token() == Token::RightParen) nextToken();
                     else { recoverableError( "Expected )", SemiColon ); parsed = false; }
                     return parsed;
@@ -304,10 +290,10 @@ namespace Language {
                 }
                 return true;
             }
-            bool parseExpression() {
+            bool parseExpression( ThreadContext& ctx ) {
                 if (monitor( DebugAspects::ParserFunctions )) monitorRecord() << setw( 20 ) << "" << "parseExpression" << record<char>;
-                auto parsed( parseDyadicExpression() );
-                generateExpressionCode();
+                auto parsed( parseDyadicExpression( ctx ) );
+                generateExpressionCode( ctx );
                 consumed = false;
                 return parsed;
             }
@@ -315,29 +301,29 @@ namespace Language {
             //  <variable-declaration> ::=
             //      'var' <identifier> [ '(' <expression> ')' ]
             // Declare a variable with an initial value, null no initial value expression is provided.
-            bool parseVariable() {
+            bool parseVariable( ThreadContext& ctx ) {
                 if (token() == Token::KeywordVar) {
                     nextToken();
                     if (token() == Token::Identifier) {
                         nextToken();
                         // Look-up to see if variable already exists in the current scope.
-                        auto exists( lookUpSymbol( identifier(), true ) );
+                        auto exists( lookUpSymbol( ctx, identifier(), true ) );
                         // Create variable in this scope
                         if (exists == NullDescriptor()) {
                             auto descriptor( LocalVariableDescriptor( locals ) );
-                            defineSymbol( identifier(), descriptor );
+                            defineSymbol( ctx, identifier(), descriptor );
                             nextLocal();
-                            storeInstruction( OpPushDescriptor, descriptor );
+                            storeInstruction( ctx, OpPushDescriptor, descriptor );
                             if (token() == Token::LeftParen) {
                                 nextToken();
-                                parseExpression();
+                                parseExpression( ctx );
                                 if (token() == Token::RightParen) {
                                     nextToken();
                                 } else recoverableError( "Expected )", SemiColon );
                             } else {
-                                storeInstruction( OpPushNull );
+                                storeInstruction( ctx, OpPushNull );
                             }
-                            storeInstruction( OpAssign );
+                            storeInstruction( ctx, OpAssign );
                         } else recoverableError( "Identifier already declared", SemiColon );
                     } else recoverableError( "Expected identifier", SemiColon );
                 }
@@ -346,14 +332,14 @@ namespace Language {
 
             //  <block-statement> ::=
             //      '{' [ <statement> ]* '}'
-            bool parseBlock( bool scoped ) {
+            bool parseBlock( ThreadContext& ctx, bool scoped ) {
                 if (token() == Token::LeftCurly) {
                     nextToken();
-                    if (scoped) parseAnonymousScope();
+                    if (scoped) parseAnonymousScope( ctx );
                     auto previousLocals( locals );
-                    while ((token() != Token::RightCurly) && (token() != Token::EndOfFile)) parseStatement();
+                    while ((token() != Token::RightCurly) && (token() != Token::EndOfFile)) parseStatement( ctx );
                     locals = previousLocals;
-                    if (scoped) unparseScope();
+                    if (scoped) unparseScope( ctx );
                     if (token() == Token::RightCurly) { nextToken(); return true; }
                     else recoverableError( "Expected }", SemiColon );
                 }
@@ -361,27 +347,27 @@ namespace Language {
             }
             //  <if-statement> ::=
             //      'if' '(' <expression> ')' <statement> [ 'else' <statement> ]
-            bool parseIfStatement() {
+            bool parseIfStatement( ThreadContext& ctx ) {
                 if (token() == Token::KeywordIf) {
                     nextToken();
                     if (token() == Token::LeftParen) {
                         nextToken();
-                        parseExpression();
-                        auto elseLabel( createPatch() );
-                        storeInstruction( OpConditionalJump, Address( 0 ) );
+                        parseExpression( ctx );
+                        auto elseLabel( createPatch( ctx ) );
+                        storeInstruction( ctx, OpConditionalJump, Address( 0 ) );
                         consumed = true;
                         if (token() == Token::RightParen) {
                             nextToken();
-                            parseStatement();
+                            parseStatement( ctx );
                             if (token() == Token::KeywordElse) {
                                 nextToken();
-                                auto endLabel( createPatch() );
+                                auto endLabel( createPatch( ctx ) );
                                 storeInstruction( OpJump, Address( 0 ) );
-                                patchJump( elseLabel );
-                                parseStatement();
-                                patchJump( endLabel );
+                                patchJump( ctx, elseLabel );
+                                parseStatement( ctx );
+                                patchJump( ctx, endLabel );
                             } else {
-                                patchJump( elseLabel );
+                                patchJump( ctx, elseLabel );
                             }
                         } else {
                             recoverableError( "Expected )", SemiColon );
@@ -394,21 +380,21 @@ namespace Language {
             }
             //  <while-statement> ::=
             //      'while' '(' <expression> ')' <statement>
-            bool parseWhileStatement() {
+            bool parseWhileStatement( ThreadContext& ctx ) {
                 if (token() == Token::KeywordWhile) {
                     nextToken();
                     if (token() == Token::LeftParen) {
                         nextToken();
-                        auto loopLabel( allocateProgram( 0 ) );
-                        parseExpression();
-                        auto endLabel( createPatch() );
+                        auto loopLabel( allocateProgram( ctx, 0 ) );
+                        parseExpression( ctx );
+                        auto endLabel( createPatch( ctx ) );
                         storeInstruction( OpConditionalJump, Address( 0 ) );
                          consumed = true;
                         if (token() == Token::RightParen) {
                             nextToken();
-                            parseStatement();
-                            storeInstruction( OpJump, loopLabel );
-                            patchJump( endLabel );
+                            parseStatement( ctx );
+                            storeInstruction( ctx, OpJump, loopLabel );
+                            patchJump( ctx, endLabel );
                         } else {
                             recoverableError( "Expected )", SemiColon );
                         }
@@ -420,19 +406,19 @@ namespace Language {
             }
             //  <return-statement> ::=
             //      'return' [ <expression> ] ';'
-            bool parseReturnStatement() {
+            bool parseReturnStatement( ThreadContext& ctx ) {
                 if (token() == Token::KeywordReturn) {
                     nextToken();
                     if (token() != Token::SemiColon) {
-                        parseExpression();
+                        parseExpression( ctx );
                     } else {
                         // Procedure returns Null if no expression is provided
                         storeInstruction( OpPushNull );
                     }
                     if (token() == Token::SemiColon) {
                         nextToken();
-                        storeInstruction( OpExitScope );
-                        storeInstruction( OpReturn );
+                        storeInstruction( ctx, OpExitScope );
+                        storeInstruction( ctx, OpReturn );
                         consumed = true;
                         return true;
                     }
@@ -442,13 +428,13 @@ namespace Language {
             }
             //  <evaluate-statement> ::=
             //      'eval' [ <expression> ] ';'
-            bool parseEvaluateStatement() {
+            bool parseEvaluateStatement( ThreadContext& ctx ) {
                 if (token() == Token::KeywordEval) {
                     nextToken();
-                    parseExpression();
+                    parseExpression( ctx );
                     if (token() == Token::SemiColon) {
                         nextToken();
-                        storeInstruction( OpEvaluate );
+                        storeInstruction( ctx, OpEvaluate );
                         consumed = true;
                         return true;
                     }
@@ -463,7 +449,7 @@ namespace Language {
             // All procedures have a variable number of arguments indexed by $0, $1, .. $N where N is the actual
             // number of argumnts provided. Optionally, arguments can be named. Argument names are aliases for
             // argument indeces.
-            bool parseDefStatement() {
+            bool parseDefStatement( ThreadContext& ctx ) {
                 if (token() == Token::KeywordDef) {
                     nextToken();
                     if (token() == Token::Identifier) {
@@ -471,23 +457,23 @@ namespace Language {
                         // Provisionally Insert code to jump over procedure definition
                         // ToDo: Jump can be avoided by determining start address of code for a translation unit. (low-prio)
                         auto procedureName( identifier() );
-                        auto skip( createPatch() );
-                        storeInstruction( OpJump, Address( 0 ) );
+                        auto skip( createPatch( ctx ) );
+                        storeInstruction( ctx, OpJump, Address( 0 ) );
                         auto value( ProcedureDescriptor( allocateProgram( 0 ) ) );
-                        defineSymbol( identifier(), value );
-                        parseNamedScope( procedureName );
+                        defineSymbol( ctx, identifier(), value );
+                        parseNamedScope( ctx, procedureName );
                         auto previousLocals( locals );
                         auto previousMaxLocals( maxLocals );
                         locals = sizeof( Descriptor );
-                        auto opLocals( createPatch() );
-                        storeInstruction( OpLocals, Word( locals ) );
+                        auto opLocals( createPatch( ctx ) );
+                        storeInstruction( ctx, OpLocals, Word( locals ) );
                         if (token() == Token::LeftParen) {
                             // Defining named arguments
                             Address index( 0 );
                             nextToken();
                             while (token() == Token::Identifier) {
                                 auto argument( ArgumentVariableDescriptor( index++ * sizeof( Descriptor ) ) );
-                                defineSymbol( identifier(), argument );
+                                defineSymbol( ctx, identifier(), argument );
                                 nextToken();
                                 if (token() != Token::Comma) break;
                                 nextToken();
@@ -495,15 +481,15 @@ namespace Language {
                             if (token() == Token::RightParen) nextToken();
                             else recoverableError( "Expected )", Token::LeftCurly );
                         }
-                        if (token() == Token::LeftCurly) parseBlock( false );
+                        if (token() == Token::LeftCurly) parseBlock( ctx, false );
                         else recoverableError( "Expected {", SemiColon );
-                        patchOperand( opLocals, maxLocals );
+                        patchOperand( ctx, opLocals, maxLocals );
                         locals = previousLocals;
                         maxLocals = previousMaxLocals;
-                        unparseScope();
+                        unparseScope( ctx );
                         // ToDo: Only generate return if required (might not be worth the trouble)
-                        storeInstruction( OpReturn );
-                        patchJump( skip );
+                        storeInstruction( ctx, OpReturn );
+                        patchJump( ctx, skip );
                     } else recoverableError( "Expected identifier", SemiColon );
                 }
                 return true;
@@ -540,14 +526,14 @@ namespace Language {
                 } else recoverableError( "Expected <", SemiColon );
                 return false;
             }
-            bool parseImport() {
+            bool parseImport( ThreadContext& ctx ) {
                 if (token() == Token::KeywordImport) {
                     nextToken();
                     return include( true );
                 }
                 return false;
             }
-            bool parseInclude() {
+            bool parseInclude( ThreadContext& ctx ) {
                 if (token() == Token::KeywordInclude) {
                     nextToken();
                     return include( false );
@@ -565,22 +551,22 @@ namespace Language {
             //      <procedure-definition> |
             //      <import-statement> |
             //      <include-statement>
-            bool parseStatement() {
-                if (token() == Token::KeywordVar) return parseVariable();
-                else if (token() == Token::LeftCurly) return parseBlock( true );
-                else if (token() == Token::KeywordIf) return parseIfStatement();
-                else if (token() == Token::KeywordWhile) return parseWhileStatement();
-                else if (token() == Token::KeywordDef) return parseDefStatement();
-                else if (token() == Token::KeywordReturn) return parseReturnStatement();
-                else if (token() == Token::KeywordEval) return parseEvaluateStatement();
-                else if (token() == Token::KeywordImport) return parseImport();
-                else if (token() == Token::KeywordInclude) return parseInclude();
+            bool parseStatement( ThreadContext& ctx ) {
+                if (token() == Token::KeywordVar) return parseVariable( ctx );
+                else if (token() == Token::LeftCurly) return parseBlock( ctx, true );
+                else if (token() == Token::KeywordIf) return parseIfStatement( ctx );
+                else if (token() == Token::KeywordWhile) return parseWhileStatement( ctx );
+                else if (token() == Token::KeywordDef) return parseDefStatement( ctx );
+                else if (token() == Token::KeywordReturn) return parseReturnStatement( ctx );
+                else if (token() == Token::KeywordEval) return parseEvaluateStatement( ctx );
+                else if (token() == Token::KeywordImport) return parseImport( ctx );
+                else if (token() == Token::KeywordInclude) return parseInclude( ctx );
                 else {
                     if (!consumed) {
-                        storeInstruction( OpPop ); // Consume value of last evaluated expression
+                        storeInstruction( ctx, OpPop ); // Consume value of last evaluated expression
                         consumed = true;
                     }
-                    if (token() != Token::SemiColon) parseExpression();
+                    if (token() != Token::SemiColon) parseExpression( ctx );
                     if (token() == Token::SemiColon) {
                         nextToken();
                         return true;
@@ -590,14 +576,14 @@ namespace Language {
                 return false;
             }
             // <program> ::= [ <statement> ]*
-            bool parse() {
+            bool parse( ThreadContext& ctx ) {
                 if (monitor( DebugAspects::ParserFunctions )) monitorRecord() << setw( 20 ) << "" << "parse" << record<char>;
                 bool parsed( true );
                 nextCharacter();
                 nextToken();
                 while (true) {
                     while (token() != Token::EndOfFile) {
-                        auto statementOK( parseStatement() );
+                        auto statementOK( parseStatement( ctx ) );
                         parsed = parsed && statementOK;
                     }
                     if (pausedReaders.size() == 0) break;
@@ -621,23 +607,23 @@ namespace Language {
             TranslateState( const string& source ) : reader( new Reader( source ) ) { initialize(); }
             TranslateState( const path& source ) : reader( new Reader( source ) ) { initialize(); }
             ~TranslateState() { delete reader; }
-            Address translate() {
+            Address translate( ThreadContext& ctx ) {
                 // ToDo: Start address may not be current program address as code may start with
                 // procedure definitions...
-                auto start( allocateProgram( 0 ) );
-                auto usage( currentMemoryUsage() );
+                auto start( allocateProgram( ctx, 0 ) );
+                auto usage( currentMemoryUsage( ctx ) );
                 bool parsed( true );
                 try {
-                    parseNamedScope( "" );
+                    parseNamedScope( ctx, "" );
                     defineIntrinsics();
-                    auto opLocals( createPatch() );
-                    storeInstruction( OpLocals, Word( 0 ) );
-                    parse();
+                    auto opLocals( createPatch( ctx ) );
+                    storeInstruction( ctx, OpLocals, Word( 0 ) );
+                    parse( ctx );
                     if ((token() == Token::EndOfFile) && (errors == 0)) {
                         // Parsed entire file without errors
-                        patchOperand( opLocals, maxLocals );
-                        unparseScope();
-                        storeInstruction( OpExit );
+                        patchOperand( ctx, opLocals, maxLocals );
+                        unparseScope( ctx );
+                        storeInstruction( ctx, OpExit );
                         return( start );
                     }
                 } catch(...) { return false; }
@@ -646,11 +632,11 @@ namespace Language {
                 }
                 if (errors != 0) {
                     // Parsing failed, reclaim provisionally allocated memory
-                    recoverMemory( usage );
+                    recoverMemory( ctx, usage );
                     // Replace failed translation unit with (procedure) code returning null
-                    storeInstruction( OpLocals, Word(0) );
-                    storeInstruction( OpPushNull );
-                    storeInstruction( OpReturn );
+                    storeInstruction( ctx, OpLocals, Word(0) );
+                    storeInstruction( ctx, OpPushNull );
+                    storeInstruction( ctx, OpReturn );
                 };
                 return start;
             }
@@ -659,13 +645,13 @@ namespace Language {
 
     } // namespace unnamed
 
-    Address translate( const string& program ) {
+    Address translate( ThreadContext& ctx, const string& program ) {
         TranslateState state( program );
-        return state.translate();
+        return state.translate( ctx  );
     }
-    Address translate( const path& program ) {
+    Address translate( ThreadContext& ctx, const path& program ) {
         TranslateState state( program );
-        return state.translate();
+        return state.translate( ctx );
     }
 
 } // namespace Language
