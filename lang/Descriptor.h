@@ -32,6 +32,7 @@ namespace Language {
     inline bool isReal( const Descriptor& d ) { return( typeCode( d ) == TypeReal ); }
     inline bool isAddress( const Descriptor& d ) { return( typeCode( d ) == TypeAddress ); }
     inline bool isProcedure( const Descriptor& d ) { return( typeCode( d ) == TypeProcedure ); }
+    inline bool isIntrinsic( const Descriptor& d ) { return( typeCode( d ) == TypeIntrinsic ); }
     Descriptor dereference( const Descriptor& descriptor );
     Descriptor& toInteger( Descriptor& d );
     Descriptor& toReal( Descriptor& d );

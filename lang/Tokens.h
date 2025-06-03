@@ -67,9 +67,10 @@ namespace Language {
         KeywordWhile,
         KeywordDef,
         KeywordReturn,
-        KeywordOut,
         KeywordImport,
         KeywordInclude,
+        KeywordEval,
+        IntrinsicOut,
     };
 
 }

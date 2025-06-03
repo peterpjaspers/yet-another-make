@@ -19,9 +19,9 @@ namespace Language {
             { string( "while" ), KeywordWhile },
             { string( "def" ), KeywordDef },
             { string( "return" ), KeywordReturn },
-            { string( "out" ), KeywordOut },
             { string( "include" ), KeywordInclude },
             { string( "import" ), KeywordImport },
+            { string( "eval" ), KeywordEval },
         };
 
     }

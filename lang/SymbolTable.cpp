@@ -2,43 +2,44 @@
 #include "Monitor.h"
 #include "Descriptor.h"
 
-#include <map>
-
 using namespace std;
 using namespace std::filesystem;
 
 namespace Language {
 
-    namespace { map<string,Descriptor> symbolTable; }
-
-    string scopedName( const std::string& name, const vector<string>& scope, int depth ) {
+    std::string qualifySymbolName( const std::string& name, int depth ) {
+        auto& ctx( ccontext() );
         string qualifiedName( "" );
-        for ( int i = 0; i < depth; ++i ) qualifiedName += scope[ i ] + ":";
+        if (depth == 0) depth = ctx.scope.size();
+        for ( int i = 0; i < depth; ++i ) qualifiedName += ctx.scope[ i ] + ":";
         qualifiedName += name;
         return qualifiedName;
     }
-    Descriptor lookUpSymbol( const std::string& name, const vector<string>& scope, bool local ) {
-        int depth( scope.size() );
+    Descriptor lookUpSymbol( const std::string& name, bool local ) {
+        auto& ctx( ccontext() );
+        int depth( ctx.scope.size() );
         if (local) {
-            auto found( symbolTable.find( scopedName( name, scope, depth ) ) );
-            if (found != symbolTable.end()) return found->second;
+            auto found( ctx.symbols.find( qualifySymbolName( name, depth ) ) );
+            if (found != ctx.symbols.end()) return found->second;
         } else {
             while (0 <= depth) {
-                auto found( symbolTable.find( scopedName( name, scope, depth ) ) );
-                if (found != symbolTable.end()) return found->second;
+                auto found( ctx.symbols.find( qualifySymbolName( name, depth ) ) );
+                if (found != ctx.symbols.end()) return found->second;
                 depth -= 1;
             }
         }
         return NullDescriptor();
     }
-    void defineSymbol( const std::string& name, const vector<string>& scope, const Descriptor value ) {
-        auto qualifiedName( scopedName( name, scope, scope.size() ) );
-        symbolTable.insert( { qualifiedName, value } );
+    void defineSymbol( const std::string& name, const Descriptor value ) {
+        auto& ctx( context() );
+        auto qualifiedName( qualifySymbolName( name, ctx.scope.size() ) );
+        ctx.symbols.insert( { qualifiedName, value } );
     }
 
     void printSymbolTable( LogFile& stream ) {
-        for ( auto entry : symbolTable ) {
-            ostream& output = stream() << setw( 32 ) << entry.first << " : ";
+        auto& ctx( ccontext() );
+        for ( auto entry : ctx.symbols ) {
+            ostream& output = stream() << setw( 32 ) << entry.first << " -> ";
             auto descriptor( entry.second );
             auto typeWord( type( descriptor ) );
             auto value( word( descriptor ) );
@@ -46,6 +47,7 @@ namespace Language {
             else if (typeWord == GlobalVariableTypeWord) output << setw( 11 ) << "Global[ " << setw( 4 ) << value << " ]" << record<char>;
             else if (typeWord == ArgumentVariableTypeWord) output << setw( 11 ) << "Argument[ " << setw( 4 ) << value << " ]" << record<char>;
             else if (typeWord == ProcedureTypeWord) output << setw( 11 ) << "Procedure[ " << setw( 4 ) << value << " ]" << record<char>;
+            else if (typeWord == IntrinsicTypeWord) output << setw( 11 ) << "Intrinsic[ " << setw( 4 ) << value << " ]" << record<char>;
             else output << setw( 11 ) << "Undefined[ " << setw( 4 ) << value << " ]" << record<char>;
         }
     }

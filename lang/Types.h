@@ -3,8 +3,8 @@
 
 #include <cstdint>
 #include <string>
-#include <vector>
 #include <bit>
+#include <map>
 
 #define _DEBUG_INTERPRETER = 1
 
@@ -32,6 +32,7 @@ namespace Language {
     static const Type TypeMap( 7 );
     static const Type TypeRecord( 8 );
     static const Type TypeAddress( 9 );
+    static const Type TypeIntrinsic( 10 );
     std::string typeToString( const Type type );
 
     // Desriptor access
@@ -39,8 +40,7 @@ namespace Language {
         Undefined   = 0,
         Local       = 1,
         Argument    = 2,
-        Global      = 3,
-        Procedure
+        Global      = 3
     };
 
     static const Type NS( 1 << 31 );                        // Not string
@@ -61,6 +61,7 @@ namespace Language {
     static const Word ArgumentVariableTypeWord( NS | AV | TypeAddress );
     static const Word GlobalVariableTypeWord( NS | GV | TypeAddress );
     static const Word ProcedureTypeWord( NS | Pointer | TypeProcedure );
+    static const Word IntrinsicTypeWord( NS | TypeIntrinsic );
     static const Word ListTypeWord( NS | Pointer | TypeList );
     static const Word SetTypeWord( NS | Pointer | TypeSet );
     static const Word MapTypeWord( NS | Pointer | TypeMap );
@@ -74,6 +75,7 @@ namespace Language {
     inline Descriptor ArgumentVariableDescriptor( Address address ) { return( ((Descriptor)ArgumentVariableTypeWord << 32) | address ); }
     inline Descriptor GlobalVariableDescriptor( Address address ) { return( ((Descriptor)GlobalVariableTypeWord << 32) | address ); }
     inline Descriptor ProcedureDescriptor( Address address ) { return( ((Descriptor)ProcedureTypeWord << 32) | address ); }
+    inline Descriptor IntrinsicDescriptor( Word value ) { return( ((Descriptor)IntrinsicTypeWord << 32) | value ); }
     inline Descriptor AddressDescriptor( Address address ) { return( ((Descriptor)AddressTypeWord << 32) | address ); }
     inline Descriptor BuildDescriptor( Type type, Word value ) { return( ((Descriptor)type << 32) | value ); }
 

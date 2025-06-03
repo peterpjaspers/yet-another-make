@@ -3,6 +3,8 @@
 
 #include "Types.h"
 
+#include <vector>
+
 namespace Language {
 
     struct PageTable {
@@ -11,6 +13,14 @@ namespace Language {
         Address capacity;
         PageTable() : extent( 0 ), capacity( 0 ) {};
     };
+    // Scope is a list of names corresponding to the current nested scope.
+    // The list holds namespace names, procedure names and annonymous block indeces.
+    // The scope list is used to uniquely identify variable names.
+    typedef std::vector<std::string> Scope;
+    // The symbol-table maps fully qualified variable or procedure names to the corresponding descriptors.
+    // A name is qualified via its nested scope; e.g., ":function:1:x" is the fully qualified variable name of
+    // "x" defined in the second statement block of the the procedure "function" defined in the global scope.
+    typedef std::map<std::string,Descriptor> SymbolTable;
 
     struct ThreadContext {
         Address pc;  // Program counter
@@ -22,10 +32,13 @@ namespace Language {
         PageTable program;
         PageTable global;
         PageTable string;
+        Scope scope;
+        SymbolTable symbols;
         ThreadContext() : pc( 0 ), sp( 0 ), ep( 0 ), ap( 0 ), fp( 0 ) {};
+
     };
 
-    const ThreadContext& constContext();
+    const ThreadContext& ccontext();
     ThreadContext& context();
 
     struct MemoryUsage {

@@ -44,6 +44,7 @@
 				"-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/um",
 				"-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/shared",
 				"${workspaceFolder}/test/testParser.cpp",
+				"${workspaceFolder}/Intrinsics.cpp",
 				"${workspaceFolder}/Reader.cpp",
 				"${workspaceFolder}/LogFile.cpp",
 				"${workspaceFolder}/Monitor.cpp",

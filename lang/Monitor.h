@@ -8,8 +8,6 @@
 
 namespace Language {
 
-    static const unsigned long MaxFileName = 1024;
-    
     void startMonitor( const std::filesystem::path& dir, const std::string& file, bool logTimes = true, bool logIntervals = false );
     LogFile& monitor();
 #ifdef _DEBUG_INTERPRETER
@@ -26,7 +24,7 @@ namespace Language {
         General                 = (1 << 1),
         InstructionExecution    = (1 << 2),     // Log instructions as they are executed
         StackOperations         = (1 << 3),     // Log all push/pop operations on the stack
-        ProcedureCall           = (1 << 4),     // Log procedure calls
+        ProcedureCalls          = (1 << 4),     // Log procedure calls
         GlobalAccess            = (1 << 5),     // Global memory access (heap address)
         ArgumentAccess          = (1 << 6),     // Argument memory access (argument-list offset access)
         LocalAccess             = (1 << 7),     // Local memory access (frame offset access)
@@ -35,7 +33,8 @@ namespace Language {
         GeneratedCode           = (1 << 10),    // Code generated during parsing
         SourceCode              = (1 << 11),    // Source code read during parsing
         Symbols                 = (1 << 12),    // Symbol creation and access
-        Reserved                = (1 << 13),
+        IntrinsicCalls          = (1 << 13),    // Log calls to intrisic functions
+        Reserved                = (1 << 14),
     };
 
 } // namespace AccessMonitor

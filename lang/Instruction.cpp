@@ -2,16 +2,20 @@
 #include "ThreadContext.h"
 #include "Functions.h"
 #include "Monitor.h"
+#include "SymbolTable.h"
+#include "Translator.h"
+#include "Intrinsics.h"
+#include "Translator.h"
 
 #include <iostream>
+#include <map>
 
 // ToDo: Include symbol name when outputing monitoring info
+// ToDo: Account for machine endianship
 
 using namespace std;
 
 namespace Language {
-
-    // ToDo: Account for machine endianship
 
     void storeWordOperand( const Address pc, const Word w ) {
         if (4 <= pageRemainder( pc )) {
@@ -80,7 +84,7 @@ namespace Language {
         return operand;
     }
     ostream& monitorInstruction( OpCode code ) {
-        auto& ctx( constContext() );
+        auto& ctx( ccontext() );
         ostream& record = monitorRecord() << setw( 4 ) << ctx.pc << " - " << opCodeTable[ code ].name;
         if (opCodeTable[ code ].operand == 1) {
             auto operand( loadWordOperand( ctx.pc + sizeof( OpCode ) ) );
@@ -102,10 +106,20 @@ namespace Language {
         if (monitor( DebugAspects::StackOperations )) monitorRecord() << "pop()" << record<char>;
         #ifdef _DEBUG_INTERPRETER
             static const char* signature( "Descriptor pop()" );
-            if (constContext().sp < sizeof( Descriptor )) throw string( signature ) + " - Stack underflow";
+            if (ccontext().sp < sizeof( Descriptor )) throw string( signature ) + " - Stack underflow";
         #endif
         context().sp -= sizeof( Descriptor );
         return d;
+    }
+    // Return number of arguments passsed to current procedure.
+    inline int argc() {
+        auto& ctx( context() );
+        return( (ctx.fp - ctx.ap) / sizeof( Descriptor ) - 2 );
+    }
+    // Return array of arguments of current procedure.
+    inline Descriptor* argv() {
+        auto& ctx( context() );
+        return reinterpret_cast<Descriptor*>( addressMemory( ctx.stack, ctx.ap ) );
     }
     inline void jump() {
         Address transfer( fetchWordOperand() );
@@ -126,20 +140,33 @@ namespace Language {
         push( AddressDescriptor( ctx.ep ) );
         ctx.ep = ctx.sp;
     }
+    void procedureReturn();
     inline void procedureCall() {
         static const char* signature( "void procedureCall()" );
         // Pick-up (procedure) descriptor, the procedure descriptor and saved expression pointer descriptor
         // are located under the current expression pointer (ep).
         auto& ctx( context() );
         Descriptor& transfer( *reinterpret_cast<Descriptor*>( addressMemory( ctx.stack, ctx.ep - (2 * sizeof( Descriptor )) ) ) );
-        // The descriptor may be a file or a string in which case it must translated (not implemented yet).
-        if (!isProcedure( transfer )) throw string( signature ) + " - Procedures call address invalid";
-        if (monitor( DebugAspects::ProcedureCall )) monitorRecord() << "Procedure call " << transfer << record<char>;
+        // ToDo: Procedure descriptor may be a file or a string in which case it must translated.
+        bool intrin( false );
+        if (isIntrinsic( transfer )) {
+            if (monitor( DebugAspects::ProcedureCalls )) monitorRecord() << "Intrinsic call " << transfer << record<char>;
+            intrin = true;
+        } else {
+            if (!isProcedure( transfer )) throw string( signature ) + " - Procedures call address invalid";
+            if (monitor( DebugAspects::ProcedureCalls )) monitorRecord() << "Procedure call " << transfer << record<char>;
+        }
         push( AddressDescriptor( ctx.pc ) );
         push( AddressDescriptor( ctx.fp ) );
         ctx.pc = address( transfer );
         ctx.fp = ctx.sp;
         ctx.ap = ctx.ep;
+        if (intrin) {
+            // Call the intrinsic (C++) function and push its return value on the stack.
+            // Intrinsic function can access its parameters via argc() and arcgv(int).
+            push( intrinsic( transfer )( argc(), argv() ) );
+            procedureReturn();
+        }
     }
     inline void procedureReturn() {
         static const char* signature( "void procedureReturn()" );
@@ -148,7 +175,7 @@ namespace Language {
         Descriptor& result( *reinterpret_cast<Descriptor*>( addressMemory( ctx.stack, (ctx.ap - (2 * sizeof( Descriptor )) ) ) ) );
         result = pop();
         #ifdef _DEBUG_INTERPRETER
-            if (monitor( DebugAspects::ProcedureCall )) monitorRecord() << "Procedure return " << record<char>;
+            if (monitor( DebugAspects::ProcedureCalls )) monitorRecord() << "Procedure return " << record<char>;
             ctx.sp = ctx.fp;
             auto fp( pop() );
             auto pc( pop() );
@@ -164,13 +191,24 @@ namespace Language {
             ctx.fp( address( pop() ) );
             ctx.pc( address( pop() ) );
             ctx.sp = ctx.ap;
-            ctx.ap( address( pop() ) );
+            ctx.ep = ( ctx.ap = address( ap ) );
         #endif
     }
     inline void locals() {
         Word locals( fetchWordOperand() );
         context().sp += locals;
     }
+    inline void enteringAnonymousScope() {
+        Word scope( fetchWordOperand() );
+        enterAnonymousScope( scope );
+    }
+    inline void enteringNamedScope() {
+        static const char* signature( "void enteringNamedScope()" );
+        Descriptor scope( fetchDescriptorOperand() );
+        if (typeCode( scope ) != TypeString) throw string( signature ) + " - Logic error, expected scope name";
+        enterNamedScope( stringToCString( scope ) );
+    }
+    inline void exittingScope() { exitScope(); }
     inline void loadArgument() {
         #ifdef _DEBUG_INTERPRETER
             static const char* signature( "void loadArgument( ThreadContext& context )" );
@@ -227,12 +265,29 @@ namespace Language {
         *(value + 1) = *value;
         context().sp += sizeof( Descriptor );
     }
-    // Output expression value to console
-    void output() {
-        auto value( pop() );
-        if (isVariable( value )) value = dereference( value );
-        auto str( stringToCString( toString( value ) ) );
-        cout << str << endl;
+    void dereferenceVariable() {
+        auto variable( reinterpret_cast<Descriptor*>( addressStack( sizeof( Descriptor ) ) ) );
+        while (isVariable( *variable )) *variable = dereference( *variable );
+    }
+    // Evaluate string(s) representing code
+    void evaluateExpression() {
+        static const char* signature( "void evaluateExpression()" );
+        auto usage( currentMemoryUsage() );
+        try {
+            auto program( pop() );
+            if (isVariable( program )) program = dereference( program );
+            auto programText( stringToCString( toString( program ) ) );
+            auto start( translate( programText ) );
+            auto& ctx( context() );
+            auto resume( ctx.pc );
+            ctx.pc = start;
+            while (executeInstruction()) {};
+            ctx.pc = resume;
+        } catch (...) {
+            // ToDo: Less severe error handling...
+            throw string( signature ) + " - Fatal eval error";
+        }
+        recoverMemory( usage );
     }
     bool executeInstruction() {
         static const char* signature( "void executeInstruction()" );
@@ -286,7 +341,11 @@ namespace Language {
             case OpFail : break;
             case OpMark : break;
             case OpUnmark : break;
-            case OpOutput : output(); break;
+            case OpEnterScope : enteringAnonymousScope(); break;
+            case OpEnterNamedScope : enteringNamedScope(); break;
+            case OpExitScope : exittingScope(); break;
+            case OpDereference : dereferenceVariable(); break;
+            case OpEvaluate : evaluateExpression(); break;
             case OpExit : return false;
             default : throw string( signature ) + " - Invalid op-code " + to_string( code );
         }
@@ -301,6 +360,7 @@ namespace Language {
             // Pick-up return value left behind on the stack, if any
             if (sizeof(Descriptor) < ctx.sp) {
                 auto value( pop() );
+                auto t( typeCode( value ) );
                 return word( toInteger( value ) );
             } else return( 0 );
         }
@@ -337,13 +397,14 @@ namespace Language {
 
     string toReadable( const OpCode code ) { return opCodeTable[ code ].name; }
 
-    void printProgram( const std::filesystem::path file ) {
+    void printProgram( const std::filesystem::path file, const Address start, const Address end ) {
         LogFile stream( file, false, false );
-        printProgram( stream );
+        printProgram( stream, start, end );
     }
-    void printProgram( LogFile& stream ) {
-        Address pc( 0 );
-        Address extent( allocateProgram( 0 ) );
+    void printProgram( LogFile& stream, const Address start, const Address end ) {
+        Address pc( start );
+        Address extent( end );
+        if (extent <= pc) extent = allocateProgram( 0 );
         while (pc < extent) {
             auto address( addressProgram( pc ) );
             OpCode code( *address );

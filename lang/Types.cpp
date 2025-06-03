@@ -12,6 +12,7 @@ namespace Language {
                 case TypeInteger : return( "Integer" );
                 case TypeReal : return( "Real" );
                 case TypeProcedure : return( "Procedure" );
+                case TypeIntrinsic : return( "Intrinsic" );
                 case TypeList : return( "List" );
                 case TypeSet : return( "Set" );
                 case TypeMap : return( "Map" );

@@ -55,8 +55,12 @@ namespace Language {
     static const OpCode OpDup               = OpCode(42U);
     static const OpCode OpAssign            = OpCode(43U);
     static const OpCode OpPushDescriptor    = OpCode(44U);
-    static const OpCode OpOutput            = OpCode(45U);
-    static const OpCode OpExit              = OpCode(46U);
+    static const OpCode OpEnterScope        = OpCode(45U);
+    static const OpCode OpEnterNamedScope   = OpCode(46U);
+    static const OpCode OpExitScope         = OpCode(47U);
+    static const OpCode OpDereference       = OpCode(48U);
+    static const OpCode OpEvaluate          = OpCode(49U);
+    static const OpCode OpExit              = OpCode(50U);
 
     struct OpCodeTableEntry { const char* name; int operand; };
     static const OpCodeTableEntry opCodeTable[] = {
@@ -105,17 +109,21 @@ namespace Language {
         /* OpDup                */ { "Duplicate",           0 },
         /* OpAssign             */ { "Assign",              0 },
         /* OpPushDescriptor     */ { "Push",                2 },
-        /* OpOutput             */ { "Output",              0 },
+        /* OpEnterScope         */ { "Enter scope",         1 },
+        /* OpEnterNamedScope    */ { "Enter named scope",   2 },
+        /* OpExitScope          */ { "Exit scope",          0 },
+        /* OpDereference        */ { "Dereference",         0 },
+        /* OpEvaluate           */ { "Evaluate",            0 },
         /* OpExit               */ { "Exit",                0 },
     };
 
     // Execute (single) instruction
     bool executeInstruction();
-    // Run a program starting at an address.
+    // Run the program starting at address.
     int run( const Address start );
-    // Push a descriptor-value on the stack
+    // Push a descriptor-value on the stack.
     void push( const Descriptor& descriptor );
-    // Pop a descriptor-value from the stack
+    // Pop a descriptor-value from the stack.
     Descriptor pop();
     // Store an instruction in Program memory
     void storeInstruction( const OpCode code );
@@ -124,9 +132,11 @@ namespace Language {
     // Convert op-code to human readble string
     std::string toReadable( const OpCode code );
 
-    // Contents the contents of the program to a human readbale file.
-    void printProgram( LogFile& stream );
-    void printProgram( const std::filesystem::path file );
+    // Print a program in a human readbale file.
+    // The start and end addresses define the program extent to be printed.
+    // If end is less than or equal to start, prints from start address to end of program memory.
+    void printProgram( LogFile& stream, const Address start = 0, const Address end = 0 );
+    void printProgram( const std::filesystem::path file, const Address start = 0, const Address end = 0 );
 
 } // namespace Language
 

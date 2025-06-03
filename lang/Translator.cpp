@@ -5,6 +5,7 @@
 #include "Instruction.h"
 #include "Monitor.h"
 #include "ThreadContext.h"
+#include "Intrinsics.h"
 
 #include <iostream>
 #include <fstream>
@@ -16,6 +17,7 @@
 // ToDo: Python like format strings
 // ToDo: Better error handling; i.e., try to recover
 // ToDo: Implement multiple instances of interpreter (Instruction.cpp) and memory pools (Memory.cpp)
+// ToDo: Optional parentheses for single argument procedure call: i.e., "out( arg )" with parens or "out arg" without
 
 using namespace std;
 using namespace std::filesystem;
@@ -48,10 +50,8 @@ namespace Language {
             PatchLabel nextPatch;
             map<PatchLabel,Address> patches;
             vector<OpPrecedence> operatorStack;
-            // Scope is a list of names corresponding to the nested scope currently being translated.
-            // The list holds namespace names, procedure names and annonymous block indeces.
-            // The scope list is used to uniquely identify variable names.
-            vector<string> scopeNames;
+            // Block indeces numbers successive nested stament blocks.
+            // This required to uniquely identify the current scope.
             vector<int> blockIndeces;
             // Maintain a set of imported file names.
             // A file is only imported once depending on its presence in the set.
@@ -95,24 +95,30 @@ namespace Language {
             // Set target address of the jump instruction associated with a patch label to the current program address.
             void patchJump( const PatchLabel label ) { patchOperand( label, allocateProgram( 0 ) ); }
 
-            void enterNamedScope( const string name ) {
-                scopeNames.push_back( name );
+            void parseNamedScope( const string name ) {
                 blockIndeces.push_back( 0 );
+                auto n( name.size() );
+                auto address( allocateString( n ) );
+                strncpy( (char*)addressString( address ), name.c_str(), n );
+                enterNamedScope( name );
+                storeInstruction( OpEnterNamedScope, StringDescriptor( address, n ) );
             }
-            void enterAnonymousScope() {
-                static const char* signature( "void enterAnonymousScope()" );
+            void parseAnonymousScope() {
+                static const char* signature( "void parseAnonymousScope()" );
                 if (blockIndeces.size() == 0) throw string( signature ) + "Internal parser error, no scope defined";
                 auto index( blockIndeces.back() );
                 blockIndeces.pop_back();
                 blockIndeces.push_back( index + 1 );
-                scopeNames.push_back( to_string( index ) );
                 blockIndeces.push_back( 0 );
+                enterAnonymousScope( index );
+                storeInstruction( OpEnterScope, Word( index ) );
             }
-            void exitScope() {
-                static const char* signature( "void exitScope()" );
+            void unparseScope() {
+                static const char* signature( "void unparseScope()" );
                 if (blockIndeces.size() == 0) throw string( signature ) + "Internal parser error, no scope defined";
-                scopeNames.pop_back();
                 blockIndeces.pop_back();
+                exitScope();
+                storeInstruction( OpExitScope );
             }
 
             // <expression> ::= <dyadic> | <assignment>
@@ -229,6 +235,9 @@ namespace Language {
                     // Parse argument expressions
                     while (parsed) {
                         parsed = parseExpression();
+                        // Dereference all variables prior to entering procedure as variable
+                        // scope will/may be inaccessible inside the procedure.
+                        storeInstruction( OpDereference );
                         if (token() != Token::Comma) break;
                         nextToken();
                     }
@@ -253,23 +262,24 @@ namespace Language {
             bool parsePrimaryExpression() {
                 if (monitor( DebugAspects::ParserFunctions )) monitorRecord() << setw( 20 ) << "" << "parsePrimaryExpression" << record<char>;
                 if (token() == Token::Identifier) {
-                    auto found( lookUpSymbol( identifier(), scopeNames ));
+                    auto found( lookUpSymbol( identifier() ));
                     if (found != NullDescriptor()) {
                         storeInstruction( OpPushDescriptor, found );
                     } else {
-                        Descriptor value;
-                        if (reader->identifierType == VariableType::Local) {
-                            value = LocalVariableDescriptor( locals );
-                            storeInstruction( OpPushDescriptor, value );
-                            nextLocal();
-                        } else if (reader->identifierType == VariableType::Argument) {
-                            value = ArgumentVariableDescriptor(  reader->integerConstant * sizeof( Descriptor ) );
-                            storeInstruction( OpPushDescriptor, value );
-                        } else if (reader->identifierType == VariableType::Global) {
-                            value = GlobalVariableDescriptor( allocateGlobal( sizeof(Descriptor) ) ) ;
-                            storeInstruction( OpPushDescriptor, value );
-                        } else fatalError( "Internal parser error - Invalid identifier type" );
-                        defineSymbol( identifier(), scopeNames, value );
+                        recoverableError( "Undefined identifier ", SemiColon );
+                        // Descriptor value;
+                        // if (reader->identifierType == VariableType::Local) {
+                        //     value = LocalVariableDescriptor( locals );
+                        //     storeInstruction( OpPushDescriptor, value );
+                        //     nextLocal();
+                        // } else if (reader->identifierType == VariableType::Argument) {
+                        //     value = ArgumentVariableDescriptor(  reader->integerConstant * sizeof( Descriptor ) );
+                        //     storeInstruction( OpPushDescriptor, value );
+                        // } else if (reader->identifierType == VariableType::Global) {
+                        //     value = GlobalVariableDescriptor( allocateGlobal( sizeof(Descriptor) ) ) ;
+                        //     storeInstruction( OpPushDescriptor, value );
+                        // } else fatalError( "Internal parser error - Invalid identifier type" );
+                        // defineSymbol( identifier(), value );
                     }
                     nextToken();
                 } else if (token() == Token::IntegerConstant) {
@@ -310,12 +320,12 @@ namespace Language {
                     nextToken();
                     if (token() == Token::Identifier) {
                         nextToken();
-                        // Look-up to see if variable already exists in this scope
-                        auto exists( lookUpSymbol( identifier(), scopeNames, true ) );
+                        // Look-up to see if variable already exists in the current scope.
+                        auto exists( lookUpSymbol( identifier(), true ) );
                         // Create variable in this scope
                         if (exists == NullDescriptor()) {
                             auto descriptor( LocalVariableDescriptor( locals ) );
-                            defineSymbol( identifier(), scopeNames, descriptor );
+                            defineSymbol( identifier(), descriptor );
                             nextLocal();
                             storeInstruction( OpPushDescriptor, descriptor );
                             if (token() == Token::LeftParen) {
@@ -336,14 +346,14 @@ namespace Language {
 
             //  <block-statement> ::=
             //      '{' [ <statement> ]* '}'
-            bool parseBlock() {
+            bool parseBlock( bool scoped ) {
                 if (token() == Token::LeftCurly) {
                     nextToken();
-                    enterAnonymousScope();
+                    if (scoped) parseAnonymousScope();
                     auto previousLocals( locals );
                     while ((token() != Token::RightCurly) && (token() != Token::EndOfFile)) parseStatement();
                     locals = previousLocals;
-                    exitScope();
+                    if (scoped) unparseScope();
                     if (token() == Token::RightCurly) { nextToken(); return true; }
                     else recoverableError( "Expected }", SemiColon );
                 }
@@ -408,22 +418,6 @@ namespace Language {
                 }
                 return true;
             }
-            //  <output-statement> ::=
-            //      'out' <expression> ';'
-            bool parseOutStatement() {
-                if (token() == Token::KeywordOut) {
-                    nextToken();
-                    parseExpression();
-                    if (token() == Token::SemiColon) {
-                        nextToken();
-                        storeInstruction( OpOutput );
-                        consumed = true;
-                        return true;
-                    }
-                    else recoverableError( "Expected ;", SemiColon );
-                }
-                return false;
-            }
             //  <return-statement> ::=
             //      'return' [ <expression> ] ';'
             bool parseReturnStatement() {
@@ -437,7 +431,24 @@ namespace Language {
                     }
                     if (token() == Token::SemiColon) {
                         nextToken();
+                        storeInstruction( OpExitScope );
                         storeInstruction( OpReturn );
+                        consumed = true;
+                        return true;
+                    }
+                    else recoverableError( "Expected ;", SemiColon );
+                }
+                return false;
+            }
+            //  <evaluate-statement> ::=
+            //      'eval' [ <expression> ] ';'
+            bool parseEvaluateStatement() {
+                if (token() == Token::KeywordEval) {
+                    nextToken();
+                    parseExpression();
+                    if (token() == Token::SemiColon) {
+                        nextToken();
+                        storeInstruction( OpEvaluate );
                         consumed = true;
                         return true;
                     }
@@ -452,7 +463,6 @@ namespace Language {
             // All procedures have a variable number of arguments indexed by $0, $1, .. $N where N is the actual
             // number of argumnts provided. Optionally, arguments can be named. Argument names are aliases for
             // argument indeces.
-            // ToDo: provide means of retrieving actual number of arguments via intrinsics (e.g., args() and argv(i) )
             bool parseDefStatement() {
                 if (token() == Token::KeywordDef) {
                     nextToken();
@@ -464,8 +474,8 @@ namespace Language {
                         auto skip( createPatch() );
                         storeInstruction( OpJump, Address( 0 ) );
                         auto value( ProcedureDescriptor( allocateProgram( 0 ) ) );
-                        defineSymbol( identifier(), scopeNames, value );
-                        enterNamedScope( procedureName );
+                        defineSymbol( identifier(), value );
+                        parseNamedScope( procedureName );
                         auto previousLocals( locals );
                         auto previousMaxLocals( maxLocals );
                         locals = sizeof( Descriptor );
@@ -477,7 +487,7 @@ namespace Language {
                             nextToken();
                             while (token() == Token::Identifier) {
                                 auto argument( ArgumentVariableDescriptor( index++ * sizeof( Descriptor ) ) );
-                                defineSymbol( identifier(), scopeNames, argument );
+                                defineSymbol( identifier(), argument );
                                 nextToken();
                                 if (token() != Token::Comma) break;
                                 nextToken();
@@ -485,14 +495,14 @@ namespace Language {
                             if (token() == Token::RightParen) nextToken();
                             else recoverableError( "Expected )", Token::LeftCurly );
                         }
-                        if (token() == Token::LeftCurly) parseBlock();
+                        if (token() == Token::LeftCurly) parseBlock( false );
                         else recoverableError( "Expected {", SemiColon );
-                        // ToDo: Only generate return if required (might not be worth the trouble)
-                        storeInstruction( OpReturn );
                         patchOperand( opLocals, maxLocals );
                         locals = previousLocals;
                         maxLocals = previousMaxLocals;
-                        exitScope();
+                        unparseScope();
+                        // ToDo: Only generate return if required (might not be worth the trouble)
+                        storeInstruction( OpReturn );
                         patchJump( skip );
                     } else recoverableError( "Expected identifier", SemiColon );
                 }
@@ -550,19 +560,19 @@ namespace Language {
             //      <block-statement> |
             //      <if-statement> |
             //      <while-statement> |
-            //      <output-statement> |
             //      <return-statement> |
+            //      <evaluate-statement> |
             //      <procedure-definition> |
             //      <import-statement> |
             //      <include-statement>
             bool parseStatement() {
                 if (token() == Token::KeywordVar) return parseVariable();
-                else if (token() == Token::LeftCurly) return parseBlock();
+                else if (token() == Token::LeftCurly) return parseBlock( true );
                 else if (token() == Token::KeywordIf) return parseIfStatement();
                 else if (token() == Token::KeywordWhile) return parseWhileStatement();
                 else if (token() == Token::KeywordDef) return parseDefStatement();
-                else if (token() == Token::KeywordOut) return parseOutStatement();
                 else if (token() == Token::KeywordReturn) return parseReturnStatement();
+                else if (token() == Token::KeywordEval) return parseEvaluateStatement();
                 else if (token() == Token::KeywordImport) return parseImport();
                 else if (token() == Token::KeywordInclude) return parseInclude();
                 else {
@@ -604,7 +614,6 @@ namespace Language {
                 errors = 0;
                 nextPatch = 0;
                 operatorStack.push_back( OpPrecedence( Token::None, -2, 0 ) );
-                enterNamedScope( "" );
             }
             
         public:
@@ -619,12 +628,15 @@ namespace Language {
                 auto usage( currentMemoryUsage() );
                 bool parsed( true );
                 try {
+                    parseNamedScope( "" );
+                    defineIntrinsics();
                     auto opLocals( createPatch() );
                     storeInstruction( OpLocals, Word( 0 ) );
                     parse();
                     if ((token() == Token::EndOfFile) && (errors == 0)) {
                         // Parsed entire file without errors
                         patchOperand( opLocals, maxLocals );
+                        unparseScope();
                         storeInstruction( OpExit );
                         return( start );
                     }

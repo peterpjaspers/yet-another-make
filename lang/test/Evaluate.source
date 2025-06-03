@@ -1,0 +1,3 @@
+out( "Evaluate..." );
+var b( 5 );
+eval( "out( b * 13 );" );

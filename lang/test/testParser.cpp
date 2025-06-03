@@ -4,6 +4,8 @@
 #include "../Instruction.h"
 #include "../SymbolTable.h"
 
+#include <iostream>
+
 using namespace std;
 using namespace std::filesystem;
 
@@ -29,7 +31,8 @@ int main( int argc, char* argv[] ) {
         // DebugAspects::ArgumentAccess |
         // DebugAspects::LocalAccess |
         // DebugAspects::StackAccess |
-        // DebugAspects::ProcedureCall |
+        // DebugAspects::ProcedureCalls |
+        DebugAspects::IntrinsicCalls |
         DebugAspects::Reserved
     );
     auto result( run( start ) );
