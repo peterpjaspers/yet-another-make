@@ -14,7 +14,7 @@ namespace Language {
         PageTable() : extent( 0 ), capacity( 0 ) {};
     };
     // Scope is a list of names corresponding to the current nested scope.
-    // The list holds namespace names, procedure names and annonymous block indeces.
+    // The list holds namespace names, procedure names and annonymous block indexes.
     // The scope list is used to uniquely identify variable names.
     typedef std::vector<std::string> Scope;
     // The symbol-table maps fully qualified variable or procedure names to the corresponding descriptors.

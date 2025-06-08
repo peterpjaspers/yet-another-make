@@ -4,8 +4,8 @@
 using namespace std;
 
 // ToDo: Consider sharing program, global and string page tables accross threads. Depends on multi-threading model.
-// ToDo: Provide all functions that access the thread-context with a version that has the thread-context as the first argument.
-//       This will reduce the number of calls required to access the thread-context.
+// ToDo: Extend memory-usage recovery with defined symbols; e.g., box and unbox. Enables running code in a sandbox.
+//       Program memory, symbols, global variables and strings must be recovered.
 namespace Language {
 
     namespace {

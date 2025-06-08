@@ -3,18 +3,21 @@
 #include "Descriptor.h"
 
 using namespace std;
-using namespace std::filesystem;
+using namespace filesystem;
 
 namespace Language {
 
-    std::string qualifySymbolName( const ThreadContext& cctx, const std::string& name, int depth ) {
+    Word index( 0 );
+    vector<IntrinsicFunction*> intrinsics;
+
+    string qualifySymbolName( const ThreadContext& cctx, const string& name, int depth ) {
         string qualifiedName( "" );
         if (depth == 0) depth = cctx.scope.size();
         for ( int i = 0; i < depth; ++i ) qualifiedName += cctx.scope[ i ] + ":";
         qualifiedName += name;
         return qualifiedName;
     }
-    Descriptor lookUpSymbol( ThreadContext& ctx, const std::string& name, bool local ) {
+    Descriptor lookUpSymbol( ThreadContext& ctx, const string& name, bool local ) {
         int depth( ctx.scope.size() );
         if (local) {
             auto found( ctx.symbols.find( qualifySymbolName( name, depth ) ) );
@@ -28,9 +31,19 @@ namespace Language {
         }
         return NullDescriptor();
     }
-    void defineSymbol( ThreadContext& ctx, const std::string& name, const Descriptor value ) {
+    void defineSymbol( ThreadContext& ctx, const string& name, const Descriptor value ) {
         auto qualifiedName( qualifySymbolName( name, ctx.scope.size() ) );
         ctx.symbols.insert( { qualifiedName, value } );
+    }
+
+    void defineIntrinsic( const string name, IntrinsicFunction* function ) {
+        intrinsics.push_back( function );
+        defineSymbol( name, IntrinsicDescriptor( index++ ) );
+    }
+    IntrinsicFunction* intrinsic( const Descriptor& descriptor ) {
+        int n( word( descriptor ) );
+        if ((0 <= n) || (n < intrinsics.size())) return intrinsics[ n ];
+        return nullptr;
     }
 
     void printSymbolTable( const ThreadContext& cctx, LogFile& stream ) {

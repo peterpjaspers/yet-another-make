@@ -20,6 +20,8 @@ namespace Language {
     typedef uint32_t Address;
     typedef uint32_t Offset;
     typedef uint8_t* PageAddress;
+    typedef Descriptor(IntrinsicFunction)( int arc, Descriptor* argv );
+
 
     // Value types
     static const Type TypeNull( 0 );

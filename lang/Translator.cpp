@@ -4,7 +4,7 @@
 #include "SymbolTable.h"
 #include "Instruction.h"
 #include "Monitor.h"
-#include "Intrinsics.h"
+#include "FormattedOutput.h"
 
 #include <iostream>
 #include <fstream>
@@ -12,10 +12,8 @@
 #include <map>
 #include <set>
 
-// ToDo: Thread-safe translation and execution
 // ToDo: Python like format strings
 // ToDo: Better error handling; i.e., try to recover
-// ToDo: Implement multiple instances of interpreter (Instruction.cpp) and memory pools (Memory.cpp)
 // ToDo: Optional parentheses for single argument procedure call: i.e., "out( arg )" with parens or "out arg" without
 
 using namespace std;
@@ -49,7 +47,7 @@ namespace Language {
             PatchLabel nextPatch;
             map<PatchLabel,Address> patches;
             vector<OpPrecedence> operatorStack;
-            // Block indeces numbers successive nested stament blocks.
+            // Block indexes numbers successive nested stament blocks.
             // This required to uniquely identify the current scope.
             vector<int> blockIndeces;
             // Maintain a set of imported file names.
@@ -308,8 +306,8 @@ namespace Language {
                         nextToken();
                         // Look-up to see if variable already exists in the current scope.
                         auto exists( lookUpSymbol( ctx, identifier(), true ) );
-                        // Create variable in this scope
                         if (exists == NullDescriptor()) {
+                            // Create variable in current scope
                             auto descriptor( LocalVariableDescriptor( locals ) );
                             defineSymbol( ctx, identifier(), descriptor );
                             nextLocal();
@@ -447,8 +445,8 @@ namespace Language {
             //  <named-arguments> ::=
             //      '(' <local-identifier> [ ',' <local-identfier> ]* ')'
             // All procedures have a variable number of arguments indexed by $0, $1, .. $N where N is the actual
-            // number of argumnts provided. Optionally, arguments can be named. Argument names are aliases for
-            // argument indeces.
+            // number of argumnts provided.
+            // Optionally, arguments can be named. Argument names are aliases for argument indexes.
             bool parseDefStatement( ThreadContext& ctx ) {
                 if (token() == Token::KeywordDef) {
                     nextToken();
@@ -457,39 +455,46 @@ namespace Language {
                         // Provisionally Insert code to jump over procedure definition
                         // ToDo: Jump can be avoided by determining start address of code for a translation unit. (low-prio)
                         auto procedureName( identifier() );
-                        auto skip( createPatch( ctx ) );
-                        storeInstruction( ctx, OpJump, Address( 0 ) );
-                        auto value( ProcedureDescriptor( allocateProgram( 0 ) ) );
-                        defineSymbol( ctx, identifier(), value );
-                        parseNamedScope( ctx, procedureName );
-                        auto previousLocals( locals );
-                        auto previousMaxLocals( maxLocals );
-                        locals = sizeof( Descriptor );
-                        auto opLocals( createPatch( ctx ) );
-                        storeInstruction( ctx, OpLocals, Word( locals ) );
-                        if (token() == Token::LeftParen) {
-                            // Defining named arguments
-                            Address index( 0 );
-                            nextToken();
-                            while (token() == Token::Identifier) {
-                                auto argument( ArgumentVariableDescriptor( index++ * sizeof( Descriptor ) ) );
-                                defineSymbol( ctx, identifier(), argument );
+                        // Look-up to see if procedure is defined in the current scope.
+                        auto exists( lookUpSymbol( ctx, procedureName, true ) );
+                        if (exists == NullDescriptor()) {
+                            // Define procedure in current scope
+                            auto skip( createPatch( ctx ) );
+                            storeInstruction( ctx, OpJump, Address( 0 ) );
+                            auto value( ProcedureDescriptor( allocateProgram( 0 ) ) );
+                            defineSymbol( ctx, identifier(), value );
+                            parseNamedScope( ctx, procedureName );
+                            auto previousLocals( locals );
+                            auto previousMaxLocals( maxLocals );
+                            locals = sizeof( Descriptor );
+                            auto opLocals( createPatch( ctx ) );
+                            storeInstruction( ctx, OpLocals, Word( locals ) );
+                            if (token() == Token::LeftParen) {
+                                // Defining named arguments
+                                Address index( 0 );
                                 nextToken();
-                                if (token() != Token::Comma) break;
-                                nextToken();
+                                while (token() == Token::Identifier) {
+                                    auto argument( ArgumentVariableDescriptor( index++ * sizeof( Descriptor ) ) );
+                                    defineSymbol( ctx, identifier(), argument );
+                                    nextToken();
+                                    if (token() != Token::Comma) break;
+                                    nextToken();
+                                }
+                                if (token() == Token::RightParen) nextToken();
+                                else recoverableError( "Expected )", Token::LeftCurly );
                             }
-                            if (token() == Token::RightParen) nextToken();
-                            else recoverableError( "Expected )", Token::LeftCurly );
+                            if (token() == Token::LeftCurly) parseBlock( ctx, false );
+                            else recoverableError( "Expected {", SemiColon );
+                            patchOperand( ctx, opLocals, maxLocals );
+                            locals = previousLocals;
+                            maxLocals = previousMaxLocals;
+                            unparseScope( ctx );
+                            // ToDo: Only generate return if required (might not be worth the trouble)
+                            storeInstruction( ctx, OpReturn );
+                            patchJump( ctx, skip );
+                        } else {
+                            recoverableError( "Procedure already defined", SemiColon );
                         }
-                        if (token() == Token::LeftCurly) parseBlock( ctx, false );
-                        else recoverableError( "Expected {", SemiColon );
-                        patchOperand( ctx, opLocals, maxLocals );
-                        locals = previousLocals;
-                        maxLocals = previousMaxLocals;
-                        unparseScope( ctx );
-                        // ToDo: Only generate return if required (might not be worth the trouble)
-                        storeInstruction( ctx, OpReturn );
-                        patchJump( ctx, skip );
                     } else recoverableError( "Expected identifier", SemiColon );
                 }
                 return true;
@@ -615,7 +620,7 @@ namespace Language {
                 bool parsed( true );
                 try {
                     parseNamedScope( ctx, "" );
-                    defineIntrinsics();
+                    defineIntrinsic( "out", formattedOutput );
                     auto opLocals( createPatch( ctx ) );
                     storeInstruction( ctx, OpLocals, Word( 0 ) );
                     parse( ctx );

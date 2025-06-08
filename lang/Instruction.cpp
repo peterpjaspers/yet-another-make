@@ -4,7 +4,6 @@
 #include "Monitor.h"
 #include "SymbolTable.h"
 #include "Translator.h"
-#include "Intrinsics.h"
 #include "Translator.h"
 
 #include <iostream>

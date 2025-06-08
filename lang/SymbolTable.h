@@ -38,6 +38,13 @@ namespace Language {
     // Define a symbol with the given name in the current local scope.
     void defineSymbol( ThreadContext& ctx, const std::string& name, const Descriptor value );
     inline void defineSymbol( const std::string& name, const Descriptor value ) { defineSymbol( context(), name, value ); }
+    // Define an intrinsic-function.
+    // Inserts a symbol to a Descriptor for the function that can be accessed via a call to 'intrinsic'.
+    void defineIntrinsic( const std::string name, IntrinsicFunction* function );
+    // Access an intrinsic-function via its descriptor.
+    // Returns a point to to the intrinsic function.
+    // Returns a null pointer if the descriptor does not refer to a valid intrinsic-function.
+    IntrinsicFunction* intrinsic( const Descriptor& descriptor );
 
     void printSymbolTable( const ThreadContext& cctx, LogFile& stream );
     void printSymbolTable( const ThreadContext& cctx, const std::filesystem::path file );
