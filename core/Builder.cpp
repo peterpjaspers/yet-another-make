@@ -101,16 +101,21 @@ namespace
         }
         return pruned;
     }
-    void deleteLeftoverFiles(const std::filesystem::path& tempFolder, ILogBook* logBook) {
+    void deleteLeftoverFiles(const std::filesystem::path& tempFolder, ILogBook* logBook, const std::filesystem::path& keep) {
         if (!std::filesystem::exists(tempFolder)) {
             std::filesystem::create_directories(tempFolder);
         }
         else {
+            std::vector<std::filesystem::path> toDelete;
             auto dirIter = std::filesystem::directory_iterator(tempFolder);
             auto fileCount = std::count_if(
                begin(dirIter),
                end(dirIter),
-               [](auto& entry) { return true; }
+               [&keep, &toDelete](auto& entry) { 
+                    bool mustDelete = keep.empty() || entry.path() != keep;
+                    if (mustDelete) toDelete.push_back(entry.path());
+                    return mustDelete;
+                }
             );
             if (fileCount > 0) {
                 std::stringstream ss;
@@ -119,8 +124,8 @@ namespace
                 logBook->add(progress);
             }
             std::error_code ec;
-            for (auto const& entry : std::filesystem::directory_iterator(tempFolder)) {
-                std::filesystem::remove_all(entry.path(), ec);
+            for (auto const& path : toDelete) {
+                std::filesystem::remove_all(path, ec);
             }
         }
     }
@@ -222,7 +227,7 @@ namespace YAM
         else if (threads > maxThreads) threads = maxThreads;
         _context.threadPool().size(threads);
 
-		deleteLeftoverFiles(FileSystem::yamTempFolder(), _context.logBook().get());
+		deleteLeftoverFiles(FileSystem::yamTempFolder(), _context.logBook().get(), repoDir);
 
         if (_buildState == nullptr) {
             std::filesystem::path yamDir = repoDir / DotYamDirectory::yamName();

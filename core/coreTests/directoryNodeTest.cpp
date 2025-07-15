@@ -39,6 +39,7 @@ namespace
 
         AccessMonitor::enableMonitoring();
         bool completed = YAMTest::executeNode(dirNode.get());
+        AccessMonitor::disableMonitoring();
         EXPECT_TRUE(completed);
         return dirNode;
     }

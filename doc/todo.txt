@@ -17,6 +17,46 @@ Bugs
   Running a build with threadpool of size 1 fixes this problem.
   A problem in Windows or in std::filesystem?
   Workaround: serialize remove_all calls
+  Problem: this also does not remove all temp dirs.
+  Workaround: delete temp dirs at start of each build.
+
+- Changing yamConfig\repoName.txt is not handled: requires creation of new home
+  repository node. Can be handled as clearing everything followed by intial build.
+
+- AccessMonitorTest.compareWithMSBuildTracker behaves differently when ran from test
+  explorer versus directly from cmd shell. In the latter case duplicate paths 
+  with mixed casing (C:\ and c:\) are detected with different access modes.
+  This causes the test to fail.
+  Using std::filesytem::canonical does not work because this only works for existing
+  files. weakly_canonical could fix this but it does not work according to spec: it
+  returns error and empty path for e.g. c:\d1\f2 where C:\D1 exists and f2 does not.
+  In this case it should have returned error and C:\D1\f2.
+
+- Running yam --noServer while server is running will result in server to cache 
+  wrong version of buildstate. Server not designed to deal with changes in buildstate
+  file made by other processes.
+  Quick fix: shutdown server when running --noServer.
+
+- MonitoredProcessWin32 passes the entire environment to child processes. 
+  This was done during the work to build yam with yam. It was done as a hack to 
+  work-around the dependency of the MS compiler and linker on the many
+  environment variables in the MS development environment.
+  In the final solution these environment variables must be defined as part
+  of the build rules. The hack was choosen because the current buildrule syntax does 
+  not support variables and because a new buildrule language is being implemented.
+
+- Dependency registration allows dependencies on ignored files (in non-ignored repos). 
+  Instead such dependencies must be flagged as an error.
+  Aside: why are Patch.obj and MonitorProcess.obj always recompiled after yamServer restart? 
+  These files depend on detours.h. Detours dir is ignored. But said recompilations occur
+  independently of detours dir being ignore or not.
+  detectedInputFiles are same after restart, hashes unchanged.
+  Because when changing detours from not-ignored to ignored then filenode detours.h
+  enters Deleted state. Deleted state filenodes return random hash.
+  With clean buildstate and detours not-ignored Patch.obj is not recompiled after
+  server restart.
+
+
 
 Features
 - multi-repo build: clone repos in subdirs of the yam root dir.
@@ -105,3 +145,11 @@ More:
 - implement DotIgnoreNode
 - investigate use of std::filesystem::path.string() and initializing paths
   from a std::string. Shouldn't we use wstring?
+
+- VS compiles multiple source files with 1 cl.exe invokation. 
+  yam uses a cl.exe invokation per source file.
+  VS is more efficient (per source file) than yam, yam is more scalable than VS.
+  1- How come VS compilation is more efficient than 1 cl.exe per source file
+  What does it mean for yam to compile as efficient as VS and still be scalable.
+  - determine the set of source files with identical compilation rules
+  - invoke cl.exe on the subset of this set that have outdated object files

@@ -1,7 +1,8 @@
 
-: foreach *.cpp |> 
-  copy %f %o
-  C:\Windows\System32\PING.EXE -n 3 127.0.0.1
-|> bin\%B.obj {objectFiles}
-: {objectFiles} |> echo %f > %o |> bin\core.txt {dlls}
-: {dlls} |> type %f > %o |> bin\core.dll
+: foreach *.cpp |>
+"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.43.34808\bin\HostX64\x64\CL.exe" /c /I..\..\..\boost_1_79_0 /I..\..\..\..\boost_1_79_0  /nologo /W3 /WX- /diagnostics:column /sdl /O2 /Oi /GL /D NDEBUG /D CORE_EXPORTS /D _WINDOWS /D _USRDLL /D _WIN32_WINNT=0x0601 /D _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS /D _CRT_SECURE_NO_WARNINGS /D _UNICODE /D UNICODE /Gm- /EHsc /MT /GS /Gy /fp:precise  /std:c++20 /permissive- /Fo"%o" /external:W3 /Gd /TP /wd4251 /FC /errorReport:prompt %f
+ |> yamgen_x64\Release\%B.obj {coreObjects}
+
+: {coreObjects} |>
+"C:\program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.43.34808\bin\HostX64\x64\Lib.exe" /OUT:"%o" /NOLOGO /MACHINE:X64 /LTCG %f
+|> yamgen_x64\Release\core.lib

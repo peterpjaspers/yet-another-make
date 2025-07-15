@@ -421,4 +421,3 @@ btree/test/testStringBtree
 *.bt
 *.txt
 accessMonitor/accessMonitor.dll
-/peterWIP

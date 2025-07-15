@@ -396,7 +396,7 @@ namespace YAM
         bool success = true;
         try {
             result->_lastWriteTime = retrieveLastWriteTime();
-            result->_executionHash = computeExecutionHash(_dotIgnoreNode->hash(), result->_content);
+            result->_executionHash = computeExecutionHash(_dotIgnoreNode->hash(), _content);
             if (
                 result->_lastWriteTime != _lastWriteTime
                 || result->_executionHash != _executionHash // because _dotIgnoreNode changed

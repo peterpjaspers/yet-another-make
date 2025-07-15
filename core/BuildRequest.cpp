@@ -1,5 +1,6 @@
 #include "BuildRequest.h"
 #include "IStreamer.h"
+#include "FileSystem.h"
 
 namespace
 {
@@ -16,7 +17,7 @@ namespace YAM
 
     // Set/get the directory from which the build is started.
     void BuildRequest::repoDirectory(std::filesystem::path const& directory) {
-        _repoDirectory = directory;
+        _repoDirectory = FileSystem::canonicalPath(directory);
     }
 
     std::filesystem::path const& BuildRequest::repoDirectory() {

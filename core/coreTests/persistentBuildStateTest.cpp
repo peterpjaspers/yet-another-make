@@ -27,16 +27,35 @@ namespace
     using namespace YAM;
     using namespace YAMTest;
 
-    // repoDir contains subdirs 1,2,3 and files 1,2,3
-    // Note: .yamDir is excluded
-    // Each subdir contains 39 files and 12 directories.
-    // Including repoDir, dir: 40 dirs, 120 files.
-    // Nodes: per directory 4 nodes (dir node, dotignore .yamignore and
-    // .gitignore). Per file 1 node.
+    // repoDir contains:
+    //      /subdirs 1,2,3 and files 1,2,3
+    //          ...
+    //      /.yam dir
+    //          /buildstate dir
+    //      /yamConfig dir
+    //          repositories.txt
+    //          fileExecSpecs.txt
+    // Each subdir N, N=1,2,3, contains 39 files and 12 directories.
+    // repoDir + subdirs: 40 dirs, 120 files.
+    // Per directory 4 nodes (dir node, dotignore, .yamignore, .gitignore). 
+    // Per file 1 node.
     // cmdNode, cmdNode1: 2 command nodes.
-    // RepositoriesNode + home repo node + repositories.txt file node: 3
-    // FileRepostoryNode has: FileExecConfigNode + SourceFileNode: 2
-    const std::size_t nNodes = 40 * 4 + 120 + 2 + 3 + 2; // in context->nodes()
+    // RepositoriesNode + home FileRepostoryNode node: 2
+    // FileRepostoryNode has: FileExecSpecsNode: 1
+    const std::size_t nNodes =
+        (40 * 4) + 120 // repo dir + subdirs 1,2,3 recursively
+        + 2 // cmdNode, cmdNode1
+        + 2 // RepositoriesNode + home FileRepositoryNode
+        + 1 // FileExecSpecsNode
+        + 4 + 4 // .yam dir + buildstate dir
+                // Note: buildstate file is created when buildstate is stored
+                // and will result in corresponding filenode at next build.
+                // This node is not accounted for in nNodes.
+        + 2 // repositories.txt + fileExecSpecs.txt
+            // Note: setup does not create yamConfig dir -> no directory node
+            // The file nodes are created irrespectively of the files being
+            // present (like the .gitignore and .yamignore files)
+        ;
 
     // Wait for file change event to be received for given paths.
     // When event is received then consume the changes.
@@ -420,14 +439,14 @@ namespace
         ASSERT_NE(nullptr, fileNode);
         auto updatedHash = storage.addFileAndUpdateFileAndExecuteNode(fileNode);
         EXPECT_TRUE(fileNode->modified());
-        EXPECT_EQ(nNodes+1, setup.context.nodes().size()); // new FileNode for File4
+        EXPECT_EQ(nNodes+2, setup.context.nodes().size()); // new FileNode for File4 and buildstate
         auto newFileNode = dynamic_pointer_cast<FileNode>(setup.context.nodes().find(root / "File4"));
         EXPECT_NE(nullptr, newFileNode);
         EXPECT_TRUE(newFileNode->modified());
 
         // Verify that the modified file node is updated in storage.
         std::size_t nStored = storage.store(); // store the modified file node.
-        EXPECT_EQ(3, nStored); // repo dir, file3, file4
+        EXPECT_EQ(5, nStored); // repo dir, file3, file4, buildstate dir, buildstate.bt
         storage.retrieve(); // replace all nodes in storage.context by ones freshly retrieved from storage
         fileNode = dynamic_pointer_cast<FileNode>(setup.context.nodes().find(root / "File3"));
         ASSERT_NE(nullptr, fileNode);
@@ -502,7 +521,12 @@ namespace
         SetupHelper setup(FileSystem::createUniqueDirectory());
 
         std::filesystem::path addedFile = setup.addNode();
-        EXPECT_EQ(nNodes + 1, setup.context.nodes().size());
+        // addNode will add file4 and then consumes changes in the
+        // repo directory tree. This will create a filenode for file4
+        // and also a filenode for the buildstate file (that was created
+        // because setup stored the buildstate).
+        // Hence +2.
+        EXPECT_EQ(nNodes + 2, setup.context.nodes().size());
 
         setup.persistentState.rollback();
 

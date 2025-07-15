@@ -17,11 +17,18 @@ namespace YAM {
     class __declspec(dllexport) Glob
     {
     public:
+
         // When globstar is true then normal meaning of **, else a consecutive
         // sequence of * symbols is collapsed to one *. E.g. ***/C becomes */C.
         //
         Glob(std::string const& globPattern, bool globstar);
         Glob(std::filesystem::path const& globPattern);
+
+        // Return a regular expression pattern that represents the input globPattern.
+        static std::string globPatternToRegex(std::string const& globPattern, bool globstar);
+
+        // Return input path as a path with forward slash seperators
+        static std::string fwdSlashPath(std::filesystem::path const& path);
 
         // Return whether pattern contains a glob special character.
         static bool isGlob(std::string const& pattern);

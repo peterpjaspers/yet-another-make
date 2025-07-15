@@ -1,0 +1,11 @@
+/.git/
+#/yamConfig/
+/cli/
+/core/coreTests/testData/
+/detours/
+/doc/
+/website/
+/codingStyle.md
+/README
+/yam.sln
+!buildfile_yam.txt

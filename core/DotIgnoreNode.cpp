@@ -88,19 +88,9 @@ namespace YAM
     }
 
     bool DotIgnoreNode::ignore(std::filesystem::path const& path) const {
-        //if (repo == context()->repositoriesNode()->homeRepository()) {
-        //    std::filesystem::path yamConfigDir = repo->directory() / "yamConfig";
-        //    if (path == yamConfigDir || path.parent_path() == yamConfigDir) {
-        //        return true;
-        //    }
-        //    std::filesystem::path yamDir = repo->directory() / ".yam";
-        //    if (path == yamDir || path.parent_path() == yamDir) {
-        //        return true;
-        //    }
-        //}
-        //for (auto const& file : _dotIgnoreFiles) {
-        //    if (file->absolutePath() == path) return true;
-        //}
+        for (auto const& file : _dotIgnoreFiles) {
+            if (file->name().filename() == path) return true;
+        }
         for (auto it = _rules.rbegin(); it != _rules.rend(); ++it) {
             auto const& rule = *it;
             if (rule.match(path)) {
@@ -109,8 +99,8 @@ namespace YAM
         }
         auto parentDir = _directory->parent();
         if (parentDir != nullptr) {
-            auto parentName = parentDir->name().filename();
-            return parentDir->dotIgnoreNode()->ignore(parentName / path);
+            auto dirName = _directory->name().filename();
+            return parentDir->dotIgnoreNode()->ignore(dirName / path);
         }
         return false;
     }
@@ -188,12 +178,14 @@ namespace YAM
         Node::stream(streamer);
         streamer->streamVector(_dotIgnoreFiles);
         streamer->stream(_hash);
+        DotIgnoreRule::streamVector(streamer, _rules);
     }
 
     void DotIgnoreNode::prepareDeserialize() {
         Node::prepareDeserialize();
         for (auto file : _dotIgnoreFiles) file->removeObserver(this);
         _dotIgnoreFiles.clear();
+        _rules.clear();
     }
 
     bool DotIgnoreNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {

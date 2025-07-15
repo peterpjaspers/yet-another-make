@@ -90,11 +90,18 @@ namespace
         std::filesystem::path const& tmpDir, 
         std::map<std::string, std::string> const& env
     ) {
-        boost::process::environment thisenv = boost::this_process::environment();
-        boost::process::environment bpenv;
-        for (auto var : vars) {
-            bpenv[var] = thisenv.at(var).to_string();
-        }
+        // TODO: this section is commented-out as part of the work to build yam
+        // with yam because using the MS compiler and linker requires many
+        // environment variables in the MS development environment.
+        // In the final solution these environment variables must be defined as part
+        // of the build rules.
+        // 
+        //boost::process::environment thisenv = boost::this_process::environment();
+        //boost::process::environment bpenv;
+        //for (auto var : vars) {
+        //    bpenv[var] = thisenv.at(var).to_string();
+        //}
+        boost::process::environment bpenv = boost::this_process::environment();
         bpenv["TMP"] = tmpDir.string();
         bpenv["TEMP"] = tmpDir.string();
         for (auto const& pair : env) {

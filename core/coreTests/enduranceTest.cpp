@@ -45,7 +45,8 @@ namespace
     class WorkingDir {
     public:
         std::filesystem::path dir;
-        WorkingDir() : dir(FileSystem::createUniqueDirectory()) {}
+        WorkingDir() : dir(FileSystem::createUniqueDirectory()) {
+        }
         ~WorkingDir() { std::filesystem::remove_all(dir); }
     };
 
@@ -56,7 +57,6 @@ namespace
         std::filesystem::path repoDir;
         Builder builder;
         ExecutionContext* context;
-        WorkingDir wdir;
 
         TestDriver()
             : repoName("test_0")
@@ -71,13 +71,6 @@ namespace
             context->logBook()->aspects(logAspects);
             // make test a bit more deterministic
             //context->threadPool().size(1);
-
-            AccessMonitor::startMonitoring(wdir.dir);
-        }
-
-        ~TestDriver() {
-            AccessMonitor::MonitorEvents result;
-            AccessMonitor::stopMonitoring(&result);
         }
 
         void startExecuteRequest(
@@ -149,6 +142,7 @@ namespace
         std::filesystem::copy(testReposSrc / "test_yam", testReposDst / "test_yam", std::filesystem::copy_options::recursive);
         std::filesystem::copy(testReposSrc / "test_yam_1", testReposDst / "test_yam_1", std::filesystem::copy_options::recursive);
         std::filesystem::copy(testReposSrc / "test_yam_2", testReposDst / "test_yam_2", std::filesystem::copy_options::recursive);
+        std::filesystem::remove_all(testReposDst / "test_yam/demo");
     }
 
     // Reproduces crash caused by bug in PersistentBuildState::removePendingDelete

@@ -16,7 +16,11 @@ namespace
         EXPECT_FALSE(parser.parseError());
         EXPECT_FALSE(options._clean);
         EXPECT_TRUE(options._scope.empty());
-        EXPECT_EQ(2, options._logAspects.size());
+        EXPECT_EQ(3, options._logAspects.size());
+        auto const& aspects = options._logAspects;
+        EXPECT_TRUE(std::find(aspects.begin(), aspects.end(), LogRecord::Aspect::Error) != aspects.end());
+        EXPECT_TRUE(std::find(aspects.begin(), aspects.end(), LogRecord::Aspect::Warning) != aspects.end());
+        EXPECT_TRUE(std::find(aspects.begin(), aspects.end(), LogRecord::Aspect::Progress) != aspects.end());
     }
 
     TEST(BuildOptionsParser, clean) {

@@ -2,15 +2,18 @@
 
 #include "Glob.h"
 #include "FileSystem.h"
+#include "IStreamable.h"
 
 #include <string>  
 #include <regex>  
 
 namespace YAM
 {
-    class DotIgnoreRule 
+    class DotIgnoreRule : public IStreamable
     {
     public:
+        DotIgnoreRule() {} // for streaming
+
         // Construct a rule from a non-empty, non-comment line from a file
         // whose syntax is as specified in https://git-scm.com/docs/gitignore.
         // 'source' typically contains storage location of pattern: file name
@@ -26,7 +29,6 @@ namespace YAM
         bool match(std::filesystem::path const& path) const;
 
         std::string const& pattern() const;
-        std::string const& source() const;
 
         // Return whether pattern starts with '!'
         bool negate() const;
@@ -38,17 +40,31 @@ namespace YAM
         bool isDirOnly() const;
 
         // Return the pattern (excluding a possibly leading !) as
+        // regular expression string
+        std::string const& reString() const;
+
+        // Return the pattern (excluding a possibly leading !) as
         // regular expression 
         std::regex const& re() const;
 
+        static void streamVector(
+            IStreamer* streamer,
+            std::vector<DotIgnoreRule>& rules
+        );
+
+        // IStreamable
+        uint32_t typeId() const override { throw "not supported"; }
+        void stream(IStreamer* streamer) override;
+
     private:
-        void parse();
+        void parse(std::string const& source);
 
         std::string _pattern;
-        std::string _source;
         bool _negate;
         bool _anchored;
         bool _dirOnly;
+        std::filesystem::path _extension;
+        std::string _reString;
         std::regex _re;
     };
     

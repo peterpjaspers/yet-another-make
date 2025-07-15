@@ -1,4 +1,5 @@
 #include "DotIgnoreParser.h"
+#include "IStreamer.h"
 
 #include <fstream>
 
@@ -25,22 +26,15 @@ namespace
         }
     }
 
+    // Return whether pattern contains '/' but not only as last character. 
+    // Note: '/' as last character means that pattern must match directory.
     bool anchored(std::string const& pattern) {
         auto pos = pattern.find_first_of("/");
         return (pos != std::string::npos && pos != pattern.length()-1);
     }
 
     bool dirOnly(std::string const& pattern) {
-        return pattern[pattern.length()] == '/';
-    }
-
-    std::string fwdSlashPath(std::filesystem::path const& patternPath) {
-        bool toFwdSlash = (std::filesystem::path::preferred_separator == '\\');
-        std::string pattern = patternPath.string();
-        if (toFwdSlash) {
-            std::replace(pattern.begin(), pattern.end(), '\\', '/');
-        }
-        return pattern;
+        return pattern[pattern.length()-1] == '/';
     }
 }
 
@@ -51,7 +45,6 @@ namespace YAM
         std::string const& source // file + line nr
     )
         : _pattern(pattern)
-        , _source(source)
         , _negate(pattern[0] == '!')
         , _anchored(anchored(pattern))
         , _dirOnly(dirOnly(pattern))
@@ -59,19 +52,32 @@ namespace YAM
         if (_negate) {
             _pattern = _pattern.substr(1, _pattern.length() - 1);
         }
-        if (!_anchored) {
-            _pattern.insert(0, "**/");
-        }
-        parse();
+        parse(source);
     }
 
-    void DotIgnoreRule::parse() {
-        try {
-            Glob glob(fwdSlashPath(_pattern), true);
-            _re = glob.regex();
+    void DotIgnoreRule::parse(std::string const& source) {
+        auto fwdGlobPattern = Glob::fwdSlashPath(_pattern);
+        // Check whether pattern is of form "*.ext", i.e. whether
+        // patterns matches path extension ".ext".
+        static std::regex extRe("^\\*(\\.[^\\*\\?\\[\\]]*)$");
+        std::smatch extMatch;
+        if (std::regex_match(fwdGlobPattern, extMatch, extRe)) {
+            _extension = extMatch[1].str();
         }
-        catch (...) {
-            throw std::runtime_error("Illegal pattern '" + _pattern + "' in " + _source);
+        if (_extension.empty()) {
+            if (_anchored) {
+                if (fwdGlobPattern[0] != '/') {
+                    fwdGlobPattern.insert(0, "/");
+                }
+            } else {
+                fwdGlobPattern.insert(0, "**/");
+            }
+            try {
+                _reString = Glob::globPatternToRegex(fwdGlobPattern, true);
+                _re = std::regex(_reString, std::regex::optimize);
+            } catch (...) {
+                throw std::runtime_error("Illegal pattern '" + _pattern + "' in " + source);
+            }
         }
     }
 
@@ -80,21 +86,46 @@ namespace YAM
     }
 
     bool DotIgnoreRule::match(std::filesystem::path const& path) const {
-        std::string fwdSlashedPath = fwdSlashPath(path);
-        if (_anchored && fwdSlashedPath[0] != '/') {
-            fwdSlashedPath.insert(0, "/");
+        if (_extension.empty()) {
+            std::string fwdSlashedPath = Glob::fwdSlashPath(path);
+            if (_anchored && fwdSlashedPath[0] != '/') {
+                fwdSlashedPath.insert(0, "/");
+            }
+            std::smatch re_match;
+            bool matches = std::regex_match(fwdSlashedPath, re_match, _re);
+            return matches;
+        } else {
+            return path.extension() == _extension;
         }
-        std::smatch re_match;
-        bool matches = std::regex_match(fwdSlashedPath, re_match, _re);
-        return matches;
     }
 
     std::string const& DotIgnoreRule::pattern() const { return _pattern; }
-    std::string const& DotIgnoreRule::source() const { return _source; }
     bool DotIgnoreRule::negate() const { return _negate; }
     bool DotIgnoreRule::isAnchored() const { return _anchored; }
     bool DotIgnoreRule::isDirOnly() const { return _dirOnly; }
+    std::string const& DotIgnoreRule::reString() const { return _reString; }
     std::regex const& DotIgnoreRule::re() const { return _re; }
+
+    void DotIgnoreRule::streamVector(
+        IStreamer* streamer,
+        std::vector<DotIgnoreRule>& rules
+    ) {
+        uint32_t cnt;
+        if (streamer->writing()) cnt = static_cast<uint32_t>(rules.size());
+        streamer->stream(cnt);
+        if (streamer->reading()) rules = std::vector<DotIgnoreRule>(cnt);
+        for (uint32_t i = 0; i < cnt; i++) rules[i].stream(streamer);
+    }
+
+    void DotIgnoreRule::stream(IStreamer* streamer) {
+        streamer->stream(_pattern);
+        streamer->stream(_negate);
+        streamer->stream(_anchored);
+        streamer->stream(_dirOnly);
+        if (streamer->reading()) {
+            parse("");
+        }
+    }
 }
 
 namespace YAM
