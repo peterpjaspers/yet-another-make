@@ -7,7 +7,7 @@ using namespace filesystem;
 
 namespace Language {
 
-    Word index( 0 );
+    Word intrinsicCode( 0 );
     vector<IntrinsicFunction*> intrinsics;
 
     string qualifySymbolName( const ThreadContext& cctx, const string& name, int depth ) {
@@ -20,11 +20,11 @@ namespace Language {
     Descriptor lookUpSymbol( ThreadContext& ctx, const string& name, bool local ) {
         int depth( ctx.scope.size() );
         if (local) {
-            auto found( ctx.symbols.find( qualifySymbolName( name, depth ) ) );
+            auto found( ctx.symbols.find( qualifySymbolName( ctx, name, depth ) ) );
             if (found != ctx.symbols.end()) return found->second;
         } else {
             while (0 <= depth) {
-                auto found( ctx.symbols.find( qualifySymbolName( name, depth ) ) );
+                auto found( ctx.symbols.find( qualifySymbolName( ctx, name, depth ) ) );
                 if (found != ctx.symbols.end()) return found->second;
                 depth -= 1;
             }
@@ -32,13 +32,13 @@ namespace Language {
         return NullDescriptor();
     }
     void defineSymbol( ThreadContext& ctx, const string& name, const Descriptor value ) {
-        auto qualifiedName( qualifySymbolName( name, ctx.scope.size() ) );
+        auto qualifiedName( qualifySymbolName( ctx, name, ctx.scope.size() ) );
         ctx.symbols.insert( { qualifiedName, value } );
     }
 
     void defineIntrinsic( const string name, IntrinsicFunction* function ) {
         intrinsics.push_back( function );
-        defineSymbol( name, IntrinsicDescriptor( index++ ) );
+        defineSymbol( name, IntrinsicDescriptor( intrinsicCode++ ) );
     }
     IntrinsicFunction* intrinsic( const Descriptor& descriptor ) {
         int n( word( descriptor ) );

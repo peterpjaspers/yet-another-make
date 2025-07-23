@@ -4,6 +4,8 @@
 #include "Types.h"
 #include "ThreadContext.h"
 
+#include <string>
+
 namespace Language {
 
     // A Descriptor provides typed access to program data.
@@ -36,12 +38,16 @@ namespace Language {
     inline Descriptor dereference( const Descriptor& descriptor ) { return dereference( context(), descriptor ); }
     Descriptor& toInteger( Descriptor& d );
     Descriptor& toReal( Descriptor& d );
-    Descriptor& toString( Descriptor& d );
+    Descriptor& toString( ThreadContext& ctx, Descriptor& d );
+    Descriptor toStringDescriptor( ThreadContext& ctx, const std::string& source );
+    inline Descriptor& toString( Descriptor& d ) { return toString( context(), d ); }
     // Convert String to numeric (either Integer or Real).
     // If String does not represent a numeric, converts to Null.
-    Descriptor& toNumeric( Descriptor& descriptor );
+    Descriptor& toNumeric( ThreadContext& ctx, Descriptor& descriptor );
+    inline Descriptor& toNumeric( Descriptor& descriptor ) { return toNumeric( context(), descriptor ); }
     // Convert String Descriptor to C++ string
-    std::string stringToCString( const Descriptor& d );
+    std::string stringToCString( ThreadContext& ctx, const Descriptor& d );
+    inline std::string stringToCString( const Descriptor& d ) { return stringToCString( context(), d ); }
     // Convert Descriptor to human radable string
     std::string toReadable( const Descriptor& d );
 

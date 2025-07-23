@@ -1,9 +1,9 @@
 #include "Instruction.h"
-#include "ThreadContext.h"
+#include "FormatString.h"
 #include "Functions.h"
 #include "Monitor.h"
 #include "SymbolTable.h"
-#include "Translator.h"
+#include "ThreadContext.h"
 #include "Translator.h"
 
 #include <iostream>
@@ -81,7 +81,14 @@ namespace Language {
         return operand;
     }
     ostream& monitorInstruction( const ThreadContext& cctx, OpCode code ) {
-        ostream& record = monitorRecord() << setw( 4 ) << cctx.pc << " - " << opCodeTable[ code ].name;
+        ostream& record = monitorRecord() << setw( 4 ) << cctx.pc << " - ";
+        record << "[ pc " << setw( 3 ) << cctx.pc
+               << ", sp " << setw( 3 ) << cctx.sp
+               << ", ep " << setw( 3 ) << cctx.ep
+               << ", ap " << setw( 3 ) << cctx.ap
+               << ", fp " << setw( 3 ) << cctx.fp
+               << " ] ";
+        record << opCodeTable[ code ].name;
         if (opCodeTable[ code ].operand == 1) {
             auto operand( loadWordOperand( cctx, cctx.pc + sizeof( OpCode ) ) );
             if (code == OpPushReal) record << "( " << bit_cast<float>( operand ) << " )";
@@ -93,19 +100,18 @@ namespace Language {
     }
     void push( const Descriptor& descriptor ) { push( context(), descriptor ); }
     void push( ThreadContext& ctx, const Descriptor& descriptor ) {
-        auto address( addressStack( ctx ) );
-        if (monitor( DebugAspects::StackOperations )) monitorRecord() << "push(" << toReadable( descriptor ) << " )" << record<char>;
-        *address = descriptor;
+        if (monitor( DebugAspects::StackOperations )) monitorRecord() << "push( " << toReadable( descriptor ) << " )" << record<char>;
+        *addressStack( ctx ) = descriptor;
         ctx.sp += sizeof( Descriptor );
     }
     Descriptor pop() { return pop( context() ); }
     Descriptor pop( ThreadContext& ctx ) {
-        auto d( *addressStack( ctx, sizeof( Descriptor ) ) );
         if (monitor( DebugAspects::StackOperations )) monitorRecord() << "pop()" << record<char>;
         #ifdef _DEBUG_INTERPRETER
             static const char* signature( "Descriptor pop()" );
             if (ctx.sp < sizeof( Descriptor )) throw string( signature ) + " - Stack underflow";
         #endif
+        auto d( *addressStack( ctx, sizeof( Descriptor ) ) );
         ctx.sp -= sizeof( Descriptor );
         return d;
     }
@@ -144,7 +150,7 @@ namespace Language {
         // ToDo: Procedure descriptor may be a file or a string in which case it must translated.
         bool intrin( false );
         if (isIntrinsic( transfer )) {
-            if (monitor( DebugAspects::ProcedureCalls )) monitorRecord() << "Intrinsic call " << transfer << record<char>;
+            if (monitor( DebugAspects::ProcedureCalls )) monitorRecord() << "Intrinsic call " << toReadable( transfer ) << record<char>;
             intrin = true;
         } else {
             if (!isProcedure( transfer )) throw string( signature ) + " - Procedures call address invalid";
@@ -152,13 +158,13 @@ namespace Language {
         }
         push( ctx, AddressDescriptor( ctx.pc ) );
         push( ctx, AddressDescriptor( ctx.fp ) );
-        ctx.pc = address( transfer );
+        ctx.pc = address( transfer ); // Address of intrinsic function undefined (set to zero)
         ctx.fp = ctx.sp;
         ctx.ap = ctx.ep;
         if (intrin) {
             // Call the intrinsic (C++) function and push its return value on the stack.
             // Intrinsic function can access its parameters via argc and argv arguments.
-            push( ctx, intrinsic( transfer )( argc( ctx ), argv( ctx ) ) );
+            push( ctx, intrinsic( transfer )( ctx, argc( ctx ), argv( ctx ) ) );
             procedureReturn( ctx );
         }
     }
@@ -199,7 +205,7 @@ namespace Language {
         static const char* signature( "void enteringNamedScope()" );
         Descriptor scope( fetchDescriptorOperand( ctx ) );
         if (typeCode( scope ) != TypeString) throw string( signature ) + " - Logic error, expected scope name";
-        enterNamedScope( ctx, stringToCString( scope ) );
+        enterNamedScope( ctx, stringToCString( ctx, scope ) );
     }
     inline void exittingScope( ThreadContext& ctx ) { exitScope( ctx ); }
     inline void loadArgument( ThreadContext& ctx ) {
@@ -259,15 +265,13 @@ namespace Language {
     void dereferenceVariable( ThreadContext& ctx ) {
         auto variable( reinterpret_cast<Descriptor*>( addressStack( ctx, sizeof( Descriptor ) ) ) );
         while (isVariable( *variable )) *variable = dereference( ctx, *variable );
+        if (isFormatString( ctx, *variable )) *variable = evaluateFormatString( ctx, *variable );
     }
-    // Evaluate string(s) representing code
-    void evaluateExpression( ThreadContext& ctx ) {
-        static const char* signature( "void evaluateExpression()" );
+    // Evaluate string representing code
+    void evaluateExpression( ThreadContext& ctx, string programText ) {
+        static const char* signature( "void evaluateExpression( ThreadContext& ctx, string programText )" );
         auto usage( currentMemoryUsage( ctx ) );
         try {
-            auto program( pop( ctx ) );
-            if (isVariable( program )) program = dereference( ctx, program );
-            auto programText( stringToCString( toString( program ) ) );
             auto start( translate( ctx, programText ) );
             auto resume( ctx.pc );
             ctx.pc = start;
@@ -277,6 +281,16 @@ namespace Language {
             // ToDo: Less severe error handling...
             throw string( signature ) + " - Fatal eval error";
         }
+        recoverMemory( ctx, usage );
+    }
+    // Evaluate Descriptor on top of stack representing code
+    void evaluateExpression( ThreadContext& ctx ) {
+        static const char* signature( "void evaluateExpression()" );
+        auto usage( currentMemoryUsage( ctx ) );
+        auto program( pop( ctx ) );
+        if (isVariable( program )) program = dereference( ctx, program );
+        auto programText( stringToCString( ctx, toString( ctx, program ) ) );
+        evaluateExpression( ctx, programText );
         recoverMemory( ctx, usage );
     }
     bool executeInstruction() { return executeInstruction( context() ); }
@@ -359,29 +373,30 @@ namespace Language {
         return( -1 );
     }
     void storeInstruction( ThreadContext& ctx, const OpCode code ) {
+        auto pc( allocateProgram( ctx, sizeof( OpCode ) ) );
+        auto address( addressProgram( ctx, pc ) );
         if (monitor( DebugAspects::GeneratedCode )) {
-            monitorRecord() << setw( 20 ) << "-> " << toReadable( code ) << record<char>;
+            monitorRecord() << setw( 20 ) << pc << " -> " << toReadable( code ) << record<char>;
         }
-        auto address( addressProgram( ctx, allocateProgram( ctx, sizeof( OpCode ) ) ) );
         *address = code;
     }
     void storeInstruction( ThreadContext& ctx, const OpCode code, const Word operand ) {
+        auto pc( allocateProgram( ctx, sizeof( OpCode ) + sizeof( Word ) ) );
+        *addressProgram( ctx, pc ) = code;
         if (monitor( DebugAspects::GeneratedCode )) {
             string opString;
             if (code == OpPushReal) opString = to_string( bit_cast<float>( operand ) );
             else opString = to_string( operand );
-            monitorRecord() << setw( 20 ) << "-> " << toReadable( code ) << "[ " << opString << " ]" << record<char>;
+            monitorRecord() << setw( 20 ) << pc << " -> " << toReadable( code ) << "[ " << opString << " ]" << record<char>;
         }
-        auto pc( allocateProgram( ctx, sizeof( OpCode ) + sizeof( Word ) ) );
-        *addressProgram( ctx, pc ) = code;
         storeWordOperand( ctx, ( pc + sizeof( OpCode ) ), operand );
     }
     void storeInstruction( ThreadContext& ctx, const OpCode code, const Descriptor operand ) {
-        if (monitor( DebugAspects::GeneratedCode )) {
-            monitorRecord() << setw( 20 ) << "-> " << toReadable( code ) << "[ " << toReadable( operand ) << " ]"<< record<char>;
-        }
         auto pc( allocateProgram( ctx, sizeof( OpCode ) + sizeof( Descriptor ) ) );
         *addressProgram( ctx, pc ) = code;
+        if (monitor( DebugAspects::GeneratedCode )) {
+            monitorRecord() << setw( 20 ) << pc << " -> " << toReadable( code ) << "[ " << toReadable( operand ) << " ]"<< record<char>;
+        }
         storeDescriptorOperand( ctx, ( pc + sizeof( OpCode ) ), operand );
     }
 

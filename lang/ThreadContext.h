@@ -38,6 +38,8 @@ namespace Language {
 
     };
 
+    typedef Descriptor(IntrinsicFunction)( ThreadContext& ctx, int arc, Descriptor* argv );
+
     // Access the current thread context.
     ThreadContext& context();
     // Const access the current thread context.

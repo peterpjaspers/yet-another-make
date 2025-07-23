@@ -11,7 +11,7 @@ namespace Language {
         if (isLocalVariable( descriptor)) return *addressLocal( ctx, adr );
         if (isArgumentVariable( descriptor)) return *addressArgument( ctx, adr );
         if (isGlobalVariable( descriptor)) return *addressGlobal( ctx, adr );
-        throw string( signature ) + " - Dereferencing unknown variable type";
+        return descriptor;
     }
     Descriptor& toInteger( Descriptor& d ) {
         static const char* signature( "void toInteger( Descriptor& )" );
@@ -43,7 +43,7 @@ namespace Language {
         }
         return( d );
     }
-    Descriptor& toString( Descriptor& d ) {
+    Descriptor& toString( ThreadContext& ctx, Descriptor& d ) {
         static const char* signature( "void toString( Descriptor& )" );
         string str;
         auto type( typeCode( d ) );
@@ -53,14 +53,18 @@ namespace Language {
             } else if (type == TypeReal) {
                 str = to_string( real( d ) );
             } else throw string( signature ) + " - Cannot convert " + typeToString( type ) + " descriptor to string.";
-            Word n( str.size() );
-            Address a( allocateString( n ) );
-            strncpy( reinterpret_cast<char *>( addressString( a ) ), str.c_str(), n );
-            d = StringDescriptor( a, n );
+            d = toStringDescriptor( ctx, str );
         }
         return( d );
     }
-    Descriptor& toNumeric( Descriptor& descriptor ) {
+    Descriptor toStringDescriptor( ThreadContext& ctx, const string& source ) {
+        auto n( source.size() );
+        auto address( allocateString( ctx, n ) );
+        strncpy( (char*)addressString( ctx, address ), source.c_str(), n );
+        return StringDescriptor( address, n );
+    }
+
+    Descriptor& toNumeric( ThreadContext& ctx, Descriptor& descriptor ) { // ToDo: Version with ctx argument
         auto str( stringToCString( descriptor ) );
         size_t count = 0;
         auto integerValue( stoi( str, &count ) );
@@ -71,10 +75,10 @@ namespace Language {
         return descriptor;
     }
 
-    string stringToCString( const Descriptor& d ) {
+    string stringToCString( ThreadContext& ctx, const Descriptor& d ) { // ToDo: Version with ctx argument
         static const char* signature( "string stringToCString( const Descriptor& )" );
         if (not isString( d )) throw string( signature ) + " - Cannot convert " + typeToString( type( d ) ) + " descriptor to C++ string";
-        return string( reinterpret_cast<char*>( addressString( address( d ) ) ), type( d ) & TypeValueMask );
+        return string( reinterpret_cast<char*>( addressString( ctx, address( d ) ) ), type( d ) & TypeValueMask );
     }
 
     string toReadable( const Descriptor& d ) {

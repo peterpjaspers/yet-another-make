@@ -25,13 +25,16 @@ int main( int argc, char* argv[] ) {
     startMonitor( ".", "Interpreter", true, false );
     monitor().enable(
         DebugAspects::InstructionExecution |
-        // DebugAspects::StackOperations |
-        // DebugAspects::GlobalAccess |
-        // DebugAspects::ArgumentAccess |
-        // DebugAspects::LocalAccess |
-        // DebugAspects::StackAccess |
-        // DebugAspects::ProcedureCalls |
+        DebugAspects::StackOperations |
+        DebugAspects::GlobalAccess |
+        DebugAspects::ArgumentAccess |
+        DebugAspects::LocalAccess |
+        DebugAspects::StackAccess |
+        DebugAspects::ProcedureCalls |
+        DebugAspects::GeneratedCode |
+        DebugAspects::SourceCode |
         DebugAspects::IntrinsicCalls |
+        DebugAspects::Symbols |
         DebugAspects::Reserved
     );
     auto result( run( start ) );

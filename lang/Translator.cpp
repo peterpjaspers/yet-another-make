@@ -271,10 +271,7 @@ namespace Language {
                 } else if (token() == Token::RealConstant) {
                     storeInstruction( ctx, OpPushReal, bit_cast<Word>( reader->realConstant ) ); nextToken();
                 } else if (token() == Token::StringConstant) {
-                    auto n( reader->stringConstant.size() );
-                    auto address( allocateString( ctx, n ) );
-                    strncpy( (char*)addressString( ctx, address ), reader->stringConstant.c_str(), n );
-                    storeInstruction( ctx, OpPushDescriptor, StringDescriptor( address, n ) );
+                    storeInstruction( ctx, OpPushDescriptor, toStringDescriptor( ctx, reader->stringConstant ) );
                     nextToken();
                 } else if (token() == Token::LeftParen) {
                     nextToken();
@@ -335,7 +332,10 @@ namespace Language {
                     nextToken();
                     if (scoped) parseAnonymousScope( ctx );
                     auto previousLocals( locals );
-                    while ((token() != Token::RightCurly) && (token() != Token::EndOfFile)) parseStatement( ctx );
+                    while ((token() != Token::RightCurly) && (token() != Token::EndOfFile)) {
+                        parseStatement( ctx );
+                        if (token() == Token::SemiColon) nextToken();
+                    }
                     locals = previousLocals;
                     if (scoped) unparseScope( ctx );
                     if (token() == Token::RightCurly) { nextToken(); return true; }
@@ -357,12 +357,14 @@ namespace Language {
                         if (token() == Token::RightParen) {
                             nextToken();
                             parseStatement( ctx );
+                            if (token() == Token::SemiColon) nextToken();
                             if (token() == Token::KeywordElse) {
                                 nextToken();
                                 auto endLabel( createPatch( ctx ) );
                                 storeInstruction( OpJump, Address( 0 ) );
                                 patchJump( ctx, elseLabel );
                                 parseStatement( ctx );
+                                if (token() == Token::SemiColon) nextToken();
                                 patchJump( ctx, endLabel );
                             } else {
                                 patchJump( ctx, elseLabel );
@@ -391,6 +393,7 @@ namespace Language {
                         if (token() == Token::RightParen) {
                             nextToken();
                             parseStatement( ctx );
+                            if (token() == Token::SemiColon) nextToken();
                             storeInstruction( ctx, OpJump, loopLabel );
                             patchJump( ctx, endLabel );
                         } else {
@@ -567,16 +570,16 @@ namespace Language {
                 else if (token() == Token::KeywordImport) return parseImport( ctx );
                 else if (token() == Token::KeywordInclude) return parseInclude( ctx );
                 else {
-                    if (!consumed) {
-                        storeInstruction( ctx, OpPop ); // Consume value of last evaluated expression
-                        consumed = true;
-                    }
-                    if (token() != Token::SemiColon) parseExpression( ctx );
+                    if (token() == Token::EndOfFile) return true;
                     if (token() == Token::SemiColon) {
                         nextToken();
                         return true;
                     }
-                    recoverableError( "Expected ;", SemiColon );
+                    if (!consumed) {
+                        storeInstruction( ctx, OpPop ); // Consume value of last evaluated expression
+                        consumed = true;
+                    }
+                    return parseExpression( ctx );
                 }
                 return false;
             }
@@ -589,6 +592,7 @@ namespace Language {
                 while (true) {
                     while (token() != Token::EndOfFile) {
                         auto statementOK( parseStatement( ctx ) );
+                        if (token() == Token::SemiColon) nextToken();
                         parsed = parsed && statementOK;
                     }
                     if (pausedReaders.size() == 0) break;

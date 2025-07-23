@@ -6,6 +6,7 @@ using namespace std;
 // ToDo: Consider sharing program, global and string page tables accross threads. Depends on multi-threading model.
 // ToDo: Extend memory-usage recovery with defined symbols; e.g., box and unbox. Enables running code in a sandbox.
 //       Program memory, symbols, global variables and strings must be recovered.
+// ToDo: Account for strings that cross page boundaries...
 namespace Language {
 
     namespace {
@@ -85,7 +86,7 @@ namespace Language {
         #endif
         Word page = ((cctx.sp - offset) >> PageAddressBits);
         if (cctx.stack.pages.size() <= page) allocatePage( context().stack );
-        if (monitor( DebugAspects::StackAccess )) monitorRecord() << setw( 20 ) << "" << "Stack access " << offset << record<char>;
+        if (monitor( DebugAspects::StackAccess )) monitorRecord() << setw( 20 ) << "" << "Stack access " << cctx.sp << " - " << offset << record<char>;
         return reinterpret_cast<Descriptor*>( addressMemory( cctx.stack, (cctx.sp - offset) ) );
     }
     Descriptor* addressLocal( const ThreadContext& cctx, const Address& address ) {

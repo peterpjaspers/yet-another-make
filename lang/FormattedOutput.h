@@ -2,6 +2,7 @@
 #define LANG_FORMATTED_OUTPUT_H
 
 #include "Types.h"
+#include "ThreadContext.h"
 
 namespace Language {
 

@@ -5,6 +5,7 @@
 #include "Descriptor.h"
 #include "LogFile.h"
 
+#include <string>
 #include <filesystem>
 
 namespace Language {
@@ -136,6 +137,9 @@ namespace Language {
     inline void storeInstruction( const OpCode code, const Descriptor operand ) { storeInstruction( context(), code, operand ); }
     // Convert op-code to human readble string
     std::string toReadable( const OpCode code );
+
+    void evaluateExpression( ThreadContext& ctx, std::string programText );
+    inline void evaluateExpression( std::string programText ) { evaluateExpression( context(), programText ); }
 
     // Print a program in a human readbale file.
     // The start and end addresses define the program extent to be printed.
