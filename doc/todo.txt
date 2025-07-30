@@ -45,18 +45,6 @@ Bugs
   of the build rules. The hack was choosen because the current buildrule syntax does 
   not support variables and because a new buildrule language is being implemented.
 
-- Dependency registration allows dependencies on ignored files (in non-ignored repos). 
-  Instead such dependencies must be flagged as an error.
-  Aside: why are Patch.obj and MonitorProcess.obj always recompiled after yamServer restart? 
-  These files depend on detours.h. Detours dir is ignored. But said recompilations occur
-  independently of detours dir being ignore or not.
-  detectedInputFiles are same after restart, hashes unchanged.
-  Because when changing detours from not-ignored to ignored then filenode detours.h
-  enters Deleted state. Deleted state filenodes return random hash.
-  With clean buildstate and detours not-ignored Patch.obj is not recompiled after
-  server restart.
-
-
 
 Features
 - multi-repo build: clone repos in subdirs of the yam root dir.

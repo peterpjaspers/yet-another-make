@@ -154,6 +154,10 @@ namespace
         EXPECT_TRUE(rule2.ignore("/dir/main.pyc"));
         EXPECT_TRUE(rule2.ignore("dip/main.pyc"));
         EXPECT_TRUE(rule2.ignore("/dip/main.pyc"));
+
+        DotIgnoreRule rule3("/detours/**", source);
+        EXPECT_TRUE(rule3.ignore("detours/inc/detours.h"));
+
     }
 
     TEST(DotIgnoreRule, NotIgnoreAnchored) {

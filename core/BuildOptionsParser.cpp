@@ -14,6 +14,7 @@ namespace YAM
         SHUTDOWN, 
         NOSRV,
         THREADS,
+        LOGIIF,
     };
     const option::Descriptor usage[] =
     {
@@ -24,6 +25,7 @@ namespace YAM
      {SHUTDOWN, 0, "",  "shutdown", option::Arg::None,     "  --shutdown \tShutdown yamServer" },
      {NOSRV,    0, "",  "noServer", option::Arg::None,     "  --noServer \tRun yam without yamServer" },
      {THREADS,  0, "j", "threads",  option::Arg::Optional, "  --threads=N \tRun up to N commands in parallel. Default is number of logical cores." },
+     {LOGIIF,   0, "",  "logiif",   option::Arg::Optional, "  --logiif \tLog ignored input files." },
      {UNKNOWN,  0, "", "",         option::Arg::None, "\nExamples:\n"
                                    "  yam --clean bin/**\n"
                                    "  yam -- bin/main.obj bin/lib.obj\n" },
@@ -66,6 +68,7 @@ namespace YAM
             if (threads && threads.arg) buildOptions._threads = atoi(threads.arg);
             if (options[NOSRV]) _noServer = true;
             if (options[SHUTDOWN]) _shutdown = true;
+            if (options[LOGIIF]) buildOptions._logAspects.push_back(LogRecord::Aspect::IgnoredInputFiles);
 
             for (int i = 0; i < parse.nonOptionsCount(); ++i) {
                 buildOptions._scope.push_back(parse.nonOption(i));

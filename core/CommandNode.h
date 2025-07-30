@@ -206,6 +206,7 @@ namespace YAM
             std::set<std::filesystem::path> _keptInputPaths;
             std::set<std::filesystem::path> _removedInputPaths;
             std::set<std::filesystem::path> _addedInputPaths;
+            std::vector<std::shared_ptr<FileNode>> _keptInputNodes;
             std::vector<std::shared_ptr<FileNode>> _addedInputNodes;
         };
         void updateOutputNameFilters();
@@ -243,6 +244,7 @@ namespace YAM
         bool findInputNodes(
             std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const& allowedGenInputFiles,
             std::set<std::filesystem::path>const& inputSymPaths,
+            std::set<std::filesystem::path>& removedInputSymPaths,
             std::vector<std::shared_ptr<FileNode>>& inputNodes,
             std::vector<std::shared_ptr<Node>>& srcInputNodes,
             ILogBook& logBook

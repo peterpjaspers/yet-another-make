@@ -16,6 +16,8 @@ namespace YAM
             _console->textColor(IConsole::orange);
         } else if (aspect == LogRecord::Progress) {
             _console->textColor(IConsole::green);
+        } else {
+            _console->textColor(IConsole::orange);
         }
     }
 

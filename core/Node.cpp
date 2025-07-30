@@ -79,11 +79,12 @@ namespace YAM
                 || _state == State::Failed
                 || _state == State::Canceled;
             _notifyingObservers = true;
-            if (_state == State::Dirty) {
+            if (_state == State::Dirty || _state == State::Deleted) {
                 for (auto observer : _observers) {
                     observer->handleDirtyOf(this);
                 }
-            } else if (_state == State::Deleted) {
+            }
+            if (_state == State::Deleted) {
                 cleanup();
             }
             if (oldState == State::Executing && nowCompleted) {

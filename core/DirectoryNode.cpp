@@ -239,6 +239,34 @@ namespace YAM
         auto sharedThis = dynamic_pointer_cast<DirectoryNode>(shared_from_this());
         return findChild(sharedThis, path.begin(), path.end());
     }
+    std::tuple<std::shared_ptr<DirectoryNode>, std::filesystem::path> DirectoryNode::findDirContainingFile(
+        std::filesystem::path symFilePath
+    ) {
+        auto pit = symFilePath.begin();
+        if (pit->string() != name()) return {nullptr, symFilePath};
+        pit++;
+        std::shared_ptr<DirectoryNode> foundDir = dynamic_pointer_cast<DirectoryNode>(shared_from_this());
+        bool found = true;
+        while (pit != symFilePath.end() && found) {
+            found = false;
+            auto childPath = foundDir->name() / *pit;
+            auto cit = foundDir->getContent().find(childPath);
+            if (cit != foundDir->getContent().end()) {
+                auto nextDir = dynamic_pointer_cast<DirectoryNode>(cit->second);
+                if (nextDir != nullptr) {
+                    pit++;
+                    foundDir = nextDir;
+                    found = true;
+                }
+            }
+        }
+        std::filesystem::path remainder;
+        while (pit != symFilePath.end()) {
+            remainder /= *pit;
+            pit++;
+        }
+        return {foundDir, remainder};
+    }
 
     std::chrono::time_point<std::chrono::utc_clock> const& DirectoryNode::lastWriteTime() {
         return _lastWriteTime;

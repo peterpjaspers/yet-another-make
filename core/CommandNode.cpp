@@ -1,5 +1,6 @@
 #include "CommandNode.h"
 #include "DirectoryNode.h"
+#include "DotIgnoreNode.h"
 #include "SourceFileNode.h"
 #include "GeneratedFileNode.h"
 #include "GroupNode.h"
@@ -19,6 +20,8 @@
 #include <algorithm>
 #include <utility>
 #include <unordered_set>
+#include <stack>
+#include <tuple>
 #include <boost/process.hpp>
 
 namespace
@@ -68,12 +71,12 @@ namespace
             std::inserter(inBoth, inBoth.begin()));
         std::set_difference(
             in1.begin(), in1.end(),
-            inBoth.begin(), inBoth.end(),
-            std::inserter(onlyIn1, onlyIn1.begin()));
-        std::set_difference(
-            in2.begin(), in2.end(),
-            inBoth.begin(), inBoth.end(),
-            std::inserter(onlyIn2, onlyIn2.begin()));
+                inBoth.begin(), inBoth.end(),
+                std::inserter(onlyIn1, onlyIn1.begin()));
+                std::set_difference(
+                    in2.begin(), in2.end(),
+                    inBoth.begin(), inBoth.end(),
+                    std::inserter(onlyIn2, onlyIn2.begin()));
     }
 
     bool isGenerated(std::shared_ptr<Node> const& node) {
@@ -103,82 +106,24 @@ namespace
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>>& outputFiles
     ) {
         for (auto const& producer : producers) {
-            auto const &cmd = dynamic_pointer_cast<CommandNode>(producer);
+            auto const& cmd = dynamic_pointer_cast<CommandNode>(producer);
             if (cmd != nullptr) {
                 std::vector<std::shared_ptr<GeneratedFileNode>> outputs = cmd->detectedOutputs();
                 for (auto const& output : outputs) {
-                    outputFiles.insert({ output->name(), output });
+                    outputFiles.insert({output->name(), output});
                 }
             } else {
-                auto const &group = dynamic_pointer_cast<GroupNode>(producer);
+                auto const& group = dynamic_pointer_cast<GroupNode>(producer);
                 if (group == nullptr) throw std::exception("not supported producer type");
                 std::set<std::shared_ptr<FileNode>, Node::CompareName> files = group->files();
                 for (auto const& file : files) {
                     auto genFileNode = dynamic_pointer_cast<GeneratedFileNode>(file);
                     if (genFileNode != nullptr) {
-                        outputFiles.insert({ genFileNode->name(), genFileNode });
+                        outputFiles.insert({genFileNode->name(), genFileNode});
                     }
                 }
             }
         }
-    }
-
-    void logBuildOrderNotGuaranteed(
-        CommandNode* cmd,
-        GeneratedFileNode* inputFile,
-        ILogBook& logBook
-    ) {
-        std::stringstream ss;
-        ss
-            << "Build order is not guaranteed." << std::endl
-            << "Fix: declare input file as input of command." << std::endl
-            << "Command   : " << cmd->name().string() << std::endl
-            << "Input file: " << inputFile->absolutePath().string() << std::endl;
-        if (cmd->buildFile() != nullptr) {
-            ss << "The command is defined in buildfile " << cmd->buildFile()->absolutePath()
-               << " by the rule at line " << cmd->ruleLineNr() << std::endl;
-        }
-        LogRecord record(LogRecord::Error, ss.str());
-        logBook.add(record);
-    }
-
-    void logInputNotInARepository(
-        CommandNode* cmd,
-        std::filesystem::path const& inputFile,
-        ILogBook& logBook
-    ) {
-        std::stringstream ss;
-        ss
-            << "Input file ignored because not in a known file repository." << std::endl
-            << "Fix: declare the file repository that contains the input," << std::endl
-            << "or change command script to not depend on the input file." << std::endl
-            << "Command   : " << cmd->name().string() << std::endl
-            << "Input file: " << inputFile.string() << std::endl;
-        if (cmd->buildFile() != nullptr) {
-            ss << "The command is defined in buildfile " << cmd->buildFile()->absolutePath()
-               << " by the rule at line " << cmd->ruleLineNr() << std::endl;
-        }
-        LogRecord record(LogRecord::IgnoredInputFiles, ss.str());
-        logBook.add(record);
-    }
-
-    void logWriteAccessedSourceFile(
-        CommandNode* cmd,
-        SourceFileNode* outputFile,
-        ILogBook& logBook
-    ) {
-        std::stringstream ss;
-        ss
-            << "Source file is updated by build." << std::endl
-            << "Fix: change command script to not update the source file." << std::endl
-            << "Command    : " << cmd->name().string() << std::endl
-            << "Source file: " << outputFile->name().string() << std::endl;
-        if (cmd->buildFile() != nullptr) {
-            ss << "The command is defined in buildfile " << cmd->buildFile()->absolutePath()
-                << " by the rule at line " << cmd->ruleLineNr() << std::endl;
-        }
-        LogRecord record(LogRecord::Error, ss.str());
-        logBook.add(record);
     }
 
     bool deleteFile(std::filesystem::path const& absPath) {
@@ -225,6 +170,123 @@ namespace
         }
     }
 
+    std::tuple<std::shared_ptr<DirectoryNode>, std::filesystem::path> findDirContainingFile(
+        std::shared_ptr<DirectoryNode> dir,
+        std::filesystem::path symFilePath
+    ) {
+        auto pit = symFilePath.begin();
+        auto const& repoName = pit->string();
+        if (repoName != dir->name()) return {nullptr, ""};
+        pit++;
+        std::shared_ptr<Node> foundNode = dir;
+        std::shared_ptr<DirectoryNode> foundDir = dir;
+        bool found = true;
+        while (pit != symFilePath.end() && found) {
+            found = false;
+            auto childPath = foundDir->name() / *pit;
+            auto cit = foundDir->getContent().find(childPath);
+            if (cit != foundDir->getContent().end()) {
+                auto nextDir = dynamic_pointer_cast<DirectoryNode>(cit->second);
+                if (nextDir != nullptr) {
+                    pit++;
+                    foundDir = nextDir;
+                    found = true;
+                }
+            }
+        }
+        std::filesystem::path remainder;
+        while (pit != symFilePath.end()) {
+            remainder /= *pit;
+            pit++;
+        }
+        return {foundDir, remainder};
+    }
+
+    bool isIgnoredFile(ExecutionContext* context, std::filesystem::path symInputFilePath) {
+        auto const& repoName = FileRepositoryNode::repoNameFromPath(symInputFilePath);
+        auto repo = context->findRepository(repoName);
+        auto dir = repo->directoryNode();
+        std::shared_ptr<DirectoryNode> foundDir;
+        std::filesystem::path remainder;
+        std::tie(foundDir, remainder) = dir->findDirContainingFile(symInputFilePath);
+        bool isIgnored = dir->dotIgnoreNode()->ignore(remainder);
+        return isIgnored;
+    }
+
+    void logBuildOrderNotGuaranteed(
+        CommandNode* cmd,
+        GeneratedFileNode* inputFile,
+        ILogBook& logBook
+    ) {
+        std::stringstream ss;
+        ss
+            << "Build order is not guaranteed." << std::endl
+            << "Fix: declare input file as input of command." << std::endl
+            << "Command   : " << cmd->name().string() << std::endl
+            << "Input file: " << inputFile->absolutePath().string() << std::endl;
+        if (cmd->buildFile() != nullptr) {
+            ss << "The command is defined in buildfile " << cmd->buildFile()->absolutePath().string()
+               << " by the rule at line " << cmd->ruleLineNr() << std::endl;
+        }
+        LogRecord record(LogRecord::Error, ss.str());
+        logBook.add(record);
+    }
+
+    void logFileNotInAKnownRepository(
+        CommandNode* cmd,
+        std::filesystem::path const& file,
+        ILogBook& logBook
+    ) {
+        std::stringstream ss;
+        ss << "File " << file.string() << " is used as input or output by command: " << cmd->name().string() << std::endl;
+        if (cmd->buildFile() != nullptr) {
+            ss << "This command is defined in buildfile " << cmd->buildFile()->name().string() << " by the rule at line " << cmd->ruleLineNr() << std::endl;
+        }
+        ss << "The file is not part of a known file repository and will not be tracked for changes." << std::endl;
+        ss << "To get rid of this warning you must declare the file repository that contains the file." << std::endl;
+        ss << "Set the repository type to: " << std::endl;
+        ss << "    Build if it is a yam repository that must be build." << std::endl;
+        ss << "    Track if yam must only track dependencies on files in this repository." << std::endl;
+        ss << "    Ignore if yam must not track dependencies on files in this repository." << std::endl;
+        LogRecord warning(LogRecord::Warning, ss.str());
+        logBook.add(warning);
+    }
+
+    void logDotIgnoredInputFile(
+        CommandNode* cmd,
+        std::filesystem::path const& inputFile,
+        ILogBook& logBook
+    ) {
+        std::stringstream ss;
+        ss << "File " << inputFile.string() << " is used as input file by command " << cmd->name().string() << std::endl;
+        if (cmd->buildFile() != nullptr) {
+            ss << "This command is defined in buildfile " << cmd->buildFile()->name().string() << " by the rule at line " << cmd->ruleLineNr() << std::endl;
+        }
+        ss << "This file is ignored by a rule in the .gitIgnore or the .yamIgnore file." << std::endl;
+        ss << "This file will not be tracked for changes." << std::endl;
+        LogRecord warning(LogRecord::IgnoredInputFiles, ss.str());
+        logBook.add(warning);
+    }
+
+    void logWriteAccessedSourceFile(
+        CommandNode* cmd,
+        SourceFileNode* outputFile,
+        ILogBook& logBook
+    ) {
+        std::stringstream ss;
+        ss
+            << "Source file is updated by build." << std::endl
+            << "Fix: change command script to not update the source file." << std::endl
+            << "Command    : " << cmd->name().string() << std::endl
+            << "Source file: " << outputFile->name().string() << std::endl;
+        if (cmd->buildFile() != nullptr) {
+            ss << "The command is defined in buildfile " << cmd->buildFile()->absolutePath().string()
+                << " by the rule at line " << cmd->ruleLineNr() << std::endl;
+        }
+        LogRecord record(LogRecord::Error, ss.str());
+        logBook.add(record);
+    }
+
     void logNotDeclaredOutput(
         CommandNode* cmd,
         std::filesystem::path const &outputPath,
@@ -237,7 +299,7 @@ namespace
             << "Command    : " << cmd->name().string() << std::endl
             << "Output file: " << outputPath.string() << std::endl;
         if (cmd->buildFile() != nullptr) {
-            ss << "The command is defined in buildfile " << cmd->buildFile()->absolutePath()
+            ss << "The command is defined in buildfile " << cmd->buildFile()->absolutePath().string()
                 << " by the rule at line " << cmd->ruleLineNr() << std::endl;
         }
         LogRecord record(LogRecord::Error, ss.str());
@@ -275,7 +337,7 @@ namespace
             << "Command 2  : " << cmd->name().string() << std::endl
             << "Output file: " << outputNode->name().string() << std::endl;
         if (cmd->buildFile() != nullptr) {
-            ss << "The command is defined in buildfile " << cmd->buildFile()->absolutePath()
+            ss << "The command is defined in buildfile " << cmd->buildFile()->absolutePath().string()
                 << " by the rule at line " << cmd->ruleLineNr() << std::endl;
         }
         LogRecord record(LogRecord::Error, ss.str());
@@ -298,7 +360,7 @@ namespace
         ss << "Actual outputs  : " << std::endl;
         for (auto const& path : actual) ss << "    " << path.string() << std::endl;
         if (cmd->buildFile() != nullptr) {
-            ss << "The command is defined in buildfile " << cmd->buildFile()->absolutePath()
+            ss << "The command is defined in buildfile " << cmd->buildFile()->absolutePath().string()
                 << " by the rule at line " << cmd->ruleLineNr() << std::endl;
         }
         LogRecord record(LogRecord::Error, ss.str());
@@ -323,7 +385,7 @@ namespace
             ss << "script stderr: " << std::endl << result.stdErr << std::endl;
         }
         if (cmd->buildFile() != nullptr) {
-            ss << "The command is defined in buildfile " << cmd->buildFile()->absolutePath()
+            ss << "The command is defined in buildfile " << cmd->buildFile()->absolutePath().string()
                 << " by the rule at line " << cmd->ruleLineNr() << std::endl;
         }
         LogRecord record(LogRecord::Error, ss.str());
@@ -343,7 +405,7 @@ namespace
             << "Tmp dir : " << dir.string() << std::endl
             << "Reason: " << ec.message() << std::endl;
         if (cmd->buildFile() != nullptr) {
-            ss << "The command is defined in buildfile " << cmd->buildFile()->absolutePath()
+            ss << "The command is defined in buildfile " << cmd->buildFile()->absolutePath().string()
                 << " by the rule at line " << cmd->ruleLineNr() << std::endl;
         }
         LogRecord record(LogRecord::Error, ss.str());
@@ -1022,20 +1084,7 @@ namespace YAM
     ) {
         auto repo = context()->findRepositoryContaining(absPath);
         if (repo == nullptr) {
-            std::stringstream ss;
-            ss << "File " << absPath.string() << " is used as input or output by script: " << std::endl;
-            ss << _script << std::endl;
-            if (_buildFile != nullptr) {
-                ss << "This script is defined in buildfile " << _buildFile->name() << " by the rule at line " << _ruleLineNr << std::endl;
-            }
-            ss << "This file is not part of a known file repository and will not be tracked for changes." << std::endl;
-            ss << "To get rid of this warning you must declare the file repository that contains the file." << std::endl;
-            ss << "Set the repository type to: " << std::endl;
-            ss << "    Build if it is a yam repository that must be build." << std::endl;
-            ss << "    Track if yam must only track dependencies on files in this repository." << std::endl;
-            ss << "    Ignore if yam must not track dependencies on files in this repository." << std::endl;
-            LogRecord warning(LogRecord::Warning, ss.str());
-            logBook.add(warning);
+            logFileNotInAKnownRepository(this, absPath, logBook);
             return "";
         } else if (repo->repoType() != FileRepositoryNode::Ignore) {
             return repo->symbolicPathOf(absPath);
@@ -1118,12 +1167,14 @@ namespace YAM
                 bool validKeptInputs = findInputNodes(
                     allowedGenInputFiles,
                     result._keptInputPaths,
+                    result._removedInputPaths,
                     notUsed1,
                     notUsed2,
                     result._log);
                 bool validNewInputs = findInputNodes(
                     allowedGenInputFiles,
                     result._addedInputPaths,
+                    result._removedInputPaths,
                     result._addedInputNodes,
                     outputsAndNewInputs,
                     result._log);
@@ -1186,7 +1237,7 @@ namespace YAM
             }
             auto ms = _scriptDuration.count() / 1000000;
             std::stringstream ss;
-			ss << "COK(" << ms << " ms, " << _detectedInputs.size() << ") " << name().string();
+			ss << "COK(" << ms << "ms, " << _detectedInputs.size() << ") " << name().string();
             LogRecord p(LogRecord::Progress, ss.str());
             context()->addToLogBook(p);
         } else {
@@ -1289,9 +1340,12 @@ namespace YAM
         return result;
     }
 
+    // Note that input paths are symbolic and that hence input paths are lexically
+    // present in a file repository of type Build or Track. See convertToSymbolicPath
     bool CommandNode::findInputNodes(
         std::map<std::filesystem::path, std::shared_ptr<GeneratedFileNode>> const& allowedGenInputFiles,
-        std::set<std::filesystem::path>const& inputSymPaths,
+        std::set<std::filesystem::path>const & inputSymPaths,
+        std::set<std::filesystem::path>& removedInputSymPaths,
         std::vector<std::shared_ptr<FileNode>>& inputNodes,
         std::vector<std::shared_ptr<Node>>& srcInputNodes,
         ILogBook& logBook
@@ -1327,12 +1381,38 @@ namespace YAM
                 // Hence inputPath identifies a source file.
                 auto srcInputFile = dynamic_pointer_cast<SourceFileNode>(fileNode);
                 if (srcInputFile == nullptr) {
-                    // inputPath references a non-existing source file.
-                    srcInputFile = std::make_shared<SourceFileNode>(context(), symInputPath);
-                    nodes.add(srcInputFile);
+                    // inputPath references a non-existing and/or ignored (by a line in a
+                    // .git/.yamIgnore file) source file in a repository of type Build or Trace.
+                    if (isIgnoredFile(context(), symInputPath)) {
+                        logDotIgnoredInputFile(this, symInputPath, logBook);
+                        removedInputSymPaths.insert(symInputPath);
+                    } else {
+                        // A non-existing not-ignored file: add a file node in order to be able to 
+                        // detect file coming into exists cq becoming ignored.
+                        // Q: how to detect that the file becomes ignored? The file node is not in a
+                        // directory node => will not be found => will not be removed from context
+                        // => cmd will not be re-executed => dependency on ignored file stays into 
+                        // existence and is not flagged as an error
+                        // Possible solution: after repo mirror updates find all src file nodes in 
+                        // context that are not in a directory node and test whether the files 
+                        // associated with these nodes are ignored. If so: remove from context 
+                        // => cmds that observe the node are set dirty and will re-execute.
+                        // Or: on .ignore change set all commands dirty. Commands that depend on
+                        // Deleted src file nodes will re-execute (because file node hash of 
+                        // Deleted nodes always changes to random number) and will find whether
+                        // they still depend on ignored files.
+                        // TODO: implement a solution
+                        srcInputFile = std::make_shared<SourceFileNode>(context(), symInputPath);
+                        nodes.add(srcInputFile);
+                    }
+                } else if (srcInputFile->state() == Node::State::Deleted) {
+                    // a node in Deleted state is not returned by nodes.find(...).
+                    throw std::exception("input node cannot be in Deleted state");
                 }
-                inputNodes.push_back(srcInputFile);
-                srcInputNodes.push_back(srcInputFile);
+                if (srcInputFile != nullptr) {
+                    inputNodes.push_back(srcInputFile);
+                    srcInputNodes.push_back(srcInputFile);
+                }
             }
             allValid = allValid && valid;
         }

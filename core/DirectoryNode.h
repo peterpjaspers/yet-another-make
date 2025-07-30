@@ -89,7 +89,34 @@ namespace YAM
 
         // Find and return the node identified by 'path'.
         // Pre: 'path' is relative to name(). 
+        // Note: The function name is somewhat confusing because the returned node
+        // need not be a child in the directory hierarchy rooted by this directory.
+        // Examples: repository contains: A\B\fileC and A\C\fileD
+        // A\B->findChild(fileC) returns the filenode for A\B\fileC
+        // A\B->findChild(..\C\fileD) returns the filenode for A\C\fileD
+        // In the last example fileD is not in the directory hierarchy rooted
+        // by A\B.
+        // 
         std::shared_ptr<Node> findChild(std::filesystem::path const& path);
+
+        // Return directory node D and path P such that:
+        // (D->name() / P) == symFilePath and no smaller P exists for which this is true.
+        // Examples: 
+        //     D is root A of directory tree A\B\C\fileD, symFilePath is P\Q\R
+        //         D == nullptr, P == P\Q\R
+        //     D is root A of directory tree A\B\C\fileD, symFilePath is A\B\Q\R
+        //         D == A\B, P = Q\R
+        //     D is root A of directory tree A\B\C\fileD, symFilePath is A\B\C\R
+        //         D == A\B\C, P = R
+        //     D is root A of directory tree A\B\C\fileD, symFilePath is A\B\C\fileD
+        //         D == A\B\C, P = fileD
+        // Note: the file identified by P can either:
+        //      - exist
+        //      - not exist
+        //      - exist but ignored by one of the dot-ignore files.
+        std::tuple<std::shared_ptr<DirectoryNode>, std::filesystem::path> findDirContainingFile(
+            std::filesystem::path symFilePath
+        );
 
         std::chrono::time_point<std::chrono::utc_clock> const& lastWriteTime();
 

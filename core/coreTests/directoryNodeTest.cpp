@@ -5,6 +5,7 @@
 #include "DirectoryTree.h"
 #include "../FileRepositoryNode.h"
 #include "../DirectoryNode.h"
+#include "../DotIgnoreNode.h"
 #include "../SourceFileNode.h"
 #include "../ExecutionContext.h"
 #include "../BuildFileParserNode.h"
@@ -245,6 +246,48 @@ namespace
         AccessMonitor::disableMonitoring();
     }
 
+    // Return directory node D and path P such that:
+    // (D->name() / P) == symFilePath and no smaller P exists for which this is true.
+    // Examples: 
+    //     D is root of directory tree A\B\C\fileD, symFilePath is P\Q\R
+    //         D == nullptr, P == P\Q\R
+    //     D is root of directory tree A\B\C\fileD, symFilePath is A\B\Q\R
+    //         D == A\B, P = Q\R
+    //     D is root of directory tree A\B\C\fileD, symFilePath is A\B\C\R
+    //         D == A\B\C, P = R
+    //     D is root of directory tree A\B\C\fileD, symFilePath is A\B\C\fileD
+    //         D == A\B\C, P = "fileD"
+    //
+    std::tuple<std::shared_ptr<DirectoryNode>, std::filesystem::path> findDirContainingFile(
+        std::shared_ptr<DirectoryNode> dir, 
+        std::filesystem::path symFilePath
+    ) {
+        auto pit = symFilePath.begin();
+        if (pit->string() != dir->name()) return {nullptr, symFilePath};
+        pit++;
+        std::shared_ptr<DirectoryNode> foundDir = dir;
+        bool found = true;
+        while (pit != symFilePath.end() && found) {
+            found = false;
+            auto childPath = foundDir->name() / *pit;
+            auto cit = foundDir->getContent().find(childPath);
+            if (cit != foundDir->getContent().end()) {
+                auto nextDir = dynamic_pointer_cast<DirectoryNode>(cit->second);
+                if (nextDir != nullptr) {
+                    pit++;
+                    foundDir = nextDir;
+                    found = true;
+                }
+            }
+        }
+        std::filesystem::path remainder;
+        while (pit != symFilePath.end()) {
+            remainder /= *pit;
+            pit++;
+        }
+        return {foundDir, remainder};
+    }
+
     TEST(DirectoryNode, dotIgnore) {
         std::filesystem::path rootDir = FileSystem::uniquePath("dirNodeTest_");
         DirectoryTree testTree(rootDir, 2, RegexSet());
@@ -265,12 +308,38 @@ namespace
 
         const char* subDir3Rules =
             "/File2\n" // Ignore File2 in SubDir2/SubDir3
-            "!/File1"  // Undo ignore of File1 in SubDir2/SubDir2
+            "!/File1"  // Undo ignore of File1 in SubDir2/SubDir3
             ;
         writeFile(rootDir / "SubDir2\\SubDir3\\.yamIgnore", std::string(subDir3Rules));
 
         auto dirNode = mirrorTree(rootDir);
         EXPECT_EQ(Node::State::Ok, dirNode->state());
+
+        std::shared_ptr<DirectoryNode> foundDir;
+        std::filesystem::path remainder;
+        std::tie(foundDir, remainder) = dirNode->findDirContainingFile("@@repo\\SubDir1");
+        EXPECT_EQ("@@repo", foundDir->name().string());
+        EXPECT_EQ("SubDir1", remainder.string());
+        EXPECT_TRUE(foundDir->dotIgnoreNode()->ignore("SubDir1/"));
+
+        std::tie(foundDir, remainder) = dirNode->findDirContainingFile("@@repo\\SubDir2");
+        EXPECT_EQ("@@repo\\SubDir2", foundDir->name().string());
+        EXPECT_EQ("", remainder.string());
+
+        std::tie(foundDir, remainder) = dirNode->findDirContainingFile("@@repo\\SubDir2\\File1");
+        EXPECT_EQ("@@repo\\SubDir2", foundDir->name().string());
+        EXPECT_EQ("File1", remainder.string());
+        EXPECT_FALSE(foundDir->dotIgnoreNode()->ignore("File1"));
+
+        std::tie(foundDir, remainder) = dirNode->findDirContainingFile("@@repo\\SubDir2\\File2");
+        EXPECT_EQ("@@repo\\SubDir2", foundDir->name().string());
+        EXPECT_EQ("File2", remainder.string());
+        EXPECT_TRUE(foundDir->dotIgnoreNode()->ignore("File2"));
+
+        std::tie(foundDir, remainder) = dirNode->findDirContainingFile("@@repo\\SubDir2\\SubDir3\\File1");
+        EXPECT_EQ("@@repo\\SubDir2\\SubDir3", foundDir->name().string());
+        EXPECT_EQ("File1", remainder.string());
+        EXPECT_FALSE(foundDir->dotIgnoreNode()->ignore("File1"));
 
         std::map<std::filesystem::path, std::shared_ptr<Node>> const& content = dirNode->getContent();
         EXPECT_TRUE(content.contains("@@repo/.yamIgnore"));
