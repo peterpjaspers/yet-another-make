@@ -50,6 +50,8 @@ namespace YAM
 
         ~PersistentBuildState();
 
+        std::filesystem::path const& stateFile() const { return _stateFile; }
+
         // Retrieve the build state.
         // Time complexity: O(N) where N is the number of objects in the build
         // state.

@@ -20,9 +20,6 @@ Bugs
   Problem: this also does not remove all temp dirs.
   Workaround: delete temp dirs at start of each build.
 
-- Changing yamConfig\repoName.txt is not handled: requires creation of new home
-  repository node. Can be handled as clearing everything followed by intial build.
-
 - AccessMonitorTest.compareWithMSBuildTracker behaves differently when ran from test
   explorer versus directly from cmd shell. In the latter case duplicate paths 
   with mixed casing (C:\ and c:\) are detected with different access modes.
@@ -45,6 +42,32 @@ Bugs
   of the build rules. The hack was choosen because the current buildrule syntax does 
   not support variables and because a new buildrule language is being implemented.
 
+- Reproduce:
+    1. cmd C depends on dot-ignored file F -> F not registered as dependency of C
+    2. rule R that ignored F is removed
+    3. build is performed
+       Expected: C is re-executed
+       Actual: C is not re-exeucted
+  C should be executed because it depends on rule R that caused F to
+  be ignored. That rule is changed (removed), hence C should re-executed.
+  Note: a similar problem exists when F is ignored because it is in an
+  ignored repository.
+  Note: the ignore result may also change when moving R up or down in the 
+  dot-ignore file or when other rules are added or moved up/down in the 
+  dot-ignore file. This makes an efficient implementation (one that only
+  re-executes C when F is no longer ignored) virtually impossible. The
+  only feasible implementation is to make C dependent on the dot-ignore
+  node that ignored F. But whis will cause many unnecessary re-executions
+  of C when dot-ignore files are modified.
+  Note: when F was not-ignored and R is added (or when F's repo type is
+  changed to Ignore), then file node F is moved to Deleted state,
+  causing C to re-execute (because C depends on file node F).
+  Alternative: let C fail when it depends on dot-ignored F.
+  However, this is not consistent with C depending on repo-ignored F.
+
+Fixed bugs:
+- Changing yamConfig\repoName.txt is not handled: requires creation of new home
+  repository node. Can be handled as clearing everything followed by intial build.
 
 Features
 - multi-repo build: clone repos in subdirs of the yam root dir.

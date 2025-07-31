@@ -46,7 +46,11 @@ namespace YAM
     private:
         void logRepoNotInitialized();
         bool _init(std::shared_ptr<BuildRequest> const& request);
+        bool _retrieveBuildState(
+            std::filesystem::path const& repoDir,
+            std::string const& repoName);
         void _clean();
+        bool _cleanAllAndDeleteBuildState();
         void _start();
         void _handleConfigNodesCompletion(Node* n);
         void _handleDirectoriesCompletion(Node* n);

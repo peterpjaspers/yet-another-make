@@ -410,8 +410,7 @@ namespace YAM
             if (frepo != _homeRepo) {
                 auto it = repos.find(frepoName);
                 if (it == repos.end()) {
-                    auto fit = _repositories.find(frepoName);
-                    toRemove.push_back(fit->second);
+                    toRemove.push_back(pair.second);
                 }
             }
         }

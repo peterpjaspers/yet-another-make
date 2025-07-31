@@ -129,7 +129,7 @@ namespace
             }
         }
     }
-    
+
     std::mutex _mutex;
     unsigned int _nBuilders = 0;
 }
@@ -214,9 +214,10 @@ namespace YAM
         if (repoName.empty() || repoName != request->repoName()) {
             state = BuildResult::State::Failed;
         }
-        _result->state(state);
         if (state != BuildResult::State::Ok) {
+            _result->state(state);
             logRepoNotInitialized();
+            _result->state(state);
             return false;
         }
 
@@ -227,41 +228,71 @@ namespace YAM
         else if (threads > maxThreads) threads = maxThreads;
         _context.threadPool().size(threads);
 
-		deleteLeftoverFiles(FileSystem::yamTempFolder(), _context.logBook().get(), repoDir);
+        deleteLeftoverFiles(FileSystem::yamTempFolder(), _context.logBook().get(), repoDir);
 
         if (_buildState == nullptr) {
-            std::filesystem::path yamDir = repoDir / DotYamDirectory::yamName();
-            std::filesystem::path buildStatePath = BuildStateVersion::select(yamDir, *(_context.logBook()));
-            if (buildStatePath.empty()) {
-                //incompatible file version
-                _result->state(BuildResult::State::Failed);
-            } else {
-                std::filesystem::create_directories(buildStatePath.parent_path());
-                _buildState = std::make_shared<PersistentBuildState>(buildStatePath, &_context);
-                _buildState->retrieve();
-                auto repositoriesNode = _context.repositoriesNode();
-                if (repositoriesNode == nullptr) {
-                    auto homeRepo = std::make_shared<FileRepositoryNode>(
-                        &_context,
-                        repoName,
-                        repoDir,
-                        FileRepositoryNode::RepoType::Build);
-                    repositoriesNode = std::make_shared<RepositoriesNode>(&_context, homeRepo);
-                    repositoriesNode->ignoreConfigFile(false);
-                    _context.repositoriesNode(repositoriesNode);
-                }
-                for (auto const& pair : _context.nodes().nodesMap()) {
-                    auto node = pair.second;
-                    if (node->state() != Node::State::Deleted) {
-                        node->setState(Node::State::Dirty);
-                    } else {
-                        throw std::runtime_error("Unexpected Node::State::Delete");
-                    }
-                }
-                repositoriesNode->startWatching();
+            if (!_retrieveBuildState(repoDir, repoName)) {
+                state = BuildResult::State::Failed;
             }
         }
+        if (_buildState != nullptr) {
+            auto repositoriesNode = _context.repositoriesNode();
+            auto homeRepo = repositoriesNode->homeRepository();
+            if (homeRepo->repoName() != repoName) {
+                LogRecord r(LogRecord::Aspect::Progress, "Renaming repository from " + homeRepo->repoName() + " to " + repoName);
+                _context.addToLogBook(r);
+                if (_cleanAllAndDeleteBuildState()) {
+                    _buildState = nullptr;
+                } else {
+                    state = BuildResult::State::Failed;
+                }
+            }
+        }
+        if (_buildState == nullptr) {
+            if (!_retrieveBuildState(repoDir, repoName)) {
+                state = BuildResult::State::Failed;
+            }
+        }
+        if (state == BuildResult::State::Ok) {
+            _context.repositoriesNode()->startWatching();
+        }
+        _result->state(state);
         return _result->state() == BuildResult::State::Ok;
+    }
+
+    bool Builder::_retrieveBuildState(
+        std::filesystem::path const& repoDir,
+        std::string const& repoName
+    ) {
+        std::filesystem::path yamDir = repoDir / DotYamDirectory::yamName();
+        std::filesystem::path buildStatePath = BuildStateVersion::select(yamDir, *(_context.logBook()));
+        if (buildStatePath.empty()) {
+            //incompatible file version
+        } else {
+            std::filesystem::create_directories(buildStatePath.parent_path());
+            _buildState = std::make_shared<PersistentBuildState>(buildStatePath, &_context);
+            _buildState->retrieve();
+            auto repositoriesNode = _context.repositoriesNode();
+            if (repositoriesNode == nullptr) {
+                auto homeRepo = std::make_shared<FileRepositoryNode>(
+                    &_context,
+                    repoName,
+                    repoDir,
+                    FileRepositoryNode::RepoType::Build);
+                repositoriesNode = std::make_shared<RepositoriesNode>(&_context, homeRepo);
+                repositoriesNode->ignoreConfigFile(false);
+                _context.repositoriesNode(repositoriesNode);
+            }
+            for (auto const& pair : _context.nodes().nodesMap()) {
+                auto node = pair.second;
+                if (node->state() != Node::State::Deleted) {
+                    node->setState(Node::State::Dirty);
+                } else {
+                    throw std::runtime_error("Unexpected Node::State::Delete");
+                }
+            }
+        }
+        return _buildState != nullptr;
     }
 
     // Called in main thread
@@ -277,6 +308,28 @@ namespace YAM
         auto state = (nFailures == 0) ? BuildResult::State::Ok : BuildResult::State::Failed;
         _result->state(state);
         _notifyCompletion(nFailures == 0 ? Node::State::Ok : Node::State::Failed);
+    }
+
+
+    // Called in main thread
+    bool Builder::_cleanAllAndDeleteBuildState() {
+        uint32_t nFailures = 0;
+        ILogBook& logBook = *(_context.logBook());
+        for (auto node : _context.nodes().nodes()) {
+            auto genFile = dynamic_pointer_cast<GeneratedFileNode>(node);
+            if (genFile != nullptr) {
+                if (!genFile->deleteFile(false, true)) nFailures += 1;
+            }
+        }
+        if (nFailures == 0) {
+            _context.repositoriesNode()->stopWatching();
+            if (!std::filesystem::remove(_buildState->stateFile())) {
+                nFailures += 1;
+                LogRecord e(LogRecord::Error, "Failed to delete buildstate file " + _buildState->stateFile().string());
+                _context.addToLogBook(e);
+            }
+        }
+        return nFailures == 0;
     }
 
     bool Builder::_containsBuildFileCycles(
