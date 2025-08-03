@@ -11,17 +11,11 @@ namespace YAM
     class SourceFileNode;
     class FileRepositoryNode;
 
-    // NOT YET IMPLEMENTED
     // A DotIgnoreNode parses a .gitignore and/or .yamignore file in a
     // given directory. Both files adhere to the gitignore specification,
     // see https://git-scm.com/docs/gitignore. The ignore() member function 
     // applies the precedence rules as specified in same specification.
-    // 
-    // Special case: homeRepo/yamConfig/ is ignored.
-    // Rationale: permanent SourceFileNodes are created for the files in
-    // that directory by RepositoriesNode and FileExecSpecsNode (and possibly
-    // more as new configuration files get introduced). These filenodes must
-    // not be set to Node::State::Deleted when removed from the filesystem.  
+    // .yamignore rules have precedence over .gitignore rules.
     //
     class __declspec(dllexport) DotIgnoreNode : public Node
     {
