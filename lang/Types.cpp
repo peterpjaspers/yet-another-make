@@ -5,9 +5,8 @@ using namespace std;
 namespace Language {
 
     string typeToString( const Type type ) {
-        auto value( type & TypeValueMask );
         if ((type & NS) != 0) {
-            switch ( value ) {
+            switch ( type & TypeValueMask ) {
                 case TypeNull : return( "Null" );
                 case TypeInteger : return( "Integer" );
                 case TypeReal : return( "Real" );
@@ -21,7 +20,7 @@ namespace Language {
                 default : return( "Unknown type");
             }
         } else {
-            return( "String[" + to_string( value ) + "]" );
+            return( "String[" + to_string( type & TypeValueMask ) + "]" );
         }
     }
 

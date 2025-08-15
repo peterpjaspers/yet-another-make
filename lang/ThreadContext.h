@@ -17,6 +17,8 @@ namespace Language {
     // The list holds namespace names, procedure names and annonymous block indexes.
     // The scope list is used to uniquely identify variable names.
     typedef std::vector<std::string> Scope;
+    // Locals is a list of number of local variables in the nested scope.
+    typedef std::vector<Word> Locals;
     // The symbol-table maps fully qualified variable or procedure names to the corresponding descriptors.
     // A name is qualified via its nested scope; e.g., ":function:1:x" is the fully qualified variable name of
     // "x" defined in the second statement block of the the procedure "function" defined in the global scope.
@@ -33,11 +35,15 @@ namespace Language {
         PageTable global;
         PageTable string;
         Scope scope;
+        Locals locals;
         SymbolTable symbols;
-        ThreadContext() : pc( 0 ), sp( 0 ), ep( 0 ), ap( 0 ), fp( 0 ) {};
-
+        ThreadContext() : pc( 0 ), sp( 0 ), ep( 0 ), ap( 0 ), fp( 0 ) { locals.push_back( 0 ); };
     };
 
+    // An intrinsic function maps a variable number of Descriptor arguments to a Descriptor result.
+    // These are typically impemented in C++ for performance or interoperablility with system components.
+    // Actual argument values must be explicitly derived from their corresponding descriptors via the
+    // thread-context argument.
     typedef Descriptor(IntrinsicFunction)( ThreadContext& ctx, int arc, Descriptor* argv );
 
     // Access the current thread context.
@@ -100,8 +106,8 @@ namespace Language {
     inline void deallocateString( const Word extent ) { deallocateString( context(), extent ); }
     
     // Address Stack memory.
-    Descriptor* addressStack( const ThreadContext& cctx, const Offset& offset = 0 );
-    inline Descriptor* addressStack( const Offset& offset = 0 ) { return addressStack( ccontext(), offset ); }
+    Descriptor* addressStack( const ThreadContext& cctx, const Offset& offset = sizeof( Descriptor ) );
+    inline Descriptor* addressStack( const Offset& offset = sizeof( Descriptor ) ) { return addressStack( ccontext(), offset ); }
     // Address local variable.
     Descriptor* addressLocal( const ThreadContext& cctx, const Address& address );
     inline Descriptor* addressLocal( const Address& address ) { return addressLocal( ccontext(), address ); }

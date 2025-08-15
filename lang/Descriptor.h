@@ -51,6 +51,17 @@ namespace Language {
     // Convert Descriptor to human radable string
     std::string toReadable( const Descriptor& d );
 
+    // template< class T >
+    // std::basic_ostream<T> & operator<<( std::basic_ostream<T> & stream, const Descriptor & d ) {
+    //     stream << toReadable( d );
+    //     return stream;
+    // };
+
+    // std::ostream & operator<<( std::ostream & stream, const Descriptor & d ) {
+    //     stream << toReadable( d );
+    //     return stream;
+    // };
+
 } // namespace Language
 
 #endif // LANG_DESCRIPTOR_H

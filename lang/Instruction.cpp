@@ -101,18 +101,18 @@ namespace Language {
     void push( const Descriptor& descriptor ) { push( context(), descriptor ); }
     void push( ThreadContext& ctx, const Descriptor& descriptor ) {
         if (monitor( DebugAspects::StackOperations )) monitorRecord() << "push( " << toReadable( descriptor ) << " )" << record<char>;
-        *addressStack( ctx ) = descriptor;
         ctx.sp += sizeof( Descriptor );
+        *addressStack( ctx ) = descriptor;
     }
     Descriptor pop() { return pop( context() ); }
     Descriptor pop( ThreadContext& ctx ) {
-        if (monitor( DebugAspects::StackOperations )) monitorRecord() << "pop()" << record<char>;
         #ifdef _DEBUG_INTERPRETER
             static const char* signature( "Descriptor pop()" );
             if (ctx.sp < sizeof( Descriptor )) throw string( signature ) + " - Stack underflow";
         #endif
-        auto d( *addressStack( ctx, sizeof( Descriptor ) ) );
+        auto d( *addressStack( ctx ) );
         ctx.sp -= sizeof( Descriptor );
+        if (monitor( DebugAspects::StackOperations )) monitorRecord() << "pop( " + toReadable( d ) + " )" << record<char>;
         return d;
     }
     // Return number of arguments passsed to current procedure.
@@ -178,12 +178,12 @@ namespace Language {
             ctx.sp = ctx.fp;
             auto fp( pop( ctx ) );
             auto pc( pop( ctx ) );
-            if (!isAddress( pc ) or !isAddress( fp )) throw string( signature ) + " - Corrupt stack";
+            if (!isAddress( pc ) or !isAddress( fp )) throw string( signature ) + " - Corrupt stack, pc = [ " + toReadable( pc ) + " ]";
             ctx.pc = address( pc );
             ctx.fp = address( fp );
             ctx.sp = ctx.ap;
             auto ap( pop( ctx ) );
-            if (!isAddress( ap )) throw string( signature ) + " - Corrupt stack";
+            if (!isAddress( ap )) throw string( signature ) + " - Corrupt stack, ap = [ " + toReadable( ap ) + " ]";
             ctx.ep = ( ctx.ap = address( ap ) );
         #elif
             ctx.sp = ctx.fp;
@@ -194,7 +194,15 @@ namespace Language {
         #endif
     }
     inline void locals( ThreadContext& ctx ) {
-        Word locals( fetchWordOperand( ctx ) );
+        auto locals( fetchWordOperand( ctx ) );
+        auto base( ctx.locals.back() );
+        // Move expression value(s) of enclosing scope accounting for locals of entered scope.
+        for (Word i( ctx.sp - (ctx.fp + base) ); 0 < i; i -= sizeof( Descriptor )){
+            // Move expression value(s) of enclosing scope accounting for locals of entered scope.
+            *addressStack( ctx, ctx.sp - (ctx.fp + base + locals + i - sizeof( Descriptor) ) ) =
+                *addressStack( ctx, ctx.sp - (ctx.fp + base + i - sizeof( Descriptor)) );
+        }
+        ctx.locals.push_back( base + locals );
         ctx.sp += locals;
     }
     inline void enteringAnonymousScope( ThreadContext& ctx ) {
@@ -207,7 +215,18 @@ namespace Language {
         if (typeCode( scope ) != TypeString) throw string( signature ) + " - Logic error, expected scope name";
         enterNamedScope( ctx, stringToCString( ctx, scope ) );
     }
-    inline void exittingScope( ThreadContext& ctx ) { exitScope( ctx ); }
+    inline void exittingScope( ThreadContext& ctx ) {
+        // Adjust stack-pointer to account for local variables that are leaving scope.
+        auto locals( ctx.locals.back() );
+        ctx.locals.pop_back();
+        auto base( ctx.locals.back() );
+        for (Word i( 0 ); i < (ctx.sp - (ctx.fp + locals) ); i += sizeof( Descriptor )){
+            // Move expression value(s) of exitting scope accounting for hole left by locals leaving scope.
+            *addressStack( ctx, ctx.sp - (ctx.fp + base + i) ) = *addressStack( ctx, ctx.sp - (ctx.fp + locals + i) );
+        }
+        ctx.sp -= (locals - base);
+        exitScope( ctx );
+    }
     inline void loadArgument( ThreadContext& ctx ) {
         #ifdef _DEBUG_INTERPRETER
             static const char* signature( "void loadArgument( ThreadContext& context )" );
@@ -245,7 +264,7 @@ namespace Language {
     inline void assign( ThreadContext& ctx ) {
         static const char* signature( "void assign( ThreadContext& context )" );
         auto rhs( pop( ctx ) );
-        auto lhs( addressStack( ctx, sizeof( Descriptor ) ) );
+        auto lhs( addressStack( ctx ) );
         if (isLocalVariable( *lhs )) {
             *addressLocal( ctx, address( *lhs ) ) = rhs;
         } else if (isArgumentVariable( *lhs )) {
@@ -253,17 +272,17 @@ namespace Language {
         } else if (isGlobalVariable( *lhs )) {
             *addressGlobal( ctx, address( *lhs ) ) = rhs;
         } else {
-            throw string( signature ) + " - Corrupt stack"; 
+            throw string( signature ) + " - Corrupt stack, rhs = [ " + toReadable( rhs ) + " ], lhs = [ " + toReadable( *lhs ) + " ]"; 
         }
         *lhs = rhs;
     }
     inline void duplicate( ThreadContext& ctx ) {
-        auto value( addressStack( ctx, sizeof( Descriptor ) ) );
+        auto value( addressStack( ctx ) );
         *(value + 1) = *value;
         ctx.sp += sizeof( Descriptor );
     }
     void dereferenceVariable( ThreadContext& ctx ) {
-        auto variable( reinterpret_cast<Descriptor*>( addressStack( ctx, sizeof( Descriptor ) ) ) );
+        auto variable( addressStack( ctx ) );
         while (isVariable( *variable )) *variable = dereference( ctx, *variable );
         if (isFormatString( ctx, *variable )) *variable = evaluateFormatString( ctx, *variable );
     }
@@ -272,10 +291,16 @@ namespace Language {
         static const char* signature( "void evaluateExpression( ThreadContext& ctx, string programText )" );
         auto usage( currentMemoryUsage( ctx ) );
         try {
-            auto start( translate( ctx, programText ) );
+            // Create implicit scope for this expression.
+            // This defines the frame-pointer offset for variables
+            // in the program being translated.
+            auto base( ctx.sp -  ctx.fp );
+            ctx.locals.push_back( base );
+            auto start( translate( ctx, programText, base ) );
             auto resume( ctx.pc );
             ctx.pc = start;
             while (executeInstruction( ctx )) {};
+            ctx.locals.pop_back();
             ctx.pc = resume;
         } catch (...) {
             // ToDo: Less severe error handling...
@@ -289,6 +314,7 @@ namespace Language {
         auto usage( currentMemoryUsage( ctx ) );
         auto program( pop( ctx ) );
         if (isVariable( program )) program = dereference( ctx, program );
+        if (!isString( program )) throw string( signature ) + " - " + toReadable( program ) + " is not program text";
         auto programText( stringToCString( ctx, toString( ctx, program ) ) );
         evaluateExpression( ctx, programText );
         recoverMemory( ctx, usage );
@@ -362,7 +388,7 @@ namespace Language {
             ctx.pc = start;
             while (executeInstruction( ctx )) {};
             // Pick-up return value left behind on the stack, if any
-            if (sizeof(Descriptor) < ctx.sp) {
+            if (sizeof(Descriptor) == ctx.sp) {
                 auto value( pop() );
                 auto t( typeCode( value ) );
                 return word( toInteger( value ) );

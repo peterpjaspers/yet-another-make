@@ -7,6 +7,7 @@ namespace Language {
 
     Descriptor dereference( ThreadContext& ctx, const Descriptor& descriptor ) {
         static const char* signature( "Descriptor dereference( const Descriptor& descriptor )" );
+        auto typ( type( descriptor ) );
         auto adr( address( descriptor ) );
         if (isLocalVariable( descriptor)) return *addressLocal( ctx, adr );
         if (isArgumentVariable( descriptor)) return *addressArgument( ctx, adr );
@@ -22,9 +23,9 @@ namespace Language {
             else if (type == TypeString) {
                 toNumeric( d );
                 if (typeCode( d ) == TypeReal) d = IntegerDescriptor( lround( real( d ) ) );
-                else if (typeCode( d ) != TypeInteger) throw string( signature ) + " - Cannot convert String descriptor to integer.";
+                else if (typeCode( d ) != TypeInteger) throw string( signature ) + " - Cannot convert " + toReadable( d ) + " to integer.";
             }
-            else throw string( signature ) + " - Cannot convert " + typeToString( type ) + " descriptor to integer.";
+            else throw string( signature ) + " - Cannot convert " + toReadable( d ) + " to integer.";
         }
         return( d );
     }
@@ -37,9 +38,9 @@ namespace Language {
             else if (type == TypeString) {
                 toNumeric( d );
                 if (typeCode( d ) == TypeInteger) d = RealDescriptor( integer( d ) );
-                else if (typeCode( d ) != TypeReal) throw string( signature ) + " - Cannot convert String descriptor to integer.";
+                else if (typeCode( d ) != TypeReal) throw string( signature ) + " - Cannot convert " + toReadable( d ) + " to real.";
             }
-            else throw string( signature ) + " - Cannot convert " + typeToString( type ) + " descriptor to real.";
+            else throw string( signature ) + " - Cannot convert " + toReadable( d ) + " to real.";
         }
         return( d );
     }
@@ -52,7 +53,7 @@ namespace Language {
                 str = to_string( integer( d ) );
             } else if (type == TypeReal) {
                 str = to_string( real( d ) );
-            } else throw string( signature ) + " - Cannot convert " + typeToString( type ) + " descriptor to string.";
+            } else throw string( signature ) + " - Cannot convert " + toReadable( d ) + " to string.";
             d = toStringDescriptor( ctx, str );
         }
         return( d );
@@ -64,7 +65,7 @@ namespace Language {
         return StringDescriptor( address, n );
     }
 
-    Descriptor& toNumeric( ThreadContext& ctx, Descriptor& descriptor ) { // ToDo: Version with ctx argument
+    Descriptor& toNumeric( ThreadContext& ctx, Descriptor& descriptor ) {
         auto str( stringToCString( descriptor ) );
         size_t count = 0;
         auto integerValue( stoi( str, &count ) );
@@ -75,24 +76,23 @@ namespace Language {
         return descriptor;
     }
 
-    string stringToCString( ThreadContext& ctx, const Descriptor& d ) { // ToDo: Version with ctx argument
+    string stringToCString( ThreadContext& ctx, const Descriptor& d ) {
+        // ToDo: Sanity check on string length and address
         static const char* signature( "string stringToCString( const Descriptor& )" );
-        if (not isString( d )) throw string( signature ) + " - Cannot convert " + typeToString( type( d ) ) + " descriptor to C++ string";
+        if (not isString( d )) throw string( signature ) + " - Cannot convert " + toReadable( d ) + " to C++ string";
         return string( reinterpret_cast<char*>( addressString( ctx, address( d ) ) ), type( d ) & TypeValueMask );
     }
 
     string toReadable( const Descriptor& d ) {
         string readable( "Descriptor< " );
-        auto t( type( d ) );
-        auto w( word( d ) );
         if (isLocalVariable( d )) readable += "L ";
         else if (isArgumentVariable( d )) readable += "A ";
         else if (isGlobalVariable( d )) readable += "G ";
         // if (t & Pointer) readable += "P ";
         // if (t & Trapped) readable += "T ";
-        readable += typeToString( t );
+        readable += typeToString( type( d ) );
         readable += " | ";
-        readable += to_string( w );
+        if (typeCode( d ) == TypeString) readable += "\"" + stringToCString( d ) + "\""; else readable += to_string( word( d ) );
         readable += " >";
         return readable;
     }
