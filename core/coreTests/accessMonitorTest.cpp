@@ -27,7 +27,10 @@ namespace
         ~WorkingDir() { std::filesystem::remove_all(dir); }
     };
 
-    std::filesystem::path wdir(std::filesystem::current_path());
+    // canonical because current_path returns lowercase drive letter when tests
+    // are ran from cmd shell while it returns uppercase drive letter when ran 
+    // from Visual Studio.
+    std::filesystem::path wdir(std::filesystem::canonical(std::filesystem::current_path()));
 
     TEST(AccessMonitor, compareWithMSBuildTracker) {
         WorkingDir tempDir;

@@ -38,7 +38,12 @@ namespace AccessMonitor {
             ThreadContext() = delete;
             ThreadContext( SessionID id, LogFile* eventLog = nullptr, LogFile* debugLog = nullptr ) : session( id ) {}
         };
-        inline ThreadContext* threadContext() { return (static_cast<ThreadContext*>(TlsGetValue(tlsSessionIndex))); }
+        inline ThreadContext* threadContext() { 
+            auto ec = GetLastError(); // because TlsSetValue resets error
+            auto ctx = (static_cast<ThreadContext*>(TlsGetValue(tlsSessionIndex)));
+            SetLastError(ec);
+            return ctx;
+        }
         Session* currentSession( ThreadContext* context ) {
             if (context == nullptr) {
                 if (remoteSession == nullptr) return nullptr;

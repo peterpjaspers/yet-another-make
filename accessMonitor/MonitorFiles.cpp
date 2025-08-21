@@ -882,9 +882,9 @@ namespace AccessMonitor {
             auto original( patchOriginal( PatchCloseHandle, IndexCloseHandle ) );
             MonitorGuard guard( Session::monitorFileAccess( false ) );
             if ( guard() ) {
-                if (debugLog( PatchExecution )) debugMessage( "CloseHandle" ) << handleCode( handle ) << " )" << record;
                 // Record last write time when closing an actual file opened for write (also for WithProgress calls)
                 auto fileName = fullName( handle );
+                if (debugLog(PatchExecution)) debugMessage("CloseHandle ") << handleCode(handle) << " " << (fileName == L"" ? L"No file" : fileName) << " )" << record;
                 fileAccessFull( fileName, AccessNone );
             }
             return original( handle );
@@ -939,13 +939,18 @@ namespace AccessMonitor {
         }
         // Expand file name to full path (according to Windows semantics)
         // Returns empty string if file name expansion fails.
-        wstring fullName( const wchar_t* fileName ) {
-            wchar_t filePath[ MaxFileName ];
-            wchar_t* fileNameAddress;
+        wstring fullName(const wchar_t* fileName) {
             wstring _fileName;
-            DWORD length = GetFullPathNameW( fileName, MaxFileName, filePath, &fileNameAddress );
-            return simplify(filePath);
+            std::error_code ec;
+            auto canonical = std::filesystem::weakly_canonical(fileName, ec);
+            if (ec) {
+                _fileName = fileName;
+            } else {
+                _fileName = canonical.generic_wstring();
+            }
+            return simplify(_fileName.c_str());
         }
+
         wstring fullName( const char* fileName ) {
             return fullName( widen( string( fileName ) ).c_str() );
         }

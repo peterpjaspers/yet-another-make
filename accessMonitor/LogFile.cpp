@@ -28,6 +28,7 @@ namespace AccessMonitor {
     }
     // Return logging stream on enabled log.
     LogRecord& LogFile::operator()() {
+        auto ec = GetLastError(); // because TlsSetValue resets error
         static const char* signature( "LogRecord& LogFile::operator()()" );
         auto record( static_cast<LogRecord*>( TlsGetValue( tlsRecordIndex ) ) );
         if (record == nullptr) {
@@ -41,12 +42,15 @@ namespace AccessMonitor {
                 chrono::duration_cast<chrono::microseconds >(time - previousTime).count() / 1000.0 << " ms ] ";
             previousTime = time;
         }
+        SetLastError(ec);
         return( *record );
     }
     void LogFile::removeThread() const {
+		auto ec = GetLastError(); // because TlsSetValue resets error
         auto record( static_cast<LogRecord*>( TlsGetValue( tlsRecordIndex ) ) );
         if (record != nullptr) free( record );
         TlsSetValue( tlsRecordIndex, nullptr );
+        SetLastError(ec);
     }
 
     void LogFile::record( const wstring& string ) {

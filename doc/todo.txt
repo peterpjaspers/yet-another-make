@@ -12,27 +12,13 @@ Bugs
   Yam can delete the stale output files. Should only be deleted on user confirm.
   Try to solve this or accept and explain in the manual?
 
-- Removal of temp dir by CommandNode succeeds according to std::filesystem::remove_all
-  but in reality most of these temp dirs stay in existence.
-  Running a build with threadpool of size 1 fixes this problem.
-  A problem in Windows or in std::filesystem?
-  Workaround: serialize remove_all calls
-  Problem: this also does not remove all temp dirs.
-  Workaround: delete temp dirs at start of each build.
-
-- AccessMonitorTest.compareWithMSBuildTracker behaves differently when ran from test
-  explorer versus directly from cmd shell. In the latter case duplicate paths 
-  with mixed casing (C:\ and c:\) are detected with different access modes.
-  This causes the test to fail.
-  Using std::filesytem::canonical does not work because this only works for existing
-  files. weakly_canonical could fix this but it does not work according to spec: it
-  returns error and empty path for e.g. c:\d1\f2 where C:\D1 exists and f2 does not.
-  In this case it should have returned error and C:\D1\f2.
 
 - Running yam --noServer while server is running will result in server to cache 
   wrong version of buildstate. Server not designed to deal with changes in buildstate
   file made by other processes.
-  Quick fix: shutdown server when running --noServer.
+  Quick fix: shutdown server when running --noServer. But not fool-proof.
+  Better to lock the file for the lifetime of PersistentBuildState lifetime, i.e.
+  for the lifetime of PersistentPagePool.
 
 - MonitoredProcessWin32 passes the entire environment to child processes. 
   This was done during the work to build yam with yam. It was done as a hack to 
@@ -54,8 +40,10 @@ Bugs
   ignored repository.
   Note: the ignore result may also change when moving R up or down in the 
   dot-ignore file or when other rules are added or moved up/down in the 
-  dot-ignore file. This makes an efficient implementation (one that only
-  re-executes C when F is no longer ignored) virtually impossible. The
+  dot-ignore file. So depending in rule R means depending on the ordered
+  collection of rules that have precedence over R followed by R.
+  This makes an efficient implementation (one that only re-executes C when F
+  is no longer ignored) virtually impossible. The
   only feasible implementation is to make C dependent on the dot-ignore
   node that ignored F. But whis will cause many unnecessary re-executions
   of C when dot-ignore files are modified.
@@ -66,8 +54,26 @@ Bugs
   However, this is not consistent with C depending on repo-ignored F.
 
 Fixed bugs:
-- Changing yamConfig\repoName.txt is not handled: requires creation of new home
+- Fixed: Changing yamConfig\repoName.txt is not handled: requires creation of new home
   repository node. Can be handled as clearing everything followed by intial build.
+
+- Workaround: Removal of temp dir by CommandNode succeeds according to std::filesystem::remove_all
+  but in reality most of these temp dirs stay in existence.
+  Running a build with threadpool of size 1 fixes this problem.
+  A problem in Windows or in std::filesystem?
+  Workaround: serialize remove_all calls
+  Problem: this also does not remove all temp dirs.
+  Workaround: delete temp dirs at start of each build.
+
+- AccessMonitorTest.compareWithMSBuildTracker behaves differently when ran from VS
+  versus directly ran from cmd shell. In the latter case duplicate paths 
+  with mixed casing (C:\ and c:\) are detected:
+  Access modes of the C:\ paths: all 1, which is incorrect.
+  Access modes of the c:\paths: all as expected
+  This causes the test to fail because the test only expects the C:\ paths to be
+  detected with correct access modes.
+  Fixed: get proper casing by using std::filesystem::weakly_canonical in accessMonitor.
+ 
 
 Features
 - multi-repo build: clone repos in subdirs of the yam root dir.
