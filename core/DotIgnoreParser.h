@@ -1,73 +1,16 @@
 #pragma once
 
+#include "DotIgnoreRule.h"
 #include "Glob.h"
 #include "FileSystem.h"
 #include "IStreamable.h"
+#include "xxhash.h"
 
 #include <string>  
 #include <regex>  
 
 namespace YAM
 {
-    class DotIgnoreRule : public IStreamable
-    {
-    public:
-        DotIgnoreRule() {} // for streaming
-
-        // Construct a rule from a non-empty, non-comment line from a file
-        // whose syntax is as specified in https://git-scm.com/docs/gitignore.
-        // 'source' typically contains storage location of pattern: file name
-        // and line nr.
-        DotIgnoreRule(std::string const& pattern, std::string const& source);
-
-        // Return whether path is to be ignored, taking negate() into account.
-        // Pre: path does not contain . and .. path components.
-        bool ignore(std::filesystem::path const& path) const;
-
-        // Return whether path matches the pattern, ignoring negate().
-        // Pre: path does not contain . and .. path components.
-        bool match(std::filesystem::path const& path) const;
-
-        std::string const& pattern() const;
-
-        // Return whether pattern starts with '!'
-        bool negate() const;
-
-        // Return whether pattern contains '/' and '/' is not at end of pattern.
-        bool isAnchored() const;
-
-        // Return whether pattern ends with '/'
-        bool isDirOnly() const;
-
-        // Return the pattern (excluding a possibly leading !) as
-        // regular expression string
-        std::string const& reString() const;
-
-        // Return the pattern (excluding a possibly leading !) as
-        // regular expression 
-        std::regex const& re() const;
-
-        static void streamVector(
-            IStreamer* streamer,
-            std::vector<DotIgnoreRule>& rules
-        );
-
-        // IStreamable
-        uint32_t typeId() const override { throw "not supported"; }
-        void stream(IStreamer* streamer) override;
-
-    private:
-        void parse(std::string const& source);
-
-        std::string _pattern;
-        bool _negate;
-        bool _anchored;
-        bool _dirOnly;
-        std::filesystem::path _extension;
-        std::string _reString;
-        std::regex _re;
-    };
-    
     class DotIgnoreParser
     {
     public:

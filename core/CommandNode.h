@@ -5,6 +5,7 @@
 #include "IMonitoredProcess.h"
 #include "MemoryLogBook.h"
 #include "Glob.h"
+#include "DotIgnoreRule.h"
 #include "xxhash.h"
 
 #include <atomic>
@@ -80,7 +81,7 @@ namespace YAM
         //
         struct OutputFilter {
             enum Type { Output, ExtraOutput, Optional, Ignore, None };
-            OutputFilter() {}
+            OutputFilter() : _type(None) {}
             OutputFilter(Type type, std::filesystem::path const& path);
             Type _type;
             std::filesystem::path _path;
@@ -247,6 +248,8 @@ namespace YAM
             std::set<std::filesystem::path>& removedInputSymPaths,
             std::vector<std::shared_ptr<FileNode>>& inputNodes,
             std::vector<std::shared_ptr<Node>>& srcInputNodes,
+            std::vector<std::shared_ptr<FileRepositoryNode>>& ignoreRepos,
+            std::vector<DotIgnoreRule>& ignoreRules,
             ILogBook& logBook
         );
         bool findOutputNodes(
@@ -287,6 +290,16 @@ namespace YAM
 
         // Inputs detected during last script execution.
         InputNodes _detectedInputs;
+
+		// An input file that was detected during last script execution may be
+		// ignored (i.e. not added to _detectedInputs) when it is a file in
+		// a repository of type Ignore or when the file is ignored by a rule
+		// in a .gitignore or .yamignore file. The repositories and rules that
+		// caused ignoring of input files are stored here in order to be able
+		// to detect changes in these repositories and rules that may cause
+		// input files to be no longer be ignored.
+        std::vector<std::shared_ptr<FileRepositoryNode>> _ignoredInputRepos;
+        std::vector<DotIgnoreRule> _inputIgnoreRules;
 
         // The hash of the hashes of all items that, when changed, invalidate
         // the output files.

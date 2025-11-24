@@ -87,14 +87,20 @@ namespace YAM
         }
     }
 
-    bool DotIgnoreNode::ignore(std::filesystem::path const& path) const {
+    DotIgnoreRule const* DotIgnoreNode::findRule(XXH64_hash_t ruleId) const {
+        auto it = _ruleIds.find(ruleId);
+        if (it != _ruleIds.end()) return it->second;
+        return nullptr;
+    }
+
+    std::pair<bool, XXH64_hash_t> DotIgnoreNode::ignore(std::filesystem::path const& path) const {
         for (auto const& file : _dotIgnoreFiles) {
-            if (file->name().filename() == path) return true;
+            if (file->name().filename() == path) return {true, 0};
         }
         for (auto it = _rules.rbegin(); it != _rules.rend(); ++it) {
             auto const& rule = *it;
             if (rule.match(path)) {
-                return !rule.negate();
+                return {!rule.negate(), rule.ruleId()};
             }
         }
         auto parentDir = _directory->parent();
@@ -102,7 +108,7 @@ namespace YAM
             auto dirName = _directory->name().filename();
             return parentDir->dotIgnoreNode()->ignore(dirName / path);
         }
-        return false;
+        return {false, 0};
     }
 
     XXH64_hash_t DotIgnoreNode::computeHash() const {
@@ -152,6 +158,23 @@ namespace YAM
         }
     }
 
+
+    void DotIgnoreNode::computeRuleIds() {
+        _ruleIds.clear();
+        XXH64_hash_t seed = 0;
+        const std::string anchor = _directory->name().string();
+        for (auto it = _rules.rbegin(); it != _rules.rend(); ++it) {
+            auto &rule = *it;
+            auto id = rule.computeRuleId(seed, anchor);
+            auto [itr, inserted] = _ruleIds.insert({id, &rule});
+            while (!inserted) {
+                id += 1;
+                auto [itr, inserted] = _ruleIds.insert({id, &rule});
+			}
+            rule.ruleId(id);
+            seed = id;
+        }
+    }
     void DotIgnoreNode::parseDotIgnoreFiles() {
         if (canceling()) {
             postCompletion(Node::State::Canceled);
@@ -160,6 +183,7 @@ namespace YAM
             for (auto const& n : _dotIgnoreFiles) {
                 parseRules(n->absolutePath(), _rules);
             }
+            computeRuleIds();
             _hash = computeHash();
             modified(true);
             postCompletion(Node::State::Ok);
@@ -186,6 +210,7 @@ namespace YAM
         for (auto file : _dotIgnoreFiles) file->removeObserver(this);
         _dotIgnoreFiles.clear();
         _rules.clear();
+		_ruleIds.clear();
     }
 
     bool DotIgnoreNode::restore(void* context, std::unordered_set<IPersistable const*>& restored)  {
@@ -194,6 +219,9 @@ namespace YAM
             file->restore(context, restored);
             file->addObserver(this);
         }
+        for (auto &rule : _rules) {
+            _ruleIds.insert({rule.ruleId(), &rule});
+		}
         return true;
     }
 }

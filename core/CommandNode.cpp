@@ -202,15 +202,13 @@ namespace
         return {foundDir, remainder};
     }
 
-    bool isIgnoredFile(ExecutionContext* context, std::filesystem::path symInputFilePath) {
+    std::pair<bool, XXH64_hash_t> isIgnoredFile(ExecutionContext* context, std::filesystem::path symInputFilePath) {
         auto const& repoName = FileRepositoryNode::repoNameFromPath(symInputFilePath);
         auto repo = context->findRepository(repoName);
         auto dir = repo->directoryNode();
-        std::shared_ptr<DirectoryNode> foundDir;
-        std::filesystem::path remainder;
-        std::tie(foundDir, remainder) = dir->findDirContainingFile(symInputFilePath);
-        bool isIgnored = dir->dotIgnoreNode()->ignore(remainder);
-        return isIgnored;
+        auto [foundDir, remainder] = dir->findDirContainingFile(symInputFilePath);
+        std::pair<bool, XXH64_hash_t> result = dir->dotIgnoreNode()->ignore(remainder);
+        return result;
     }
 
     void logBuildOrderNotGuaranteed(
@@ -806,7 +804,12 @@ namespace YAM
             auto const& input = pair.second;
             if (!isGenerated(input)) input->removeObserver(this);
         }
-        _detectedInputs.clear();        
+        _detectedInputs.clear();
+        for (auto &repo : _ignoredInputRepos) {
+            repo->removeObserver(this);
+        }
+        _ignoredInputRepos.clear();
+        _inputIgnoreRules.clear();
     }
 
     void CommandNode::setDetectedInputs(ExecutionResult const& result) {
@@ -1079,6 +1082,11 @@ namespace YAM
         }
     }
 
+
+    //std::pair<std::shared_ptr<FileRepositoryNode> CommandNode::convertToSymbolicPath(
+    //) {
+    //
+
     std::filesystem::path CommandNode::convertToSymbolicPath(
         std::filesystem::path const& absPath, MemoryLogBook& logBook
     ) {
@@ -1121,7 +1129,8 @@ namespace YAM
                 std::set<std::filesystem::path> previousInputPaths;
                 for (auto const& pair : _detectedInputs) {
                     previousInputPaths.insert(pair.second->name());
-                }                    
+                }
+				// TODO: register unkwown and ignore repositories
                 auto currentInputPaths = convertToSymbolicPaths(scriptResult.readOnlyFiles, result->_log);
                 computePathSetsDifference(
                     previousInputPaths, currentInputPaths,
@@ -1162,6 +1171,9 @@ namespace YAM
                 getOutputFileNodes(_inputProducers, allowedGenInputFiles);
                 std::vector<std::shared_ptr<FileNode>> notUsed1;
                 std::vector<std::shared_ptr<Node>> notUsed2;
+                std::vector<std::shared_ptr<FileRepositoryNode>> ignoreRepos;
+                std::vector<DotIgnoreRule> ignoreRules;
+                //std::pair<DotIgnoreRule, bool>
                 // Kept inputs must be validated because of possible change in 
                 // _inputproducers.
                 bool validKeptInputs = findInputNodes(
@@ -1170,13 +1182,18 @@ namespace YAM
                     result._removedInputPaths,
                     notUsed1,
                     notUsed2,
-                    result._log);
+                    ignoreRepos,
+                    ignoreRules,
+                    result._log
+                );
                 bool validNewInputs = findInputNodes(
                     allowedGenInputFiles,
                     result._addedInputPaths,
                     result._removedInputPaths,
                     result._addedInputNodes,
                     outputsAndNewInputs,
+                    ignoreRepos,
+                    ignoreRules,
                     result._log);
                 if (validKeptInputs && validNewInputs) {
                     setDetectedInputs(result);
@@ -1348,6 +1365,8 @@ namespace YAM
         std::set<std::filesystem::path>& removedInputSymPaths,
         std::vector<std::shared_ptr<FileNode>>& inputNodes,
         std::vector<std::shared_ptr<Node>>& srcInputNodes,
+        std::vector<std::shared_ptr<FileRepositoryNode>>& ignoreRepos,
+        std::vector<DotIgnoreRule>& ignoreRules,
         ILogBook& logBook
     ) {
         bool allValid = true;
@@ -1383,7 +1402,9 @@ namespace YAM
                 if (srcInputFile == nullptr) {
                     // inputPath references a non-existing and/or ignored (by a line in a
                     // .git/.yamIgnore file) source file in a repository of type Build or Trace.
-                    if (isIgnoredFile(context(), symInputPath)) {
+                    std::pair<bool, XXH64_hash_t> ignoreResult = isIgnoredFile(context(), symInputPath);
+                    if (ignoreResult.first) {
+                        ignoreRules.push_back(ignoreResult.first);
                         logDotIgnoredInputFile(this, symInputPath, logBook);
                         removedInputSymPaths.insert(symInputPath);
                     } else {

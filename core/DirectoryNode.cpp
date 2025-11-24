@@ -287,10 +287,11 @@ namespace YAM
         std::shared_ptr<Node> child = nullptr;
         auto const& absPath = dirEntry.path();
         bool ignored = true;
+        XXH64_hash_t ruleId;
         if (dirEntry.is_directory()) {
-            ignored = _dotIgnoreNode->ignore(absPath.filename() / "");
+            std::tie(ignored, ruleId) = _dotIgnoreNode->ignore(absPath.filename() / "");
         } else if (dirEntry.is_regular_file()) {
-            ignored = _dotIgnoreNode->ignore(absPath.filename());
+            std::tie(ignored, ruleId) = _dotIgnoreNode->ignore(absPath.filename());
         }
         if (!ignored) {
             auto symPath = repo->symbolicPathOf(absPath);

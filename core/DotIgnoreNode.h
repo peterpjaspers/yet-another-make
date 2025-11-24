@@ -40,9 +40,17 @@ namespace YAM
         // return the hash of the ignore patterns. 
         XXH64_hash_t hash() const { return _hash; }
 
-        // Return whether given path is to be ignored by the build.
+		// Return the rule with given id, or nullptr if no such rule.
+        DotIgnoreRule const* findRule(XXH64_hash_t ruleId) const;
+
+        // Usage: auto [toBeIgnored, ruleId] = ignoreNode->ignore(path);
         // Pre: path is relative to directory()->absolutePath().
-        bool ignore(std::filesystem::path const& path) const;
+        // 
+		// On return: if toBeIgnored then path is to be ignored, else not.
+		// If toBeIgnored then ruleId uniquely identifies the rule that
+		// caused path to be ignored. Else ruleId has no meaning.
+        // 
+        std::pair<bool, XXH64_hash_t> ignore(std::filesystem::path const& path) const;
 
         // Remove the .gitignore and .yamignore nodes from context->nodes().
         void clear();
@@ -60,7 +68,8 @@ namespace YAM
     private:
         friend class DirectoryNode;
 
-        void directory(DirectoryNode* directory);
+        void directory(DirectoryNode* directory); 
+        void computeRuleIds();
         XXH64_hash_t computeHash() const;
         void handleRequisiteCompletion(Node::State state); 
         void parseDotIgnoreFiles();
@@ -73,6 +82,8 @@ namespace YAM
         std::vector<std::shared_ptr<SourceFileNode>> _dotIgnoreFiles;
 
         std::vector<DotIgnoreRule> _rules;
+		// Map from rule id to rule pointer for fast lookup of rules by id.
+        std::unordered_map<XXH64_hash_t, DotIgnoreRule*> _ruleIds;
          
         // The hash of the hashes of the _dotIgnoreFiles.
         XXH64_hash_t _hash;
