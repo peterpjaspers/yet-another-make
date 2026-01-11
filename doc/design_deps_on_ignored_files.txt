@@ -1,0 +1,230 @@
+Given:
+    - file C.cpp in repository P
+    - C.cpp depends on H.h in directory D
+    - H.h is an ignored file
+In this case command node C.obj that compiles C.cpp will not register 
+this dependency.
+
+H.h is to be ignored when
+- it is in a repository Q of type Ignore
+- it matches an ignore rule IH in a .git/yamignore file.
+
+H.h can become un-ignored 
+- by changing the repository type of Q to Track or Build
+- by removing the ignore rule IH from the .ignore file.
+
+When H.h becomes un-ignored then command node C.obj must be re-executed to 
+allow it to find and register the dependency on H.h.
+
+Note: it feels natural to silently discard dependencies on files in Ignored
+repositories because this is the whole purpose of such repositories.
+For dependencies on files ignored by .ignore rules one may argue to treat this as
+an error, especially if H.h is in same repo as C.cpp. 
+For now yam will treat both cases equal, i.e. silently discard the dependency.
+Note: treating the latter case as an error is significantly easier to implement,
+as we will see later in this discussion.
+
+Design/implementation:
+- changed repo type from Ignore to Track/Build
+  See design_multipleRepositories.txt
+- removed/modified ignore rule IH.
+  Note that the position of the rule in the .ignore file matters.
+  E.g. a negation rule that re-includes H.h can be added after IH 
+  (rules lower in de .ignore file have precedence over rules higher in the 
+  file), or added to a .ignore file deeper in the directory tree (rules
+  deeper in the directory tree have precedence over rules higher in the tree).
+  To be able to detect such changes yam computes for each rule at 
+  position P and rule text T hash(P, T) = hash(P,T, hash(P+1)).
+  This is done by the DotIgnoreNode of directory D, D being the directory
+  that contains H.h.
+  The command node registers a dependency on the rule identified by hash(P,T)
+  by storing D->dotIgnoreNode and the rule hash. The command also starts 
+  observing D->dotIgnoreNode to get notified in case of changes in D->dotIgnoreNode.
+  When the .ignore file changes, the DotIgnoreNode becomes Dirty and will notify 
+  the command node to become Dirty as well. Command will then start() and query 
+  D->dotIgnoreNode for the rule hash. If the hash no longer exists then the
+  command will re-execute, re-discover the dependency on H.h, ask D->dotIgnoreNode
+  whether H.h is to be ignored, and register yes/no the dependency on H.h.
+
+Can this design fail to re-start/execute command C?
+Yes, for example in the following scenario:
+
+Given directory tree P/Q.
+Command C discovers a dependency on the non-existing file P/Q/R/S/X.txt.
+Because R and S do not exist C will evaluate the ignore rules in Q and, if no
+matching rule was found in Q, then in P (as implemented in DotIgnoreNode).
+Assume Q has no rules and P contains .gitignore with rule *.txt. This results in 
+X.txt to be ignored and cmd C to observe Q->dotIgnoreNode. 
+Reminder: transition to dirty state of Q->dotIgnoreNode is propagated recursively
+to Q and to all subdirs of Q because a change in Q ignore rules may affect all
+subdirs => dirty DirectoryNode will re-execute because dir nodes do not mirror 
+ignored dirs/files.
+
+Now assume directories R and S and file S/.gitignore with rule !X.txt are added.
+This is what will happen and what should happen instead:
+    . adding R will cause dir node Q to become dirty and re-execute to find R.
+      R will execute S and find S. S->dotIgnoreNode will be created with rule !X.txt.
+      Problem1: C must also observe Q to become dirty when Q becomes dirty. This is
+      needed because we shall see that C needs to discover the added dirs R and S.
+      Fix1: C to also observe Q, being the first existing parent dir of X.txt.
+    . Assuming fix1 has been implemented:
+      C became dirty and starts its requisites. On requisite completion C will compute
+      a new executionHash. This involves querying Q->dotIgnoreNode for existence of the
+      rule hash of rule *.txt. 
+      Problem1: Q will falsely report that the rule does not exist because it only 
+      searches its own .ignore files, not the parent P (which contains the rule).
+      Fix1: Q->dotIgnoreNode must search in parent dir as well (recursively).
+      Problem2: C is quering the wrong ignore node. It must instead query S/.gitignore 
+      to detect that rule !X.txt in S->dotIgnoreNode overrides the *.txt rule in P.
+      Note: in this case the wrong logic accidentally results in the correct outcome.
+      Fix2: C must register that the *.txt rule was used to ignore a file in P/Q/R/S.
+      When recomputing the execution hash C must check whether this dir exists, and if so
+      query S->dotIgnoreNode for the existance of the rule. Else, if it exists,
+      query R->dotIgnoreNode etc. upto P.
+    . if new hash != current hash then execute command
+        . (re-)find dependency on P/Q/R/S/X.txt
+        . query S->dotIgnoreNode (instead of Q) for ignore status of X.txt
+        . register dependency on X.txt because it is no longer ignored
+        . finish
+    . else
+        . finish
+
+
+
+Discuss Phil's propasal: register all dependencies, including ignored files.
+But ignore changes in ignored files. 
+
+- cmd node executes -> all dependencies (ignored, not-ignored, exisiting, 
+  non-existing) are registered.
+  Note: file nodes for non-existing files must be created by cmd because such
+  nodes are not in the repo mirror
+- cmd node also registers dependencies on the dotignore nodes of the directories
+  that contain ignored dependencies.
+  Note: file nodes for non-existing dotignore nodes must be created by cmd.
+  This requires creation of a directory node for the associated non-existing
+  directory because DotIgnoreNode references it. Directory nodes reference 
+  their parent dirs. Therefore the entire directory path to the first existing 
+  parent dir node must be created.
+- cmd node becomes dirty when one of the dependencies is modified
+- when cmd is started the cmd determines its pre-requisites: only not-ignored
+  dependencies. Changes in the ignored dependencies are ignored. This requires
+  the cmd to determine the ignore status of all dependencies.
+- changes in .ignore files are detected because cmd depends on the
+  DotIgnoreNode of the directory that contains the ignored file/dir.
+  Because all dependencies ((not-)ignored and (not-)existing) are registered
+  this will only cause re-execution of cmd, when a not-ignored file is
+  modified. A changed .ignore file will therefore only cause re-execution of a
+  cmd when it causes the ignore status of a dependency to change from ignored
+  to not-ignored AND that dependency was modified since the execution of cmd
+  in which the ignored dependency was first detected.
+  This means that the execution hash of a ignored dependency must only be 
+  captured when it transits from ignored to not-ignored. This to prevent that
+  re-executions of the cmd capture the latest execution hash of the ignored
+  dependency, preventing future re-executions when the ignore status changes
+  while the file was not modified.
+  A simpler alternative is to re-execute cmd when a file transits from ignored
+  to not-ignored, regardless whether it was modified or not.
+
+Observations:
+- . This defeats the original purpose of ignored files/dirs:
+  reduce the size of the repo mirror.
+- changes in ignored files/dirs are ignored. This may hide errors.
+  Workaround: warn/error when an ignored file/dir is modified.
+- file nodes are created for non-existing files when cmds depend on them.
+  These file nodes are not part of the mirror. Nodes in the mirror are
+  garbage collected when deleted from the filesystem. For file nodes to
+  non-exsting files an alternative garbage collection mechanism is needed.
+
+
+
+
+--Dependencies on files in repos, handling repo type changes--
+Repo type is one of ignore, track, build.
+Note: only repos of type build/track have a repo mirror.
+Note: a command ignores dependencies on files in repos of type ignore,
+i.e. it only stores dependencies in its input dependency list from repos
+of type build/track.
+
+-Changing a repo from build/track to ignore-
+This will remove the mirror of the repo. This changes the state of file nodes
+in the mirror to Deleted, causing commands that depend on these file nodes to
+become Dirty. At next build these commands will re-execute (because the hash 
+of Deleted file nodes is changed to a random number) and discard the now 
+ignored files from the cmds input dependencies.
+THIS IS IMPLEMENTED IN YAM dd 2026-01-10
+
+-Changing a repo from ignore to build/track-
+This will create the directory mirror. Cmds that depend on files in the 
+previously ignored repo must re-execute in order to make them register the
+dependencies on files in the now build/track repo.
+THIS CMD RE-EXECUTION IS NOT IMPLEMENTED IN YAM dd 2026-01-10
+
+-Possible solution for both change scenarios-
+A cmd registers as dependencies the repo nodes of files on which it has 
+(possibly ignored) dependencies and includes the repo hashes in its execution
+hash. When a repo type is changed all cmds depending on the repo become Dirty
+and will re-execute at next build (because the repo hash, and thus the cmd's
+execution hash, changes when the repo type changes).
+Change ignore -> build/track: the cmds will register the previously ignored
+file dependencies.
+Change build/track -> ignore: the cmds will discard the previously registered
+file dependencies.
+Note: in this design it is possible to optimize build/track -> ignore by not 
+re-executing the cmds when only repo type changes occurred. This can be 
+implemented by having CommandNode override Node::handleDirtyOf(observed) and 
+testing whether 'observed' is one of the cmd's repo dependencies. If this is 
+the case the cmd can remove file nodes from this repo from its input 
+dependencies and not transit to Dirty state. The cmd must re-compute its 
+execution hash to reflect the removed file dependencies.
+
+--Dependencies on files ignored by rules in .ignore file--
+Assume file root/a/b/X is ignored by rule R in .ignore file root/a/I.
+Assume that cmd C depends on root/a/b/X. C does not register this file as a
+dependency because the file is to be ignored.
+Note: file root/a/b/X may not exist, also directory root/a/b may not exist.
+When un-ignoring root/a/b/X: C must be re-executed to discover, and register,
+the dependency on root/a/b/X.
+Un-ignoring root/a/b/X can be done in several ways:
+   - remove R from root/a/I 
+   - add a negation rule after R in root/a/I
+   - add a negation rule in root/a/b/I (possibly requiring creation of dir 
+     root/a/b and .ignore file root/a/b/I
+Ignoring root/a/b/X can be done in several ways:
+   - add R to root/I 
+   - add R to root/a/I 
+   - add R to root/a/b/I
+
+C must be able to detect these changes and re-execute. C can do so by 
+registering a dependency on root/a/b/I.
+When root/a/b/I changes then C must becomes dirty and re-execute.
+Note: this will cause many unnecessary re-executions of C because changes
+may not affect the ignore status of root/a/b/X.
+A complication is that root/a/b/I may not exist yet when C first discovers the
+dependency on root/a/b/X.
+Implementation:
+Note: a change in root/I affects the not-ignored content of a all subdirectories
+(recursively) of root while a change in a subdir of root will not affect the
+not-ignored content of parent dirs. This is why DotIgnoreNode propagates dirty
+to its directory node and all of its subdir nodes.
+
+Ideally the cmd need only register a dependency on root/a/b/I to be notified
+of changes in ignore rules that may affect the ignore status of root/a/b/X.
+What to do if root/a/b/I does not exist?
+    - create directory nodes for the non-exisiting directories in path root/a/b
+      Note: the new dir nodes will create dotignore nodes root/a/I and root/a/b/I
+    - create parent references for the new dir
+      Also create child references to the nodes associated with the
+      non-existing directories.
+
+
+A simplification is to:
+    - not process .gitignore files
+    - to support only 1 .yamignore, stored in the repo root directory
+    - to re-execute all cmds when the .yamignore file changes
+Alternative: 
+    - not process .gitignore and .yamignore files
+    - define ignore rules in repository declaration
+      E.g. repo A on directory rootOfA, ignore <rules>
+      Advantage over .yamignore: repos B and C can use repo A with different 
+      ignore rules
+    - to re-execute all cmds that depend on repo when repo declaration changes
